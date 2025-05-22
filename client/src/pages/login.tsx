@@ -79,8 +79,8 @@ const Login = () => {
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // First set the user in context 
-      login(userData);
+      // Store user data in localStorage (simpler than context for now)
+      localStorage.setItem('user', JSON.stringify(userData));
       
       // Show success toast
       toast({
@@ -88,10 +88,8 @@ const Login = () => {
         description: "Welcome back to BeautyBook!",
       });
       
-      // Navigate to dashboard after a short delay
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 1000);
+      // Force redirect to dashboard page (bypassing router)
+      document.location.href = "/dashboard";
       
     } catch (error: any) {
       console.error("Login error:", error);
