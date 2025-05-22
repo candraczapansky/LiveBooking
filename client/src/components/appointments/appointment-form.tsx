@@ -318,7 +318,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <SelectContent>
                       {services?.map((service) => (
                         <SelectItem key={service.id} value={service.id.toString()}>
-                          {service.name} ({service.duration} min) - {formatPrice(service.price)}
+                          {service.name || ''} ({service.duration || 0} min) - {formatPrice(service.price || 0)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -348,7 +348,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <SelectContent>
                       {staff?.map((staffMember) => (
                         <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
-                          {staffMember.user.firstName} {staffMember.user.lastName} - {staffMember.title}
+                          {staffMember.user?.firstName || ''} {staffMember.user?.lastName || ''} - {staffMember.title}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -378,7 +378,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <SelectContent>
                       {clients?.map((client) => (
                         <SelectItem key={client.id} value={client.id.toString()}>
-                          {client.firstName} {client.lastName} ({client.email})
+                          {client.firstName || ''} {client.lastName || ''} ({client.email || ''})
                         </SelectItem>
                       ))}
                     </SelectContent>
