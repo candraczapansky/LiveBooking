@@ -77,22 +77,24 @@ const Login = () => {
       }
 
       const userData = await response.json();
+      console.log("Login successful, user data:", userData);
       
-      // First show success message
+      // First set the user in context 
+      login(userData);
+      
+      // Show success toast
       toast({
         title: "Login Successful",
         description: "Welcome back to BeautyBook!",
       });
       
-      // Then set the user in context and redirect
-      login(userData);
-      
-      // Small delay to ensure context is updated before navigation
+      // Navigate to dashboard after a short delay
       setTimeout(() => {
-        navigate("/dashboard");
-      }, 500);
+        window.location.href = "/dashboard";
+      }, 1000);
       
     } catch (error: any) {
+      console.error("Login error:", error);
       toast({
         title: "Login Failed",
         description: error.message || "Invalid credentials",

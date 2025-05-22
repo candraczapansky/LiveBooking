@@ -77,14 +77,17 @@ function Router() {
 
 function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const isAuthenticated = !!user;
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
 
   useEffect(() => {
     // Check for user in localStorage on initial load
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setIsAuthenticated(true);
+        console.log("Auth initialized from localStorage:", userData);
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
@@ -93,12 +96,15 @@ function useAuth() {
   }, []);
 
   const login = (userData: User) => {
+    console.log("Login called with:", userData);
     setUser(userData);
+    setIsAuthenticated(true);
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
   const logout = () => {
     setUser(null);
+    setIsAuthenticated(false);
     localStorage.removeItem('user');
   };
 
