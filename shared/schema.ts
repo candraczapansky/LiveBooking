@@ -1,0 +1,162 @@
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// User schema
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  email: text("email").notNull(),
+  role: text("role").notNull().default("client"), // admin, staff, client
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Service Categories schema
+export const serviceCategories = pgTable("service_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+});
+
+export const insertServiceCategorySchema = createInsertSchema(serviceCategories).omit({
+  id: true,
+});
+
+// Services schema
+export const services = pgTable("services", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  duration: integer("duration").notNull(), // in minutes
+  price: doublePrecision("price").notNull(),
+  categoryId: integer("category_id").notNull(),
+});
+
+export const insertServiceSchema = createInsertSchema(services).omit({
+  id: true,
+});
+
+// Staff schema (extends users)
+export const staff = pgTable("staff", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: text("title").notNull(),
+  bio: text("bio"),
+  commissionRate: doublePrecision("commission_rate"),
+});
+
+export const insertStaffSchema = createInsertSchema(staff).omit({
+  id: true,
+});
+
+// Staff services (many-to-many relationship between staff and services)
+export const staffServices = pgTable("staff_services", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").notNull(),
+  serviceId: integer("service_id").notNull(),
+});
+
+export const insertStaffServiceSchema = createInsertSchema(staffServices).omit({
+  id: true,
+});
+
+// Appointments schema
+export const appointments = pgTable("appointments", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  serviceId: integer("service_id").notNull(),
+  staffId: integer("staff_id").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  status: text("status").notNull().default("pending"), // pending, confirmed, cancelled, completed
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAppointmentSchema = createInsertSchema(appointments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Memberships schema
+export const memberships = pgTable("memberships", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  price: doublePrecision("price").notNull(),
+  duration: integer("duration").notNull(), // in days
+  benefits: text("benefits"),
+});
+
+export const insertMembershipSchema = createInsertSchema(memberships).omit({
+  id: true,
+});
+
+// Client memberships
+export const clientMemberships = pgTable("client_memberships", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  membershipId: integer("membership_id").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  active: boolean("active").notNull().default(true),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+});
+
+export const insertClientMembershipSchema = createInsertSchema(clientMemberships).omit({
+  id: true,
+});
+
+// Payments schema
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  appointmentId: integer("appointment_id"),
+  clientMembershipId: integer("client_membership_id"),
+  amount: doublePrecision("amount").notNull(),
+  status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  paymentDate: timestamp("payment_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPaymentSchema = createInsertSchema(payments).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Type exports
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
+export type ServiceCategory = typeof serviceCategories.$inferSelect;
+export type InsertServiceCategory = z.infer<typeof insertServiceCategorySchema>;
+
+export type Service = typeof services.$inferSelect;
+export type InsertService = z.infer<typeof insertServiceSchema>;
+
+export type Staff = typeof staff.$inferSelect;
+export type InsertStaff = z.infer<typeof insertStaffSchema>;
+
+export type StaffService = typeof staffServices.$inferSelect;
+export type InsertStaffService = z.infer<typeof insertStaffServiceSchema>;
+
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+export type Membership = typeof memberships.$inferSelect;
+export type InsertMembership = z.infer<typeof insertMembershipSchema>;
+
+export type ClientMembership = typeof clientMemberships.$inferSelect;
+export type InsertClientMembership = z.infer<typeof insertClientMembershipSchema>;
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;

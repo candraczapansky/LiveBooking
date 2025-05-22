@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 0 0% 100%;
+  --foreground: 20 14.3% 4.1%;
+  --muted: 60 4.8% 95.9%;
+  --muted-foreground: 25 5.3% 44.7%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 20 14.3% 4.1%;
+  --card: 0 0% 100%;
+  --card-foreground: 20 14.3% 4.1%;
+  --border: 20 5.9% 90%;
+  --input: 20 5.9% 90%;
+  --primary: 246 80% 60%; /* #4F46E5 */
+  --primary-foreground: 211 100% 99%;
+  --secondary: 160 84% 39%; /* #10B981 */
+  --secondary-foreground: 24 9.8% 10%;
+  --accent: 24 94% 53%; /* #F97316 */
+  --accent-foreground: 24 9.8% 10%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 60 9.1% 97.8%;
+  --ring: 20 14.3% 4.1%;
+  --radius: 0.5rem;
+  
+  /* Chart colors */
+  --chart-1: 246 80% 60%;
+  --chart-2: 160 84% 39%;
+  --chart-3: 24 94% 53%;
+  --chart-4: 262 83% 58%;
+  --chart-5: 48 96% 53%;
+  
+  /* Sidebar colors */
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 20 14.3% 4.1%;
+  --sidebar-primary: 246 80% 60%;
+  --sidebar-primary-foreground: 211 100% 99%;
+  --sidebar-accent: 246 80% 95%;
+  --sidebar-accent-foreground: 246 80% 60%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 246 80% 60%;
+}
+
+.dark {
+  --background: 240 10% 3.9%;
+  --foreground: 0 0% 98%;
+  --muted: 240 3.7% 15.9%;
+  --muted-foreground: 240 5% 64.9%;
+  --popover: 240 10% 3.9%;
+  --popover-foreground: 0 0% 98%;
+  --card: 240 10% 3.9%;
+  --card-foreground: 0 0% 98%;
+  --border: 240 3.7% 15.9%;
+  --input: 240 3.7% 15.9%;
+  --primary: 246 80% 60%;
+  --primary-foreground: 211 100% 99%;
+  --secondary: 160 84% 39%;
+  --secondary-foreground: 0 0% 98%;
+  --accent: 24 94% 53%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 30.6%;
+  --destructive-foreground: 0 0% 98%;
+  --ring: 240 4.9% 83.9%;
+  
+  /* Chart colors - darkened for dark mode */
+  --chart-1: 246 70% 50%;
+  --chart-2: 160 70% 35%;
+  --chart-3: 24 80% 48%;
+  --chart-4: 262 70% 52%;
+  --chart-5: 48 80% 48%;
+  
+  /* Sidebar colors */
+  --sidebar-background: 240 10% 3.9%;
+  --sidebar-foreground: 0 0% 98%;
+  --sidebar-primary: 246 80% 60%;
+  --sidebar-primary-foreground: 211 100% 99%;
+  --sidebar-accent: 246 30% 20%;
+  --sidebar-accent-foreground: 246 80% 60%;
+  --sidebar-border: 240 3.7% 15.9%;
+  --sidebar-ring: 246 80% 60%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Custom styles for active sidebar item */
+.sidebar-item.active {
+  @apply border-l-4 border-primary bg-sidebar-accent text-primary;
+}
+
+.sidebar-item {
+  @apply flex items-center px-4 py-3 text-sm font-medium rounded-md transition-colors;
+}
+
+.sidebar-item:not(.active) {
+  @apply text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800;
+}
+
+/* Mobile sidebar toggle */
+@media (max-width: 768px) {
+  .sidebar {
+    @apply transform -translate-x-full transition-transform ease-in-out duration-300;
+  }
+  
+  .sidebar.open {
+    @apply translate-x-0;
+  }
+}
+
+/* Stats card hover effect */
+.stats-card {
+  @apply transition-all duration-200;
+}
+
+.stats-card:hover {
+  @apply shadow-lg transform -translate-y-1;
+}
