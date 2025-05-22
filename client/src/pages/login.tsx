@@ -77,13 +77,21 @@ const Login = () => {
       }
 
       const userData = await response.json();
-      login(userData);
-      navigate("/dashboard");
       
+      // First show success message
       toast({
         title: "Login Successful",
         description: "Welcome back to BeautyBook!",
       });
+      
+      // Then set the user in context and redirect
+      login(userData);
+      
+      // Small delay to ensure context is updated before navigation
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 500);
+      
     } catch (error: any) {
       toast({
         title: "Login Failed",
