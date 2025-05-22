@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
 import { 
