@@ -4,8 +4,9 @@ import Header from "@/components/layout/header";
 import CategoryList from "@/components/services/category-list";
 import ServiceList from "@/components/services/service-list";
 import ServiceForm from "@/components/services/service-form";
+import CategoryForm from "@/components/services/category-form";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, FolderPlus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -13,6 +14,7 @@ const ServicesPage = () => {
   useDocumentTitle("Services | BeautyBook");
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
+  const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
 
   // Fetch categories to get the first one by default
   const { data: categories, isLoading } = useQuery({
@@ -21,14 +23,13 @@ const ServicesPage = () => {
       const response = await fetch('/api/service-categories');
       if (!response.ok) throw new Error('Failed to fetch categories');
       return response.json();
-    },
-    onSuccess: (data) => {
-      // Select the first category if none is selected yet
-      if (!selectedCategoryId && data.length > 0) {
-        setSelectedCategoryId(data[0].id);
-      }
     }
   });
+
+  // Select the first category if none is selected yet
+  if (!selectedCategoryId && categories && categories.length > 0) {
+    setSelectedCategoryId(categories[0].id);
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -47,7 +48,11 @@ const ServicesPage = () => {
                   Manage your salon services and categories
                 </p>
               </div>
-              <div className="mt-4 sm:mt-0">
+              <div className="mt-4 sm:mt-0 flex gap-2">
+                <Button variant="outline" onClick={() => setIsCategoryFormOpen(true)}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Add Category
+                </Button>
                 <Button onClick={() => setIsServiceFormOpen(true)}>
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Service
@@ -95,6 +100,12 @@ const ServicesPage = () => {
       <ServiceForm 
         open={isServiceFormOpen} 
         onOpenChange={setIsServiceFormOpen} 
+      />
+      
+      {/* Category Form Modal */}
+      <CategoryForm 
+        open={isCategoryFormOpen} 
+        onOpenChange={setIsCategoryFormOpen} 
       />
     </div>
   );
