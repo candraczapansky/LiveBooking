@@ -239,7 +239,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
                   <FormLabel>Category</FormLabel>
                   <Select
                     value={field.value?.toString()}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => field.onChange(parseInt(value))}
                   >
                     <FormControl>
                       <SelectTrigger>
