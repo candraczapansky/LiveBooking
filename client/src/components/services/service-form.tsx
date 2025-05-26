@@ -208,7 +208,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{serviceId ? "Edit Service" : "Add New Service"}</DialogTitle>
           <DialogDescription>
@@ -317,30 +317,36 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Assign Staff Members</FormLabel>
-                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                    {staffMembers?.map((staff: any) => (
-                      <div key={staff.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`staff-${staff.id}`}
-                          checked={field.value?.includes(staff.id) || false}
-                          onCheckedChange={(checked) => {
-                            const currentValue = field.value || [];
-                            if (checked) {
-                              field.onChange([...currentValue, staff.id]);
-                            } else {
-                              field.onChange(currentValue.filter((id: number) => id !== staff.id));
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`staff-${staff.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+                  {staffMembers && staffMembers.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
+                      {staffMembers.map((staff: any) => (
+                        <div key={staff.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`staff-${staff.id}`}
+                            checked={field.value?.includes(staff.id) || false}
+                            onCheckedChange={(checked) => {
+                              const currentValue = field.value || [];
+                              if (checked) {
+                                field.onChange([...currentValue, staff.id]);
+                              } else {
+                                field.onChange(currentValue.filter((id: number) => id !== staff.id));
+                              }
+                            }}
+                          />
+                          <label
+                            htmlFor={`staff-${staff.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                          >
+                            {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground p-4 border rounded-md bg-muted/50">
+                      No staff members available. Please create staff members first to assign them to services.
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
