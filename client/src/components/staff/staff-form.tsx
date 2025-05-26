@@ -620,12 +620,41 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (file) {
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              const result = event.target?.result as string;
-                              field.onChange(result);
+                            // Create a canvas to resize the image
+                            const canvas = document.createElement('canvas');
+                            const ctx = canvas.getContext('2d');
+                            const img = new Image();
+                            
+                            img.onload = () => {
+                              // Set maximum dimensions
+                              const maxWidth = 400;
+                              const maxHeight = 400;
+                              
+                              let { width, height } = img;
+                              
+                              // Calculate new dimensions
+                              if (width > height) {
+                                if (width > maxWidth) {
+                                  height = (height * maxWidth) / width;
+                                  width = maxWidth;
+                                }
+                              } else {
+                                if (height > maxHeight) {
+                                  width = (width * maxHeight) / height;
+                                  height = maxHeight;
+                                }
+                              }
+                              
+                              canvas.width = width;
+                              canvas.height = height;
+                              
+                              // Draw and compress
+                              ctx?.drawImage(img, 0, 0, width, height);
+                              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                              field.onChange(compressedDataUrl);
                             };
-                            reader.readAsDataURL(file);
+                            
+                            img.src = URL.createObjectURL(file);
                           }
                         }}
                         className="cursor-pointer"
