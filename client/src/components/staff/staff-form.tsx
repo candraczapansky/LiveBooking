@@ -157,19 +157,40 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
       // If it's not an existing user, create a new user first
       if (!isExistingUser) {
-        const userData = {
-          username: data.username,
-          email: data.email,
-          password: data.password,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          role: "staff",
-        };
+        // Generate a unique username if the provided one fails
+        let username = data.username;
+        let userCreated = false;
+        let attempts = 0;
+        
+        while (!userCreated && attempts < 5) {
+          const userData = {
+            username: attempts === 0 ? username : `${username}${attempts}`,
+            email: data.email,
+            password: data.password,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phone: data.phone,
+            role: "staff",
+          };
 
-        const userResponse = await apiRequest("POST", "/api/register", userData);
-        const user = await userResponse.json();
-        userId = user.id;
+          const userResponse = await apiRequest("POST", "/api/register", userData);
+          if (userResponse.ok) {
+            const user = await userResponse.json();
+            userId = user.id;
+            userCreated = true;
+          } else {
+            const errorData = await userResponse.json();
+            if (errorData.error?.includes("Username already taken")) {
+              attempts++;
+            } else {
+              throw new Error(errorData.error || "Failed to create user");
+            }
+          }
+        }
+        
+        if (!userCreated) {
+          throw new Error("Unable to create a unique username. Please try a different username.");
+        }
       } else {
         userId = data.userId;
       }
