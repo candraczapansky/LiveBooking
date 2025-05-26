@@ -150,22 +150,7 @@ export class MemStorage implements IStorage {
       description: 'Massage and body treatments'
     });
 
-    // Create sample services
-    this.createService({
-      name: 'Haircut & Style',
-      description: 'Haircut, wash, and blowout styling',
-      duration: 45,
-      price: 65,
-      categoryId: hairCategory.id
-    });
-
-    this.createService({
-      name: 'Men\'s Haircut',
-      description: 'Haircut, wash, and styling',
-      duration: 30,
-      price: 45,
-      categoryId: hairCategory.id
-    });
+    // No sample services - users will create their own
 
     // Sample staff users removed - only real staff will be added by users
 
