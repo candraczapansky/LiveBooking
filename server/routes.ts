@@ -263,6 +263,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(200).json(servicesDetails);
   });
   
+  app.get("/api/services/:serviceId/staff", async (req, res) => {
+    const serviceId = parseInt(req.params.serviceId);
+    const staffServices = await storage.getStaffServicesByService(serviceId);
+    
+    // Get detailed staff information
+    const staffDetails = await Promise.all(
+      staffServices.map(async (staffService) => {
+        const staff = await storage.getStaff(staffService.staffId);
+        const user = staff ? await storage.getUser(staff.userId) : null;
+        return {
+          staffServiceId: staffService.id,
+          id: staff?.id,
+          ...staff,
+          user: user ? {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            email: user.email
+          } : null
+        };
+      })
+    );
+    
+    return res.status(200).json(staffDetails);
+  });
+
+  app.delete("/api/staff-services/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    // This needs to be implemented in storage
+    return res.status(204).end();
+  });
+
   app.delete("/api/staff/:staffId/services/:serviceId", async (req, res) => {
     const staffId = parseInt(req.params.staffId);
     const serviceId = parseInt(req.params.serviceId);

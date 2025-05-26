@@ -43,6 +43,7 @@ export interface IStorage {
   // Staff Service operations
   assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService>;
   getStaffServices(staffId: number): Promise<StaffService[]>;
+  getStaffServicesByService(serviceId: number): Promise<StaffService[]>;
   removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean>;
 
   // Appointment operations
@@ -319,6 +320,12 @@ export class MemStorage implements IStorage {
   async getStaffServices(staffId: number): Promise<StaffService[]> {
     return Array.from(this.staffServices.values()).filter(
       (staffService) => staffService.staffId === staffId
+    );
+  }
+
+  async getStaffServicesByService(serviceId: number): Promise<StaffService[]> {
+    return Array.from(this.staffServices.values()).filter(
+      (staffService) => staffService.serviceId === serviceId
     );
   }
 
