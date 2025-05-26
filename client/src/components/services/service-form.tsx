@@ -40,6 +40,7 @@ const serviceFormSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
   categoryId: z.coerce.number().min(1, "Category is required"),
+  roomId: z.coerce.number().optional(),
   bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code"),
@@ -82,6 +83,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     }
   });
 
+  const { data: rooms } = useQuery({
+    queryKey: ['/api/rooms'],
+    queryFn: async () => {
+      const response = await fetch('/api/rooms');
+      if (!response.ok) throw new Error('Failed to fetch rooms');
+      return response.json();
+    }
+  });
+
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
@@ -90,6 +100,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       duration: 30,
       price: 0,
       categoryId: undefined,
+      roomId: undefined,
       bufferTimeBefore: 0,
       bufferTimeAfter: 0,
       color: "#3B82F6",
@@ -330,33 +341,64 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select
-                    value={field.value?.toString()}
-                    onValueChange={(value) => field.onChange(parseInt(value))}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {serviceCategories?.map((category: any) => (
-                        <SelectItem key={category.id} value={category.id.toString()}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {serviceCategories?.map((category: any) => (
+                          <SelectItem key={category.id} value={category.id.toString()}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="roomId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Room (Optional)</FormLabel>
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a room" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No room assigned</SelectItem>
+                        {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
+                          <SelectItem key={room.id} value={room.id.toString()}>
+                            {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             {/* Service Color */}
             <FormField

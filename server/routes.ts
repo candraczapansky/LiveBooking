@@ -138,6 +138,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     return res.status(204).end();
   });
+
+  // Rooms routes
+  app.get("/api/rooms", async (req, res) => {
+    const rooms = await storage.getAllRooms();
+    return res.status(200).json(rooms);
+  });
+
+  app.post("/api/rooms", validateBody(insertRoomSchema), async (req, res) => {
+    const newRoom = await storage.createRoom(req.body);
+    return res.status(201).json(newRoom);
+  });
+
+  app.put("/api/rooms/:id", validateBody(insertRoomSchema.partial()), async (req, res) => {
+    const id = parseInt(req.params.id);
+    try {
+      const updatedRoom = await storage.updateRoom(id, req.body);
+      return res.status(200).json(updatedRoom);
+    } catch (error) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+  });
+
+  app.delete("/api/rooms/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteRoom(id);
+    if (deleted) {
+      return res.status(200).json({ message: "Room deleted successfully" });
+    } else {
+      return res.status(404).json({ error: "Room not found" });
+    }
+  });
   
   // Services routes
   app.get("/api/services", async (req, res) => {
