@@ -233,12 +233,7 @@ const StaffPage = () => {
                         )}
                       </div>
                     </CardContent>
-                    <CardFooter className="pt-0">
-                      <Button variant="outline" className="w-full" onClick={() => toast({ title: "Feature Coming Soon", description: "View schedule functionality will be available soon!" })}>
-                        <Scissors className="h-4 w-4 mr-2" />
-                        View Services
-                      </Button>
-                    </CardFooter>
+
                   </Card>
                 ))}
               </div>
