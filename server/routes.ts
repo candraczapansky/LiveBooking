@@ -45,6 +45,15 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Add middleware to log all requests
+  app.use((req, res, next) => {
+    if (req.method === 'PUT' && req.url.includes('/services/')) {
+      console.log(`PUT request received: ${req.method} ${req.url}`);
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
+    }
+    next();
+  });
+
   // Auth routes
   app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
