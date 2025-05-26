@@ -186,46 +186,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     const { assignedStaff, ...serviceData } = req.body;
     
-    console.log("Service update request body:", JSON.stringify(req.body, null, 2));
-    console.log("Assigned staff:", assignedStaff);
-    
     try {
+      // Update basic service data first
       const updatedService = await storage.updateService(id, serviceData);
       
       // Handle staff assignments with custom rates
-      console.log("Checking assignedStaff:", assignedStaff, "Type:", typeof assignedStaff, "Is array:", Array.isArray(assignedStaff));
-      if (assignedStaff !== undefined) {
-        console.log("Processing staff assignments...");
-        // First, remove all existing staff assignments for this service
+      if (assignedStaff && Array.isArray(assignedStaff)) {
+        // Remove all existing staff assignments for this service
         const existingAssignments = await storage.getStaffServicesByService(id);
-        console.log("Existing assignments to remove:", existingAssignments);
         for (const assignment of existingAssignments) {
           await storage.removeServiceFromStaff(assignment.staffId, assignment.serviceId);
         }
         
-        // Then add new assignments with custom rates
-        console.log("Adding new assignments, length:", assignedStaff?.length);
-        if (assignedStaff && assignedStaff.length > 0) {
-          for (const assignment of assignedStaff) {
-            console.log("Creating staff assignment with:", {
-              staffId: assignment.staffId,
-              serviceId: id,
-              customRate: assignment.customRate,
-              customCommissionRate: assignment.customCommissionRate,
-            });
-            const result = await storage.assignServiceToStaff({
-              staffId: assignment.staffId,
-              serviceId: id,
-              customRate: assignment.customRate || null,
-              customCommissionRate: assignment.customCommissionRate || null,
-            });
-            console.log("Staff assignment created:", result);
-          }
+        // Add new assignments with custom rates
+        for (const assignment of assignedStaff) {
+          await storage.assignServiceToStaff({
+            staffId: assignment.staffId,
+            serviceId: id,
+            customRate: assignment.customRate || null,
+            customCommissionRate: assignment.customCommissionRate || null,
+          });
         }
       }
       
       return res.status(200).json(updatedService);
     } catch (error) {
+      console.error("Service update error:", error);
       return res.status(404).json({ error: "Service not found" });
     }
   });
