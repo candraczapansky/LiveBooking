@@ -134,21 +134,7 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleData() {
-    // Create sample service categories
-    const hairCategory = this.createServiceCategory({
-      name: 'Hair Services',
-      description: 'All hair-related services'
-    });
-
-    const facialCategory = this.createServiceCategory({
-      name: 'Facial Treatments',
-      description: 'Facial care services'
-    });
-
-    const massageCategory = this.createServiceCategory({
-      name: 'Massage Therapy',
-      description: 'Massage and body treatments'
-    });
+    // No sample categories - users will create their own
 
     // No sample services - users will create their own
 
