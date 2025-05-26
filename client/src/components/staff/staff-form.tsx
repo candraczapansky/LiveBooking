@@ -348,7 +348,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   type="button" 
                   variant={isExistingUser ? "outline" : "default"} 
                   size="sm"
-                  onClick={() => !isExistingUser && toggleUserType()}
+                  onClick={() => setIsExistingUser(false)}
                 >
                   New User
                 </Button>
@@ -356,7 +356,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   type="button" 
                   variant={isExistingUser ? "default" : "outline"} 
                   size="sm"
-                  onClick={() => isExistingUser && toggleUserType()}
+                  onClick={() => setIsExistingUser(true)}
                 >
                   Existing User
                 </Button>
