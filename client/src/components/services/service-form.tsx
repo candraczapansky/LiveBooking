@@ -144,12 +144,14 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       const response = await apiRequest("POST", "/api/services", serviceData);
       const service = await response.json();
       
-      // Assign staff to the service
+      // Assign staff to the service with custom rates
       if (assignedStaff && assignedStaff.length > 0) {
-        for (const staffId of assignedStaff) {
+        for (const assignment of assignedStaff) {
           await apiRequest("POST", "/api/staff-services", {
-            staffId,
+            staffId: assignment.staffId,
             serviceId: service.id,
+            customRate: assignment.customRate || null,
+            customCommissionRate: assignment.customCommissionRate || null,
           });
         }
       }
@@ -181,24 +183,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
   const updateServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
       const { assignedStaff, ...serviceData } = data;
-      const response = await apiRequest("PUT", `/api/services/${serviceId}`, serviceData);
+      
+      // Send the service data along with assigned staff to the backend
+      const fullServiceData = {
+        ...serviceData,
+        assignedStaff: assignedStaff
+      };
+      
+      const response = await apiRequest("PUT", `/api/services/${serviceId}`, fullServiceData);
       const service = await response.json();
-      
-      // Remove all existing staff assignments for this service
-      const existingStaff = await fetch(`/api/services/${serviceId}/staff`).then(res => res.json());
-      for (const staff of existingStaff) {
-        await apiRequest("DELETE", `/api/staff-services/${staff.staffServiceId}`);
-      }
-      
-      // Add new staff assignments
-      if (assignedStaff && assignedStaff.length > 0) {
-        for (const staffId of assignedStaff) {
-          await apiRequest("POST", "/api/staff-services", {
-            staffId,
-            serviceId: service.id,
-          });
-        }
-      }
       
       return service;
     },
