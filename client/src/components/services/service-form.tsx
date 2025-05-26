@@ -106,7 +106,11 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         fetch(`/api/services/${serviceId}/staff`).then(res => res.json())
       ])
         .then(([serviceData, staffData]) => {
-          const assignedStaffIds = staffData.map((staff: any) => staff.id);
+          const assignedStaff = staffData.map((staff: any) => ({
+            staffId: staff.id,
+            customRate: staff.customRate || undefined,
+            customCommissionRate: staff.customCommissionRate || undefined,
+          }));
           
           form.reset({
             name: serviceData.name,
@@ -117,7 +121,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             bufferTimeBefore: serviceData.bufferTimeBefore || 0,
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
             color: serviceData.color || "#3B82F6",
-            assignedStaff: assignedStaffIds,
+            assignedStaff: assignedStaff,
           });
           setIsLoading(false);
         })

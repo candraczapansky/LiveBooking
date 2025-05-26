@@ -126,7 +126,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/services", validateBody(insertServiceSchema), async (req, res) => {
-    const newService = await storage.createService(req.body);
+    const { assignedStaff, ...serviceData } = req.body;
+    const newService = await storage.createService(serviceData);
+    
+    // Handle staff assignments with custom rates
+    if (assignedStaff && assignedStaff.length > 0) {
+      for (const assignment of assignedStaff) {
+        await storage.assignServiceToStaff({
+          staffId: assignment.staffId,
+          serviceId: newService.id,
+          customRate: assignment.customRate || null,
+          customCommissionRate: assignment.customCommissionRate || null,
+        });
+      }
+    }
+    
     return res.status(201).json(newService);
   });
   
@@ -143,8 +157,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.put("/api/services/:id", validateBody(insertServiceSchema.partial()), async (req, res) => {
     const id = parseInt(req.params.id);
+    const { assignedStaff, ...serviceData } = req.body;
+    
     try {
-      const updatedService = await storage.updateService(id, req.body);
+      const updatedService = await storage.updateService(id, serviceData);
+      
+      // Handle staff assignments with custom rates
+      if (assignedStaff !== undefined) {
+        // First, remove all existing staff assignments for this service
+        const existingAssignments = await storage.getStaffServicesByService(id);
+        for (const assignment of existingAssignments) {
+          await storage.removeServiceFromStaff(assignment.staffId, assignment.serviceId);
+        }
+        
+        // Then add new assignments with custom rates
+        if (assignedStaff && assignedStaff.length > 0) {
+          for (const assignment of assignedStaff) {
+            await storage.assignServiceToStaff({
+              staffId: assignment.staffId,
+              serviceId: id,
+              customRate: assignment.customRate || null,
+              customCommissionRate: assignment.customCommissionRate || null,
+            });
+          }
+        }
+      }
+      
       return res.status(200).json(updatedService);
     } catch (error) {
       return res.status(404).json({ error: "Service not found" });

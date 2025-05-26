@@ -305,7 +305,12 @@ export class MemStorage implements IStorage {
   // Staff Service operations
   async assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService> {
     const id = this.currentStaffServiceId++;
-    const newStaffService: StaffService = { ...staffService, id };
+    const newStaffService: StaffService = { 
+      ...staffService, 
+      id,
+      customRate: staffService.customRate || null,
+      customCommissionRate: staffService.customCommissionRate || null
+    };
     this.staffServices.set(id, newStaffService);
     return newStaffService;
   }
