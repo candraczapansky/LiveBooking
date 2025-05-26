@@ -354,10 +354,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const staffId = parseInt(req.params.staffId);
     const staffServices = await storage.getStaffServices(staffId);
     
+    console.log("Raw staff services from storage:", staffServices);
+    
     // Get detailed service information
     const servicesDetails = await Promise.all(
       staffServices.map(async (staffService) => {
         const service = await storage.getService(staffService.serviceId);
+        console.log("Staff service with rates:", {
+          staffServiceId: staffService.id,
+          customRate: staffService.customRate,
+          customCommissionRate: staffService.customCommissionRate
+        });
         return {
           staffServiceId: staffService.id,
           staffId: staffService.staffId,
@@ -367,6 +374,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       })
     );
+    
+    console.log("Final services details:", servicesDetails);
     
     return res.status(200).json(servicesDetails);
   });
