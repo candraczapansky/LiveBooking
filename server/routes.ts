@@ -193,14 +193,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updatedService = await storage.updateService(id, serviceData);
       
       // Handle staff assignments with custom rates
+      console.log("Checking assignedStaff:", assignedStaff, "Type:", typeof assignedStaff, "Is array:", Array.isArray(assignedStaff));
       if (assignedStaff !== undefined) {
+        console.log("Processing staff assignments...");
         // First, remove all existing staff assignments for this service
         const existingAssignments = await storage.getStaffServicesByService(id);
+        console.log("Existing assignments to remove:", existingAssignments);
         for (const assignment of existingAssignments) {
           await storage.removeServiceFromStaff(assignment.staffId, assignment.serviceId);
         }
         
         // Then add new assignments with custom rates
+        console.log("Adding new assignments, length:", assignedStaff?.length);
         if (assignedStaff && assignedStaff.length > 0) {
           for (const assignment of assignedStaff) {
             console.log("Creating staff assignment with:", {
