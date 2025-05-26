@@ -39,6 +39,8 @@ export const services = pgTable("services", {
   duration: integer("duration").notNull(), // in minutes
   price: doublePrecision("price").notNull(),
   categoryId: integer("category_id").notNull(),
+  bufferTimeBefore: integer("buffer_time_before").default(0), // in minutes
+  bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({

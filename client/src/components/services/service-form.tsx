@@ -40,6 +40,8 @@ const serviceFormSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
   categoryId: z.coerce.number().min(1, "Category is required"),
+  bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
+  bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   assignedStaff: z.array(z.number()).optional(),
 });
 
@@ -83,6 +85,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       duration: 30,
       price: 0,
       categoryId: undefined,
+      bufferTimeBefore: 0,
+      bufferTimeAfter: 0,
       assignedStaff: [],
     },
   });
@@ -104,6 +108,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             duration: serviceData.duration,
             price: serviceData.price,
             categoryId: serviceData.categoryId,
+            bufferTimeBefore: serviceData.bufferTimeBefore || 0,
+            bufferTimeAfter: serviceData.bufferTimeAfter || 0,
             assignedStaff: assignedStaffIds,
           });
           setIsLoading(false);
@@ -280,6 +286,37 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                     <FormLabel>Price ($)</FormLabel>
                     <FormControl>
                       <Input type="number" min="0" step="0.01" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Buffer Time Settings */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="bufferTimeBefore"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Buffer Time Before (minutes)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bufferTimeAfter"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Buffer Time After (minutes)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min="0" placeholder="0" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
