@@ -32,6 +32,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const serviceFormSchema = z.object({
   name: z.string().min(1, "Service name is required"),
@@ -39,6 +40,7 @@ const serviceFormSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
   categoryId: z.coerce.number().min(1, "Category is required"),
+  assignedStaff: z.array(z.number()).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -63,6 +65,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
     }
   });
 
+  const { data: staffMembers } = useQuery({
+    queryKey: ['/api/staff'],
+    queryFn: async () => {
+      const response = await fetch('/api/staff');
+      if (!response.ok) throw new Error('Failed to fetch staff');
+      return response.json();
+    }
+  });
+
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
@@ -71,6 +82,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
       duration: 30,
       price: 0,
       categoryId: undefined,
+      assignedStaff: [],
     },
   });
 
@@ -78,15 +90,20 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
   useEffect(() => {
     if (serviceId && open) {
       setIsLoading(true);
-      fetch(`/api/services/${serviceId}`)
-        .then(res => res.json())
-        .then(data => {
+      Promise.all([
+        fetch(`/api/services/${serviceId}`).then(res => res.json()),
+        fetch(`/api/services/${serviceId}/staff`).then(res => res.json())
+      ])
+        .then(([serviceData, staffData]) => {
+          const assignedStaffIds = staffData.map((staff: any) => staff.id);
+          
           form.reset({
-            name: data.name,
-            description: data.description || "",
-            duration: data.duration,
-            price: data.price,
-            categoryId: data.categoryId,
+            name: serviceData.name,
+            description: serviceData.description || "",
+            duration: serviceData.duration,
+            price: serviceData.price,
+            categoryId: serviceData.categoryId,
+            assignedStaff: assignedStaffIds,
           });
           setIsLoading(false);
         })
@@ -105,7 +122,21 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
-      return apiRequest("POST", "/api/services", data);
+      const { assignedStaff, ...serviceData } = data;
+      const response = await apiRequest("POST", "/api/services", serviceData);
+      const service = await response.json();
+      
+      // Assign staff to the service
+      if (assignedStaff && assignedStaff.length > 0) {
+        for (const staffId of assignedStaff) {
+          await apiRequest("POST", "/api/staff-services", {
+            staffId,
+            serviceId: service.id,
+          });
+        }
+      }
+      
+      return service;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
@@ -127,7 +158,27 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
 
   const updateServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
-      return apiRequest("PUT", `/api/services/${serviceId}`, data);
+      const { assignedStaff, ...serviceData } = data;
+      const response = await apiRequest("PUT", `/api/services/${serviceId}`, serviceData);
+      const service = await response.json();
+      
+      // Remove all existing staff assignments for this service
+      const existingStaff = await fetch(`/api/services/${serviceId}/staff`).then(res => res.json());
+      for (const staff of existingStaff) {
+        await apiRequest("DELETE", `/api/staff-services/${staff.staffServiceId}`);
+      }
+      
+      // Add new staff assignments
+      if (assignedStaff && assignedStaff.length > 0) {
+        for (const staffId of assignedStaff) {
+          await apiRequest("POST", "/api/staff-services", {
+            staffId,
+            serviceId: service.id,
+          });
+        }
+      }
+      
+      return service;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
@@ -254,6 +305,42 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Staff Assignment */}
+            <FormField
+              control={form.control}
+              name="assignedStaff"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Assign Staff Members</FormLabel>
+                  <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                    {staffMembers?.map((staff: any) => (
+                      <div key={staff.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`staff-${staff.id}`}
+                          checked={field.value?.includes(staff.id) || false}
+                          onCheckedChange={(checked) => {
+                            const currentValue = field.value || [];
+                            if (checked) {
+                              field.onChange([...currentValue, staff.id]);
+                            } else {
+                              field.onChange(currentValue.filter((id: number) => id !== staff.id));
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`staff-${staff.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
