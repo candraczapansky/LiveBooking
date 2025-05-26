@@ -110,11 +110,11 @@ const StaffPage = () => {
   };
 
   const filteredStaff = staff?.filter((staffMember: StaffMember) =>
-    staffMember.user.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    staffMember.user.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    staffMember.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    staffMember.user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (staffMember.user.phone && staffMember.user.phone.includes(searchQuery))
+    staffMember.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    staffMember.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    staffMember.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    staffMember.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (staffMember.user?.phone && staffMember.user.phone.includes(searchQuery))
   );
 
   return (
@@ -169,7 +169,7 @@ const StaffPage = () => {
                       <div className="flex items-center justify-between">
                         <Avatar className="h-16 w-16">
                           <AvatarFallback className="text-lg">
-                            {getInitials(staffMember.user.firstName, staffMember.user.lastName)}
+                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex space-x-2">
@@ -193,7 +193,7 @@ const StaffPage = () => {
                       </div>
                       <div className="mt-2">
                         <CardTitle className="text-xl">
-                          {getFullName(staffMember.user.firstName, staffMember.user.lastName)}
+                          {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
                         </CardTitle>
                         <CardDescription className="flex items-center mt-1">
                           <Badge variant="outline" className="mr-2">
@@ -209,11 +209,11 @@ const StaffPage = () => {
                       <div className="space-y-2">
                         <div className="flex items-center text-sm">
                           <span className="font-medium w-20">Email:</span>
-                          <span className="text-gray-600 dark:text-gray-400">{staffMember.user.email}</span>
+                          <span className="text-gray-600 dark:text-gray-400">{staffMember.user?.email || "-"}</span>
                         </div>
                         <div className="flex items-center text-sm">
                           <span className="font-medium w-20">Phone:</span>
-                          <span className="text-gray-600 dark:text-gray-400">{staffMember.user.phone || "-"}</span>
+                          <span className="text-gray-600 dark:text-gray-400">{staffMember.user?.phone || "-"}</span>
                         </div>
                         {staffMember.bio && (
                           <div className="pt-2">
