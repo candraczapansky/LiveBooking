@@ -320,14 +320,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Staff service not found" });
       }
       
+      console.log("Updating staff service with data:", { customRate, customCommissionRate });
+      
       const updatedStaffService = await storage.updateStaffService(id, {
         customRate: customRate || null,
         customCommissionRate: customCommissionRate || null,
       });
       
+      console.log("Updated staff service result:", updatedStaffService);
+      
       return res.status(200).json(updatedStaffService);
     } catch (error) {
       return res.status(404).json({ error: "Failed to update staff service" });
+    }
+  });
+
+  app.get("/api/staff-services/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    
+    try {
+      const staffService = await storage.getStaffServiceById(id);
+      if (!staffService) {
+        return res.status(404).json({ error: "Staff service not found" });
+      }
+      
+      return res.status(200).json(staffService);
+    } catch (error) {
+      return res.status(404).json({ error: "Failed to get staff service" });
     }
   });
   
@@ -342,6 +361,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return {
           staffServiceId: staffService.id,
           staffId: staffService.staffId,
+          customRate: staffService.customRate,
+          customCommissionRate: staffService.customCommissionRate,
           ...service
         };
       })
