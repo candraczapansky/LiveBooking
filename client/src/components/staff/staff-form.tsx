@@ -126,6 +126,17 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
             .then(staffServices => {
               const assignedServiceIds = staffServices.map((service: any) => service.id);
               
+              // Build service rates object from existing assignments
+              const serviceRates: Record<string, { customRate?: number; customCommissionRate?: number }> = {};
+              staffServices.forEach((service: any) => {
+                if (service.customRate || service.customCommissionRate) {
+                  serviceRates[service.id.toString()] = {
+                    customRate: service.customRate,
+                    customCommissionRate: service.customCommissionRate,
+                  };
+                }
+              });
+              
               form.reset({
                 userId: data.userId,
                 title: data.title,
@@ -140,6 +151,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 email: data.user?.email || "",
                 phone: data.user?.phone || "",
                 assignedServices: assignedServiceIds,
+                serviceRates: serviceRates,
               });
               
               setIsLoading(false);
