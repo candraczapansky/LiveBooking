@@ -23,6 +23,12 @@ const serviceWithStaffSchema = insertServiceSchema.extend({
   })).optional(),
 });
 
+// Custom schema for staff service with custom rates
+const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
+  customRate: z.number().optional(),
+  customCommissionRate: z.number().optional(),
+});
+
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
   return (req: Request, res: Response, next: Function) => {
@@ -286,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Staff Services routes
-  app.post("/api/staff-services", validateBody(insertStaffServiceSchema), async (req, res) => {
+  app.post("/api/staff-services", validateBody(staffServiceWithRatesSchema), async (req, res) => {
     const newStaffService = await storage.assignServiceToStaff(req.body);
     return res.status(201).json(newStaffService);
   });
