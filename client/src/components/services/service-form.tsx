@@ -190,6 +190,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         assignedStaff: assignedStaff
       };
       
+      console.log("Frontend sending data:", JSON.stringify(fullServiceData, null, 2));
+      
       const response = await apiRequest("PUT", `/api/services/${serviceId}`, fullServiceData);
       const service = await response.json();
       

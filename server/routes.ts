@@ -174,6 +174,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     const { assignedStaff, ...serviceData } = req.body;
     
+    console.log("Service update request body:", JSON.stringify(req.body, null, 2));
+    console.log("Assigned staff:", assignedStaff);
+    
     try {
       const updatedService = await storage.updateService(id, serviceData);
       
