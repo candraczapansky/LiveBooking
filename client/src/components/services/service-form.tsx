@@ -42,6 +42,7 @@ const serviceFormSchema = z.object({
   categoryId: z.coerce.number().min(1, "Category is required"),
   bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code"),
   assignedStaff: z.array(z.number()).optional(),
 });
 
@@ -87,6 +88,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       categoryId: undefined,
       bufferTimeBefore: 0,
       bufferTimeAfter: 0,
+      color: "#3B82F6",
       assignedStaff: [],
     },
   });
@@ -110,6 +112,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             categoryId: serviceData.categoryId,
             bufferTimeBefore: serviceData.bufferTimeBefore || 0,
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
+            color: serviceData.color || "#3B82F6",
             assignedStaff: assignedStaffIds,
           });
           setIsLoading(false);
@@ -347,6 +350,35 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Service Color */}
+            <FormField
+              control={form.control}
+              name="color"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Service Color</FormLabel>
+                  <div className="flex items-center gap-3">
+                    <FormControl>
+                      <Input 
+                        type="color" 
+                        {...field} 
+                        className="w-16 h-10 p-1 border rounded cursor-pointer"
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <Input 
+                        type="text" 
+                        placeholder="#3B82F6" 
+                        {...field}
+                        className="flex-1 font-mono uppercase"
+                      />
+                    </FormControl>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

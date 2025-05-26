@@ -41,6 +41,7 @@ export const services = pgTable("services", {
   categoryId: integer("category_id").notNull(),
   bufferTimeBefore: integer("buffer_time_before").default(0), // in minutes
   bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
+  color: text("color").default("#3B82F6"), // hex color code
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({
