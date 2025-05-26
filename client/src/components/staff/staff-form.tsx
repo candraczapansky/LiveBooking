@@ -40,7 +40,7 @@ const staffFormSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   bio: z.string().optional(),
   commissionType: z.enum(["commission", "hourly", "fixed", "hourly_plus_commission"]).default("commission"),
-  commissionRate: z.coerce.number().min(0, "Commission rate must be a positive number or zero").max(1, "Commission rate must be between 0 and 1").optional(),
+  commissionRate: z.coerce.number().min(0, "Commission rate must be a positive number or zero").max(100, "Commission rate must be between 0 and 100").optional(),
   hourlyRate: z.coerce.number().min(0, "Hourly rate must be a positive number or zero").optional(),
   fixedRate: z.coerce.number().min(0, "Fixed rate must be a positive number or zero").optional(),
   username: z.string().min(1, "Username is required").optional(),
@@ -126,7 +126,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 title: data.title,
                 bio: data.bio || "",
                 commissionType: data.commissionType || "commission",
-                commissionRate: data.commissionRate,
+                commissionRate: data.commissionRate ? data.commissionRate * 100 : undefined, // Convert decimal to percentage
                 hourlyRate: data.hourlyRate,
                 fixedRate: data.fixedRate,
                 photoUrl: data.photoUrl || "",
@@ -207,7 +207,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         title: data.title,
         bio: data.bio,
         commissionType: data.commissionType,
-        commissionRate: data.commissionRate,
+        commissionRate: data.commissionRate ? data.commissionRate / 100 : undefined, // Convert percentage to decimal
         hourlyRate: data.hourlyRate,
         fixedRate: data.fixedRate,
         photoUrl: data.photoUrl,
@@ -265,7 +265,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         title: data.title,
         bio: data.bio,
         commissionType: data.commissionType,
-        commissionRate: data.commissionRate,
+        commissionRate: data.commissionRate ? data.commissionRate / 100 : undefined, // Convert percentage to decimal
         hourlyRate: data.hourlyRate,
         fixedRate: data.fixedRate,
         photoUrl: data.photoUrl,
@@ -727,15 +727,15 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 name="commissionRate"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Commission Rate (0-1)</FormLabel>
+                    <FormLabel>Commission Rate (%)</FormLabel>
                     <FormControl>
                       <Input 
                         type="number" 
                         min="0" 
-                        max="1" 
-                        step="0.01" 
+                        max="100" 
+                        step="1" 
                         {...field} 
-                        placeholder="e.g., 0.3 for 30%"
+                        placeholder="e.g., 30 for 30%"
                       />
                     </FormControl>
                     <FormMessage />
