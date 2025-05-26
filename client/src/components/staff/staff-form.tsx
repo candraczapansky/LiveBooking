@@ -39,7 +39,10 @@ const staffFormSchema = z.object({
   userId: z.coerce.number().optional(),
   title: z.string().min(1, "Job title is required"),
   bio: z.string().optional(),
-  commissionRate: z.coerce.number().min(0, "Commission rate must be a positive number or zero").max(1, "Commission rate must be between 0 and 1"),
+  commissionType: z.enum(["commission", "hourly", "fixed", "hourly_plus_commission"]).default("commission"),
+  commissionRate: z.coerce.number().min(0, "Commission rate must be a positive number or zero").max(1, "Commission rate must be between 0 and 1").optional(),
+  hourlyRate: z.coerce.number().min(0, "Hourly rate must be a positive number or zero").optional(),
+  fixedRate: z.coerce.number().min(0, "Fixed rate must be a positive number or zero").optional(),
   username: z.string().min(1, "Username is required").optional(),
   email: z.string().email("Invalid email address").optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
@@ -122,7 +125,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 userId: data.userId,
                 title: data.title,
                 bio: data.bio || "",
+                commissionType: data.commissionType || "commission",
                 commissionRate: data.commissionRate,
+                hourlyRate: data.hourlyRate,
+                fixedRate: data.fixedRate,
                 photoUrl: data.photoUrl || "",
                 firstName: data.user?.firstName || "",
                 lastName: data.user?.lastName || "",
@@ -200,7 +206,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         userId,
         title: data.title,
         bio: data.bio,
+        commissionType: data.commissionType,
         commissionRate: data.commissionRate,
+        hourlyRate: data.hourlyRate,
+        fixedRate: data.fixedRate,
         photoUrl: data.photoUrl,
       };
 
@@ -255,7 +264,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const staffData = {
         title: data.title,
         bio: data.bio,
+        commissionType: data.commissionType,
         commissionRate: data.commissionRate,
+        hourlyRate: data.hourlyRate,
+        fixedRate: data.fixedRate,
         photoUrl: data.photoUrl,
       };
 
@@ -683,26 +695,100 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               )}
             />
 
+            {/* Commission Structure */}
             <FormField
               control={form.control}
-              name="commissionRate"
+              name="commissionType"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Commission Rate (0-1)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      max="1" 
-                      step="0.01" 
-                      {...field} 
-                      placeholder="e.g., 0.3 for 30%"
-                    />
-                  </FormControl>
+                  <FormLabel>Payment Structure</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment structure" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="commission">Commission Only</SelectItem>
+                      <SelectItem value="hourly">Hourly Rate</SelectItem>
+                      <SelectItem value="fixed">Fixed Rate per Service</SelectItem>
+                      <SelectItem value="hourly_plus_commission">Hourly + Commission</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Commission Rate - shown for commission and hourly_plus_commission */}
+            {(form.watch('commissionType') === 'commission' || form.watch('commissionType') === 'hourly_plus_commission') && (
+              <FormField
+                control={form.control}
+                name="commissionRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commission Rate (0-1)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="1" 
+                        step="0.01" 
+                        {...field} 
+                        placeholder="e.g., 0.3 for 30%"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Hourly Rate - shown for hourly and hourly_plus_commission */}
+            {(form.watch('commissionType') === 'hourly' || form.watch('commissionType') === 'hourly_plus_commission') && (
+              <FormField
+                control={form.control}
+                name="hourlyRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hourly Rate ($)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01" 
+                        {...field} 
+                        placeholder="e.g., 25.00"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Fixed Rate - shown for fixed */}
+            {form.watch('commissionType') === 'fixed' && (
+              <FormField
+                control={form.control}
+                name="fixedRate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fixed Rate per Service ($)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        step="0.01" 
+                        {...field} 
+                        placeholder="e.g., 50.00"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Service Assignments */}
             <div>

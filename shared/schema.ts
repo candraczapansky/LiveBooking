@@ -51,7 +51,10 @@ export const staff = pgTable("staff", {
   userId: integer("user_id").notNull(),
   title: text("title").notNull(),
   bio: text("bio"),
-  commissionRate: doublePrecision("commission_rate"),
+  commissionType: text("commission_type").notNull().default("commission"), // commission, hourly, fixed, hourly_plus_commission
+  commissionRate: doublePrecision("commission_rate"), // percentage for commission (0-1)
+  hourlyRate: doublePrecision("hourly_rate"), // hourly wage
+  fixedRate: doublePrecision("fixed_rate"), // fixed amount per service
   photoUrl: text("photo_url"),
 });
 
