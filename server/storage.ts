@@ -166,41 +166,7 @@ export class MemStorage implements IStorage {
       categoryId: hairCategory.id
     });
 
-    // Create sample staff users
-    const jessicaUser = this.createUser({
-      username: 'jessica',
-      password: 'password',
-      email: 'jessica@beautybook.com',
-      role: 'staff',
-      firstName: 'Jessica',
-      lastName: 'Taylor',
-      phone: '555-987-6543'
-    });
-
-    const davidUser = this.createUser({
-      username: 'david',
-      password: 'password',
-      email: 'david@beautybook.com',
-      role: 'staff',
-      firstName: 'David',
-      lastName: 'Miller',
-      phone: '555-456-7890'
-    });
-
-    // Create staff profiles
-    this.createStaff({
-      userId: jessicaUser.id,
-      title: 'Senior Stylist',
-      bio: 'Specializes in color and transformations',
-      commissionRate: 0.4
-    });
-
-    this.createStaff({
-      userId: davidUser.id,
-      title: 'Barber',
-      bio: 'Men\'s haircut specialist',
-      commissionRate: 0.35
-    });
+    // Sample staff users removed - only real staff will be added by users
 
     // Create sample membership
     this.createMembership({
