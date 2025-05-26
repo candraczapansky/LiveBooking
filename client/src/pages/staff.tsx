@@ -39,6 +39,7 @@ type StaffMember = {
   title: string;
   bio?: string;
   commissionRate: number;
+  photoUrl?: string;
   user: {
     id: number;
     firstName?: string;

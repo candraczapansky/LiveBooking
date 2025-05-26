@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -588,13 +588,43 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               name="photoUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Photo URL (Optional)</FormLabel>
+                  <FormLabel>Staff Photo (Optional)</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="https://example.com/staff-photo.jpg"
-                      {...field}
-                      value={field.value || ""}
-                    />
+                    <div className="space-y-4">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const result = event.target?.result as string;
+                              field.onChange(result);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="cursor-pointer"
+                      />
+                      {field.value && (
+                        <div className="flex items-center space-x-4">
+                          <img
+                            src={field.value}
+                            alt="Staff photo preview"
+                            className="h-16 w-16 object-cover rounded-full border"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => field.onChange("")}
+                          >
+                            Remove Photo
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
