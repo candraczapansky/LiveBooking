@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(200).json(service);
   });
   
-  app.put("/api/services/:id", validateBody(serviceWithStaffSchema.partial()), async (req, res) => {
+  app.put("/api/services/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     const { assignedStaff, ...serviceData } = req.body;
     
