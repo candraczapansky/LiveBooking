@@ -43,7 +43,11 @@ const serviceFormSchema = z.object({
   bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code"),
-  assignedStaff: z.array(z.number()).optional(),
+  assignedStaff: z.array(z.object({
+    staffId: z.number(),
+    customRate: z.coerce.number().min(0, "Rate must be 0 or greater").optional(),
+    customCommissionRate: z.coerce.number().min(0, "Commission rate must be 0 or greater").optional(),
+  })).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -392,29 +396,83 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                 <FormItem>
                   <FormLabel>Assign Staff Members</FormLabel>
                   {staffMembers && staffMembers.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-3 max-h-40 overflow-y-auto border rounded-md p-3">
-                      {staffMembers.map((staff: any) => (
-                        <div key={staff.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`staff-${staff.id}`}
-                            checked={field.value?.includes(staff.id) || false}
-                            onCheckedChange={(checked) => {
-                              const currentValue = field.value || [];
-                              if (checked) {
-                                field.onChange([...currentValue, staff.id]);
-                              } else {
-                                field.onChange(currentValue.filter((id: number) => id !== staff.id));
-                              }
-                            }}
-                          />
-                          <label
-                            htmlFor={`staff-${staff.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                          >
-                            {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
-                          </label>
-                        </div>
-                      ))}
+                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto border rounded-md p-3">
+                      {staffMembers.map((staff: any) => {
+                        const isAssigned = field.value?.some((assignment: any) => assignment.staffId === staff.id) || false;
+                        const currentAssignment = field.value?.find((assignment: any) => assignment.staffId === staff.id);
+                        
+                        return (
+                          <div key={staff.id} className="border rounded-lg p-3 space-y-3">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`staff-${staff.id}`}
+                                checked={isAssigned}
+                                onCheckedChange={(checked) => {
+                                  const currentValue = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...currentValue, { 
+                                      staffId: staff.id,
+                                      customRate: undefined,
+                                      customCommissionRate: undefined
+                                    }]);
+                                  } else {
+                                    field.onChange(currentValue.filter((assignment: any) => assignment.staffId !== staff.id));
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor={`staff-${staff.id}`}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
+                              </label>
+                            </div>
+                            
+                            {isAssigned && (
+                              <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="text-xs text-gray-600 mb-1 block">
+                                    Custom Rate (${staff.hourlyRate || staff.fixedRate || 0}/hr default)
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder={`Default: $${staff.hourlyRate || staff.fixedRate || 0}`}
+                                    value={currentAssignment?.customRate || ""}
+                                    onChange={(e) => {
+                                      const newValue = field.value?.map((assignment: any) => 
+                                        assignment.staffId === staff.id 
+                                          ? { ...assignment, customRate: e.target.value ? parseFloat(e.target.value) : undefined }
+                                          : assignment
+                                      );
+                                      field.onChange(newValue);
+                                    }}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="text-xs text-gray-600 mb-1 block">
+                                    Custom Commission ({staff.commissionRate || 0}% default)
+                                  </label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder={`Default: ${staff.commissionRate || 0}%`}
+                                    value={currentAssignment?.customCommissionRate || ""}
+                                    onChange={(e) => {
+                                      const newValue = field.value?.map((assignment: any) => 
+                                        assignment.staffId === staff.id 
+                                          ? { ...assignment, customCommissionRate: e.target.value ? parseFloat(e.target.value) : undefined }
+                                          : assignment
+                                      );
+                                      field.onChange(newValue);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-sm text-muted-foreground p-4 border rounded-md bg-muted/50">

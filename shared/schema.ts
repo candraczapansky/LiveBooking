@@ -70,6 +70,8 @@ export const staffServices = pgTable("staff_services", {
   id: serial("id").primaryKey(),
   staffId: integer("staff_id").notNull(),
   serviceId: integer("service_id").notNull(),
+  customRate: doublePrecision("custom_rate"), // Custom pay rate for this specific service
+  customCommissionRate: doublePrecision("custom_commission_rate"), // Custom commission rate for this specific service
 });
 
 export const insertStaffServiceSchema = createInsertSchema(staffServices).omit({
