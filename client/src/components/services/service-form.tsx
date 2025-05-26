@@ -49,9 +49,10 @@ type ServiceFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   serviceId?: number;
+  onServiceCreated?: (categoryId: number) => void;
 };
 
-const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
+const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: ServiceFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -138,12 +139,16 @@ const ServiceForm = ({ open, onOpenChange, serviceId }: ServiceFormProps) => {
       
       return service;
     },
-    onSuccess: () => {
+    onSuccess: (service) => {
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
       toast({
         title: "Success",
         description: "Service created successfully",
       });
+      // Call the callback to switch to the correct category
+      if (onServiceCreated && service.categoryId) {
+        onServiceCreated(service.categoryId);
+      }
       form.reset();
       onOpenChange(false);
     },
