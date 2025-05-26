@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   insertUserSchema,
   insertServiceCategorySchema,
+  insertRoomSchema,
   insertServiceSchema,
   insertStaffSchema,
   insertStaffServiceSchema,

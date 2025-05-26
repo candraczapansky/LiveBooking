@@ -1,6 +1,7 @@
 import {
   users, User, InsertUser,
   serviceCategories, ServiceCategory, InsertServiceCategory,
+  rooms, Room, InsertRoom,
   services, Service, InsertService,
   staff, Staff, InsertStaff,
   staffServices, StaffService, InsertStaffService,
@@ -99,6 +100,7 @@ export class MemStorage implements IStorage {
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
+  private currentRoomId: number;
   private currentServiceId: number;
   private currentStaffId: number;
   private currentStaffServiceId: number;
@@ -110,6 +112,7 @@ export class MemStorage implements IStorage {
   constructor() {
     this.users = new Map();
     this.serviceCategories = new Map();
+    this.rooms = new Map();
     this.services = new Map();
     this.staff = new Map();
     this.staffServices = new Map();
@@ -120,6 +123,7 @@ export class MemStorage implements IStorage {
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
+    this.currentRoomId = 1;
     this.currentServiceId = 1;
     this.currentStaffId = 1;
     this.currentStaffServiceId = 1;
@@ -145,6 +149,28 @@ export class MemStorage implements IStorage {
 
   private initializeSampleData() {
     // No sample categories - users will create their own
+
+    // Create sample rooms
+    this.createRoom({
+      name: 'Treatment Room 1',
+      description: 'Main treatment room for facials and individual services',
+      capacity: 1,
+      isActive: true
+    });
+
+    this.createRoom({
+      name: 'Treatment Room 2', 
+      description: 'Secondary treatment room for massages and body treatments',
+      capacity: 1,
+      isActive: true
+    });
+
+    this.createRoom({
+      name: 'Styling Station Area',
+      description: 'Open area with multiple styling stations',
+      capacity: 4,
+      isActive: true
+    });
 
     // No sample services - users will create their own
 
@@ -216,6 +242,36 @@ export class MemStorage implements IStorage {
 
   async deleteServiceCategory(id: number): Promise<boolean> {
     return this.serviceCategories.delete(id);
+  }
+
+  // Room operations
+  async createRoom(room: InsertRoom): Promise<Room> {
+    const id = this.currentRoomId++;
+    const newRoom: Room = { ...room, id };
+    this.rooms.set(id, newRoom);
+    return newRoom;
+  }
+
+  async getRoom(id: number): Promise<Room | undefined> {
+    return this.rooms.get(id);
+  }
+
+  async getAllRooms(): Promise<Room[]> {
+    return Array.from(this.rooms.values());
+  }
+
+  async updateRoom(id: number, roomData: Partial<InsertRoom>): Promise<Room> {
+    const existingRoom = this.rooms.get(id);
+    if (!existingRoom) {
+      throw new Error("Room not found");
+    }
+    const updatedRoom: Room = { ...existingRoom, ...roomData };
+    this.rooms.set(id, updatedRoom);
+    return updatedRoom;
+  }
+
+  async deleteRoom(id: number): Promise<boolean> {
+    return this.rooms.delete(id);
   }
 
   // Service operations
