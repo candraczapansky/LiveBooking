@@ -203,12 +203,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Then add new assignments with custom rates
         if (assignedStaff && assignedStaff.length > 0) {
           for (const assignment of assignedStaff) {
-            await storage.assignServiceToStaff({
+            console.log("Creating staff assignment with:", {
+              staffId: assignment.staffId,
+              serviceId: id,
+              customRate: assignment.customRate,
+              customCommissionRate: assignment.customCommissionRate,
+            });
+            const result = await storage.assignServiceToStaff({
               staffId: assignment.staffId,
               serviceId: id,
               customRate: assignment.customRate || null,
               customCommissionRate: assignment.customCommissionRate || null,
             });
+            console.log("Staff assignment created:", result);
           }
         }
       }
