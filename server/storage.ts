@@ -44,6 +44,8 @@ export interface IStorage {
   assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService>;
   getStaffServices(staffId: number): Promise<StaffService[]>;
   getStaffServicesByService(serviceId: number): Promise<StaffService[]>;
+  getStaffServiceById(id: number): Promise<StaffService | undefined>;
+  updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService>;
   removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean>;
 
   // Appointment operations
@@ -325,6 +327,25 @@ export class MemStorage implements IStorage {
     return Array.from(this.staffServices.values()).filter(
       (staffService) => staffService.serviceId === serviceId
     );
+  }
+
+  async getStaffServiceById(id: number): Promise<StaffService | undefined> {
+    return this.staffServices.get(id);
+  }
+
+  async updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService> {
+    const existingStaffService = this.staffServices.get(id);
+    if (!existingStaffService) {
+      throw new Error("Staff service not found");
+    }
+
+    const updatedStaffService: StaffService = {
+      ...existingStaffService,
+      ...data,
+    };
+
+    this.staffServices.set(id, updatedStaffService);
+    return updatedStaffService;
   }
 
   async removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean> {

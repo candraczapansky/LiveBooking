@@ -308,6 +308,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const newStaffService = await storage.assignServiceToStaff(req.body);
     return res.status(201).json(newStaffService);
   });
+
+  app.put("/api/staff-services/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { customRate, customCommissionRate } = req.body;
+    
+    try {
+      // Find the staff service and update it
+      const existingStaffService = await storage.getStaffServiceById(id);
+      if (!existingStaffService) {
+        return res.status(404).json({ error: "Staff service not found" });
+      }
+      
+      const updatedStaffService = await storage.updateStaffService(id, {
+        customRate: customRate || null,
+        customCommissionRate: customCommissionRate || null,
+      });
+      
+      return res.status(200).json(updatedStaffService);
+    } catch (error) {
+      return res.status(404).json({ error: "Failed to update staff service" });
+    }
+  });
   
   app.get("/api/staff/:staffId/services", async (req, res) => {
     const staffId = parseInt(req.params.staffId);

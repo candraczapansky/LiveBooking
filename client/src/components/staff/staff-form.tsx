@@ -51,6 +51,10 @@ const staffFormSchema = z.object({
   phone: z.string().optional(),
   photoUrl: z.string().optional(),
   assignedServices: z.array(z.coerce.number()).optional(),
+  serviceRates: z.record(z.string(), z.object({
+    customRate: z.coerce.number().optional(),
+    customCommissionRate: z.coerce.number().optional(),
+  })).optional(),
 });
 
 type StaffFormValues = z.infer<typeof staffFormSchema>;
@@ -81,6 +85,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       lastName: "",
       phone: "",
       assignedServices: [],
+      serviceRates: {},
     },
   });
 
@@ -288,13 +293,27 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           }
         }
 
-        // Add newly assigned services
+        // Add newly assigned services with custom rates
         for (const serviceId of data.assignedServices) {
           if (!currentServiceIds.includes(serviceId)) {
+            const serviceRates = data.serviceRates?.[serviceId.toString()];
             await apiRequest("POST", "/api/staff-services", {
               staffId: staffId,
               serviceId,
+              customRate: serviceRates?.customRate || null,
+              customCommissionRate: serviceRates?.customCommissionRate || null,
             });
+          } else {
+            // Update existing assignment with new custom rates
+            const existingService = currentServices.find((service: any) => service.id === serviceId);
+            if (existingService) {
+              const serviceRates = data.serviceRates?.[serviceId.toString()];
+              // Update the staff service with new rates
+              await apiRequest("PUT", `/api/staff-services/${existingService.staffServiceId}`, {
+                customRate: serviceRates?.customRate || null,
+                customCommissionRate: serviceRates?.customCommissionRate || null,
+              });
+            }
           }
         }
       }
@@ -793,32 +812,93 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
             {/* Service Assignments */}
             <div>
               <FormLabel className="block mb-2">Assigned Services</FormLabel>
-              <div className="border rounded-md p-4 space-y-2 max-h-48 overflow-y-auto">
-                {services?.map((service: any) => (
-                  <div key={service.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`service-${service.id}`}
-                      checked={form.watch('assignedServices')?.includes(service.id)}
-                      onCheckedChange={(checked) => {
-                        const currentServices = form.watch('assignedServices') || [];
-                        if (checked) {
-                          form.setValue('assignedServices', [...currentServices, service.id]);
-                        } else {
-                          form.setValue(
-                            'assignedServices',
-                            currentServices.filter((id: number) => id !== service.id)
-                          );
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor={`service-${service.id}`}
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      {service.name}
-                    </label>
-                  </div>
-                ))}
+              <div className="border rounded-md p-4 space-y-4 max-h-96 overflow-y-auto">
+                {services?.map((service: any) => {
+                  const isAssigned = form.watch('assignedServices')?.includes(service.id);
+                  const serviceRates = form.watch('serviceRates') || {};
+                  const currentRates = serviceRates[service.id.toString()] || {};
+                  
+                  return (
+                    <div key={service.id} className="border rounded-lg p-3 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`service-${service.id}`}
+                          checked={isAssigned}
+                          onCheckedChange={(checked) => {
+                            const currentServices = form.watch('assignedServices') || [];
+                            if (checked) {
+                              form.setValue('assignedServices', [...currentServices, service.id]);
+                            } else {
+                              form.setValue(
+                                'assignedServices',
+                                currentServices.filter((id: number) => id !== service.id)
+                              );
+                              // Remove rates when service is unassigned
+                              const currentRates = form.watch('serviceRates') || {};
+                              const { [service.id.toString()]: removed, ...remainingRates } = currentRates;
+                              form.setValue('serviceRates', remainingRates);
+                            }
+                          }}
+                        />
+                        <label
+                          htmlFor={`service-${service.id}`}
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
+                        >
+                          {service.name} - ${service.price} ({service.duration} min)
+                        </label>
+                      </div>
+                      
+                      {isAssigned && (
+                        <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-gray-600 mb-1 block">
+                              Custom Rate (${form.watch('hourlyRate') || 12}/hr default)
+                            </label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={`Default: $${form.watch('hourlyRate') || 12}`}
+                              value={currentRates.customRate || ""}
+                              onChange={(e) => {
+                                const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                                const currentRates = form.watch('serviceRates') || {};
+                                form.setValue('serviceRates', {
+                                  ...currentRates,
+                                  [service.id.toString()]: {
+                                    ...currentRates[service.id.toString()],
+                                    customRate: value
+                                  }
+                                });
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-600 mb-1 block">
+                              Custom Commission ({form.watch('commissionRate') || 0}% default)
+                            </label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={`Default: ${form.watch('commissionRate') || 0}%`}
+                              value={currentRates.customCommissionRate || ""}
+                              onChange={(e) => {
+                                const value = e.target.value ? parseFloat(e.target.value) : undefined;
+                                const currentRates = form.watch('serviceRates') || {};
+                                form.setValue('serviceRates', {
+                                  ...currentRates,
+                                  [service.id.toString()]: {
+                                    ...currentRates[service.id.toString()],
+                                    customCommissionRate: value
+                                  }
+                                });
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
