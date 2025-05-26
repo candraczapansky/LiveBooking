@@ -33,9 +33,12 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 function validateBody<T>(schema: z.ZodType<T>) {
   return (req: Request, res: Response, next: Function) => {
     try {
+      console.log("Validating body with schema:", JSON.stringify(req.body, null, 2));
       req.body = schema.parse(req.body);
+      console.log("Validation successful");
       next();
     } catch (error) {
+      console.log("Validation failed:", error);
       res.status(400).json({ error: "Invalid request body" });
     }
   };
