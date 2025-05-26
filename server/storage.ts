@@ -217,7 +217,13 @@ export class MemStorage implements IStorage {
   }
 
   async getService(id: number): Promise<Service | undefined> {
-    return this.services.get(id);
+    const service = this.services.get(id);
+    if (service && !service.color) {
+      // Set default color for services that don't have one
+      service.color = "#3B82F6";
+      this.services.set(id, service);
+    }
+    return service;
   }
 
   async getServicesByCategory(categoryId: number): Promise<Service[]> {
