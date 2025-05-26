@@ -52,6 +52,7 @@ export const staff = pgTable("staff", {
   title: text("title").notNull(),
   bio: text("bio"),
   commissionRate: doublePrecision("commission_rate"),
+  photoUrl: text("photo_url"),
 });
 
 export const insertStaffSchema = createInsertSchema(staff).omit({

@@ -46,6 +46,7 @@ const staffFormSchema = z.object({
   firstName: z.string().min(1, "First name is required").optional(),
   lastName: z.string().min(1, "Last name is required").optional(),
   phone: z.string().optional(),
+  photoUrl: z.string().optional(),
   assignedServices: z.array(z.coerce.number()).optional(),
 });
 
@@ -122,6 +123,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 title: data.title,
                 bio: data.bio || "",
                 commissionRate: data.commissionRate,
+                photoUrl: data.photoUrl || "",
                 firstName: data.user?.firstName || "",
                 lastName: data.user?.lastName || "",
                 email: data.user?.email || "",
