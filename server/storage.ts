@@ -227,13 +227,29 @@ export class MemStorage implements IStorage {
   }
 
   async getServicesByCategory(categoryId: number): Promise<Service[]> {
-    return Array.from(this.services.values()).filter(
+    const services = Array.from(this.services.values()).filter(
       (service) => service.categoryId === categoryId
     );
+    // Ensure all services have a color field
+    return services.map(service => {
+      if (!service.color) {
+        service.color = "#3B82F6";
+        this.services.set(service.id, service);
+      }
+      return service;
+    });
   }
 
   async getAllServices(): Promise<Service[]> {
-    return Array.from(this.services.values());
+    const services = Array.from(this.services.values());
+    // Ensure all services have a color field
+    return services.map(service => {
+      if (!service.color) {
+        service.color = "#3B82F6";
+        this.services.set(service.id, service);
+      }
+      return service;
+    });
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
