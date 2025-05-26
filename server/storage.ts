@@ -24,6 +24,13 @@ export interface IStorage {
   updateServiceCategory(id: number, categoryData: Partial<InsertServiceCategory>): Promise<ServiceCategory>;
   deleteServiceCategory(id: number): Promise<boolean>;
 
+  // Room operations
+  createRoom(room: InsertRoom): Promise<Room>;
+  getRoom(id: number): Promise<Room | undefined>;
+  getAllRooms(): Promise<Room[]>;
+  updateRoom(id: number, roomData: Partial<InsertRoom>): Promise<Room>;
+  deleteRoom(id: number): Promise<boolean>;
+
   // Service operations
   createService(service: InsertService): Promise<Service>;
   getService(id: number): Promise<Service | undefined>;
@@ -81,6 +88,7 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private serviceCategories: Map<number, ServiceCategory>;
+  private rooms: Map<number, Room>;
   private services: Map<number, Service>;
   private staff: Map<number, Staff>;
   private staffServices: Map<number, StaffService>;

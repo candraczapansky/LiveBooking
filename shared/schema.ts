@@ -31,6 +31,19 @@ export const insertServiceCategorySchema = createInsertSchema(serviceCategories)
   id: true,
 });
 
+// Rooms schema
+export const rooms = pgTable("rooms", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  capacity: integer("capacity").default(1),
+  isActive: boolean("is_active").default(true),
+});
+
+export const insertRoomSchema = createInsertSchema(rooms).omit({
+  id: true,
+});
+
 // Services schema
 export const services = pgTable("services", {
   id: serial("id").primaryKey(),
@@ -39,6 +52,7 @@ export const services = pgTable("services", {
   duration: integer("duration").notNull(), // in minutes
   price: doublePrecision("price").notNull(),
   categoryId: integer("category_id").notNull(),
+  roomId: integer("room_id"),
   bufferTimeBefore: integer("buffer_time_before").default(0), // in minutes
   bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
   color: text("color").default("#3B82F6"), // hex color code
@@ -148,6 +162,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type ServiceCategory = typeof serviceCategories.$inferSelect;
 export type InsertServiceCategory = z.infer<typeof insertServiceCategorySchema>;
+
+export type Room = typeof rooms.$inferSelect;
+export type InsertRoom = z.infer<typeof insertRoomSchema>;
 
 export type Service = typeof services.$inferSelect;
 export type InsertService = z.infer<typeof insertServiceSchema>;
