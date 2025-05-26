@@ -99,7 +99,8 @@ const ServicesPage = () => {
       {/* Service Form Modal */}
       <ServiceForm 
         open={isServiceFormOpen} 
-        onOpenChange={setIsServiceFormOpen} 
+        onOpenChange={setIsServiceFormOpen}
+        onServiceCreated={(categoryId) => setSelectedCategoryId(categoryId)}
       />
       
       {/* Category Form Modal */}
