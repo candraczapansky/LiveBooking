@@ -585,6 +585,24 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
             <FormField
               control={form.control}
+              name="photoUrl"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Photo URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="https://example.com/staff-photo.jpg"
+                      {...field}
+                      value={field.value || ""}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="commissionRate"
               render={({ field }) => (
                 <FormItem>

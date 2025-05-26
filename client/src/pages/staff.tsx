@@ -168,9 +168,17 @@ const StaffPage = () => {
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between">
                         <Avatar className="h-16 w-16">
-                          <AvatarFallback className="text-lg">
-                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
-                          </AvatarFallback>
+                          {staffMember.photoUrl ? (
+                            <img
+                              src={staffMember.photoUrl}
+                              alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                              className="h-full w-full object-cover rounded-full"
+                            />
+                          ) : (
+                            <AvatarFallback className="text-lg">
+                              {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
+                            </AvatarFallback>
+                          )}
                         </Avatar>
                         <div className="flex space-x-2">
                           <Button
