@@ -40,6 +40,7 @@ type Service = {
   duration: number;
   price: number;
   categoryId: number;
+  color: string;
 };
 
 type ServiceListProps = {
@@ -154,19 +155,20 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                 <TableHead>Duration</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Staff</TableHead>
+                <TableHead>Color</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4">
+                  <TableCell colSpan={6} className="text-center py-4">
                     Loading services...
                   </TableCell>
                 </TableRow>
               ) : filteredServices?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-4">
+                  <TableCell colSpan={6} className="text-center py-4">
                     No services found. {searchQuery ? 'Try a different search term.' : ''}
                   </TableCell>
                 </TableRow>
@@ -180,6 +182,18 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                     <TableCell>{formatDuration(service.duration)}</TableCell>
                     <TableCell>{formatPrice(service.price)}</TableCell>
                     <TableCell>{getStaffForService(service.id)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600"
+                          style={{ backgroundColor: service.color || "#3B82F6" }}
+                          title={service.color || "#3B82F6"}
+                        />
+                        <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                          {service.color || "#3B82F6"}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
