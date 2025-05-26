@@ -14,6 +14,15 @@ import {
   insertPaymentSchema
 } from "@shared/schema";
 
+// Custom schema for service with staff assignments
+const serviceWithStaffSchema = insertServiceSchema.extend({
+  assignedStaff: z.array(z.object({
+    staffId: z.number(),
+    customRate: z.number().optional(),
+    customCommissionRate: z.number().optional(),
+  })).optional(),
+});
+
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
   return (req: Request, res: Response, next: Function) => {
@@ -125,7 +134,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(200).json(services);
   });
   
-  app.post("/api/services", validateBody(insertServiceSchema), async (req, res) => {
+  app.post("/api/services", validateBody(serviceWithStaffSchema), async (req, res) => {
     const { assignedStaff, ...serviceData } = req.body;
     const newService = await storage.createService(serviceData);
     
@@ -155,7 +164,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(200).json(service);
   });
   
-  app.put("/api/services/:id", validateBody(insertServiceSchema.partial()), async (req, res) => {
+  app.put("/api/services/:id", validateBody(serviceWithStaffSchema.partial()), async (req, res) => {
     const id = parseInt(req.params.id);
     const { assignedStaff, ...serviceData } = req.body;
     
