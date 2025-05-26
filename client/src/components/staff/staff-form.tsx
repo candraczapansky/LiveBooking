@@ -180,6 +180,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         title: data.title,
         bio: data.bio,
         commissionRate: data.commissionRate,
+        photoUrl: data.photoUrl,
       };
 
       const staffResponse = await apiRequest("POST", "/api/staff", staffData);
@@ -234,6 +235,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         title: data.title,
         bio: data.bio,
         commissionRate: data.commissionRate,
+        photoUrl: data.photoUrl,
       };
 
       const staffResponse = await apiRequest("PUT", `/api/staff/${staffId}`, staffData);
