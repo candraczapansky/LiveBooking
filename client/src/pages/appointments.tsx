@@ -319,15 +319,15 @@ const AppointmentsPage = () => {
           </div>
 
           {/* Calendar Grid */}
-          <div className="flex-1 overflow-auto">
-            <div className="flex min-h-full">
+          <div className="flex-1 overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
+            <div className="flex" style={{ minHeight: `${timeSlots.length * 60 + 48}px` }}>
               {/* Time Column */}
-              <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0">
-                <div className="h-12 border-b border-gray-200 dark:border-gray-700"></div>
+              <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
+                <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
                 {timeSlots.map((time) => (
                   <div 
                     key={time}
-                    className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1"
+                    className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
                     style={{ height: '60px' }}
                   >
                     <span className="text-xs text-gray-600 dark:text-gray-400">
@@ -339,10 +339,10 @@ const AppointmentsPage = () => {
 
               {/* Main Calendar Area */}
               <div className="flex-1">
-                {/* Staff Header */}
-                <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+                {/* Staff Header - Sticky */}
+                <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
                   {staffMembers.map((staffName, index) => (
-                    <div key={staffName} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center">
+                    <div key={staffName} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
                       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                         {staffName}
                       </span>
@@ -359,7 +359,7 @@ const AppointmentsPage = () => {
                         {timeSlots.map((time, timeIndex) => (
                           <div 
                             key={`${staffIndex}-${time}`}
-                            className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
+                            className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
                             style={{ height: '60px' }}
                             onClick={() => handleAddAppointment()}
                           />
@@ -379,9 +379,9 @@ const AppointmentsPage = () => {
                       return (
                         <div
                           key={appointment.id}
-                          className="absolute pointer-events-auto cursor-pointer rounded-md p-2 text-xs overflow-hidden shadow-sm border text-white"
+                          className="absolute pointer-events-auto cursor-pointer rounded-md p-2 text-xs overflow-hidden shadow-sm border text-white hover:shadow-md transition-shadow"
                           style={{
-                            top: position.top + 48, // Account for header
+                            top: position.top,
                             height: position.height,
                             left: `${staffColumn * 25}%`,
                             width: '24%',
