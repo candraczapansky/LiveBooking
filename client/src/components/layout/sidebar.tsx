@@ -43,9 +43,10 @@ type SidebarProps = {
   isMobile: boolean;
   isOpen: boolean;
   onClose: () => void;
+  onToggle: () => void;
 };
 
-const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
+const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
   const [location] = useLocation();
   const { user, logout } = useContext(AuthContext);
 
@@ -77,7 +78,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
                 variant="ghost" 
                 size="icon" 
                 className="mr-3 h-8 w-8"
-                onClick={onClose}
+                onClick={onToggle}
               >
                 <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </Button>
@@ -161,6 +162,7 @@ export const SidebarController = () => {
       isMobile={isMobile}
       isOpen={isOpen}
       onClose={() => setIsOpen(false)}
+      onToggle={() => setIsOpen(!isOpen)}
     />
   );
 };
