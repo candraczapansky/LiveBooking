@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const serviceFormSchema = z.object({
   name: z.string().min(1, "Service name is required"),
@@ -49,6 +50,7 @@ const serviceFormSchema = z.object({
     customRate: z.coerce.number().min(0, "Rate must be 0 or greater").optional(),
     customCommissionRate: z.coerce.number().min(0, "Commission rate must be 0 or greater").optional(),
   })).optional(),
+  requiredDevices: z.array(z.number()).optional(),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -92,6 +94,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     }
   });
 
+  const { data: devices } = useQuery({
+    queryKey: ['/api/devices'],
+    queryFn: async () => {
+      const response = await fetch('/api/devices');
+      if (!response.ok) throw new Error('Failed to fetch devices');
+      return response.json();
+    }
+  });
+
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
@@ -105,6 +116,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       bufferTimeAfter: 0,
       color: "#3B82F6",
       assignedStaff: [],
+      requiredDevices: [],
     },
   });
 
@@ -399,6 +411,51 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                 )}
               />
             </div>
+
+            {/* Required Devices */}
+            <FormField
+              control={form.control}
+              name="requiredDevices"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Required Devices</FormLabel>
+                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg">
+                    {!devices || devices.length === 0 ? (
+                      <div className="col-span-2 text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No devices available
+                      </div>
+                    ) : (
+                      devices.filter((device: any) => device.isActive).map((device: any) => (
+                        <div key={device.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`device-${device.id}`}
+                            checked={field.value?.includes(device.id) || false}
+                            onCheckedChange={(checked) => {
+                              const currentIds = field.value || [];
+                              if (checked) {
+                                field.onChange([...currentIds, device.id]);
+                              } else {
+                                field.onChange(currentIds.filter((id: number) => id !== device.id));
+                              }
+                            }}
+                          />
+                          <Label 
+                            htmlFor={`device-${device.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {device.name}
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Select devices that are required for this service
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Service Color */}
             <FormField
