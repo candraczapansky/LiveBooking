@@ -2,6 +2,7 @@ import {
   users, User, InsertUser,
   serviceCategories, ServiceCategory, InsertServiceCategory,
   rooms, Room, InsertRoom,
+  devices, Device, InsertDevice,
   services, Service, InsertService,
   staff, Staff, InsertStaff,
   staffServices, StaffService, InsertStaffService,
@@ -31,6 +32,13 @@ export interface IStorage {
   getAllRooms(): Promise<Room[]>;
   updateRoom(id: number, roomData: Partial<InsertRoom>): Promise<Room>;
   deleteRoom(id: number): Promise<boolean>;
+
+  // Device operations
+  createDevice(device: InsertDevice): Promise<Device>;
+  getDevice(id: number): Promise<Device | undefined>;
+  getAllDevices(): Promise<Device[]>;
+  updateDevice(id: number, deviceData: Partial<InsertDevice>): Promise<Device>;
+  deleteDevice(id: number): Promise<boolean>;
 
   // Service operations
   createService(service: InsertService): Promise<Service>;
@@ -90,6 +98,7 @@ export class MemStorage implements IStorage {
   private users: Map<number, User>;
   private serviceCategories: Map<number, ServiceCategory>;
   private rooms: Map<number, Room>;
+  private devices: Map<number, Device>;
   private services: Map<number, Service>;
   private staff: Map<number, Staff>;
   private staffServices: Map<number, StaffService>;

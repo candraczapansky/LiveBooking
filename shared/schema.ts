@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -41,6 +41,25 @@ export const rooms = pgTable("rooms", {
 });
 
 export const insertRoomSchema = createInsertSchema(rooms).omit({
+  id: true,
+});
+
+// Devices schema
+export const devices = pgTable("devices", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  deviceType: text("device_type").notNull(), // hair_dryer, massage_table, styling_chair, etc.
+  brand: text("brand"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  purchaseDate: text("purchase_date"),
+  warrantyExpiry: text("warranty_expiry"),
+  status: text("status").notNull().default("available"), // available, in_use, maintenance, broken
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+export const insertDeviceSchema = createInsertSchema(devices).omit({
   id: true,
 });
 
@@ -186,3 +205,6 @@ export type InsertClientMembership = z.infer<typeof insertClientMembershipSchema
 
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = z.infer<typeof insertDeviceSchema>;
