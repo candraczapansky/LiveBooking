@@ -14,7 +14,8 @@ import {
   LogOut, 
   X, 
   Menu,
-  MapPin
+  MapPin,
+  Monitor
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -59,6 +60,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
     { icon: <UserCircle />, label: "Staff", href: "/staff" },
     { icon: <Scissors />, label: "Services", href: "/services" },
     { icon: <MapPin />, label: "Rooms", href: "/rooms" },
+    { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },

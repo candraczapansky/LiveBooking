@@ -184,6 +184,58 @@ export class MemStorage implements IStorage {
       isActive: true
     });
 
+    // Create sample devices
+    this.createDevice({
+      name: 'Professional Hair Dryer Station 1',
+      description: 'High-speed ionic hair dryer for quick styling',
+      deviceType: 'hair_dryer',
+      brand: 'Dyson',
+      model: 'Supersonic HD07',
+      serialNumber: 'DYS001234',
+      purchaseDate: '2024-01-15',
+      warrantyExpiry: '2026-01-15',
+      status: 'available',
+      isActive: true
+    });
+
+    this.createDevice({
+      name: 'Luxury Massage Table 1',
+      description: 'Electric height-adjustable massage table with heating',
+      deviceType: 'massage_table',
+      brand: 'Earthlite',
+      model: 'Ellora Vista',
+      serialNumber: 'EL789456',
+      purchaseDate: '2023-08-20',
+      warrantyExpiry: '2025-08-20',
+      status: 'available',
+      isActive: true
+    });
+
+    this.createDevice({
+      name: 'Hydraulic Styling Chair A',
+      description: 'Professional salon chair with 360-degree rotation',
+      deviceType: 'styling_chair',
+      brand: 'Takara Belmont',
+      model: 'Apollo II',
+      serialNumber: 'TB345678',
+      purchaseDate: '2023-05-10',
+      warrantyExpiry: '2028-05-10',
+      status: 'in_use',
+      isActive: true
+    });
+
+    this.createDevice({
+      name: 'Facial Steamer Pro',
+      description: 'Professional ozone facial steamer for deep cleansing',
+      deviceType: 'facial_steamer',
+      brand: 'Lucas',
+      model: 'Champagne 701',
+      serialNumber: 'LC112233',
+      purchaseDate: '2024-03-01',
+      status: 'maintenance',
+      isActive: true
+    });
+
     // No sample services - users will create their own
 
     // Sample staff users removed - only real staff will be added by users
