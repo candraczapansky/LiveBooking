@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Bell, Menu } from "lucide-react";
 import { AuthContext } from "@/App";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -7,12 +7,33 @@ import { getInitials, getFullName } from "@/lib/utils";
 
 const Header = () => {
   const { user } = useContext(AuthContext);
+  const [showMenuButton, setShowMenuButton] = useState(false);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const sidebarOpen = (window as any).sidebarIsOpen;
+      setShowMenuButton(!sidebarOpen);
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
+            {showMenuButton && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="mr-3"
+                onClick={() => (window as any).toggleSidebar?.()}
+              >
+                <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+              </Button>
+            )}
             <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
           </div>
           <div className="flex items-center">

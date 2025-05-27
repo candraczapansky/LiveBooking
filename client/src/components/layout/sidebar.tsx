@@ -143,7 +143,7 @@ export const SidebarController = () => {
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth >= 768) {
+      if (window.innerWidth < 768) {
         setIsOpen(false);
       }
     };
@@ -152,18 +152,28 @@ export const SidebarController = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Export toggle function globally so header can access it
+  // Export toggle function and state globally so other components can access it
   useEffect(() => {
     (window as any).toggleSidebar = () => setIsOpen(!isOpen);
+    (window as any).sidebarIsOpen = isOpen;
   }, [isOpen]);
 
   return (
-    <Sidebar
-      isMobile={isMobile}
-      isOpen={isOpen}
-      onClose={() => setIsOpen(false)}
-      onToggle={() => setIsOpen(!isOpen)}
-    />
+    <>
+      <Sidebar
+        isMobile={isMobile}
+        isOpen={isOpen}
+        onClose={() => setIsOpen(false)}
+        onToggle={() => setIsOpen(!isOpen)}
+      />
+      {/* Overlay for mobile when sidebar is open */}
+      {isMobile && isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden" 
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+    </>
   );
 };
 
