@@ -404,6 +404,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 >
                   Staff Profile
                 </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                >
+                  Schedule
+                </Button>
               </div>
             )}
 
