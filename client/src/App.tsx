@@ -11,6 +11,7 @@ import Login from "@/pages/login";
 import Services from "@/pages/services";
 import Clients from "@/pages/clients";
 import Staff from "@/pages/staff";
+import Rooms from "@/pages/rooms";
 import Appointments from "@/pages/appointments";
 import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
@@ -64,6 +65,7 @@ function Router() {
       <Route path="/services" component={Services} />
       <Route path="/clients" component={Clients} />
       <Route path="/staff" component={Staff} />
+      <Route path="/rooms" component={Rooms} />
       <Route path="/appointments" component={Appointments} />
       <Route path="/memberships" component={Memberships} />
       <Route path="/reports" component={Reports} />
