@@ -9,6 +9,7 @@ import { Device } from "@shared/schema";
 import { DeviceForm } from "@/components/devices/device-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { AppLayout } from "@/components/layout/app-layout";
 
 export default function DevicesPage() {
   useDocumentTitle("Devices - Salon Management");
@@ -88,7 +89,8 @@ export default function DevicesPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <AppLayout>
+        <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         </div>
@@ -107,12 +109,14 @@ export default function DevicesPage() {
             </Card>
           ))}
         </div>
-      </div>
+        </div>
+      </AppLayout>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <AppLayout>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         <Button 
@@ -203,6 +207,7 @@ export default function DevicesPage() {
           onClose={handleCloseForm}
         />
       )}
-    </div>
+      </div>
+    </AppLayout>
   );
 }
