@@ -15,6 +15,19 @@ const ServicesPage = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch categories to get the first one by default
   const { data: categories, isLoading } = useQuery({
@@ -35,7 +48,9 @@ const ServicesPage = () => {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        sidebarOpen ? 'ml-64' : 'ml-0'
+      }`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
