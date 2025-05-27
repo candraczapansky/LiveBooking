@@ -106,10 +106,13 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
 
   const updateRoomMutation = useMutation({
     mutationFn: async (data: RoomFormValues) => {
-      return apiRequest(`/api/rooms/${room.id}`, {
+      const response = await fetch(`/api/rooms/${room.id}`, {
         method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
+      if (!response.ok) throw new Error("Failed to update room");
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/rooms"] });
