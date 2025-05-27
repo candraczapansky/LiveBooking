@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +58,19 @@ const StaffPage = () => {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ['/api/staff'],
@@ -122,7 +135,9 @@ const StaffPage = () => {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        sidebarOpen ? 'ml-64' : 'ml-0'
+      }`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
