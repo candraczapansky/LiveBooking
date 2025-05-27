@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -23,13 +24,14 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Device, insertDeviceSchema } from "@shared/schema";
+import { Device, insertDeviceSchema, Service } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
 const deviceFormSchema = insertDeviceSchema.extend({
   name: z.string().min(1, "Device name is required"),
   deviceType: z.string().min(1, "Device type is required"),
   status: z.string().min(1, "Status is required"),
+  serviceIds: z.array(z.number()).optional(),
 });
 
 type DeviceFormData = z.infer<typeof deviceFormSchema>;
@@ -63,6 +65,11 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Fetch available services for selection
+  const { data: services = [] } = useQuery<Service[]>({
+    queryKey: ["/api/services"],
+  });
+
   const form = useForm<DeviceFormData>({
     resolver: zodResolver(deviceFormSchema),
     defaultValues: {
@@ -76,6 +83,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
       warrantyExpiry: device?.warrantyExpiry || "",
       status: device?.status || "available",
       isActive: device?.isActive ?? true,
+      serviceIds: [],
     },
   });
 
@@ -298,6 +306,51 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                 )}
               />
             </div>
+
+            {/* Services that need this device */}
+            <FormField
+              control={form.control}
+              name="serviceIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Services That Need This Device</FormLabel>
+                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg">
+                    {services.length === 0 ? (
+                      <div className="col-span-2 text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                        No services available
+                      </div>
+                    ) : (
+                      services.map((service) => (
+                        <div key={service.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`service-${service.id}`}
+                            checked={field.value?.includes(service.id) || false}
+                            onCheckedChange={(checked) => {
+                              const currentIds = field.value || [];
+                              if (checked) {
+                                field.onChange([...currentIds, service.id]);
+                              } else {
+                                field.onChange(currentIds.filter(id => id !== service.id));
+                              }
+                            }}
+                          />
+                          <Label 
+                            htmlFor={`service-${service.id}`}
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            {service.name}
+                          </Label>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    Select which services require this device for scheduling and resource management
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
