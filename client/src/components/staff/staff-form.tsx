@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 
 import {
   Dialog,
@@ -64,6 +65,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [, setLocation] = useLocation();
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
@@ -408,6 +410,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   type="button" 
                   variant="outline" 
                   size="sm"
+                  onClick={() => {
+                    onOpenChange(false);
+                    setLocation('/schedule');
+                  }}
                 >
                   Schedule
                 </Button>
