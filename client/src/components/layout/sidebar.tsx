@@ -125,8 +125,7 @@ const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
   );
 };
 
-export const SidebarController = () => {
-  const [isOpen, setIsOpen] = useState(false);
+export const SidebarController = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -139,27 +138,14 @@ export const SidebarController = () => {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [setIsOpen]);
 
   return (
-    <>
-      <Sidebar
-        isMobile={isMobile}
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-      />
-      
-      {isMobile && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="fixed top-4 left-4 z-20"
-          onClick={() => setIsOpen(true)}
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-      )}
-    </>
+    <Sidebar
+      isMobile={isMobile}
+      isOpen={isOpen}
+      onClose={() => setIsOpen(false)}
+    />
   );
 };
 

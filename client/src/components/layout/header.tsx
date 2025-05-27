@@ -1,19 +1,31 @@
 import { useContext } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Menu } from "lucide-react";
 import { AuthContext } from "@/App";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getInitials, getFullName } from "@/lib/utils";
 
-const Header = () => {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+const Header = ({ onMenuClick }: HeaderProps) => {
   const { user } = useContext(AuthContext);
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          <div className="flex items-center md:hidden">
-            {/* Menu button handled by SidebarController */}
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="md:hidden mr-2"
+              onClick={onMenuClick}
+            >
+              <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
+            </Button>
+            <h1 className="text-xl font-bold text-primary md:hidden">BeautyBook</h1>
           </div>
           <div className="flex items-center">
             <div className="ml-4 flex items-center md:ml-6">
