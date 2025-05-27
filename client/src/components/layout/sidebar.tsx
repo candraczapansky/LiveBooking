@@ -72,7 +72,17 @@ const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
       <div className="flex flex-col h-full">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+            <div className="flex items-center">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="mr-3 h-8 w-8"
+                onClick={onClose}
+              >
+                <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+              </Button>
+              <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+            </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={onClose} className="md:hidden">
                 <X className="h-5 w-5" />
