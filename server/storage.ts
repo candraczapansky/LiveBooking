@@ -110,6 +110,7 @@ export class MemStorage implements IStorage {
   private currentUserId: number;
   private currentServiceCategoryId: number;
   private currentRoomId: number;
+  private currentDeviceId: number;
   private currentServiceId: number;
   private currentStaffId: number;
   private currentStaffServiceId: number;
@@ -122,6 +123,7 @@ export class MemStorage implements IStorage {
     this.users = new Map();
     this.serviceCategories = new Map();
     this.rooms = new Map();
+    this.devices = new Map();
     this.services = new Map();
     this.staff = new Map();
     this.staffServices = new Map();
@@ -133,6 +135,7 @@ export class MemStorage implements IStorage {
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
     this.currentRoomId = 1;
+    this.currentDeviceId = 1;
     this.currentServiceId = 1;
     this.currentStaffId = 1;
     this.currentStaffServiceId = 1;
@@ -281,6 +284,36 @@ export class MemStorage implements IStorage {
 
   async deleteRoom(id: number): Promise<boolean> {
     return this.rooms.delete(id);
+  }
+
+  // Device operations
+  async createDevice(device: InsertDevice): Promise<Device> {
+    const id = this.currentDeviceId++;
+    const newDevice: Device = { ...device, id };
+    this.devices.set(id, newDevice);
+    return newDevice;
+  }
+
+  async getDevice(id: number): Promise<Device | undefined> {
+    return this.devices.get(id);
+  }
+
+  async getAllDevices(): Promise<Device[]> {
+    return Array.from(this.devices.values());
+  }
+
+  async updateDevice(id: number, deviceData: Partial<InsertDevice>): Promise<Device> {
+    const existingDevice = this.devices.get(id);
+    if (!existingDevice) {
+      throw new Error(`Device with id ${id} not found`);
+    }
+    const updatedDevice: Device = { ...existingDevice, ...deviceData };
+    this.devices.set(id, updatedDevice);
+    return updatedDevice;
+  }
+
+  async deleteDevice(id: number): Promise<boolean> {
+    return this.devices.delete(id);
   }
 
   // Service operations

@@ -6,6 +6,7 @@ import {
   insertUserSchema,
   insertServiceCategorySchema,
   insertRoomSchema,
+  insertDeviceSchema,
   insertServiceSchema,
   insertStaffSchema,
   insertStaffServiceSchema,
@@ -167,6 +168,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(200).json({ message: "Room deleted successfully" });
     } else {
       return res.status(404).json({ error: "Room not found" });
+    }
+  });
+
+  // Devices routes
+  app.get("/api/devices", async (req, res) => {
+    const devices = await storage.getAllDevices();
+    return res.status(200).json(devices);
+  });
+
+  app.post("/api/devices", validateBody(insertDeviceSchema), async (req, res) => {
+    const newDevice = await storage.createDevice(req.body);
+    return res.status(201).json(newDevice);
+  });
+
+  app.put("/api/devices/:id", validateBody(insertDeviceSchema.partial()), async (req, res) => {
+    const id = parseInt(req.params.id);
+    try {
+      const updatedDevice = await storage.updateDevice(id, req.body);
+      return res.status(200).json(updatedDevice);
+    } catch (error) {
+      return res.status(404).json({ error: "Device not found" });
+    }
+  });
+
+  app.delete("/api/devices/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteDevice(id);
+    if (deleted) {
+      return res.status(200).json({ message: "Device deleted successfully" });
+    } else {
+      return res.status(404).json({ error: "Device not found" });
     }
   });
   
