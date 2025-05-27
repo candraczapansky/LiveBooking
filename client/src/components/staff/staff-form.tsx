@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,25 +36,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 // Staff form schema
 const staffFormSchema = z.object({
-  userId: z.coerce.number().optional(),
   title: z.string().min(1, "Job title is required"),
   bio: z.string().optional(),
-  commissionType: z.enum(["commission", "hourly", "fixed", "hourly_plus_commission"]).default("commission"),
-  commissionRate: z.coerce.number().min(0, "Commission rate must be a positive number or zero").max(100, "Commission rate must be between 0 and 100").optional(),
-  hourlyRate: z.coerce.number().min(0, "Hourly rate must be a positive number or zero").optional(),
-  fixedRate: z.coerce.number().min(0, "Fixed rate must be a positive number or zero").optional(),
-  username: z.string().min(1, "Username is required").optional(),
-  email: z.string().email("Invalid email address").optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
-  firstName: z.string().min(1, "First name is required").optional(),
-  lastName: z.string().min(1, "Last name is required").optional(),
+  commissionRate: z.number().min(0).max(100).default(0),
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
-  photoUrl: z.string().optional(),
-  assignedServices: z.array(z.coerce.number()).optional(),
+  assignedServices: z.array(z.number()).default([]),
   serviceRates: z.record(z.string(), z.object({
-    customRate: z.coerce.number().optional(),
-    customCommissionRate: z.coerce.number().optional(),
-  })).optional(),
+    customRate: z.number().optional(),
+    customCommissionRate: z.number().optional(),
+  })).default({}),
 });
 
 type StaffFormValues = z.infer<typeof staffFormSchema>;
@@ -69,12 +64,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [isExistingUser, setIsExistingUser] = useState(false);
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
     defaultValues: {
-      userId: undefined,
       title: "",
       bio: "",
       commissionRate: 0,
@@ -100,17 +93,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     enabled: open
   });
 
-  // Fetch existing users for dropdown
-  const { data: users } = useQuery({
-    queryKey: ['/api/users'],
-    queryFn: async () => {
-      const response = await fetch('/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
-      return response.json();
-    },
-    enabled: open && isExistingUser
-  });
-
   // Fetch staff data if editing
   useEffect(() => {
     if (staffId && open) {
@@ -118,8 +100,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       fetch(`/api/staff/${staffId}`)
         .then(res => res.json())
         .then(data => {
-          setIsExistingUser(true);
-          
           // Fetch staff services
           fetch(`/api/staff/${staffId}/services`)
             .then(res => res.json())
@@ -138,28 +118,28 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               });
               
               form.reset({
-                userId: data.userId,
-                title: data.title,
+                title: data.title || "",
                 bio: data.bio || "",
-                commissionType: data.commissionType || "commission",
-                commissionRate: data.commissionRate ? data.commissionRate * 100 : undefined, // Convert decimal to percentage
-                hourlyRate: data.hourlyRate,
-                fixedRate: data.fixedRate,
-                photoUrl: data.photoUrl || "",
+                commissionRate: data.commissionRate || 0,
                 firstName: data.user?.firstName || "",
                 lastName: data.user?.lastName || "",
                 email: data.user?.email || "",
+                username: data.user?.username || "",
+                password: "", // Don't pre-fill password
                 phone: data.user?.phone || "",
                 assignedServices: assignedServiceIds,
                 serviceRates: serviceRates,
               });
-              
-              setIsLoading(false);
             })
             .catch(err => {
               console.error("Error fetching staff services:", err);
-              setIsLoading(false);
-            });
+              toast({
+                title: "Error",
+                description: "Failed to load staff services",
+                variant: "destructive",
+              });
+            })
+            .finally(() => setIsLoading(false));
         })
         .catch(err => {
           console.error("Error fetching staff:", err);
@@ -169,78 +149,98 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
             variant: "destructive",
           });
           setIsLoading(false);
-          onOpenChange(false);
         });
+    } else if (open && !staffId) {
+      // Reset form for new staff member
+      form.reset({
+        title: "",
+        bio: "",
+        commissionRate: 0,
+        username: "",
+        email: "",
+        password: "",
+        firstName: "",
+        lastName: "",
+        phone: "",
+        assignedServices: [],
+        serviceRates: {},
+      });
     }
-  }, [staffId, open, form, toast, onOpenChange]);
+  }, [staffId, open, form]);
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+    }
+  }, [open, form]);
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
+      // Always create a new user for staff
       let userId;
+      
+      // Generate a unique username if the provided one fails
+      let username = data.username;
+      let userCreated = false;
+      let attempts = 0;
+      
+      while (!userCreated && attempts < 5) {
+        const userData = {
+          username: attempts === 0 ? username : `${username}${attempts}`,
+          email: data.email,
+          password: data.password,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          role: "staff",
+        };
 
-      // If it's not an existing user, create a new user first
-      if (!isExistingUser) {
-        // Generate a unique username if the provided one fails
-        let username = data.username;
-        let userCreated = false;
-        let attempts = 0;
-        
-        while (!userCreated && attempts < 5) {
-          const userData = {
-            username: attempts === 0 ? username : `${username}${attempts}`,
-            email: data.email,
-            password: data.password,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            role: "staff",
-          };
-
-          const userResponse = await apiRequest("POST", "/api/register", userData);
-          if (userResponse.ok) {
-            const user = await userResponse.json();
-            userId = user.id;
-            userCreated = true;
+        const userResponse = await apiRequest("POST", "/api/register", userData);
+        if (userResponse.ok) {
+          const user = await userResponse.json();
+          userId = user.id;
+          userCreated = true;
+        } else {
+          const errorData = await userResponse.json();
+          if (errorData.error?.includes("Username already taken")) {
+            attempts++;
           } else {
-            const errorData = await userResponse.json();
-            if (errorData.error?.includes("Username already taken")) {
-              attempts++;
-            } else {
-              throw new Error(errorData.error || "Failed to create user");
-            }
+            throw new Error(errorData.error || "Failed to create user");
           }
         }
-        
-        if (!userCreated) {
-          throw new Error("Unable to create a unique username. Please try a different username.");
-        }
-      } else {
-        userId = data.userId;
+      }
+      
+      if (!userCreated) {
+        throw new Error("Unable to create a unique username. Please try a different username.");
       }
 
-      // Create staff profile
+      // Create staff member
       const staffData = {
-        userId,
+        userId: userId,
         title: data.title,
         bio: data.bio,
-        commissionType: data.commissionType,
-        commissionRate: data.commissionRate ? data.commissionRate / 100 : undefined, // Convert percentage to decimal
-        hourlyRate: data.hourlyRate,
-        fixedRate: data.fixedRate,
-        photoUrl: data.photoUrl,
+        commissionRate: data.commissionRate,
       };
 
       const staffResponse = await apiRequest("POST", "/api/staff", staffData);
+      if (!staffResponse.ok) {
+        const errorData = await staffResponse.json();
+        throw new Error(errorData.error || "Failed to create staff member");
+      }
+
       const staff = await staffResponse.json();
 
       // Assign services to staff
-      if (data.assignedServices && data.assignedServices.length > 0) {
-        for (const serviceId of data.assignedServices) {
-          await apiRequest("POST", "/api/staff-services", {
-            staffId: staff.id,
-            serviceId,
-          });
-        }
+      for (const serviceId of data.assignedServices) {
+        const serviceAssignment = {
+          staffId: staff.id,
+          serviceId: serviceId,
+          customRate: data.serviceRates[serviceId.toString()]?.customRate,
+          customCommissionRate: data.serviceRates[serviceId.toString()]?.customCommissionRate,
+        };
+        
+        await apiRequest("POST", "/api/staff-services", serviceAssignment);
       }
 
       return staff;
@@ -249,10 +249,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
       toast({
         title: "Success",
-        description: "Staff member created successfully",
+        description: "Staff member created successfully!",
       });
-      form.reset();
       onOpenChange(false);
+      form.reset();
     },
     onError: (error) => {
       toast({
@@ -265,80 +265,75 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
   const updateStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
-      // Update user data if needed
-      if (data.firstName || data.lastName || data.email || data.phone) {
-        const userData = {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phone: data.phone,
-        };
+      if (!staffId) throw new Error("Staff ID is required for update");
 
-        await apiRequest("PUT", `/api/users/${data.userId}`, userData);
+      // Update user information
+      const userData = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+      };
+
+      const userResponse = await apiRequest("PATCH", `/api/users/${staffId}`, userData);
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        throw new Error(errorData.error || "Failed to update user");
       }
 
-      // Update staff profile
+      // Update staff information
       const staffData = {
         title: data.title,
         bio: data.bio,
-        commissionType: data.commissionType,
-        commissionRate: data.commissionRate ? data.commissionRate / 100 : undefined, // Convert percentage to decimal
-        hourlyRate: data.hourlyRate,
-        fixedRate: data.fixedRate,
-        photoUrl: data.photoUrl,
+        commissionRate: data.commissionRate,
       };
 
-      const staffResponse = await apiRequest("PUT", `/api/staff/${staffId}`, staffData);
-      const staff = await staffResponse.json();
+      const staffResponse = await apiRequest("PATCH", `/api/staff/${staffId}`, staffData);
+      if (!staffResponse.ok) {
+        const errorData = await staffResponse.json();
+        throw new Error(errorData.error || "Failed to update staff member");
+      }
 
       // Update service assignments
-      if (data.assignedServices) {
-        // First, fetch current service assignments
-        const response = await fetch(`/api/staff/${staffId}/services`);
-        const currentServices = await response.json();
-        const currentServiceIds = currentServices.map((service: any) => service.id);
+      const existingServices = await fetch(`/api/staff/${staffId}/services`).then(res => res.json());
+      const existingServiceIds = existingServices.map((service: any) => service.id);
 
-        // Remove services no longer assigned
-        for (const serviceId of currentServiceIds) {
-          if (!data.assignedServices.includes(serviceId)) {
-            await apiRequest("DELETE", `/api/staff/${staffId}/services/${serviceId}`, null);
-          }
-        }
-
-        // Add newly assigned services with custom rates
-        for (const serviceId of data.assignedServices) {
-          if (!currentServiceIds.includes(serviceId)) {
-            const serviceRates = data.serviceRates?.[serviceId.toString()];
-            await apiRequest("POST", "/api/staff-services", {
-              staffId: staffId,
-              serviceId,
-              customRate: serviceRates?.customRate || null,
-              customCommissionRate: serviceRates?.customCommissionRate || null,
-            });
-          } else {
-            // Update existing assignment with new custom rates
-            const existingService = currentServices.find((service: any) => service.id === serviceId);
-            if (existingService) {
-              const serviceRates = data.serviceRates?.[serviceId.toString()];
-              // Update the staff service with new rates
-              await apiRequest("PUT", `/api/staff-services/${existingService.staffServiceId}`, {
-                customRate: serviceRates?.customRate || null,
-                customCommissionRate: serviceRates?.customCommissionRate || null,
-              });
-            }
-          }
+      // Remove services that are no longer assigned
+      for (const existingServiceId of existingServiceIds) {
+        if (!data.assignedServices.includes(existingServiceId)) {
+          await apiRequest("DELETE", `/api/staff-services/staff/${staffId}/service/${existingServiceId}`);
         }
       }
 
-      return staff;
+      // Add new services or update existing ones
+      for (const serviceId of data.assignedServices) {
+        const serviceAssignment = {
+          staffId: staffId,
+          serviceId: serviceId,
+          customRate: data.serviceRates[serviceId.toString()]?.customRate,
+          customCommissionRate: data.serviceRates[serviceId.toString()]?.customCommissionRate,
+        };
+
+        if (existingServiceIds.includes(serviceId)) {
+          // Update existing assignment
+          const existingAssignment = existingServices.find((s: any) => s.id === serviceId);
+          if (existingAssignment) {
+            await apiRequest("PATCH", `/api/staff-services/${existingAssignment.staffServiceId}`, serviceAssignment);
+          }
+        } else {
+          // Create new assignment
+          await apiRequest("POST", "/api/staff-services", serviceAssignment);
+        }
+      }
+
+      return await staffResponse.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
       toast({
         title: "Success",
-        description: "Staff member updated successfully",
+        description: "Staff member updated successfully!",
       });
-      form.reset();
       onOpenChange(false);
     },
     onError: (error) => {
@@ -350,47 +345,40 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     }
   });
 
-  const onSubmit = (values: StaffFormValues) => {
+  const onSubmit = async (data: StaffFormValues) => {
     if (staffId) {
-      updateStaffMutation.mutate(values);
+      updateStaffMutation.mutate(data);
     } else {
-      createStaffMutation.mutate(values);
+      createStaffMutation.mutate(data);
     }
   };
 
-  const toggleUserType = () => {
-    setIsExistingUser(!isExistingUser);
-    form.reset({
-      ...form.getValues(),
-      userId: undefined,
-      username: "",
-      email: "",
-      password: "",
-      firstName: "",
-      lastName: "",
-      phone: "",
-    });
+  const handleServiceToggle = (serviceId: number, checked: boolean) => {
+    const currentServices = form.getValues('assignedServices');
+    if (checked) {
+      form.setValue('assignedServices', [...currentServices, serviceId]);
+    } else {
+      form.setValue('assignedServices', currentServices.filter(id => id !== serviceId));
+      // Remove custom rates for this service
+      const currentRates = form.getValues('serviceRates');
+      const newRates = { ...currentRates };
+      delete newRates[serviceId.toString()];
+      form.setValue('serviceRates', newRates);
+    }
   };
 
-  const handleUserSelect = (userId: string) => {
-    // Fetch user details and populate form
-    fetch(`/api/users/${userId}`)
-      .then(res => res.json())
-      .then(user => {
-        form.setValue('userId', parseInt(userId));
-        form.setValue('firstName', user.firstName || "");
-        form.setValue('lastName', user.lastName || "");
-        form.setValue('email', user.email || "");
-        form.setValue('phone', user.phone || "");
-      })
-      .catch(err => {
-        console.error("Error fetching user details:", err);
-        toast({
-          title: "Error",
-          description: "Failed to load user details",
-          variant: "destructive",
-        });
-      });
+  const handleCustomRateChange = (serviceId: number, field: 'customRate' | 'customCommissionRate', value: string) => {
+    const numValue = value === '' ? undefined : parseFloat(value);
+    const currentRates = form.getValues('serviceRates');
+    const serviceKey = serviceId.toString();
+    
+    form.setValue('serviceRates', {
+      ...currentRates,
+      [serviceKey]: {
+        ...currentRates[serviceKey],
+        [field]: numValue,
+      }
+    });
   };
 
   return (
@@ -399,224 +387,120 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         <DialogHeader>
           <DialogTitle>{staffId ? "Edit Staff Member" : "Add New Staff Member"}</DialogTitle>
           <DialogDescription>
-            {staffId
-              ? "Update the staff member's details below."
-              : "Create a new staff member by filling out the form below."}
+            {staffId ? "Update the staff member information below." : "Create a new staff member by filling out the form below."}
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Staff Type Selection */}
+            {/* Staff Profile Header */}
             {!staffId && (
               <div className="flex items-center space-x-2">
                 <Button 
                   type="button" 
-                  variant={isExistingUser ? "outline" : "default"} 
+                  variant="default" 
                   size="sm"
-                  onClick={() => setIsExistingUser(false)}
+                  disabled
                 >
-                  New User
-                </Button>
-                <Button 
-                  type="button" 
-                  variant={isExistingUser ? "default" : "outline"} 
-                  size="sm"
-                  onClick={() => setIsExistingUser(true)}
-                >
-                  Existing User
+                  Staff Profile
                 </Button>
               </div>
             )}
 
-            {/* User Selection for Existing User */}
-            {isExistingUser && !staffId && (
+            {/* Personal Information */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="userId"
+                name="firstName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Select User</FormLabel>
-                    <Select 
-                      onValueChange={value => handleUserSelect(value)}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a user" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {users?.filter((user: any) => user.role !== 'staff').map((user: any) => (
-                          <SelectItem key={user.id} value={user.id.toString()}>
-                            {user.firstName} {user.lastName} ({user.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            )}
+              
+              <FormField
+                control={form.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* New User Fields */}
-            {!isExistingUser && !staffId && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Username</FormLabel>
-                        <FormControl>
-                          <Input placeholder="johndoe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="john.doe@example.com" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(123) 456-7890" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Display user info if editing */}
-            {staffId && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Username</FormLabel>
+                    <FormControl>
+                      <Input placeholder="johndoe" {...field} disabled={!!staffId} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {!staffId && (
                 <FormField
                   control={form.control}
-                  name="firstName"
+                  name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name</FormLabel>
+                      <FormLabel>Password</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                        <Input type="password" placeholder="••••••••" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="john.doe@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="phone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Phone</FormLabel>
-                      <FormControl>
-                        <Input placeholder="(123) 456-7890" {...field} value={field.value || ""} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Staff Profile Fields */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="john.doe@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="(555) 123-4567" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Job Information */}
             <FormField
               control={form.control}
               name="title"
@@ -624,7 +508,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 <FormItem>
                   <FormLabel>Job Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="Senior Stylist" {...field} />
+                    <Input placeholder="Hair Stylist" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -638,10 +522,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 <FormItem>
                   <FormLabel>Bio (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea
+                    <Textarea 
                       placeholder="Describe the staff member's experience and specialties..."
+                      className="resize-none"
+                      rows={3}
                       {...field}
-                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -651,268 +536,83 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
             <FormField
               control={form.control}
-              name="photoUrl"
+              name="commissionRate"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Staff Photo (Optional)</FormLabel>
+                  <FormLabel>Commission Rate (%)</FormLabel>
                   <FormControl>
-                    <div className="space-y-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            // Create a canvas to resize the image
-                            const canvas = document.createElement('canvas');
-                            const ctx = canvas.getContext('2d');
-                            const img = new Image();
-                            
-                            img.onload = () => {
-                              // Set maximum dimensions
-                              const maxWidth = 400;
-                              const maxHeight = 400;
-                              
-                              let { width, height } = img;
-                              
-                              // Calculate new dimensions
-                              if (width > height) {
-                                if (width > maxWidth) {
-                                  height = (height * maxWidth) / width;
-                                  width = maxWidth;
-                                }
-                              } else {
-                                if (height > maxHeight) {
-                                  width = (width * maxHeight) / height;
-                                  height = maxHeight;
-                                }
-                              }
-                              
-                              canvas.width = width;
-                              canvas.height = height;
-                              
-                              // Draw and compress
-                              ctx?.drawImage(img, 0, 0, width, height);
-                              const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                              field.onChange(compressedDataUrl);
-                            };
-                            
-                            img.src = URL.createObjectURL(file);
-                          }
-                        }}
-                        className="cursor-pointer"
-                      />
-                      {field.value && (
-                        <div className="flex items-center space-x-4">
-                          <img
-                            src={field.value}
-                            alt="Staff photo preview"
-                            className="h-16 w-16 object-cover rounded-full border"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => field.onChange("")}
-                          >
-                            Remove Photo
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+                    <Input 
+                      type="number" 
+                      min="0" 
+                      max="100" 
+                      step="0.1"
+                      placeholder="15"
+                      {...field}
+                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Commission Structure */}
-            <FormField
-              control={form.control}
-              name="commissionType"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payment Structure</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select payment structure" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="commission">Commission Only</SelectItem>
-                      <SelectItem value="hourly">Hourly Rate</SelectItem>
-                      <SelectItem value="fixed">Fixed Rate per Service</SelectItem>
-                      <SelectItem value="hourly_plus_commission">Hourly + Commission</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Commission Rate - shown for commission and hourly_plus_commission */}
-            {(form.watch('commissionType') === 'commission' || form.watch('commissionType') === 'hourly_plus_commission') && (
-              <FormField
-                control={form.control}
-                name="commissionRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Commission Rate (%)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="100" 
-                        step="1" 
-                        {...field} 
-                        placeholder="e.g., 30 for 30%"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Hourly Rate - shown for hourly and hourly_plus_commission */}
-            {(form.watch('commissionType') === 'hourly' || form.watch('commissionType') === 'hourly_plus_commission') && (
-              <FormField
-                control={form.control}
-                name="hourlyRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Hourly Rate ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        step="0.01" 
-                        {...field} 
-                        placeholder="e.g., 25.00"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Fixed Rate - shown for fixed */}
-            {form.watch('commissionType') === 'fixed' && (
-              <FormField
-                control={form.control}
-                name="fixedRate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Fixed Rate per Service ($)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        step="0.01" 
-                        {...field} 
-                        placeholder="e.g., 50.00"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Service Assignments */}
-            <div>
-              <FormLabel className="block mb-2">Assigned Services</FormLabel>
-              <div className="border rounded-md p-4 space-y-4 max-h-96 overflow-y-auto">
-                {services?.map((service: any) => {
-                  const isAssigned = form.watch('assignedServices')?.includes(service.id);
-                  const serviceRates = form.watch('serviceRates') || {};
-                  const currentRates = serviceRates[service.id.toString()] || {};
-                  
-                  return (
-                    <div key={service.id} className="border rounded-lg p-3 space-y-3">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`service-${service.id}`}
-                          checked={isAssigned}
-                          onCheckedChange={(checked) => {
-                            const currentServices = form.watch('assignedServices') || [];
-                            if (checked) {
-                              form.setValue('assignedServices', [...currentServices, service.id]);
-                            } else {
-                              form.setValue(
-                                'assignedServices',
-                                currentServices.filter((id: number) => id !== service.id)
-                              );
-                              // Remove rates when service is unassigned
-                              const currentRates = form.watch('serviceRates') || {};
-                              const { [service.id.toString()]: removed, ...remainingRates } = currentRates;
-                              form.setValue('serviceRates', remainingRates);
-                            }
-                          }}
-                        />
-                        <label
-                          htmlFor={`service-${service.id}`}
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
-                        >
-                          {service.name} - ${service.price} ({service.duration} min)
-                        </label>
-                      </div>
-                      
-                      {isAssigned && (
-                        <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="text-xs text-gray-600 mb-1 block">
-                              Custom Rate (${form.watch('hourlyRate') || 12}/hr default)
-                            </label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder={`Default: $${form.watch('hourlyRate') || 12}`}
-                              value={currentRates.customRate || ""}
-                              onChange={(e) => {
-                                const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                                const currentRates = form.watch('serviceRates') || {};
-                                form.setValue('serviceRates', {
-                                  ...currentRates,
-                                  [service.id.toString()]: {
-                                    ...currentRates[service.id.toString()],
-                                    customRate: value
-                                  }
-                                });
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs text-gray-600 mb-1 block">
-                              Custom Commission ({form.watch('commissionRate') || 0}% default)
-                            </label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder={`Default: ${form.watch('commissionRate') || 0}%`}
-                              value={currentRates.customCommissionRate || ""}
-                              onChange={(e) => {
-                                const value = e.target.value ? parseFloat(e.target.value) : undefined;
-                                const currentRates = form.watch('serviceRates') || {};
-                                form.setValue('serviceRates', {
-                                  ...currentRates,
-                                  [service.id.toString()]: {
-                                    ...currentRates[service.id.toString()],
-                                    customCommissionRate: value
-                                  }
-                                });
-                              }}
-                            />
-                          </div>
+            {/* Service Assignment */}
+            {services && services.length > 0 && (
+              <div className="space-y-3">
+                <FormLabel>Assigned Services</FormLabel>
+                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                  {services.map((service: any) => {
+                    const isAssigned = form.watch('assignedServices').includes(service.id);
+                    const serviceRates = form.watch('serviceRates')[service.id.toString()] || {};
+                    
+                    return (
+                      <div key={service.id} className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`service-${service.id}`}
+                            checked={isAssigned}
+                            onCheckedChange={(checked) => handleServiceToggle(service.id, !!checked)}
+                          />
+                          <label 
+                            htmlFor={`service-${service.id}`}
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                          >
+                            {service.name} - ${service.price}
+                          </label>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        
+                        {isAssigned && (
+                          <div className="ml-6 grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-gray-600">Custom Rate ($)</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                placeholder={service.price}
+                                value={serviceRates.customRate || ''}
+                                onChange={(e) => handleCustomRateChange(service.id, 'customRate', e.target.value)}
+                                className="h-7 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-600">Custom Commission (%)</label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder="Use default"
+                                value={serviceRates.customCommissionRate || ''}
+                                onChange={(e) => handleCustomRateChange(service.id, 'customCommissionRate', e.target.value)}
+                                className="h-7 text-xs"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
