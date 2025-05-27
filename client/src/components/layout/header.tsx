@@ -16,12 +16,12 @@ const Header = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="mr-2"
+              className="mr-3"
               onClick={() => (window as any).toggleSidebar?.()}
             >
               <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
             </Button>
-            <h1 className="text-xl font-bold text-primary md:hidden">BeautyBook</h1>
+            <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
           </div>
           <div className="flex items-center">
             <div className="ml-4 flex items-center md:ml-6">
