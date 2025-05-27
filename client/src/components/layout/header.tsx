@@ -5,11 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { getInitials, getFullName } from "@/lib/utils";
 
-interface HeaderProps {
-  onMenuClick?: () => void;
-}
-
-const Header = ({ onMenuClick }: HeaderProps) => {
+const Header = () => {
   const { user } = useContext(AuthContext);
 
   return (
@@ -20,8 +16,8 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="md:hidden mr-2"
-              onClick={onMenuClick}
+              className="mr-2"
+              onClick={() => (window as any).toggleSidebar?.()}
             >
               <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
             </Button>

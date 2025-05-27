@@ -125,7 +125,8 @@ const Sidebar = ({ isMobile, isOpen, onClose }: SidebarProps) => {
   );
 };
 
-export const SidebarController = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (open: boolean) => void }) => {
+export const SidebarController = () => {
+  const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -138,7 +139,12 @@ export const SidebarController = ({ isOpen, setIsOpen }: { isOpen: boolean; setI
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [setIsOpen]);
+  }, []);
+
+  // Export toggle function globally so header can access it
+  useEffect(() => {
+    (window as any).toggleSidebar = () => setIsOpen(!isOpen);
+  }, [isOpen]);
 
   return (
     <Sidebar
