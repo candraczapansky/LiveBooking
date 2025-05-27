@@ -18,7 +18,6 @@ import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
 import Marketing from "@/pages/marketing";
 import Settings from "@/pages/settings";
-import Schedule from "@/pages/schedule";
 import ClientBooking from "@/pages/client-booking";
 
 type User = {
@@ -74,7 +73,6 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/marketing" component={Marketing} />
       <Route path="/settings" component={Settings} />
-      <Route path="/schedule" component={Schedule} />
       <Route path="/booking" component={ClientBooking} />
       <Route component={NotFound} />
     </Switch>

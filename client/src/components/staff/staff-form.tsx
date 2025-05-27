@@ -64,7 +64,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'schedule'>('profile');
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
@@ -394,31 +393,27 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Tab Selection */}
+            {/* Staff Profile Header */}
             {!staffId && (
               <div className="flex items-center space-x-2">
                 <Button 
                   type="button" 
-                  variant={activeTab === 'profile' ? "default" : "outline"}
+                  variant="default" 
                   size="sm"
-                  onClick={() => setActiveTab('profile')}
+                  disabled
                 >
                   Staff Profile
                 </Button>
                 <Button 
                   type="button" 
-                  variant={activeTab === 'schedule' ? "default" : "outline"}
+                  variant="outline" 
                   size="sm"
-                  onClick={() => setActiveTab('schedule')}
                 >
                   Schedule
                 </Button>
               </div>
             )}
 
-            {/* Profile Tab Content */}
-            {activeTab === 'profile' && (
-              <>
             {/* Personal Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -622,17 +617,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            </>
-            )}
-
-            {/* Schedule Tab Content */}
-            {activeTab === 'schedule' && (
-              <div className="space-y-4">
-                <div className="text-center text-gray-500 py-8">
-                  <p>Schedule management will be available here.</p>
-                  <p className="text-sm mt-2">This feature allows you to set working hours for staff members.</p>
                 </div>
               </div>
             )}
