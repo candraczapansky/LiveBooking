@@ -80,7 +80,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: DeviceFormData) => apiRequest("/api/devices", "POST", data),
+    mutationFn: (data: DeviceFormData) => apiRequest("POST", "/api/devices", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/devices"] });
       toast({
@@ -100,7 +100,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
 
   const updateMutation = useMutation({
     mutationFn: (data: DeviceFormData) =>
-      apiRequest(`/api/devices/${device!.id}`, "PUT", data),
+      apiRequest("PUT", `/api/devices/${device!.id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/devices"] });
       toast({
