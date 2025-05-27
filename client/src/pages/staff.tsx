@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
-import StaffForm from "@/components/staff/staff-form";
+import StaffForm from "@/components/staff/staff-form-fixed";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {
