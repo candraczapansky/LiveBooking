@@ -52,7 +52,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
 
   const sidebarClass = `sidebar fixed inset-y-0 left-0 z-30 w-64 bg-sidebar-background shadow-lg transform transition-transform ${
     isOpen ? "translate-x-0" : "-translate-x-full"
-  } ${!isMobile ? "md:relative" : ""}`;
+  }`;
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },

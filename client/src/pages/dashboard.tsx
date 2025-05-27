@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -11,12 +11,27 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 const Dashboard = () => {
   useDocumentTitle("Dashboard | BeautyBook");
   const { user } = useContext(AuthContext);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
   
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        sidebarOpen ? 'ml-64' : 'ml-0'
+      }`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
