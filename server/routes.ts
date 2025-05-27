@@ -294,6 +294,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Staff routes
   app.get("/api/staff", async (req, res) => {
     const allStaff = await storage.getAllStaff();
+    console.log("Current staff in storage:", allStaff);
     
     // Get user details for each staff member
     const staffWithUserDetails = await Promise.all(
