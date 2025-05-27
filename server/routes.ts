@@ -366,6 +366,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ error: "Staff member not found" });
     }
   });
+
+  app.delete("/api/staff/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const deleted = await storage.deleteStaff(id);
+    
+    if (!deleted) {
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+    
+    return res.status(204).end();
+  });
   
   // Staff Services routes
   app.post("/api/staff-services", validateBody(staffServiceWithRatesSchema), async (req, res) => {
