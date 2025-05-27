@@ -377,8 +377,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                   <FormItem>
                     <FormLabel>Room (Optional)</FormLabel>
                     <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                      value={field.value?.toString() || "none"}
+                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -386,7 +386,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No room assigned</SelectItem>
+                        <SelectItem value="none">No room assigned</SelectItem>
                         {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
                           <SelectItem key={room.id} value={room.id.toString()}>
                             {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
