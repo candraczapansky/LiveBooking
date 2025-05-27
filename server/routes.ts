@@ -369,7 +369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/staff/:id", async (req, res) => {
     const id = parseInt(req.params.id);
+    console.log(`Attempting to delete staff member with ID: ${id}`);
+    
+    // Check if staff member exists before deletion
+    const existingStaff = await storage.getStaff(id);
+    console.log(`Staff member exists:`, existingStaff);
+    
     const deleted = await storage.deleteStaff(id);
+    console.log(`Deletion result:`, deleted);
     
     if (!deleted) {
       return res.status(404).json({ error: "Staff member not found" });
