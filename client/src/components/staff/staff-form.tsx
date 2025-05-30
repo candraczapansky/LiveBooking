@@ -39,7 +39,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 const staffFormSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   bio: z.string().optional(),
+  commissionType: z.enum(["hourly", "commission", "fixed", "hourly_commission"]).default("commission"),
   commissionRate: z.number().min(0).max(100).default(0),
+  hourlyRate: z.number().min(0).optional(),
+  fixedSalary: z.number().min(0).optional(),
   username: z.string().min(1, "Username is required"),
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -72,7 +75,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     defaultValues: {
       title: "",
       bio: "",
+      commissionType: "commission",
       commissionRate: 0,
+      hourlyRate: 0,
+      fixedSalary: 0,
       username: "",
       email: "",
       password: "",
@@ -547,27 +553,105 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="commissionRate"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Commission Rate (%)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      max="100" 
-                      step="0.1"
-                      placeholder="15"
-                      {...field}
-                      onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+            {/* Payment Structure */}
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="commissionType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payment Structure</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select payment type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="commission">Commission Only</SelectItem>
+                        <SelectItem value="hourly">Hourly Only</SelectItem>
+                        <SelectItem value="fixed">Fixed Salary</SelectItem>
+                        <SelectItem value="hourly_commission">Hourly + Commission</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Commission Rate - Show for commission and hourly_commission */}
+              {(form.watch('commissionType') === 'commission' || form.watch('commissionType') === 'hourly_commission') && (
+                <FormField
+                  control={form.control}
+                  name="commissionRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Commission Rate (%)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          placeholder="15"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
-            />
+
+              {/* Hourly Rate - Show for hourly and hourly_commission */}
+              {(form.watch('commissionType') === 'hourly' || form.watch('commissionType') === 'hourly_commission') && (
+                <FormField
+                  control={form.control}
+                  name="hourlyRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Hourly Rate ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="0.01"
+                          placeholder="25.00"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {/* Fixed Salary - Show for fixed */}
+              {form.watch('commissionType') === 'fixed' && (
+                <FormField
+                  control={form.control}
+                  name="fixedSalary"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Annual Salary ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          step="1000"
+                          placeholder="50000"
+                          {...field}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
 
             {/* Service Assignment */}
             {services && services.length > 0 && (
