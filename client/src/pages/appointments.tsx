@@ -180,23 +180,49 @@ const AppointmentsPage = () => {
   });
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    if (viewMode === 'month') {
+      return date.toLocaleDateString('en-US', { 
+        month: 'long',
+        year: 'numeric'
+      });
+    } else if (viewMode === 'week') {
+      const startOfWeek = new Date(date);
+      startOfWeek.setDate(date.getDate() - date.getDay());
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      
+      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
   };
 
-  const goToPreviousDay = () => {
+  const goToPrevious = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() - 1);
+    if (viewMode === 'month') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else if (viewMode === 'week') {
+      newDate.setDate(newDate.getDate() - 7);
+    } else {
+      newDate.setDate(newDate.getDate() - 1);
+    }
     setCurrentDate(newDate);
   };
 
-  const goToNextDay = () => {
+  const goToNext = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(newDate.getDate() + 1);
+    if (viewMode === 'month') {
+      newDate.setMonth(newDate.getMonth() + 1);
+    } else if (viewMode === 'week') {
+      newDate.setDate(newDate.getDate() + 7);
+    } else {
+      newDate.setDate(newDate.getDate() + 1);
+    }
     setCurrentDate(newDate);
   };
 
@@ -245,6 +271,240 @@ const AppointmentsPage = () => {
 
   const resetZoom = () => {
     setZoomLevel(1);
+  };
+
+  const getWeekDays = (date: Date) => {
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - date.getDay());
+    
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - firstDay.getDay());
+    
+    const days = [];
+    for (let i = 0; i < 42; i++) { // 6 weeks * 7 days
+      const day = new Date(startDate);
+      day.setDate(startDate.getDate() + i);
+      days.push(day);
+    }
+    return days;
+  };
+
+  const renderDayView = () => (
+    <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
+      {/* Time Column */}
+      <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
+        <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
+        {timeSlots.map((time) => (
+          <div 
+            key={time}
+            className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
+            style={{ height: `${getSlotHeight()}px` }}
+          >
+            <span className="text-xs text-gray-600 dark:text-gray-400">
+              {time}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Main Calendar Area */}
+      <div className="flex-1">
+        {/* Staff Header - Sticky */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
+          {staffMembers.map((staffName, index) => (
+            <div key={staffName} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                {staffName}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Time Grid */}
+        <div className="relative">
+          <div className="flex">
+            {/* Staff Columns */}
+            {staffMembers.map((staffName, staffIndex) => (
+              <div key={staffName} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+                {timeSlots.map((time, timeIndex) => (
+                  <div 
+                    key={`${staffIndex}-${time}`}
+                    className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                    style={{ height: `${getSlotHeight()}px` }}
+                    onClick={() => handleAddAppointment()}
+                  />
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* Appointment Blocks */}
+          <div className="absolute inset-0 pointer-events-none">
+            {sampleAppointments.map((appointment) => {
+              const position = getAppointmentPosition(appointment.time, appointment.duration);
+              const staffColumn = getStaffColumn(appointment.staff);
+              
+              if (staffColumn === -1) return null;
+              
+              return (
+                <div
+                  key={appointment.id}
+                  className="absolute pointer-events-auto cursor-pointer rounded-md p-2 text-xs overflow-hidden shadow-sm border text-white hover:shadow-md transition-shadow"
+                  style={{
+                    top: position.top,
+                    height: position.height,
+                    left: `${staffColumn * 25}%`,
+                    width: '24%',
+                    margin: '1px',
+                    backgroundColor: appointment.color,
+                    borderColor: appointment.color,
+                    fontSize: `${Math.max(10, 12 * zoomLevel)}px`,
+                    padding: `${Math.max(4, 8 * zoomLevel)}px`
+                  }}
+                  onClick={() => handleEditAppointment(appointment.id)}
+                >
+                  <div className="font-medium truncate">
+                    {appointment.time} - {appointment.title}
+                  </div>
+                  <div className="opacity-90 truncate">
+                    👤 {appointment.clientName}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderWeekView = () => {
+    const weekDays = getWeekDays(currentDate);
+    
+    return (
+      <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
+        {/* Time Column */}
+        <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
+          <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
+          {timeSlots.map((time) => (
+            <div 
+              key={time}
+              className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
+              style={{ height: `${getSlotHeight()}px` }}
+            >
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {time}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Days Columns */}
+        <div className="flex-1">
+          {/* Days Header */}
+          <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
+            {weekDays.map((day, index) => (
+              <div key={index} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800">
+                <span className="text-xs text-gray-600 dark:text-gray-400">
+                  {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                </span>
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {day.getDate()}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Grid */}
+          <div className="relative">
+            <div className="flex">
+              {weekDays.map((day, dayIndex) => (
+                <div key={dayIndex} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+                  {timeSlots.map((time, timeIndex) => (
+                    <div 
+                      key={`${dayIndex}-${time}`}
+                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                      style={{ height: `${getSlotHeight()}px` }}
+                      onClick={() => handleAddAppointment()}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderMonthView = () => {
+    const monthDays = getDaysInMonth(currentDate);
+    const weeks = [];
+    
+    for (let i = 0; i < monthDays.length; i += 7) {
+      weeks.push(monthDays.slice(i, i + 7));
+    }
+    
+    return (
+      <div className="h-full">
+        {/* Days Header */}
+        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+            <div key={day} className="p-3 text-center text-sm font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        {/* Calendar Grid */}
+        <div className="flex-1">
+          {weeks.map((week, weekIndex) => (
+            <div key={weekIndex} className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 last:border-b-0" style={{ height: 'calc((100vh - 300px) / 6)' }}>
+              {week.map((day, dayIndex) => {
+                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                const isToday = day.toDateString() === new Date().toDateString();
+                
+                return (
+                  <div 
+                    key={dayIndex}
+                    className={`border-r border-gray-200 dark:border-gray-700 last:border-r-0 p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      !isCurrentMonth ? 'bg-gray-50 dark:bg-gray-800 text-gray-400' : ''
+                    } ${isToday ? 'bg-blue-50 dark:bg-blue-900' : ''}`}
+                    onClick={() => handleAddAppointment()}
+                  >
+                    <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : ''}`}>
+                      {day.getDate()}
+                    </div>
+                    {/* Sample appointments for month view */}
+                    {isCurrentMonth && day.getDate() % 3 === 0 && (
+                      <div className="mt-1">
+                        <div className="text-xs bg-purple-200 text-purple-800 px-1 rounded mb-1 truncate">
+                          Appointment
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -338,13 +598,13 @@ const AppointmentsPage = () => {
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <Button variant="ghost" size="sm" onClick={goToPreviousDay}>
+                  <Button variant="ghost" size="sm" onClick={goToPrevious}>
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 min-w-[200px]">
                     {formatDate(currentDate)}
                   </h2>
-                  <Button variant="ghost" size="sm" onClick={goToNextDay}>
+                  <Button variant="ghost" size="sm" onClick={goToNext}>
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -367,92 +627,9 @@ const AppointmentsPage = () => {
 
           {/* Calendar Grid */}
           <div className="flex-1 overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
-            <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
-              {/* Time Column */}
-              <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
-                <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
-                {timeSlots.map((time) => (
-                  <div 
-                    key={time}
-                    className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
-                    style={{ height: `${getSlotHeight()}px` }}
-                  >
-                    <span className="text-xs text-gray-600 dark:text-gray-400">
-                      {time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Main Calendar Area */}
-              <div className="flex-1">
-                {/* Staff Header - Sticky */}
-                <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
-                  {staffMembers.map((staffName, index) => (
-                    <div key={staffName} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {staffName}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Time Grid */}
-                <div className="relative">
-                  <div className="flex">
-                    {/* Staff Columns */}
-                    {staffMembers.map((staffName, staffIndex) => (
-                      <div key={staffName} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-                        {timeSlots.map((time, timeIndex) => (
-                          <div 
-                            key={`${staffIndex}-${time}`}
-                            className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                            style={{ height: `${getSlotHeight()}px` }}
-                            onClick={() => handleAddAppointment()}
-                          />
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Appointment Blocks */}
-                  <div className="absolute inset-0 pointer-events-none">
-                    {sampleAppointments.map((appointment) => {
-                      const position = getAppointmentPosition(appointment.time, appointment.duration);
-                      const staffColumn = getStaffColumn(appointment.staff);
-                      
-                      if (staffColumn === -1) return null;
-                      
-                      return (
-                        <div
-                          key={appointment.id}
-                          className="absolute pointer-events-auto cursor-pointer rounded-md p-2 text-xs overflow-hidden shadow-sm border text-white hover:shadow-md transition-shadow"
-                          style={{
-                            top: position.top,
-                            height: position.height,
-                            left: `${staffColumn * 25}%`,
-                            width: '24%',
-                            margin: '1px',
-                            backgroundColor: appointment.color,
-                            borderColor: appointment.color,
-                            fontSize: `${Math.max(10, 12 * zoomLevel)}px`,
-                            padding: `${Math.max(4, 8 * zoomLevel)}px`
-                          }}
-                          onClick={() => handleEditAppointment(appointment.id)}
-                        >
-                          <div className="font-medium truncate">
-                            {appointment.time} - {appointment.title}
-                          </div>
-                          <div className="opacity-90 truncate">
-                            👤 {appointment.clientName}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            </div>
+            {viewMode === 'day' && renderDayView()}
+            {viewMode === 'week' && renderWeekView()}
+            {viewMode === 'month' && renderMonthView()}
           </div>
         </main>
       </div>
