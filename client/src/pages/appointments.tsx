@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import AppointmentForm from "@/components/appointments/appointment-form";
-import { PlusCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
@@ -147,6 +147,7 @@ const AppointmentsPage = () => {
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
+  const [zoomLevel, setZoomLevel] = useState(1); // 0.5 = zoomed out, 1 = normal, 2 = zoomed in
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -203,16 +204,20 @@ const AppointmentsPage = () => {
     setCurrentDate(new Date());
   };
 
+  const getSlotHeight = () => {
+    return Math.round(60 * zoomLevel); // Base 60px per hour slot, adjusted by zoom
+  };
+
   const getAppointmentPosition = (time: string, duration: number) => {
     const timeIndex = timeSlots.findIndex(slot => slot === time);
-    if (timeIndex === -1) return { top: 0, height: 60 };
+    if (timeIndex === -1) return { top: 0, height: getSlotHeight() };
     
-    const slotHeight = 15; // Each 15-minute slot is 15px
+    const slotHeight = getSlotHeight() / 4; // Each 15-minute slot
     const slotsNeeded = Math.ceil(duration / 15);
     
     return {
       top: timeIndex * slotHeight,
-      height: Math.max(slotsNeeded * slotHeight, 45)
+      height: Math.max(slotsNeeded * slotHeight, Math.round(45 * zoomLevel))
     };
   };
 
@@ -228,6 +233,18 @@ const AppointmentsPage = () => {
   const handleEditAppointment = (appointmentId: number) => {
     setSelectedAppointmentId(appointmentId);
     setIsFormOpen(true);
+  };
+
+  const zoomIn = () => {
+    setZoomLevel(prev => Math.min(prev * 1.5, 3)); // Max zoom 3x
+  };
+
+  const zoomOut = () => {
+    setZoomLevel(prev => Math.max(prev / 1.5, 0.3)); // Min zoom 0.3x
+  };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
   };
 
   return (
@@ -253,6 +270,36 @@ const AppointmentsPage = () => {
                 <Button onClick={goToToday} variant="outline" size="sm">
                   Today
                 </Button>
+                
+                {/* Zoom Controls */}
+                <div className="flex items-center border rounded-md bg-gray-50 dark:bg-gray-800">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={zoomOut}
+                    className="h-8 w-8 p-0 rounded-none border-r"
+                    disabled={zoomLevel <= 0.3}
+                  >
+                    <ZoomOut className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={resetZoom}
+                    className="h-8 px-2 rounded-none text-xs font-medium min-w-[40px]"
+                  >
+                    {Math.round(zoomLevel * 100)}%
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={zoomIn}
+                    className="h-8 w-8 p-0 rounded-none border-l"
+                    disabled={zoomLevel >= 3}
+                  >
+                    <ZoomIn className="h-3 w-3" />
+                  </Button>
+                </div>
                 
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                   <SelectTrigger className="w-48">
@@ -320,7 +367,7 @@ const AppointmentsPage = () => {
 
           {/* Calendar Grid */}
           <div className="flex-1 overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
-            <div className="flex" style={{ minHeight: `${timeSlots.length * 60 + 48}px` }}>
+            <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
               {/* Time Column */}
               <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
                 <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
@@ -328,7 +375,7 @@ const AppointmentsPage = () => {
                   <div 
                     key={time}
                     className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
-                    style={{ height: '60px' }}
+                    style={{ height: `${getSlotHeight()}px` }}
                   >
                     <span className="text-xs text-gray-600 dark:text-gray-400">
                       {time}
@@ -360,7 +407,7 @@ const AppointmentsPage = () => {
                           <div 
                             key={`${staffIndex}-${time}`}
                             className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                            style={{ height: '60px' }}
+                            style={{ height: `${getSlotHeight()}px` }}
                             onClick={() => handleAddAppointment()}
                           />
                         ))}
@@ -387,7 +434,9 @@ const AppointmentsPage = () => {
                             width: '24%',
                             margin: '1px',
                             backgroundColor: appointment.color,
-                            borderColor: appointment.color
+                            borderColor: appointment.color,
+                            fontSize: `${Math.max(10, 12 * zoomLevel)}px`,
+                            padding: `${Math.max(4, 8 * zoomLevel)}px`
                           }}
                           onClick={() => handleEditAppointment(appointment.id)}
                         >
