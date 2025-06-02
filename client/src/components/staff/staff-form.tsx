@@ -39,6 +39,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 const staffFormSchema = z.object({
   title: z.string().min(1, "Job title is required"),
   bio: z.string().optional(),
+  photo: z.string().optional(),
   commissionType: z.enum(["hourly", "commission", "fixed", "hourly_commission"]).default("commission"),
   commissionRate: z.number().min(0).max(100).default(0),
   hourlyRate: z.number().min(0).optional(),
@@ -75,6 +76,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     defaultValues: {
       title: "",
       bio: "",
+      photo: "",
       commissionType: "commission",
       commissionRate: 0,
       hourlyRate: 0,
@@ -547,6 +549,47 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                       rows={3}
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="photo"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Profile Photo (Optional)</FormLabel>
+                  <FormControl>
+                    <div className="space-y-4">
+                      {field.value && (
+                        <div className="flex items-center space-x-4">
+                          <img 
+                            src={field.value} 
+                            alt="Staff photo preview" 
+                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => field.onChange("")}
+                          >
+                            Remove Photo
+                          </Button>
+                        </div>
+                      )}
+                      <Input 
+                        type="url"
+                        placeholder="Enter photo URL (e.g., https://example.com/photo.jpg)"
+                        value={field.value || ""}
+                        onChange={field.onChange}
+                      />
+                      <p className="text-xs text-gray-500">
+                        Upload your photo to a hosting service and paste the URL here, or use a professional headshot URL.
+                      </p>
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
