@@ -96,6 +96,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     return res.status(201).json(userWithoutPassword);
   });
+
+  // Users routes
+  app.get("/api/users", async (req, res) => {
+    console.log("GET /api/users called");
+    try {
+      // Get all users from storage (this would typically be from a database)
+      const users = Array.from((storage as any).users.values());
+      console.log("Users found:", users.length);
+      
+      // Remove passwords from all users before sending
+      const usersWithoutPasswords = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      
+      return res.status(200).json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      return res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
   
   // Service Categories routes
   app.get("/api/service-categories", async (req, res) => {
