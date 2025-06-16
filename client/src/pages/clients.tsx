@@ -75,7 +75,7 @@ type Client = {
 const clientFormSchema = z.object({
   username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -135,6 +135,7 @@ const ClientsPage = () => {
     defaultValues: {
       username: "",
       email: "",
+      password: "",
       firstName: "",
       lastName: "",
       phone: "",

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,6 +34,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Upload, X } from "lucide-react";
 
 // Staff form schema
 const staffFormSchema = z.object({
@@ -70,6 +71,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [, setLocation] = useLocation();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
