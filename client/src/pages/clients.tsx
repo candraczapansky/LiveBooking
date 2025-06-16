@@ -107,7 +107,7 @@ const ClientsPage = () => {
   }, []);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ['/api/clients'],
+    queryKey: ['/api/users'],
     queryFn: async () => {
       // In a real app, we would have a dedicated endpoint for clients
       // For this demo, we'll fetch all users and filter for clients
@@ -151,7 +151,7 @@ const ClientsPage = () => {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({
         title: "Success",
         description: "Client created successfully",
@@ -173,7 +173,7 @@ const ClientsPage = () => {
       return apiRequest("PUT", `/api/users/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({
         title: "Success",
         description: "Client updated successfully",
@@ -196,7 +196,7 @@ const ClientsPage = () => {
       return apiRequest("DELETE", `/api/users/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/clients'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       toast({
         title: "Success",
         description: "Client deleted successfully",
