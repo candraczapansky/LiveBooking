@@ -137,11 +137,40 @@ const ReportsPage = () => {
           name: service.name, 
           value: 0, 
           revenue: 0, 
-          bookings: 0 
+          bookings: 0,
+          totalDuration: 0,
+          averageDuration: 0
         };
         existing.value += service.price || 0;
         existing.revenue += service.price || 0;
         existing.bookings += 1;
+        existing.totalDuration += service.duration || 0;
+        existing.averageDuration = Math.round(existing.totalDuration / existing.bookings);
+        serviceStats.set(service.id, existing);
+      }
+    });
+
+    return Array.from(serviceStats.values()).sort((a, b) => b.revenue - a.revenue);
+  };
+
+  // Generate detailed service performance data
+  const generateServicePerformanceData = () => {
+    const serviceStats = new Map();
+    
+    paidAppointments.forEach((apt: any) => {
+      const service = services.find((s: any) => s.id === apt.serviceId);
+      if (service) {
+        const existing = serviceStats.get(service.id) || { 
+          name: service.name, 
+          bookings: 0, 
+          revenue: 0,
+          totalDuration: 0,
+          averageDuration: 0
+        };
+        existing.bookings += 1;
+        existing.revenue += service.price || 0;
+        existing.totalDuration += service.duration || 0;
+        existing.averageDuration = Math.round(existing.totalDuration / existing.bookings);
         serviceStats.set(service.id, existing);
       }
     });
@@ -175,6 +204,7 @@ const ReportsPage = () => {
   };
 
   const serviceData = generateServiceData();
+  const servicePerformanceData = generateServicePerformanceData();
   const staffData = generateStaffData();
 
   // Generate client data from real appointments
@@ -669,41 +699,23 @@ const ReportsPage = () => {
                             </tr>
                           </thead>
                           <tbody>
-                            <tr className="border-b">
-                              <td className="py-3">Haircut & Style</td>
-                              <td className="text-right py-3">420</td>
-                              <td className="text-right py-3">45 min</td>
-                              <td className="text-right py-3">{formatPrice(27300)}</td>
-                              <td className="text-right py-3 text-green-600">+12%</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="py-3">Color Services</td>
-                              <td className="text-right py-3">310</td>
-                              <td className="text-right py-3">120 min</td>
-                              <td className="text-right py-3">{formatPrice(46500)}</td>
-                              <td className="text-right py-3 text-green-600">+8%</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="py-3">Treatments</td>
-                              <td className="text-right py-3">185</td>
-                              <td className="text-right py-3">60 min</td>
-                              <td className="text-right py-3">{formatPrice(13875)}</td>
-                              <td className="text-right py-3 text-green-600">+15%</td>
-                            </tr>
-                            <tr className="border-b">
-                              <td className="py-3">Massage</td>
-                              <td className="text-right py-3">175</td>
-                              <td className="text-right py-3">60 min</td>
-                              <td className="text-right py-3">{formatPrice(12250)}</td>
-                              <td className="text-right py-3 text-red-600">-2%</td>
-                            </tr>
-                            <tr>
-                              <td className="py-3">Facials</td>
-                              <td className="text-right py-3">160</td>
-                              <td className="text-right py-3">45 min</td>
-                              <td className="text-right py-3">{formatPrice(9600)}</td>
-                              <td className="text-right py-3 text-green-600">+5%</td>
-                            </tr>
+                            {servicePerformanceData.length > 0 ? (
+                              servicePerformanceData.map((service, index) => (
+                                <tr key={index} className={index < servicePerformanceData.length - 1 ? "border-b" : ""}>
+                                  <td className="py-3">{service.name}</td>
+                                  <td className="text-right py-3">{service.bookings}</td>
+                                  <td className="text-right py-3">{service.averageDuration} min</td>
+                                  <td className="text-right py-3">{formatPrice(service.revenue)}</td>
+                                  <td className="text-right py-3 text-muted-foreground">-</td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                                  No paid appointments yet. Complete some appointments to see service performance data.
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
