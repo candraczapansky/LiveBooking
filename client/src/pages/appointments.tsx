@@ -273,11 +273,21 @@ const AppointmentsPage = () => {
     const endTime = new Date(appointment.endTime);
     const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
     
+    // Get local time components to avoid timezone issues
     const startHour = startTime.getHours();
     const startMinute = startTime.getMinutes();
-    const topPosition = ((startHour - 8) * 2 + (startMinute === 30 ? 1 : 0)) * 30 * zoomLevel;
     
+    // Ensure appointment is within business hours (8 AM to 7 PM)
+    if (startHour < 8 || startHour >= 19) {
+      return { top: '0px', height: '0px', display: 'none' };
+    }
+    
+    // Calculate position based on time slots starting from 8:00 AM
+    // Each 30-minute slot is 30px * zoomLevel high
+    const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
     const slotHeight = 30 * zoomLevel;
+    const topPosition = (totalMinutesFromStart / 30) * slotHeight;
+    
     const slotsNeeded = Math.ceil(duration / 30);
     
     // Ensure minimum height for button visibility
@@ -377,7 +387,12 @@ const AppointmentsPage = () => {
 
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
-            {appointments?.map((appointment: any) => {
+            {appointments?.filter((appointment: any) => {
+              // Only show appointments for the current date
+              const appointmentDate = new Date(appointment.startTime);
+              const currentDateOnly = new Date(currentDate);
+              return appointmentDate.toDateString() === currentDateOnly.toDateString();
+            }).map((appointment: any) => {
               const startTime = new Date(appointment.startTime);
               const endTime = new Date(appointment.endTime);
               const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
