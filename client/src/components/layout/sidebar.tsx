@@ -65,7 +65,6 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
-    { icon: <DollarSign />, label: "Payroll", href: "/payroll" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];

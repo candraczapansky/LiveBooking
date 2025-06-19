@@ -20,6 +20,7 @@ import {
   BarChart2,
   PieChart
 } from "lucide-react";
+import PayrollReport from "./payroll-report";
 import { formatPrice } from "@/lib/utils";
 import {
   BarChart,
@@ -241,6 +242,10 @@ const ReportsPage = () => {
                 <TabsTrigger value="staff" className="flex items-center">
                   <Users className="h-4 w-4 mr-2" />
                   Staff
+                </TabsTrigger>
+                <TabsTrigger value="payroll" className="flex items-center">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Payroll
                 </TabsTrigger>
               </TabsList>
               
@@ -746,6 +751,11 @@ const ReportsPage = () => {
                     </CardContent>
                   </Card>
                 </div>
+              </TabsContent>
+              
+              {/* Payroll Report */}
+              <TabsContent value="payroll">
+                <PayrollReport />
               </TabsContent>
             </Tabs>
           </div>
