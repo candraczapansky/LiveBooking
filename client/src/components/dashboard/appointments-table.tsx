@@ -14,33 +14,6 @@ import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTime, getInitials } from "@/lib/utils";
 
-type Appointment = {
-  id: number;
-  startTime: string;
-  endTime: string;
-  status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
-  client: {
-    id: number;
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-  };
-  service: {
-    id: number;
-    name: string;
-    duration: number;
-    price: number;
-  };
-  staff: {
-    user: {
-      id: number;
-      firstName?: string;
-      lastName?: string;
-    };
-  };
-};
-
 const getStatusBadgeStyle = (status: string) => {
   switch(status) {
     case 'confirmed':
@@ -60,145 +33,38 @@ const AppointmentsTable = () => {
   const [page, setPage] = useState(1);
   const pageSize = 5;
 
-  const { data: appointments, isLoading } = useQuery({
+  const { data: allAppointments, isLoading } = useQuery({
     queryKey: ['/api/appointments'],
-    queryFn: () => {
-      // This would fetch from the API in a real app
-      // For demo purposes, we'll return mock data
-      return Promise.resolve([
-        {
-          id: 1,
-          startTime: "2023-07-15T09:00:00Z",
-          endTime: "2023-07-15T09:45:00Z",
-          status: 'confirmed',
-          client: {
-            id: 101,
-            email: "emma.w@example.com",
-            firstName: "Emma",
-            lastName: "Wilson"
-          },
-          service: {
-            id: 201,
-            name: "Haircut & Style",
-            duration: 45,
-            price: 65
-          },
-          staff: {
-            user: {
-              id: 301,
-              firstName: "Jessica",
-              lastName: "Taylor"
-            }
-          }
-        },
-        {
-          id: 2,
-          startTime: "2023-07-15T10:00:00Z",
-          endTime: "2023-07-15T10:30:00Z",
-          status: 'confirmed',
-          client: {
-            id: 102,
-            email: "michael.b@example.com",
-            firstName: "Michael",
-            lastName: "Brown"
-          },
-          service: {
-            id: 202,
-            name: "Men's Haircut",
-            duration: 30,
-            price: 45
-          },
-          staff: {
-            user: {
-              id: 302,
-              firstName: "David",
-              lastName: "Miller"
-            }
-          }
-        },
-        {
-          id: 3,
-          startTime: "2023-07-15T11:15:00Z",
-          endTime: "2023-07-15T13:15:00Z",
-          status: 'pending',
-          client: {
-            id: 103,
-            email: "sophia.c@example.com",
-            firstName: "Sophia",
-            lastName: "Chen"
-          },
-          service: {
-            id: 203,
-            name: "Full Highlights",
-            duration: 120,
-            price: 150
-          },
-          staff: {
-            user: {
-              id: 301,
-              firstName: "Jessica",
-              lastName: "Taylor"
-            }
-          }
-        },
-        {
-          id: 4,
-          startTime: "2023-07-15T14:30:00Z",
-          endTime: "2023-07-15T15:30:00Z",
-          status: 'confirmed',
-          client: {
-            id: 104,
-            email: "olivia.m@example.com",
-            firstName: "Olivia",
-            lastName: "Martinez"
-          },
-          service: {
-            id: 204,
-            name: "Deep Conditioning Treatment",
-            duration: 60,
-            price: 75
-          },
-          staff: {
-            user: {
-              id: 303,
-              firstName: "Amanda",
-              lastName: "Lee"
-            }
-          }
-        },
-        {
-          id: 5,
-          startTime: "2023-07-15T16:00:00Z",
-          endTime: "2023-07-15T16:45:00Z",
-          status: 'cancelled',
-          client: {
-            id: 105,
-            email: "james.w@example.com",
-            firstName: "James",
-            lastName: "Wilson"
-          },
-          service: {
-            id: 205,
-            name: "Beard Trim & Hot Shave",
-            duration: 45,
-            price: 55
-          },
-          staff: {
-            user: {
-              id: 302,
-              firstName: "David",
-              lastName: "Miller"
-            }
-          }
-        }
-      ]) as Appointment[];
-    }
+  });
+
+  const { data: services } = useQuery({
+    queryKey: ['/api/services'],
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['/api/users'],
+  });
+
+  // Filter today's appointments
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+  const todayAppointments = allAppointments?.filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate >= todayStart && aptDate < todayEnd;
+  }) || [];
+
+  // Sort appointments by start time
+  const sortedAppointments = todayAppointments.sort((a: any, b: any) => {
+    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
   });
 
   if (isLoading) {
     return <div className="flex justify-center p-8">Loading appointments...</div>;
   }
 
+  const appointments = sortedAppointments;
   const totalAppointments = appointments?.length || 0;
   const totalPages = Math.ceil(totalAppointments / pageSize);
   const paginatedAppointments = appointments?.slice((page - 1) * pageSize, page * pageSize);
@@ -229,100 +95,95 @@ const AppointmentsTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedAppointments?.map((appointment) => (
-              <TableRow key={appointment.id}>
-                <TableCell className="whitespace-nowrap">
-                  {formatTime(appointment.startTime)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <Avatar className="h-8 w-8 mr-4">
-                      <AvatarImage 
-                        src={`https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120`} 
-                        alt={`${appointment.client.firstName} ${appointment.client.lastName}`}
-                      />
-                      <AvatarFallback>{getInitials(appointment.client.firstName, appointment.client.lastName)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                        {appointment.client.firstName} {appointment.client.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {appointment.client.email}
+            {paginatedAppointments?.map((appointment: any) => {
+              const service = services?.find((s: any) => s.id === appointment.serviceId);
+              const client = users?.find((u: any) => u.id === appointment.clientId);
+              const staff = users?.find((u: any) => u.id === appointment.staffId);
+              
+              return (
+                <TableRow key={appointment.id}>
+                  <TableCell className="whitespace-nowrap">
+                    {formatTime(appointment.startTime)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <Avatar className="h-8 w-8 mr-3">
+                        <AvatarImage src="" alt="" />
+                        <AvatarFallback className="text-xs">
+                          {getInitials(client?.firstName, client?.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {client?.firstName} {client?.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {client?.email}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm text-gray-900 dark:text-gray-100">{appointment.service.name}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{appointment.service.duration} min</div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-sm text-gray-900 dark:text-gray-100">
-                    {appointment.staff.user.firstName} {appointment.staff.user.lastName}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={getStatusBadgeStyle(appointment.status)}>
-                    {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="link" className="text-primary">Details</Button>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900 dark:text-gray-100">{service?.name}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{service?.duration} min</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm text-gray-900 dark:text-gray-100">
+                      {staff?.firstName} {staff?.lastName}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={getStatusBadgeStyle(appointment.paymentStatus || 'pending')}>
+                      {appointment.paymentStatus || 'pending'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button variant="outline" size="sm">
+                      View
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
-      </div>
-      <div className="bg-muted/50 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
-        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              Showing <span className="font-medium">{(page - 1) * pageSize + 1}</span> to{" "}
-              <span className="font-medium">
-                {Math.min(page * pageSize, totalAppointments)}
-              </span>{" "}
-              of <span className="font-medium">{totalAppointments}</span> appointments
-            </p>
+        
+        {totalAppointments === 0 && (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            No appointments scheduled for today
           </div>
-          <div>
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+        )}
+      </div>
+      
+      {totalPages > 1 && (
+        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 sm:px-6">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-700 dark:text-gray-300">
+              Showing {Math.min((page - 1) * pageSize + 1, totalAppointments)} to {Math.min(page * pageSize, totalAppointments)} of {totalAppointments} appointments
+            </div>
+            <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
-                size="icon"
+                size="sm"
                 onClick={handlePrevPage}
                 disabled={page === 1}
-                className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300"
               >
-                <span className="sr-only">Previous</span>
                 <ChevronLeft className="h-4 w-4" />
+                Previous
               </Button>
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <Button
-                  key={i}
-                  variant={page === i + 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPage(i + 1)}
-                  className="relative inline-flex items-center px-4 py-2 border"
-                >
-                  {i + 1}
-                </Button>
-              ))}
               <Button
                 variant="outline"
-                size="icon"
+                size="sm"
                 onClick={handleNextPage}
                 disabled={page === totalPages}
-                className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300"
               >
-                <span className="sr-only">Next</span>
+                Next
                 <ChevronRight className="h-4 w-4" />
               </Button>
-            </nav>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

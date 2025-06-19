@@ -4,21 +4,50 @@ import { formatPrice } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 
 const StatsOverview = () => {
-  // In a real app, we would fetch this data from the API
-  // For demo purposes, we'll use static data
-  const { data: appointmentsData, isLoading: appointmentsLoading } = useQuery({
+  // Fetch real appointment data
+  const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ['/api/appointments'],
-    queryFn: () => {
-      return Promise.resolve([
-        /* Would be filled with appointment data */
-      ]);
-    }
   });
 
-  const todayAppointments = 24;
-  const revenue = 1284.50;
-  const newClients = 18;
-  const activeMemberships = 156;
+  const { data: services } = useQuery({
+    queryKey: ['/api/services'],
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['/api/users'],
+  });
+
+  // Calculate today's metrics from real data
+  const today = new Date();
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+  const todayAppointments = appointments?.filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate >= todayStart && aptDate < todayEnd;
+  }).length || 0;
+
+  // Calculate today's revenue from paid appointments
+  const paidAppointments = appointments?.filter((apt: any) => apt.paymentStatus === 'paid') || [];
+  const todayRevenue = paidAppointments.filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate >= todayStart && aptDate < todayEnd;
+  }).reduce((sum: number, apt: any) => {
+    const service = services?.find((s: any) => s.id === apt.serviceId);
+    return sum + (service?.price || 0);
+  }, 0);
+
+  // Calculate new clients this month from paid appointments
+  const thisMonth = new Date().getMonth();
+  const thisYear = new Date().getFullYear();
+  const thisMonthPaidAppointments = paidAppointments.filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate.getMonth() === thisMonth && aptDate.getFullYear() === thisYear;
+  });
+  const newClients = new Set(thisMonthPaidAppointments.map((apt: any) => apt.clientId)).size;
+
+  // Active memberships placeholder (would need actual membership data)
+  const activeMemberships = 0;
 
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
@@ -35,7 +64,7 @@ const StatsOverview = () => {
         icon={<DollarSign className="h-5 w-5 text-secondary" />}
         iconBgColor="bg-secondary/10"
         title="Revenue Today"
-        value={formatPrice(revenue)}
+        value={formatPrice(todayRevenue)}
         linkText="View report"
         linkHref="/reports"
       />
