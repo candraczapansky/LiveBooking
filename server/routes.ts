@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
+import Stripe from "stripe";
 import {
   insertUserSchema,
   insertServiceCategorySchema,
@@ -29,6 +30,14 @@ const serviceWithStaffSchema = insertServiceSchema.extend({
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
   customRate: z.number().optional(),
   customCommissionRate: z.number().optional(),
+});
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2024-06-20",
 });
 
 // Helper to validate request body using schema
