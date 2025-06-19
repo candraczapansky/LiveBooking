@@ -319,7 +319,7 @@ const AppointmentsPage = () => {
 
   const renderDayView = () => {
     const staffCount = staff?.length || 1;
-    const columnWidth = Math.max(200, Math.floor((window.innerWidth - (sidebarOpen ? 280 : 80) - 100) / staffCount));
+    const columnWidth = Math.max(280, Math.floor((window.innerWidth - (sidebarOpen ? 280 : 80) - 100) / staffCount));
     
     return (
       <div className="relative">
@@ -467,28 +467,28 @@ const AppointmentsPage = () => {
                     opacity: draggedAppointment?.id === appointment.id ? 0.5 : (appointment.paymentStatus === 'paid' ? 1 : 0.7)
                   }}
                 >
-                  <div className="text-xs font-medium truncate">
+                  <div className="text-xs font-medium leading-tight mb-1" title={serviceName}>
                     {serviceName}
                   </div>
-                  <div className="text-xs opacity-90 truncate">
+                  <div className="text-xs opacity-90 leading-tight mb-1" title={clientName}>
                     {clientName}
                   </div>
-                  <div className="text-xs opacity-75 truncate">
+                  <div className="text-xs opacity-75 leading-tight mb-2" title={`${timeString} • ${duration} min`}>
                     {timeString} • {duration} min
                   </div>
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="flex flex-col gap-1">
                     {appointment.paymentStatus === 'paid' ? (
-                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1 self-start">
                         <DollarSign className="w-2.5 h-2.5" />
                         Paid
                       </span>
                     ) : (
-                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1 self-start">
                         <CreditCard className="w-2.5 h-2.5" />
                         Click to pay
                       </span>
                     )}
-                    <span className="text-xs opacity-60 group-hover:opacity-80 transition-opacity">
+                    <span className="text-xs opacity-60 group-hover:opacity-80 transition-opacity self-end">
                       Click to edit
                     </span>
                   </div>
