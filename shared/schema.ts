@@ -127,6 +127,9 @@ export const appointments = pgTable("appointments", {
 export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   id: true,
   createdAt: true,
+}).extend({
+  startTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
 });
 
 // Memberships schema
