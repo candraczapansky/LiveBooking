@@ -314,6 +314,42 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     }
   };
 
+  const handleCashPayment = async () => {
+    if (!appointmentId || appointmentId <= 0) return;
+    
+    try {
+      // Create a payment record for cash payment
+      await apiRequest("POST", "/api/payments", {
+        appointmentId: appointmentId,
+        amount: selectedService?.price || 0,
+        paymentMethod: "cash",
+        status: "paid"
+      });
+
+      // Update appointment payment status
+      await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
+        ...appointment,
+        paymentStatus: "paid"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      
+      toast({
+        title: "Cash Payment Recorded",
+        description: "Appointment marked as paid with cash.",
+      });
+      
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record cash payment.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDelete = async () => {
     if (!appointmentId || appointmentId <= 0) return;
     setIsDeleting(true);
@@ -580,20 +616,32 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                         <span className="text-sm font-medium">Paid</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-2">
+                      <div className="space-y-2">
                         <span className="text-sm text-muted-foreground">Amount: {formatPrice(selectedService?.price || 0)}</span>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            setShowCheckout(true);
-                            onOpenChange(false); // Close the appointment dialog
-                          }}
-                          className="bg-green-600 hover:bg-green-700"
-                        >
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Pay Now
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              setShowCheckout(true);
+                              onOpenChange(false); // Close the appointment dialog
+                            }}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Pay with Card
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={handleCashPayment}
+                            variant="outline"
+                            className="border-green-600 text-green-600 hover:bg-green-50"
+                          >
+                            <DollarSign className="mr-2 h-4 w-4" />
+                            Mark as Cash Paid
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
