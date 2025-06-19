@@ -129,12 +129,7 @@ const timeSlots = [
   "7:00 PM"
 ];
 
-const staffMembers = [
-  "Kelsey Czapansky",
-  "Katy Ferguson", 
-  "Amanda Sappington",
-  "Rita Williams"
-];
+// Staff members will be loaded from API
 
 const AppointmentsPage = () => {
   useDocumentTitle("Appointments | BeautyBook");
@@ -175,6 +170,24 @@ const AppointmentsPage = () => {
     queryFn: async () => {
       const response = await fetch('/api/services');
       if (!response.ok) throw new Error('Failed to fetch services');
+      return response.json();
+    }
+  });
+
+  const { data: appointments, isLoading: isLoadingAppointments } = useQuery({
+    queryKey: ['/api/appointments'],
+    queryFn: async () => {
+      const response = await fetch('/api/appointments');
+      if (!response.ok) throw new Error('Failed to fetch appointments');
+      return response.json();
+    }
+  });
+
+  const { data: users } = useQuery({
+    queryKey: ['/api/users'],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
       return response.json();
     }
   });
@@ -354,11 +367,27 @@ const AppointmentsPage = () => {
 
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
-            {sampleAppointments.map((appointment) => {
-              const position = getAppointmentPosition(appointment.time, appointment.duration);
-              const staffColumn = getStaffColumn(appointment.staff);
+            {appointments?.map((appointment) => {
+              const startTime = new Date(appointment.startTime);
+              const endTime = new Date(appointment.endTime);
+              const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // duration in minutes
+              const timeString = startTime.toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              });
+              
+              const position = getAppointmentPosition(timeString, duration);
+              const staffName = appointment.staff?.user ? 
+                `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
+                'Unknown Staff';
+              const staffColumn = getStaffColumn(staffName);
               
               if (staffColumn === -1) return null;
+              
+              const clientName = appointment.client ? 
+                `${appointment.client.firstName} ${appointment.client.lastName}` : 
+                'Unknown Client';
               
               return (
                 <div
@@ -370,18 +399,18 @@ const AppointmentsPage = () => {
                     left: `${staffColumn * 25}%`,
                     width: '24%',
                     margin: '1px',
-                    backgroundColor: appointment.color,
-                    borderColor: appointment.color,
+                    backgroundColor: appointment.service?.color || '#3B82F6',
+                    borderColor: appointment.service?.color || '#3B82F6',
                     fontSize: `${Math.max(10, 12 * zoomLevel)}px`,
                     padding: `${Math.max(4, 8 * zoomLevel)}px`
                   }}
                   onClick={() => handleEditAppointment(appointment.id)}
                 >
                   <div className="font-medium truncate">
-                    {appointment.time} - {appointment.title}
+                    {timeString} - {appointment.service?.name || 'Service'}
                   </div>
                   <div className="opacity-90 truncate">
-                    👤 {appointment.clientName}
+                    👤 {clientName}
                   </div>
                 </div>
               );

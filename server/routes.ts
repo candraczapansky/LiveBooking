@@ -541,8 +541,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } else if (date) {
       appointments = await storage.getAppointmentsByDate(new Date(date as string));
     } else {
-      // Return today's appointments by default
-      appointments = await storage.getAppointmentsByDate(new Date());
+      // Return all appointments when no filters are specified
+      appointments = Array.from((storage as any).appointments.values());
     }
     
     // Get detailed information for each appointment
