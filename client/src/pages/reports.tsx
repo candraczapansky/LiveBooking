@@ -313,8 +313,8 @@ const ReportsPage = () => {
     // Track client first appointments to determine new vs returning
     const clientFirstAppointment = new Map();
     
-    // Sort appointments by date to process chronologically
-    const sortedAppointments = [...appointments].sort((a: any, b: any) => 
+    // Sort paid appointments by date to process chronologically
+    const sortedAppointments = [...paidAppointments].sort((a: any, b: any) => 
       new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
 
