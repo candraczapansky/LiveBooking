@@ -10,110 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
 
-// Sample appointment data that matches the calendar layout
-const sampleAppointments = [
-  {
-    id: 1,
-    title: "Natural Volume Hair Extensions",
-    clientName: "Vicki S",
-    time: "12:30 PM",
-    duration: 60,
-    service: "Hair",
-    staff: "Kelsey Czapansky",
-    color: "#e879f9"
-  },
-  {
-    id: 2,
-    title: "Classic Mini Fill",
-    clientName: "Kelly B",
-    time: "10:00 AM",
-    duration: 90,
-    service: "Nails",
-    staff: "Kelsey Czapansky",
-    color: "#facc15"
-  },
-  {
-    id: 3,
-    title: "Classic Fill",
-    clientName: "Kelly B", 
-    time: "11:00 AM",
-    duration: 60,
-    service: "Nails",
-    staff: "Kelsey Czapansky",
-    color: "#e879f9"
-  },
-  {
-    id: 4,
-    title: "Bold Fill",
-    clientName: "Macy S",
-    time: "12:00 PM",
-    duration: 60,
-    service: "Nails",
-    staff: "Katy Ferguson",
-    color: "#e879f9"
-  },
-  {
-    id: 5,
-    title: "Classic Full Set",
-    clientName: "Suzy L",
-    time: "1:00 PM",
-    duration: 120,
-    service: "Nails",
-    staff: "Kelsey Czapansky",
-    color: "#facc15"
-  },
-  {
-    id: 6,
-    title: "Bold Fill",
-    clientName: "Louise C",
-    time: "4:00 PM",
-    duration: 60,
-    service: "Nails",
-    staff: "Kelsey Czapansky",
-    color: "#e879f9"
-  },
-  {
-    id: 7,
-    title: "Natural Volume Extensions",
-    clientName: "Emma K",
-    time: "5:00 PM",
-    duration: 90,
-    service: "Hair",
-    staff: "Kelsey Czapansky",
-    color: "#e879f9"
-  },
-  {
-    id: 8,
-    title: "Outside Fill Color",
-    clientName: "Jenni H",
-    time: "12:00 PM",
-    duration: 90,
-    service: "Nails",
-    staff: "Amanda Sappington",
-    color: "#a855f7"
-  },
-  {
-    id: 9,
-    title: "Blended Fill",
-    clientName: "Alyson J",
-    time: "12:00 PM",
-    duration: 60,
-    service: "Nails",
-    staff: "Rita Williams",
-    color: "#facc15"
-  },
-  {
-    id: 10,
-    title: "Blended Extensions",
-    clientName: "Christina W",
-    time: "2:00 PM",
-    duration: 120,
-    service: "Hair",
-    staff: "Amanda Sappington",
-    color: "#f472b6"
-  }
-];
-
 const timeSlots = [
   "8:00 AM", "8:30 AM",
   "9:00 AM", "9:30 AM",
@@ -129,8 +25,6 @@ const timeSlots = [
   "7:00 PM"
 ];
 
-// Staff members will be loaded from API
-
 const AppointmentsPage = () => {
   useDocumentTitle("Appointments | BeautyBook");
   const { toast } = useToast();
@@ -142,7 +36,7 @@ const AppointmentsPage = () => {
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
-  const [zoomLevel, setZoomLevel] = useState(1); // 0.5 = zoomed out, 1 = normal, 2 = zoomed in
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -152,110 +46,111 @@ const AppointmentsPage = () => {
       }
     };
 
+    checkSidebarState();
     const interval = setInterval(checkSidebarState, 100);
     return () => clearInterval(interval);
   }, []);
 
-  const { data: staff } = useQuery({
-    queryKey: ['/api/staff'],
-    queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      return response.json();
-    }
-  });
-
-  const { data: services } = useQuery({
-    queryKey: ['/api/services'],
-    queryFn: async () => {
-      const response = await fetch('/api/services');
-      if (!response.ok) throw new Error('Failed to fetch services');
-      return response.json();
-    }
-  });
-
-  const { data: appointments, isLoading: isLoadingAppointments } = useQuery({
+  // Fetch appointments from API
+  const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ['/api/appointments'],
-    queryFn: async () => {
-      const response = await fetch('/api/appointments');
-      if (!response.ok) throw new Error('Failed to fetch appointments');
-      return response.json();
-    }
   });
 
-  const { data: users } = useQuery({
-    queryKey: ['/api/users'],
-    queryFn: async () => {
-      const response = await fetch('/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
-      return response.json();
-    }
+  // Fetch staff from API
+  const { data: staff, isLoading: staffLoading } = useQuery({
+    queryKey: ['/api/staff'],
+  });
+
+  // Fetch services from API
+  const { data: services, isLoading: servicesLoading } = useQuery({
+    queryKey: ['/api/services'],
   });
 
   const formatDate = (date: Date) => {
-    if (viewMode === 'month') {
-      return date.toLocaleDateString('en-US', { 
-        month: 'long',
-        year: 'numeric'
-      });
-    } else if (viewMode === 'week') {
-      const startOfWeek = new Date(date);
-      startOfWeek.setDate(date.getDate() - date.getDay());
-      const endOfWeek = new Date(startOfWeek);
-      endOfWeek.setDate(startOfWeek.getDate() + 6);
-      
-      return `${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    } else {
-      return date.toLocaleDateString('en-US', { 
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
-  const goToPrevious = () => {
-    const newDate = new Date(currentDate);
-    if (viewMode === 'month') {
-      newDate.setMonth(newDate.getMonth() - 1);
-    } else if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() - 7);
-    } else {
-      newDate.setDate(newDate.getDate() - 1);
-    }
-    setCurrentDate(newDate);
-  };
-
-  const goToNext = () => {
-    const newDate = new Date(currentDate);
-    if (viewMode === 'month') {
-      newDate.setMonth(newDate.getMonth() + 1);
-    } else if (viewMode === 'week') {
-      newDate.setDate(newDate.getDate() + 7);
-    } else {
-      newDate.setDate(newDate.getDate() + 1);
-    }
-    setCurrentDate(newDate);
-  };
-
-  const goToToday = () => {
-    setCurrentDate(new Date());
-  };
-
-  const getSlotHeight = () => {
-    return Math.round(60 * zoomLevel); // Base 60px per hour slot, adjusted by zoom
-  };
-
-  const getAppointmentPosition = (time: string, duration: number) => {
-    const timeIndex = timeSlots.findIndex(slot => slot === time);
-    if (timeIndex === -1) return { top: 0, height: getSlotHeight() };
+  const getWeekDays = (date: Date) => {
+    const week = [];
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - date.getDay());
     
-    const slotHeight = getSlotHeight(); // Each 30-minute slot
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      week.push(day);
+    }
+    return week;
+  };
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDay = firstDay.getDay();
+    
+    const days = [];
+    
+    // Add empty cells for days before the first day of the month
+    for (let i = 0; i < startingDay; i++) {
+      days.push(null);
+    }
+    
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(new Date(year, month, day));
+    }
+    
+    return days;
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    
+    if (viewMode === 'day') {
+      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
+    } else if (viewMode === 'week') {
+      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
+    } else if (viewMode === 'month') {
+      newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
+    }
+    
+    setCurrentDate(newDate);
+  };
+
+  const zoomIn = () => {
+    if (zoomLevel < 3) {
+      setZoomLevel(prev => Math.min(prev + 0.5, 3));
+    }
+  };
+
+  const zoomOut = () => {
+    if (zoomLevel > 0.5) {
+      setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
+    }
+  };
+
+  const getAppointmentStyle = (appointment: any) => {
+    const startTime = new Date(appointment.startTime);
+    const endTime = new Date(appointment.endTime);
+    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+    
+    const startHour = startTime.getHours();
+    const startMinute = startTime.getMinutes();
+    const topPosition = ((startHour - 8) * 2 + (startMinute === 30 ? 1 : 0)) * 30 * zoomLevel;
+    
+    const slotHeight = 30 * zoomLevel;
     const slotsNeeded = Math.ceil(duration / 30);
     
     return {
-      top: timeIndex * slotHeight,
+      top: `${topPosition}px`,
       height: Math.max(slotsNeeded * slotHeight, Math.round(45 * zoomLevel))
     };
   };
@@ -273,99 +168,68 @@ const AppointmentsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleEditAppointment = (appointmentId: number) => {
-    setSelectedAppointmentId(appointmentId);
-    setIsFormOpen(true);
-  };
-
-  const zoomIn = () => {
-    setZoomLevel(prev => Math.min(prev * 1.5, 3)); // Max zoom 3x
-  };
-
-  const zoomOut = () => {
-    setZoomLevel(prev => Math.max(prev / 1.5, 0.3)); // Min zoom 0.3x
-  };
-
-  const resetZoom = () => {
-    setZoomLevel(1);
-  };
-
-  const getWeekDays = (date: Date) => {
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay());
+  const renderDayView = () => {
+    const staffCount = staff?.length || 1;
+    const columnWidth = Math.max(200, Math.floor((window.innerWidth - (sidebarOpen ? 280 : 80) - 100) / staffCount));
     
-    const days = [];
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - firstDay.getDay());
-    
-    const days = [];
-    for (let i = 0; i < 42; i++) { // 6 weeks * 7 days
-      const day = new Date(startDate);
-      day.setDate(startDate.getDate() + i);
-      days.push(day);
-    }
-    return days;
-  };
-
-  const renderDayView = () => (
-    <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
-      {/* Time Column */}
-      <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
-        <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
-        {timeSlots.map((time) => (
-          <div 
-            key={time}
-            className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
-            style={{ height: `${getSlotHeight()}px` }}
-          >
-            <span className="text-xs text-gray-600 dark:text-gray-400">
-              {time}
-            </span>
+    return (
+      <div className="relative">
+        {/* Header with staff names */}
+        <div className="flex border-b bg-white dark:bg-gray-800 sticky top-0 z-10">
+          <div className="w-20 flex-shrink-0 border-r p-4 text-sm font-medium text-gray-600 dark:text-gray-300">
+            Time
           </div>
-        ))}
-      </div>
-
-      {/* Main Calendar Area */}
-      <div className="flex-1">
-        {/* Staff Header - Sticky */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
           {staff?.map((staffMember: any) => {
             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
             return (
-              <div key={staffMember.id} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {staffName}
-                </span>
+              <div 
+                key={staffMember.id}
+                className="border-r p-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
+                style={{ width: columnWidth }}
+              >
+                {staffName}
               </div>
             );
           })}
         </div>
 
-        {/* Time Grid */}
+        {/* Time grid */}
         <div className="relative">
+          {/* Time labels and grid lines */}
           <div className="flex">
-            {/* Staff Columns */}
-            {staff?.map((staffMember: any, staffIndex: number) => (
-              <div key={staffMember.id} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-                {timeSlots.map((time, timeIndex) => (
+            <div className="w-20 flex-shrink-0">
+              {timeSlots.map((time, index) => (
+                <div 
+                  key={time} 
+                  className="border-r border-b h-8 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
+                  style={{ height: Math.round(30 * zoomLevel) }}
+                >
+                  {time}
+                </div>
+              ))}
+            </div>
+            
+            {/* Staff columns */}
+            {staff?.map((staffMember: any) => (
+              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth }}>
+                {timeSlots.map((time, index) => (
                   <div 
-                    key={`${staffIndex}-${time}`}
-                    className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                    style={{ height: `${getSlotHeight()}px` }}
-                    onClick={() => handleAddAppointment()}
+                    key={time} 
+                    className="border-b h-8 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    style={{ height: Math.round(30 * zoomLevel) }}
+                    onClick={() => {
+                      // Set time for new appointment
+                      const [timeStr, period] = time.split(' ');
+                      const [hours, minutes] = timeStr.split(':');
+                      let hour = parseInt(hours);
+                      if (period === 'PM' && hour !== 12) hour += 12;
+                      if (period === 'AM' && hour === 12) hour = 0;
+                      
+                      const appointmentDate = new Date(currentDate);
+                      appointmentDate.setHours(hour, parseInt(minutes), 0, 0);
+                      
+                      handleAddAppointment();
+                    }}
                   />
                 ))}
               </div>
@@ -377,47 +241,48 @@ const AppointmentsPage = () => {
             {appointments?.map((appointment: any) => {
               const startTime = new Date(appointment.startTime);
               const endTime = new Date(appointment.endTime);
-              const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // duration in minutes
+              const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
               const timeString = startTime.toLocaleTimeString('en-US', { 
                 hour: 'numeric', 
                 minute: '2-digit',
-                hour12: true 
+                hour12: true
               });
+
+              // Find staff member and get column
+              const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
+              const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+              const columnIndex = getStaffColumn(staffName);
               
-              const position = getAppointmentPosition(timeString, duration);
-              const staffName = appointment.staff?.user ? 
-                `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
-                'Unknown Staff';
-              const staffColumn = getStaffColumn(staffName);
-              
-              if (staffColumn === -1) return null;
-              
-              const clientName = appointment.client ? 
-                `${appointment.client.firstName} ${appointment.client.lastName}` : 
-                'Unknown Client';
-              
+              if (columnIndex === -1) return null;
+
+              const leftPosition = 80 + (columnIndex * columnWidth);
+              const appointmentStyle = getAppointmentStyle(appointment);
+
               return (
                 <div
                   key={appointment.id}
-                  className="absolute pointer-events-auto cursor-pointer rounded-md p-2 text-xs overflow-hidden shadow-sm border text-white hover:shadow-md transition-shadow"
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
                   style={{
-                    top: position.top,
-                    height: position.height,
-                    left: `${staffColumn * 25}%`,
-                    width: '24%',
-                    margin: '1px',
-                    backgroundColor: appointment.service?.color || '#3B82F6',
-                    borderColor: appointment.service?.color || '#3B82F6',
-                    fontSize: `${Math.max(10, 12 * zoomLevel)}px`,
-                    padding: `${Math.max(4, 8 * zoomLevel)}px`
+                    left: `${leftPosition + 4}px`,
+                    width: `${columnWidth - 8}px`,
+                    ...appointmentStyle,
+                    backgroundColor: '#e879f9',
+                    borderColor: '#c026d3',
+                    color: '#ffffff'
                   }}
-                  onClick={() => handleEditAppointment(appointment.id)}
+                  onClick={() => {
+                    setSelectedAppointmentId(appointment.id);
+                    setIsFormOpen(true);
+                  }}
                 >
-                  <div className="font-medium truncate">
-                    {timeString} - {appointment.service?.name || 'Service'}
+                  <div className="text-xs font-medium truncate">
+                    {appointment.notes || 'Appointment'}
                   </div>
-                  <div className="opacity-90 truncate">
-                    👤 {clientName}
+                  <div className="text-xs opacity-90 truncate">
+                    {timeString}
+                  </div>
+                  <div className="text-xs opacity-75 truncate">
+                    {duration} min
                   </div>
                 </div>
               );
@@ -425,63 +290,26 @@ const AppointmentsPage = () => {
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderWeekView = () => {
     const weekDays = getWeekDays(currentDate);
     
     return (
-      <div className="flex" style={{ minHeight: `${timeSlots.length * getSlotHeight() + 48}px` }}>
-        {/* Time Column */}
-        <div className="w-20 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex-shrink-0 sticky left-0 z-10">
-          <div className="h-12 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"></div>
-          {timeSlots.map((time) => (
-            <div 
-              key={time}
-              className="border-b border-gray-200 dark:border-gray-700 flex items-start justify-end pr-2 pt-1 bg-gray-50 dark:bg-gray-800"
-              style={{ height: `${getSlotHeight()}px` }}
-            >
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {time}
-              </span>
+      <div className="text-center p-8 text-gray-500 dark:text-gray-400">
+        <p>Week view coming soon...</p>
+        <div className="mt-4 flex justify-center space-x-4">
+          {weekDays.map((day, index) => (
+            <div key={index} className="text-center">
+              <div className="text-sm font-medium">
+                {day.toLocaleDateString('en-US', { weekday: 'short' })}
+              </div>
+              <div className="text-lg">
+                {day.getDate()}
+              </div>
             </div>
           ))}
-        </div>
-
-        {/* Days Columns */}
-        <div className="flex-1">
-          {/* Days Header */}
-          <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
-            {weekDays.map((day, index) => (
-              <div key={index} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-800">
-                <span className="text-xs text-gray-600 dark:text-gray-400">
-                  {day.toLocaleDateString('en-US', { weekday: 'short' })}
-                </span>
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {day.getDate()}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          {/* Time Grid */}
-          <div className="relative">
-            <div className="flex">
-              {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-                  {timeSlots.map((time, timeIndex) => (
-                    <div 
-                      key={`${dayIndex}-${time}`}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-                      style={{ height: `${getSlotHeight()}px` }}
-                      onClick={() => handleAddAppointment()}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
     );
@@ -489,102 +317,137 @@ const AppointmentsPage = () => {
 
   const renderMonthView = () => {
     const monthDays = getDaysInMonth(currentDate);
-    const weeks = [];
-    
-    for (let i = 0; i < monthDays.length; i += 7) {
-      weeks.push(monthDays.slice(i, i + 7));
-    }
     
     return (
-      <div className="h-full">
-        {/* Days Header */}
-        <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-            <div key={day} className="p-3 text-center text-sm font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+      <div className="p-4">
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="p-2 text-center text-sm font-medium text-gray-600 dark:text-gray-300">
               {day}
             </div>
           ))}
         </div>
         
-        {/* Calendar Grid */}
-        <div className="flex-1">
-          {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-700 last:border-b-0" style={{ height: 'calc((100vh - 300px) / 6)' }}>
-              {week.map((day, dayIndex) => {
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const isToday = day.toDateString() === new Date().toDateString();
-                
-                return (
-                  <div 
-                    key={dayIndex}
-                    className={`border-r border-gray-200 dark:border-gray-700 last:border-r-0 p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                      !isCurrentMonth ? 'bg-gray-50 dark:bg-gray-800 text-gray-400' : ''
-                    } ${isToday ? 'bg-blue-50 dark:bg-blue-900' : ''}`}
-                    onClick={() => handleAddAppointment()}
-                  >
-                    <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : ''}`}>
-                      {day.getDate()}
-                    </div>
-                    {/* Sample appointments for month view */}
-                    {isCurrentMonth && day.getDate() % 3 === 0 && (
-                      <div className="mt-1">
-                        <div className="text-xs bg-purple-200 text-purple-800 px-1 rounded mb-1 truncate">
-                          Appointment
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+        <div className="grid grid-cols-7 gap-1">
+          {monthDays.map((day, index) => {
+            if (!day) {
+              return <div key={index} className="h-24"></div>;
+            }
+            
+            const isToday = day.toDateString() === new Date().toDateString();
+            
+            return (
+              <div 
+                key={index} 
+                className={`h-24 border rounded-lg p-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                  isToday ? 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700' : 'bg-white dark:bg-gray-800'
+                }`}
+                onClick={() => {
+                  setCurrentDate(day);
+                  setViewMode('day');
+                }}
+              >
+                <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {day.getDate()}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   };
 
+  if (appointmentsLoading || staffLoading || servicesLoading) {
+    return (
+      <div className="flex">
+        <SidebarController />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-auto p-4">
+            <div className="animate-pulse">
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex">
       <SidebarController />
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
         <Header />
         
-        <main className="flex-1 overflow-hidden bg-white dark:bg-gray-900">
-          {/* Calendar Header */}
-          <div className="border-b border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center justify-between mb-4">
+        <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
+          {/* Top Controls */}
+          <div className="bg-white dark:bg-gray-800 border-b px-6 py-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Manage salon appointments and bookings
-                </p>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button onClick={goToToday} variant="outline" size="sm">
-                  Today
-                </Button>
                 
+                <Button
+                  onClick={handleAddAppointment}
+                  className="bg-pink-600 hover:bg-pink-700 text-white"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  New Appointment
+                </Button>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                {/* Date Navigation */}
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigateDate('prev')}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <span className="text-sm font-medium min-w-48 text-center">
+                    {formatDate(currentDate)}
+                  </span>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigateDate('next')}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* View Mode Toggle */}
+                <Select value={viewMode} onValueChange={setViewMode}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Day</SelectItem>
+                    <SelectItem value="week">Week</SelectItem>
+                    <SelectItem value="month">Month</SelectItem>
+                  </SelectContent>
+                </Select>
+
                 {/* Zoom Controls */}
-                <div className="flex items-center border rounded-md bg-gray-50 dark:bg-gray-800">
+                <div className="flex border rounded-lg overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={zoomOut}
                     className="h-8 w-8 p-0 rounded-none border-r"
-                    disabled={zoomLevel <= 0.3}
+                    disabled={zoomLevel <= 0.5}
                   >
                     <ZoomOut className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={resetZoom}
-                    className="h-8 px-2 rounded-none text-xs font-medium min-w-[40px]"
-                  >
-                    {Math.round(zoomLevel * 100)}%
                   </Button>
                   <Button
                     variant="ghost"
@@ -599,7 +462,7 @@ const AppointmentsPage = () => {
                 
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Platter - Broken A..." />
+                    <SelectValue placeholder="Select staff..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All stylists</SelectItem>
@@ -616,56 +479,23 @@ const AppointmentsPage = () => {
                 
                 <Select value={selectedService} onValueChange={setSelectedService}>
                   <SelectTrigger className="w-48">
-                    <SelectValue placeholder="All service categories" />
+                    <SelectValue placeholder="Select service..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All service categories</SelectItem>
-                    <SelectItem value="hair">Hair Services</SelectItem>
-                    <SelectItem value="nails">Nail Services</SelectItem>
-                    <SelectItem value="skin">Skin Services</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Button onClick={handleAddAppointment} className="bg-blue-600 hover:bg-blue-700">
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  New Appointment
-                </Button>
-              </div>
-            </div>
-
-            {/* Date Navigation */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" size="sm" onClick={goToPrevious}>
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 min-w-[200px]">
-                    {formatDate(currentDate)}
-                  </h2>
-                  <Button variant="ghost" size="sm" onClick={goToNext}>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Select value={viewMode} onValueChange={setViewMode}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
+                    <SelectItem value="all">All services</SelectItem>
+                    {services?.map((service: any) => (
+                      <SelectItem key={service.id} value={service.name}>
+                        {service.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
           </div>
 
-          {/* Calendar Grid */}
-          <div className="flex-1 overflow-auto" style={{ height: 'calc(100vh - 200px)' }}>
+          {/* Calendar Views */}
+          <div className="p-6">
             {viewMode === 'day' && renderDayView()}
             {viewMode === 'week' && renderWeekView()}
             {viewMode === 'month' && renderMonthView()}
