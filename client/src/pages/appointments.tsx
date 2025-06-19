@@ -148,14 +148,14 @@ const AppointmentsPage = () => {
   const handlePayment = (appointment: any) => {
     // Get service details and calculate amount
     const service = services?.find((s: any) => s.id === appointment.serviceId);
-    const staff = staffMembers?.find((s: any) => s.id === appointment.staffId);
+    const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
     const client = users?.find((u: any) => u.id === appointment.clientId);
     
     const checkoutData = {
       id: appointment.id,
       clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
       serviceName: service?.name || 'Unknown Service',
-      staffName: staff?.user ? `${staff.user.firstName} ${staff.user.lastName}` : 'Unknown Staff',
+      staffName: staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff',
       startTime: new Date(appointment.startTime),
       endTime: new Date(appointment.endTime),
       amount: service?.price || 0,
@@ -173,7 +173,7 @@ const AppointmentsPage = () => {
       description: "The appointment payment has been processed successfully.",
     });
     // Refresh appointments data
-    refetchAppointments();
+    window.location.reload();
   };
 
   const getAppointmentStyle = (appointment: any) => {
@@ -308,18 +308,14 @@ const AppointmentsPage = () => {
               return (
                 <div
                   key={appointment.id}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-md transition-shadow"
                   style={{
                     left: `${leftPosition + 4}px`,
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
-                    backgroundColor: '#e879f9',
-                    borderColor: '#c026d3',
+                    backgroundColor: appointment.paymentStatus === 'paid' ? '#10b981' : '#e879f9',
+                    borderColor: appointment.paymentStatus === 'paid' ? '#059669' : '#c026d3',
                     color: '#ffffff'
-                  }}
-                  onClick={() => {
-                    setSelectedAppointmentId(appointment.id);
-                    setIsFormOpen(true);
                   }}
                 >
                   <div className="text-xs font-medium truncate">
@@ -330,6 +326,36 @@ const AppointmentsPage = () => {
                   </div>
                   <div className="text-xs opacity-75 truncate">
                     {timeString} • {duration} min
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    <button
+                      className="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 rounded px-1.5 py-0.5 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAppointmentId(appointment.id);
+                        setIsFormOpen(true);
+                      }}
+                    >
+                      Edit
+                    </button>
+                    {appointment.paymentStatus !== 'paid' && (
+                      <button
+                        className="text-xs bg-green-600 hover:bg-green-700 rounded px-1.5 py-0.5 transition-colors flex items-center gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePayment(appointment);
+                        }}
+                      >
+                        <CreditCard className="w-2.5 h-2.5" />
+                        Pay
+                      </button>
+                    )}
+                    {appointment.paymentStatus === 'paid' && (
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
+                        <DollarSign className="w-2.5 h-2.5" />
+                        Paid
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -557,6 +583,16 @@ const AppointmentsPage = () => {
         appointmentId={selectedAppointmentId}
         selectedDate={currentDate}
       />
+
+      {/* Checkout Component */}
+      {checkoutAppointment && (
+        <AppointmentCheckout
+          appointment={checkoutAppointment}
+          isOpen={isCheckoutOpen}
+          onClose={() => setIsCheckoutOpen(false)}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 };

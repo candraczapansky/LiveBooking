@@ -12,7 +12,7 @@ import { formatPrice } from "@/lib/utils";
 import { format } from "date-fns";
 
 // Initialize Stripe
-const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY || "pk_test_51RbYANP6cNUB4dEVCkyNxs0OLb1Lbh0GKX1Np3jD3bEC3VmNxN18UpPH0awHEsOp4ydEICVsQC317A2PAuQtzEph00Ppqo4NUV";
+const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
 if (!stripePublicKey) {
   throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
 }
