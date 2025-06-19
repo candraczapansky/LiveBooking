@@ -426,7 +426,12 @@ const AppointmentsPage = () => {
                   draggable
                   onDragStart={(e) => handleDragStart(e, appointment)}
                   onDragEnd={handleDragEnd}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-md transition-shadow cursor-move"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedAppointmentId(appointment.id);
+                    setIsFormOpen(true);
+                  }}
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] group"
                   style={{
                     left: `${leftPosition + 4}px`,
                     width: `${columnWidth - 8}px`,
@@ -446,14 +451,22 @@ const AppointmentsPage = () => {
                   <div className="text-xs opacity-75 truncate">
                     {timeString} • {duration} min
                   </div>
-                  {appointment.paymentStatus === 'paid' && (
-                    <div className="flex items-center gap-1 mt-1">
+                  <div className="flex items-center justify-between mt-1">
+                    {appointment.paymentStatus === 'paid' ? (
                       <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
                         <DollarSign className="w-2.5 h-2.5" />
                         Paid
                       </span>
-                    </div>
-                  )}
+                    ) : (
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
+                        <CreditCard className="w-2.5 h-2.5" />
+                        Click to pay
+                      </span>
+                    )}
+                    <span className="text-xs opacity-60 group-hover:opacity-80 transition-opacity">
+                      Click to edit
+                    </span>
+                  </div>
                 </div>
               );
             })}
