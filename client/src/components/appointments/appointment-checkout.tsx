@@ -52,7 +52,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     setIsProcessing(true);
 
     try {
-      const { error } = await stripe.confirmPayment({
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: window.location.origin + "/appointments",
@@ -61,19 +61,43 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       });
 
       if (error) {
+        console.error('Payment confirmation error:', error);
+        
+        // Show more helpful error messages for common test scenarios
+        let errorMessage = error.message;
+        if (error.code === 'card_declined') {
+          errorMessage = "For testing, use card number 4242424242424242 with any future expiry date and any 3-digit CVC.";
+        }
+        
         toast({
           title: "Payment Failed",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Payment Successful",
-          description: "Your appointment has been confirmed!",
-        });
-        onSuccess();
+      } else if (paymentIntent?.status === 'succeeded') {
+        // Confirm payment on backend
+        try {
+          await apiRequest("POST", "/api/confirm-payment", {
+            paymentIntentId: paymentIntent.id,
+            appointmentId: appointment.id
+          });
+          
+          toast({
+            title: "Payment Successful",
+            description: "Your appointment has been confirmed!",
+          });
+          onSuccess();
+        } catch (confirmError) {
+          console.error('Backend confirmation error:', confirmError);
+          toast({
+            title: "Payment Processed",
+            description: "Payment successful, but there was an issue updating the appointment. Please contact support.",
+            variant: "destructive",
+          });
+        }
       }
     } catch (error: any) {
+      console.error('Payment processing error:', error);
       toast({
         title: "Payment Error",
         description: error.message || "An unexpected error occurred",
@@ -255,6 +279,17 @@ export default function AppointmentCheckout({
           </div>
 
           <Separator />
+
+          {/* Test Card Information */}
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Test Payment Information</h3>
+            <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
+              <p><strong>Card Number:</strong> 4242 4242 4242 4242</p>
+              <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
+              <p><strong>CVC:</strong> Any 3 digits (e.g., 123)</p>
+              <p><strong>Name:</strong> Any name</p>
+            </div>
+          </div>
 
           {/* Payment Form */}
           {isLoading ? (
