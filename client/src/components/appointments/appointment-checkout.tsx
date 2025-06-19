@@ -66,7 +66,11 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         // Show more helpful error messages for common test scenarios
         let errorMessage = error.message;
         if (error.code === 'card_declined') {
-          errorMessage = "For testing, use card number 4242424242424242 with any future expiry date and any 3-digit CVC.";
+          if (error.decline_code === 'test_mode_live_card') {
+            errorMessage = "You entered a real card number. For testing, you MUST use the test card number 4242424242424242 (not your real card).";
+          } else {
+            errorMessage = "For testing, use card number 4242424242424242 with any future expiry date and any 3-digit CVC.";
+          }
         }
         
         toast({
@@ -281,13 +285,19 @@ export default function AppointmentCheckout({
           <Separator />
 
           {/* Test Card Information */}
-          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">Test Payment Information</h3>
-            <div className="text-xs text-blue-800 dark:text-blue-200 space-y-1">
-              <p><strong>Card Number:</strong> 4242 4242 4242 4242</p>
-              <p><strong>Expiry:</strong> Any future date (e.g., 12/25)</p>
-              <p><strong>CVC:</strong> Any 3 digits (e.g., 123)</p>
-              <p><strong>Name:</strong> Any name</p>
+          <div className="bg-red-50 dark:bg-red-950 border-2 border-red-300 dark:border-red-700 rounded-lg p-4">
+            <h3 className="text-sm font-bold text-red-900 dark:text-red-100 mb-2 flex items-center gap-2">
+              ⚠️ IMPORTANT: Test Mode Only
+            </h3>
+            <div className="text-sm text-red-800 dark:text-red-200 space-y-2">
+              <p className="font-semibold">DO NOT use your real credit card!</p>
+              <p>This system is in test mode. Use these test details only:</p>
+              <div className="bg-white dark:bg-gray-800 p-3 rounded border font-mono text-xs">
+                <p><strong>Card Number:</strong> 4242 4242 4242 4242</p>
+                <p><strong>Expiry:</strong> 12/25 (any future date)</p>
+                <p><strong>CVC:</strong> 123 (any 3 digits)</p>
+                <p><strong>Name:</strong> Test User</p>
+              </div>
             </div>
           </div>
 
