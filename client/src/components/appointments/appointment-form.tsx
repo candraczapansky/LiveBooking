@@ -585,7 +585,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                         <Button
                           type="button"
                           size="sm"
-                          onClick={() => setShowCheckout(true)}
+                          onClick={() => {
+                            setShowCheckout(true);
+                            onOpenChange(false); // Close the appointment dialog
+                          }}
                           className="bg-green-600 hover:bg-green-700"
                         >
                           <CreditCard className="mr-2 h-4 w-4" />
