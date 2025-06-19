@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import AppointmentForm from "@/components/appointments/appointment-form";
-import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
+import AppointmentCheckout from "@/components/appointments/appointment-checkout";
+import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
@@ -31,6 +32,8 @@ const AppointmentsPage = () => {
   const [location, setLocation] = useLocation();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState("day");
@@ -140,6 +143,37 @@ const AppointmentsPage = () => {
     if (zoomLevel > 0.5) {
       setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
     }
+  };
+
+  const handlePayment = (appointment: any) => {
+    // Get service details and calculate amount
+    const service = services?.find((s: any) => s.id === appointment.serviceId);
+    const staff = staffMembers?.find((s: any) => s.id === appointment.staffId);
+    const client = users?.find((u: any) => u.id === appointment.clientId);
+    
+    const checkoutData = {
+      id: appointment.id,
+      clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
+      serviceName: service?.name || 'Unknown Service',
+      staffName: staff?.user ? `${staff.user.firstName} ${staff.user.lastName}` : 'Unknown Staff',
+      startTime: new Date(appointment.startTime),
+      endTime: new Date(appointment.endTime),
+      amount: service?.price || 0,
+      status: appointment.status,
+      paymentStatus: appointment.paymentStatus || 'unpaid'
+    };
+    
+    setCheckoutAppointment(checkoutData);
+    setIsCheckoutOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    toast({
+      title: "Payment Successful",
+      description: "The appointment payment has been processed successfully.",
+    });
+    // Refresh appointments data
+    refetchAppointments();
   };
 
   const getAppointmentStyle = (appointment: any) => {

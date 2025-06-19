@@ -120,6 +120,8 @@ export const appointments = pgTable("appointments", {
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   status: text("status").notNull().default("pending"), // pending, confirmed, cancelled, completed
+  paymentStatus: text("payment_status").notNull().default("unpaid"), // unpaid, paid, refunded
+  totalAmount: doublePrecision("total_amount"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -164,9 +166,11 @@ export const insertClientMembershipSchema = createInsertSchema(clientMemberships
 // Payments schema
 export const payments = pgTable("payments", {
   id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
   appointmentId: integer("appointment_id"),
   clientMembershipId: integer("client_membership_id"),
   amount: doublePrecision("amount").notNull(),
+  method: text("method").notNull().default("card"), // card, cash, check, etc.
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   paymentDate: timestamp("payment_date"),
