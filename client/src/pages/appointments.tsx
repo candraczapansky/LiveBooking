@@ -261,7 +261,11 @@ const AppointmentsPage = () => {
   };
 
   const getStaffColumn = (staffName: string) => {
-    return staffMembers.findIndex(name => name === staffName);
+    if (!staff) return -1;
+    return staff.findIndex((staffMember: any) => {
+      const fullName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+      return fullName === staffName;
+    });
   };
 
   const handleAddAppointment = () => {
@@ -338,21 +342,24 @@ const AppointmentsPage = () => {
       <div className="flex-1">
         {/* Staff Header - Sticky */}
         <div className="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 sticky top-0 z-20">
-          {staffMembers.map((staffName, index) => (
-            <div key={staffName} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                {staffName}
-              </span>
-            </div>
-          ))}
+          {staff?.map((staffMember: any) => {
+            const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+            return (
+              <div key={staffMember.id} className="flex-1 h-12 border-r border-gray-200 dark:border-gray-700 last:border-r-0 flex items-center justify-center bg-gray-50 dark:bg-gray-800">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {staffName}
+                </span>
+              </div>
+            );
+          })}
         </div>
 
         {/* Time Grid */}
         <div className="relative">
           <div className="flex">
             {/* Staff Columns */}
-            {staffMembers.map((staffName, staffIndex) => (
-              <div key={staffName} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+            {staff?.map((staffMember: any, staffIndex: number) => (
+              <div key={staffMember.id} className="flex-1 border-r border-gray-200 dark:border-gray-700 last:border-r-0">
                 {timeSlots.map((time, timeIndex) => (
                   <div 
                     key={`${staffIndex}-${time}`}
@@ -367,7 +374,7 @@ const AppointmentsPage = () => {
 
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
-            {appointments?.map((appointment) => {
+            {appointments?.map((appointment: any) => {
               const startTime = new Date(appointment.startTime);
               const endTime = new Date(appointment.endTime);
               const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60)); // duration in minutes
@@ -596,11 +603,14 @@ const AppointmentsPage = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All stylists</SelectItem>
-                    {staffMembers.map((member) => (
-                      <SelectItem key={member} value={member}>
-                        {member}
-                      </SelectItem>
-                    ))}
+                    {staff?.map((staffMember: any) => {
+                      const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+                      return (
+                        <SelectItem key={staffMember.id} value={staffName}>
+                          {staffName}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 
@@ -668,7 +678,7 @@ const AppointmentsPage = () => {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         appointmentId={selectedAppointmentId}
-        defaultDate={currentDate}
+        selectedDate={currentDate}
       />
     </div>
   );
