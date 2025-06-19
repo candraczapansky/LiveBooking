@@ -41,44 +41,6 @@ import {
 
 const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
-// Sample data for sales report
-const salesData = [
-  { name: 'Jan', revenue: 12000, expenses: 8000 },
-  { name: 'Feb', revenue: 15000, expenses: 8200 },
-  { name: 'Mar', revenue: 18000, expenses: 9000 },
-  { name: 'Apr', revenue: 16500, expenses: 8500 },
-  { name: 'May', revenue: 19000, expenses: 9200 },
-  { name: 'Jun', revenue: 22000, expenses: 10000 },
-];
-
-// Sample data for client report
-const clientData = [
-  { name: 'Jan', new: 25, returning: 120 },
-  { name: 'Feb', new: 30, returning: 125 },
-  { name: 'Mar', new: 35, returning: 130 },
-  { name: 'Apr', new: 28, returning: 135 },
-  { name: 'May', new: 32, returning: 140 },
-  { name: 'Jun', new: 40, returning: 145 },
-];
-
-// Sample data for services report
-const serviceData = [
-  { name: 'Haircut & Style', value: 35 },
-  { name: 'Color Services', value: 25 },
-  { name: 'Treatments', value: 15 },
-  { name: 'Massage', value: 15 },
-  { name: 'Facials', value: 10 },
-];
-
-// Sample data for staff performance
-const staffData = [
-  { name: 'Jessica', appointments: 85, revenue: 4500 },
-  { name: 'David', appointments: 72, revenue: 3800 },
-  { name: 'Amanda', appointments: 68, revenue: 3600 },
-  { name: 'Michael', appointments: 55, revenue: 2900 },
-  { name: 'Sarah', appointments: 45, revenue: 2400 },
-];
-
 const ReportsPage = () => {
   useDocumentTitle("Reports | BeautyBook");
   const [timePeriod, setTimePeriod] = useState("month");
@@ -130,6 +92,134 @@ const ReportsPage = () => {
   const totalAppointments = appointments.length;
   const completedAppointments = appointments.filter((apt: any) => apt.status === 'confirmed' || apt.status === 'completed').length;
   const appointmentCompletionRate = totalAppointments > 0 ? Math.round(completedAppointments / totalAppointments * 100) : 0;
+
+  // Generate sales data from real appointments
+  const generateSalesData = () => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    const salesByMonth = new Map();
+
+    // Initialize all months with zero revenue
+    monthNames.forEach((month, index) => {
+      salesByMonth.set(index, { name: month, revenue: 0, expenses: 0 });
+    });
+
+    // Calculate revenue from paid appointments
+    paidAppointments.forEach((apt: any) => {
+      const aptDate = new Date(apt.startTime);
+      if (aptDate.getFullYear() === currentYear) {
+        const month = aptDate.getMonth();
+        const service = services.find((s: any) => s.id === apt.serviceId);
+        const revenue = service?.price || 0;
+        
+        const monthData = salesByMonth.get(month);
+        if (monthData) {
+          monthData.revenue += revenue;
+          monthData.expenses = Math.round(monthData.revenue * 0.4); // 40% expense ratio
+          salesByMonth.set(month, monthData);
+        }
+      }
+    });
+
+    return Array.from(salesByMonth.values());
+  };
+
+  const salesData = generateSalesData();
+
+  // Generate service performance data from real appointments
+  const generateServiceData = () => {
+    const serviceStats = new Map();
+    
+    paidAppointments.forEach((apt: any) => {
+      const service = services.find((s: any) => s.id === apt.serviceId);
+      if (service) {
+        const existing = serviceStats.get(service.id) || { 
+          name: service.name, 
+          value: 0, 
+          revenue: 0, 
+          bookings: 0 
+        };
+        existing.value += service.price || 0;
+        existing.revenue += service.price || 0;
+        existing.bookings += 1;
+        serviceStats.set(service.id, existing);
+      }
+    });
+
+    return Array.from(serviceStats.values()).sort((a, b) => b.revenue - a.revenue);
+  };
+
+  // Generate staff performance data from real appointments
+  const generateStaffData = () => {
+    const staffStats = new Map();
+    
+    paidAppointments.forEach((apt: any) => {
+      const staffMember = staff.find((s: any) => s.id === apt.staffId);
+      if (staffMember && staffMember.user) {
+        const staffName = `${staffMember.user.firstName} ${staffMember.user.lastName}`;
+        const service = services.find((s: any) => s.id === apt.serviceId);
+        const revenue = service?.price || 0;
+        
+        const existing = staffStats.get(apt.staffId) || { 
+          name: staffName, 
+          appointments: 0, 
+          revenue: 0 
+        };
+        existing.appointments += 1;
+        existing.revenue += revenue;
+        staffStats.set(apt.staffId, existing);
+      }
+    });
+
+    return Array.from(staffStats.values()).sort((a, b) => b.revenue - a.revenue);
+  };
+
+  const serviceData = generateServiceData();
+  const staffData = generateStaffData();
+
+  // Generate client data from real appointments
+  const generateClientData = () => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentYear = new Date().getFullYear();
+    const clientsByMonth = new Map();
+
+    // Initialize all months
+    monthNames.forEach((month, index) => {
+      clientsByMonth.set(index, { name: month, new: 0, returning: 0 });
+    });
+
+    // Track client first appointments to determine new vs returning
+    const clientFirstAppointment = new Map();
+    
+    // Sort appointments by date to process chronologically
+    const sortedAppointments = [...appointments].sort((a: any, b: any) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+
+    sortedAppointments.forEach((apt: any) => {
+      const aptDate = new Date(apt.startTime);
+      if (aptDate.getFullYear() === currentYear) {
+        const month = aptDate.getMonth();
+        const monthData = clientsByMonth.get(month);
+        
+        if (monthData) {
+          if (!clientFirstAppointment.has(apt.clientId)) {
+            // First time seeing this client
+            clientFirstAppointment.set(apt.clientId, aptDate);
+            monthData.new += 1;
+          } else {
+            // Returning client
+            monthData.returning += 1;
+          }
+          clientsByMonth.set(month, monthData);
+        }
+      }
+    });
+
+    return Array.from(clientsByMonth.values());
+  };
+
+  const clientData = generateClientData();
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
