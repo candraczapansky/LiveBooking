@@ -176,8 +176,10 @@ const AppointmentsPage = () => {
       title: "Payment Successful",
       description: "The appointment payment has been processed successfully.",
     });
-    // Refresh appointments data
-    window.location.reload();
+    // Refresh appointments data without page reload
+    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    setIsCheckoutOpen(false);
+    setCheckoutAppointment(null);
   };
 
   // Drag and drop mutation

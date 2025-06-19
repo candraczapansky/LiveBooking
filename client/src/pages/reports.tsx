@@ -67,19 +67,10 @@ const ReportsPage = () => {
   // Calculate real metrics from appointment and payment data
   const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
   
-  // Debug logging to check data
-  console.log('All appointments:', appointments);
-  console.log('Paid appointments:', paidAppointments);
-  console.log('Services:', services);
-  
   const totalRevenue = paidAppointments.reduce((sum: number, apt: any) => {
     const service = services.find((s: any) => s.id === apt.serviceId);
-    const price = service?.price || 0;
-    console.log(`Appointment ${apt.id}: Service ${service?.name}, Price ${price}`);
-    return sum + price;
+    return sum + (service?.price || 0);
   }, 0);
-  
-  console.log('Total revenue calculated:', totalRevenue);
   
   // For demo purposes, we'll estimate expenses as 40% of revenue
   const totalExpenses = Math.round(totalRevenue * 0.4);
