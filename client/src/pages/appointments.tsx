@@ -391,7 +391,16 @@ const AppointmentsPage = () => {
               // Only show appointments for the current date
               const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
-              return appointmentDate.toDateString() === currentDateOnly.toDateString();
+              
+              // Normalize dates to compare just year, month, and day
+              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(appointmentDate.getDate()).padStart(2, '0');
+              const currentDateStr = currentDateOnly.getFullYear() + '-' + 
+                String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(currentDateOnly.getDate()).padStart(2, '0');
+              
+              return appointmentDateStr === currentDateStr;
             }).map((appointment: any) => {
               const startTime = new Date(appointment.startTime);
               const endTime = new Date(appointment.endTime);
