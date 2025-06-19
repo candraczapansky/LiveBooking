@@ -434,6 +434,17 @@ const AppointmentsPage = () => {
               const leftPosition = 80 + (columnIndex * columnWidth);
               const appointmentStyle = getAppointmentStyle(appointment);
 
+              // Get service color for appointment
+              const serviceColor = appointment.service?.color || '#6b7280';
+              const isServiceColorLight = (color: string) => {
+                const hex = color.replace('#', '');
+                const r = parseInt(hex.substr(0, 2), 16);
+                const g = parseInt(hex.substr(2, 2), 16);
+                const b = parseInt(hex.substr(4, 2), 16);
+                const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                return brightness > 155;
+              };
+
               return (
                 <div
                   key={appointment.id}
@@ -450,10 +461,10 @@ const AppointmentsPage = () => {
                     left: `${leftPosition + 4}px`,
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
-                    backgroundColor: appointment.paymentStatus === 'paid' ? '#10b981' : '#e879f9',
-                    borderLeftColor: appointment.paymentStatus === 'paid' ? '#059669' : '#c026d3',
-                    color: '#ffffff',
-                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
+                    backgroundColor: serviceColor,
+                    borderLeftColor: serviceColor,
+                    color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
+                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : (appointment.paymentStatus === 'paid' ? 1 : 0.7)
                   }}
                 >
                   <div className="text-xs font-medium truncate">
