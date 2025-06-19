@@ -349,8 +349,13 @@ const AppointmentsPage = () => {
                 {timeSlots.map((time, index) => (
                   <div 
                     key={time} 
-                    className="border-b h-8 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    className={`border-b h-8 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
+                      dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
+                    }`}
                     style={{ height: Math.round(30 * zoomLevel) }}
+                    onDragOver={(e) => handleDragOver(e, time)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, time)}
                     onClick={() => {
                       // Set time for new appointment
                       const [timeStr, period] = time.split(' ');
@@ -403,14 +408,18 @@ const AppointmentsPage = () => {
               return (
                 <div
                   key={appointment.id}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-md transition-shadow"
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, appointment)}
+                  onDragEnd={handleDragEnd}
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-md transition-shadow cursor-move"
                   style={{
                     left: `${leftPosition + 4}px`,
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     backgroundColor: appointment.paymentStatus === 'paid' ? '#10b981' : '#e879f9',
                     borderLeftColor: appointment.paymentStatus === 'paid' ? '#059669' : '#c026d3',
-                    color: '#ffffff'
+                    color: '#ffffff',
+                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
                   }}
                 >
                   <div className="text-xs font-medium truncate">
