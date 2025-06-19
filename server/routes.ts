@@ -33,11 +33,9 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 });
 
 // Initialize Stripe
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20",
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_51RbYANP6cNUB4dEVf1nyRTSD5c5CeEntQf6BNkv7stG7VboQ1uRREl6GUdTe9v7nwC2ymFdbL8ns5wHNm0VhZckX00vFoAdCq8";
+const stripe = new Stripe(stripeSecretKey, {
+  apiVersion: "2023-10-16",
 });
 
 // Helper to validate request body using schema
@@ -767,19 +765,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment intent creation
+  // Stripe payment routes for appointment checkout
   app.post("/api/create-payment-intent", async (req, res) => {
-    const { amount } = req.body;
-    
-    if (!amount) {
-      return res.status(400).json({ error: "Amount is required" });
+    try {
+      const { amount, appointmentId, description } = req.body;
+      
+      if (!amount) {
+        return res.status(400).json({ error: "Amount is required" });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100), // Convert to cents
+        currency: "usd",
+        metadata: {
+          appointmentId: appointmentId?.toString() || "",
+          type: "appointment_payment"
+        },
+        description: description || "Appointment Payment"
+      });
+
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id
+      });
+    } catch (error: any) {
+      console.error('Payment intent creation error:', error);
+      res.status(500).json({ 
+        error: "Error creating payment intent: " + error.message 
+      });
     }
-    
-    // In a real app, this would call Stripe API
-    // Since we don't have actual Stripe integration, we'll mock the response
-    return res.status(200).json({
-      clientSecret: "mock_client_secret_" + Math.random().toString(36).substring(2, 15)
-    });
+  });
+
+  // Confirm payment and update appointment status
+  app.post("/api/confirm-payment", async (req, res) => {
+    try {
+      const { paymentIntentId, appointmentId } = req.body;
+      
+      if (!paymentIntentId || !appointmentId) {
+        return res.status(400).json({ error: "Payment intent ID and appointment ID are required" });
+      }
+
+      // Retrieve payment intent to verify it was successful
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      if (paymentIntent.status === 'succeeded') {
+        // Update appointment status to paid
+        const appointment = await storage.getAppointment(appointmentId);
+        if (appointment) {
+          await storage.updateAppointment(appointmentId, {
+            status: 'confirmed',
+            paymentStatus: 'paid'
+          });
+
+          // Create payment record
+          await storage.createPayment({
+            clientId: appointment.clientId,
+            amount: paymentIntent.amount / 100, // Convert back from cents
+            method: 'card',
+            status: 'completed',
+            appointmentId: appointmentId,
+            stripePaymentIntentId: paymentIntentId
+          });
+
+          res.json({ success: true, appointment });
+        } else {
+          res.status(404).json({ error: "Appointment not found" });
+        }
+      } else {
+        res.status(400).json({ error: "Payment not successful" });
+      }
+    } catch (error: any) {
+      console.error('Payment confirmation error:', error);
+      res.status(500).json({ 
+        error: "Error confirming payment: " + error.message 
+      });
+    }
   });
 
   const httpServer = createServer(app);
