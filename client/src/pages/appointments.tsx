@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { apiRequest } from "@/lib/queryClient";
 import AppointmentForm from "@/components/appointments/appointment-form";
 import AppointmentCheckout from "@/components/appointments/appointment-checkout";
 import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
@@ -29,6 +30,7 @@ const timeSlots = [
 const AppointmentsPage = () => {
   useDocumentTitle("Appointments | BeautyBook");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
@@ -40,6 +42,8 @@ const AppointmentsPage = () => {
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
+  const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -174,6 +178,94 @@ const AppointmentsPage = () => {
     });
     // Refresh appointments data
     window.location.reload();
+  };
+
+  // Drag and drop mutation
+  const dragMutation = useMutation({
+    mutationFn: async ({ appointmentId, newStartTime }: { appointmentId: number; newStartTime: Date }) => {
+      const appointment = appointments?.find((apt: any) => apt.id === appointmentId);
+      if (!appointment) throw new Error('Appointment not found');
+
+      const service = services?.find((s: any) => s.id === appointment.serviceId);
+      const duration = service?.duration || 60;
+      const newEndTime = new Date(newStartTime.getTime() + duration * 60 * 1000);
+
+      const updatedAppointment = {
+        serviceId: appointment.serviceId,
+        staffId: appointment.staffId,
+        clientId: appointment.clientId,
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+        status: appointment.status,
+        notes: appointment.notes,
+      };
+
+      return apiRequest("PUT", `/api/appointments/${appointmentId}`, updatedAppointment);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      toast({
+        title: "Appointment Moved",
+        description: "The appointment has been successfully rescheduled.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to move appointment.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Drag handlers
+  const handleDragStart = (e: React.DragEvent, appointment: any) => {
+    setDraggedAppointment(appointment);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', appointment.id.toString());
+  };
+
+  const handleDragEnd = () => {
+    setDraggedAppointment(null);
+    setDragOverTimeSlot(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, timeSlot: string) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverTimeSlot(timeSlot);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverTimeSlot(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, timeSlot: string) => {
+    e.preventDefault();
+    
+    if (!draggedAppointment) return;
+
+    // Parse the time slot (e.g., "10:00 AM")
+    const [time, period] = timeSlot.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    let adjustedHours = hours;
+    
+    if (period === 'PM' && hours !== 12) {
+      adjustedHours += 12;
+    } else if (period === 'AM' && hours === 12) {
+      adjustedHours = 0;
+    }
+
+    const newStartTime = new Date(currentDate);
+    newStartTime.setHours(adjustedHours, minutes, 0, 0);
+
+    dragMutation.mutate({
+      appointmentId: draggedAppointment.id,
+      newStartTime
+    });
+
+    setDraggedAppointment(null);
+    setDragOverTimeSlot(null);
   };
 
   const getAppointmentStyle = (appointment: any) => {
