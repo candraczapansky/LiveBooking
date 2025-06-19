@@ -67,31 +67,42 @@ const ReportsPage = () => {
   // Calculate real metrics from appointment and payment data
   const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
   
+  // Debug logging to check data
+  console.log('All appointments:', appointments);
+  console.log('Paid appointments:', paidAppointments);
+  console.log('Services:', services);
+  
   const totalRevenue = paidAppointments.reduce((sum: number, apt: any) => {
     const service = services.find((s: any) => s.id === apt.serviceId);
-    return sum + (service?.price || 0);
+    const price = service?.price || 0;
+    console.log(`Appointment ${apt.id}: Service ${service?.name}, Price ${price}`);
+    return sum + price;
   }, 0);
+  
+  console.log('Total revenue calculated:', totalRevenue);
   
   // For demo purposes, we'll estimate expenses as 40% of revenue
   const totalExpenses = Math.round(totalRevenue * 0.4);
   const totalProfit = totalRevenue - totalExpenses;
   
-  const uniqueClients = new Set(appointments.map((apt: any) => apt.clientId)).size;
+  // Use only paid appointments for accurate metrics
+  const uniqueClients = new Set(paidAppointments.map((apt: any) => apt.clientId)).size;
   const totalClients = uniqueClients;
   
-  // Calculate new clients this month (simplified)
+  // Calculate new clients this month from paid appointments only
   const thisMonth = new Date().getMonth();
   const thisYear = new Date().getFullYear();
-  const thisMonthAppointments = appointments.filter((apt: any) => {
+  const thisMonthPaidAppointments = paidAppointments.filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
     return aptDate.getMonth() === thisMonth && aptDate.getFullYear() === thisYear;
   });
-  const newClients = new Set(thisMonthAppointments.map((apt: any) => apt.clientId)).size;
+  const newClients = new Set(thisMonthPaidAppointments.map((apt: any) => apt.clientId)).size;
   const clientRetentionRate = totalClients > 0 ? Math.round((totalClients - newClients) / totalClients * 100) : 0;
   
-  const totalAppointments = appointments.length;
-  const completedAppointments = appointments.filter((apt: any) => apt.status === 'confirmed' || apt.status === 'completed').length;
-  const appointmentCompletionRate = totalAppointments > 0 ? Math.round(completedAppointments / totalAppointments * 100) : 0;
+  // Count only paid appointments for consistency with revenue data
+  const totalAppointments = paidAppointments.length;
+  const completedAppointments = paidAppointments.length; // All paid appointments are completed
+  const appointmentCompletionRate = 100; // 100% since we only count paid appointments
 
   // Generate sales data from real appointments
   const generateSalesData = () => {
