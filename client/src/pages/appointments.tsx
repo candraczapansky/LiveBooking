@@ -476,20 +476,20 @@ const AppointmentsPage = () => {
                   <div className="text-xs opacity-75 leading-tight mb-2" title={`${timeString} • ${duration} min`}>
                     {timeString} • {duration} min
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between mt-auto pt-1">
                     {appointment.paymentStatus === 'paid' ? (
-                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1 self-start">
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
                         <DollarSign className="w-2.5 h-2.5" />
                         Paid
                       </span>
                     ) : (
-                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1 self-start">
+                      <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
                         <CreditCard className="w-2.5 h-2.5" />
-                        Click to pay
+                        Pay
                       </span>
                     )}
-                    <span className="text-xs opacity-60 group-hover:opacity-80 transition-opacity self-end">
-                      Click to edit
+                    <span className="text-xs opacity-60 group-hover:opacity-80 transition-opacity">
+                      Edit
                     </span>
                   </div>
                 </div>
