@@ -6,6 +6,7 @@ import { z } from "zod";
 import { format, addMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import AppointmentCheckout from "./appointment-checkout";
 
 import {
   Dialog,
@@ -41,7 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { Loader2, Calendar as CalendarIcon, Clock, CreditCard, DollarSign } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 
 // Define the form schema
@@ -90,6 +91,7 @@ const timeSlots = generateTimeSlots();
 
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showCheckout, setShowCheckout] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   

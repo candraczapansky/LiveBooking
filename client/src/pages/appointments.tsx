@@ -188,9 +188,12 @@ const AppointmentsPage = () => {
     const slotHeight = 30 * zoomLevel;
     const slotsNeeded = Math.ceil(duration / 30);
     
+    // Ensure minimum height for button visibility
+    const minHeight = duration > 30 ? Math.round(65 * zoomLevel) : Math.round(45 * zoomLevel);
+    
     return {
       top: `${topPosition}px`,
-      height: Math.max(slotsNeeded * slotHeight, Math.round(45 * zoomLevel))
+      height: Math.max(slotsNeeded * slotHeight, minHeight)
     };
   };
 
@@ -327,36 +330,14 @@ const AppointmentsPage = () => {
                   <div className="text-xs opacity-75 truncate">
                     {timeString} • {duration} min
                   </div>
-                  <div className="flex gap-1 mt-1">
-                    <button
-                      className="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 rounded px-1.5 py-0.5 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedAppointmentId(appointment.id);
-                        setIsFormOpen(true);
-                      }}
-                    >
-                      Edit
-                    </button>
-                    {appointment.paymentStatus !== 'paid' && (
-                      <button
-                        className="text-xs bg-green-600 hover:bg-green-700 rounded px-1.5 py-0.5 transition-colors flex items-center gap-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handlePayment(appointment);
-                        }}
-                      >
-                        <CreditCard className="w-2.5 h-2.5" />
-                        Pay
-                      </button>
-                    )}
-                    {appointment.paymentStatus === 'paid' && (
+                  {appointment.paymentStatus === 'paid' && (
+                    <div className="flex items-center gap-1 mt-1">
                       <span className="text-xs bg-white bg-opacity-20 rounded px-1.5 py-0.5 flex items-center gap-1">
                         <DollarSign className="w-2.5 h-2.5" />
                         Paid
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
