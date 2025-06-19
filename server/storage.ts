@@ -318,6 +318,41 @@ export class MemStorage implements IStorage {
       customCommissionRate: 0.50 // Higher commission for complex color work
     });
 
+    // Create sample completed appointments for payroll testing
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    // Create some appointments this month
+    this.createAppointment({
+      clientId: 1, // Admin user as client for testing
+      serviceId: 1, // Women's Haircut & Style
+      staffId: 1, // Emma Martinez
+      startTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days into month
+      endTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
+      status: 'completed',
+      notes: 'Regular haircut and style service'
+    });
+
+    this.createAppointment({
+      clientId: 1,
+      serviceId: 2, // Color & Highlights
+      staffId: 1, // Emma Martinez
+      startTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days into month
+      endTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2 hours
+      status: 'completed',
+      notes: 'Full color and highlights treatment'
+    });
+
+    this.createAppointment({
+      clientId: 1,
+      serviceId: 1, // Women's Haircut & Style
+      staffId: 1, // Emma Martinez
+      startTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000), // 15 days into month
+      endTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
+      status: 'completed',
+      notes: 'Follow-up styling appointment'
+    });
+
     // Create sample membership
     this.createMembership({
       name: 'Premium',

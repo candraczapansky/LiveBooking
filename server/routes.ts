@@ -408,6 +408,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Staff Services routes
+  app.get("/api/staff-services", async (req, res) => {
+    const allStaffServices = Array.from((storage as any).staffServices.values());
+    return res.status(200).json(allStaffServices);
+  });
+
   app.post("/api/staff-services", validateBody(staffServiceWithRatesSchema), async (req, res) => {
     const newStaffService = await storage.assignServiceToStaff(req.body);
     return res.status(201).json(newStaffService);

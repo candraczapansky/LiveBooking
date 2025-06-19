@@ -15,7 +15,8 @@ import {
   X, 
   Menu,
   MapPin,
-  Monitor
+  Monitor,
+  DollarSign
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
+    { icon: <DollarSign />, label: "Payroll", href: "/payroll" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
