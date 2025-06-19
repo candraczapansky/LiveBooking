@@ -294,13 +294,12 @@ const AppointmentsPage = () => {
     const topPosition = (totalMinutesFromStart / 30) * slotHeight;
     
     const slotsNeeded = Math.ceil(duration / 30);
+    const calculatedHeight = slotsNeeded * slotHeight;
     
-    // Ensure minimum height for button visibility
-    const minHeight = duration > 30 ? Math.round(65 * zoomLevel) : Math.round(45 * zoomLevel);
-    
+    // Use actual appointment duration, don't force minimum height that extends beyond time
     return {
       top: `${topPosition}px`,
-      height: Math.max(slotsNeeded * slotHeight, minHeight)
+      height: `${calculatedHeight}px`
     };
   };
 
