@@ -91,6 +91,7 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
   getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByClient(clientId: number): Promise<Payment[]>;
+  getAllPayments(): Promise<Payment[]>;
   updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment>;
 }
 
@@ -775,6 +776,10 @@ export class MemStorage implements IStorage {
         (payment.appointmentId && appointmentIds.includes(payment.appointmentId)) ||
         (payment.clientMembershipId && membershipIds.includes(payment.clientMembershipId))
     );
+  }
+
+  async getAllPayments(): Promise<Payment[]> {
+    return Array.from(this.payments.values());
   }
 
   async updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment> {

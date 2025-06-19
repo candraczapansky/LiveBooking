@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -83,6 +84,12 @@ const ReportsPage = () => {
   const [timePeriod, setTimePeriod] = useState("month");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // Fetch real data from APIs
+  const { data: appointments = [] } = useQuery({ queryKey: ['/api/appointments'] });
+  const { data: services = [] } = useQuery({ queryKey: ['/api/services'] });
+  const { data: users = [] } = useQuery({ queryKey: ['/api/users'] });
+  const { data: staff = [] } = useQuery({ queryKey: ['/api/staff'] });
+
   useEffect(() => {
     const checkSidebarState = () => {
       const globalSidebarState = (window as any).sidebarIsOpen;
@@ -95,17 +102,34 @@ const ReportsPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // This would be calculated from real data in a production app
-  const totalRevenue = 98500;
-  const totalExpenses = 53000;
+  // Calculate real metrics from appointment and payment data
+  const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
+  
+  const totalRevenue = paidAppointments.reduce((sum: number, apt: any) => {
+    const service = services.find((s: any) => s.id === apt.serviceId);
+    return sum + (service?.price || 0);
+  }, 0);
+  
+  // For demo purposes, we'll estimate expenses as 40% of revenue
+  const totalExpenses = Math.round(totalRevenue * 0.4);
   const totalProfit = totalRevenue - totalExpenses;
   
-  const totalClients = 450;
-  const newClients = 62;
-  const clientRetentionRate = 85;
+  const uniqueClients = new Set(appointments.map((apt: any) => apt.clientId)).size;
+  const totalClients = uniqueClients;
   
-  const totalAppointments = 1250;
-  const appointmentCompletionRate = 94;
+  // Calculate new clients this month (simplified)
+  const thisMonth = new Date().getMonth();
+  const thisYear = new Date().getFullYear();
+  const thisMonthAppointments = appointments.filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate.getMonth() === thisMonth && aptDate.getFullYear() === thisYear;
+  });
+  const newClients = new Set(thisMonthAppointments.map((apt: any) => apt.clientId)).size;
+  const clientRetentionRate = totalClients > 0 ? Math.round((totalClients - newClients) / totalClients * 100) : 0;
+  
+  const totalAppointments = appointments.length;
+  const completedAppointments = appointments.filter((apt: any) => apt.status === 'confirmed' || apt.status === 'completed').length;
+  const appointmentCompletionRate = totalAppointments > 0 ? Math.round(completedAppointments / totalAppointments * 100) : 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
