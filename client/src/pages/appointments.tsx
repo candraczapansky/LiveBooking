@@ -314,7 +314,7 @@ const AppointmentsPage = () => {
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     backgroundColor: appointment.paymentStatus === 'paid' ? '#10b981' : '#e879f9',
-                    borderColor: appointment.paymentStatus === 'paid' ? '#059669' : '#c026d3',
+                    borderLeftColor: appointment.paymentStatus === 'paid' ? '#059669' : '#c026d3',
                     color: '#ffffff'
                   }}
                 >
