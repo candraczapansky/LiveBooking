@@ -24,7 +24,10 @@ const timeSlots = [
   "4:00 PM", "4:30 PM",
   "5:00 PM", "5:30 PM",
   "6:00 PM", "6:30 PM",
-  "7:00 PM"
+  "7:00 PM", "7:30 PM",
+  "8:00 PM", "8:30 PM",
+  "9:00 PM", "9:30 PM",
+  "10:00 PM"
 ];
 
 const AppointmentsPage = () => {
@@ -279,8 +282,8 @@ const AppointmentsPage = () => {
     const startHour = startTime.getHours();
     const startMinute = startTime.getMinutes();
     
-    // Ensure appointment is within business hours (8 AM to 7 PM)
-    if (startHour < 8 || startHour >= 19) {
+    // Ensure appointment is within business hours (8 AM to 10 PM)
+    if (startHour < 8 || startHour >= 22) {
       return { top: '0px', height: '0px', display: 'none' };
     }
     

@@ -69,8 +69,8 @@ interface AppointmentFormProps {
 
 const generateTimeSlots = () => {
   const slots = [];
-  // Generate time slots from 9 AM to 8 PM
-  for (let hour = 9; hour <= 20; hour++) {
+  // Generate time slots from 8 AM to 10 PM
+  for (let hour = 8; hour <= 22; hour++) {
     const hourFormatted = hour % 12 === 0 ? 12 : hour % 12;
     const period = hour < 12 ? "AM" : "PM";
     
