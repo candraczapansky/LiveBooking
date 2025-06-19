@@ -587,17 +587,18 @@ const AppointmentsPage = () => {
   }
 
   return (
-    <div className="flex">
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
         <Header />
         
-        <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
-          {/* Top Controls */}
-          <div className="bg-white dark:bg-gray-800 border-b px-6 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+          <div className="max-w-7xl mx-auto">
+            {/* Top Controls */}
+            <div className="bg-white dark:bg-gray-800 border-b px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
                 
                 <Button
@@ -701,11 +702,12 @@ const AppointmentsPage = () => {
             </div>
           </div>
 
-          {/* Calendar Views */}
-          <div className="p-6">
-            {viewMode === 'day' && renderDayView()}
-            {viewMode === 'week' && renderWeekView()}
-            {viewMode === 'month' && renderMonthView()}
+            {/* Calendar Views */}
+            <div className="p-6">
+              {viewMode === 'day' && renderDayView()}
+              {viewMode === 'week' && renderWeekView()}
+              {viewMode === 'month' && renderMonthView()}
+            </div>
           </div>
         </main>
       </div>
