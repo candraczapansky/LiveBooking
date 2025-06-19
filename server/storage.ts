@@ -160,7 +160,16 @@ export class MemStorage implements IStorage {
   }
 
   private initializeSampleData() {
-    // No sample categories - users will create their own
+    // Create sample service categories
+    this.createServiceCategory({
+      name: 'Hair Services',
+      description: 'Professional hair styling, cutting, and coloring services'
+    });
+
+    this.createServiceCategory({
+      name: 'Facial Treatments',
+      description: 'Skincare and facial rejuvenation treatments'
+    });
 
     // Create sample rooms
     this.createRoom({
@@ -236,9 +245,78 @@ export class MemStorage implements IStorage {
       isActive: true
     });
 
-    // No sample services - users will create their own
+    // Create sample staff user
+    this.createUser({
+      username: 'stylist1',
+      password: 'password',
+      email: 'emma.martinez@beautybook.com',
+      role: 'staff',
+      firstName: 'Emma',
+      lastName: 'Martinez',
+      phone: '555-234-5678'
+    });
 
-    // Sample staff users removed - only real staff will be added by users
+    // Create staff member profile
+    this.createStaff({
+      userId: 2, // The staff user we just created
+      title: 'Senior Hair Stylist',
+      bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
+      commissionType: 'commission',
+      commissionRate: 0.45, // 45% commission
+      photoUrl: null
+    });
+
+    // Create sample services
+    this.createService({
+      name: 'Women\'s Haircut & Style',
+      description: 'Professional haircut with wash, cut, and styling',
+      duration: 60,
+      price: 85.00,
+      categoryId: 1, // Hair Services category
+      roomId: 3, // Styling Station Area
+      bufferTimeBefore: 10,
+      bufferTimeAfter: 10,
+      color: '#FF6B9D'
+    });
+
+    this.createService({
+      name: 'Color & Highlights',
+      description: 'Full color service with highlights and toning',
+      duration: 120,
+      price: 150.00,
+      categoryId: 1, // Hair Services category
+      roomId: 3, // Styling Station Area
+      bufferTimeBefore: 15,
+      bufferTimeAfter: 15,
+      color: '#8B5CF6'
+    });
+
+    this.createService({
+      name: 'Deep Cleansing Facial',
+      description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
+      duration: 90,
+      price: 95.00,
+      categoryId: 2, // Facial Treatments category
+      roomId: 1, // Treatment Room 1
+      bufferTimeBefore: 10,
+      bufferTimeAfter: 10,
+      color: '#10B981'
+    });
+
+    // Assign services to staff member
+    this.assignServiceToStaff({
+      staffId: 1, // Emma Martinez
+      serviceId: 1, // Women's Haircut & Style
+      customRate: null,
+      customCommissionRate: null
+    });
+
+    this.assignServiceToStaff({
+      staffId: 1, // Emma Martinez  
+      serviceId: 2, // Color & Highlights
+      customRate: null,
+      customCommissionRate: 0.50 // Higher commission for complex color work
+    });
 
     // Create sample membership
     this.createMembership({
@@ -263,7 +341,17 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentUserId++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      id,
+      username: insertUser.username,
+      password: insertUser.password,
+      email: insertUser.email,
+      role: insertUser.role || "client",
+      firstName: insertUser.firstName || null,
+      lastName: insertUser.lastName || null,
+      phone: insertUser.phone || null,
+      createdAt: new Date()
+    };
     this.users.set(id, user);
     return user;
   }
@@ -281,7 +369,11 @@ export class MemStorage implements IStorage {
   // Service Category operations
   async createServiceCategory(category: InsertServiceCategory): Promise<ServiceCategory> {
     const id = this.currentServiceCategoryId++;
-    const newCategory: ServiceCategory = { ...category, id };
+    const newCategory: ServiceCategory = { 
+      id,
+      name: category.name,
+      description: category.description || null
+    };
     this.serviceCategories.set(id, newCategory);
     return newCategory;
   }
@@ -311,7 +403,13 @@ export class MemStorage implements IStorage {
   // Room operations
   async createRoom(room: InsertRoom): Promise<Room> {
     const id = this.currentRoomId++;
-    const newRoom: Room = { ...room, id };
+    const newRoom: Room = { 
+      id,
+      name: room.name,
+      description: room.description || null,
+      capacity: room.capacity || null,
+      isActive: room.isActive !== undefined ? room.isActive : null
+    };
     this.rooms.set(id, newRoom);
     return newRoom;
   }
