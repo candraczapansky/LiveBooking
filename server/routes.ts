@@ -796,6 +796,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get all payments for verification
+  app.get("/api/payments", async (req, res) => {
+    try {
+      const payments = await storage.getAllPayments();
+      
+      // Get detailed information for each payment
+      const detailedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const client = await storage.getUser(payment.clientId);
+          const appointment = payment.appointmentId ? await storage.getAppointment(payment.appointmentId) : null;
+          let service = null;
+          
+          if (appointment) {
+            service = await storage.getService(appointment.serviceId);
+          }
+          
+          return {
+            ...payment,
+            client: client ? {
+              id: client.id,
+              firstName: client.firstName,
+              lastName: client.lastName,
+              email: client.email
+            } : null,
+            appointment,
+            service
+          };
+        })
+      );
+      
+      res.json(detailedPayments);
+    } catch (error: any) {
+      console.error('Error fetching payments:', error);
+      res.status(500).json({ error: "Error fetching payments: " + error.message });
+    }
+  });
+
   // Confirm payment and update appointment status
   app.post("/api/confirm-payment", async (req, res) => {
     try {
