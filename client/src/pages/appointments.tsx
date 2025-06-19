@@ -66,6 +66,11 @@ const AppointmentsPage = () => {
     queryKey: ['/api/services'],
   });
 
+  // Fetch users to get client information
+  const { data: users, isLoading: usersLoading } = useQuery({
+    queryKey: ['/api/users'],
+  });
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
       weekday: 'long', 
@@ -253,6 +258,14 @@ const AppointmentsPage = () => {
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
               const columnIndex = getStaffColumn(staffName);
               
+              // Find service information
+              const service = services?.find((s: any) => s.id === appointment.serviceId);
+              const serviceName = service?.name || 'Service';
+              
+              // Find client information
+              const client = users?.find((u: any) => u.id === appointment.clientId);
+              const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
+              
               if (columnIndex === -1) return null;
 
               const leftPosition = 80 + (columnIndex * columnWidth);
@@ -276,13 +289,13 @@ const AppointmentsPage = () => {
                   }}
                 >
                   <div className="text-xs font-medium truncate">
-                    {appointment.notes || 'Appointment'}
+                    {serviceName}
                   </div>
                   <div className="text-xs opacity-90 truncate">
-                    {timeString}
+                    {clientName}
                   </div>
                   <div className="text-xs opacity-75 truncate">
-                    {duration} min
+                    {timeString} • {duration} min
                   </div>
                 </div>
               );
@@ -358,7 +371,7 @@ const AppointmentsPage = () => {
     );
   };
 
-  if (appointmentsLoading || staffLoading || servicesLoading) {
+  if (appointmentsLoading || staffLoading || servicesLoading || usersLoading) {
     return (
       <div className="flex">
         <SidebarController />
