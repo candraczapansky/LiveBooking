@@ -315,15 +315,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   };
 
   const handleCashPayment = async () => {
-    if (!appointmentId || appointmentId <= 0) return;
+    if (!appointmentId || appointmentId <= 0 || !appointment) return;
     
     try {
       // Create a payment record for cash payment
       await apiRequest("POST", "/api/payments", {
+        clientId: appointment.clientId,
         appointmentId: appointmentId,
         amount: selectedService?.price || 0,
-        paymentMethod: "cash",
-        status: "paid"
+        method: "cash",
+        status: "completed"
       });
 
       // Update appointment payment status
