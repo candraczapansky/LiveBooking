@@ -153,77 +153,42 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     },
     enabled: open && !!appointmentId && appointmentId > 0
   });
+
+  // Computed values
+  const selectedServiceId = form.watch("serviceId");
+  const startTimeString = form.watch("time");
   
-  // Create or update appointment
-  const mutation = useMutation({
-    mutationFn: async (data: any) => {
-      if (appointmentId && appointmentId > 0) {
-        return apiRequest('PATCH', `/api/appointments/${appointmentId}`, data);
-      } else {
-        return apiRequest('POST', '/api/appointments', data);
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      toast({
-        title: appointmentId ? "Appointment Updated" : "Appointment Created",
-        description: appointmentId 
-          ? "The appointment has been updated successfully." 
-          : "New appointment has been created successfully.",
-      });
-      onOpenChange(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
-    }
-  });
+  const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
   
-  // Delete appointment
-  const deleteMutation = useMutation({
-    mutationFn: async () => {
-      if (!appointmentId) return;
-      return apiRequest('DELETE', `/api/appointments/${appointmentId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      toast({
-        title: "Appointment Deleted",
-        description: "The appointment has been deleted successfully.",
-      });
-      onOpenChange(false);
-      setIsDeleting(false);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Could not delete the appointment. Please try again.",
-        variant: "destructive",
-      });
-      setIsDeleting(false);
-    }
-  });
+  const endTime = selectedService && startTimeString ? (() => {
+    const [hours, minutes] = startTimeString.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+    const endDate = addMinutes(startDate, selectedService.duration);
+    return format(endDate, 'h:mm a');
+  })() : null;
   
-  // If editing an appointment, populate the form
+  // Load appointment data when editing
   useEffect(() => {
-    if (appointment && open) {
-      const date = new Date(appointment.startTime);
-      const timeString = format(date, "HH:mm");
+    if (appointment && appointmentId && appointmentId > 0) {
+      const appointmentDate = new Date(appointment.startTime);
+      const appointmentTime = format(appointmentDate, 'HH:mm');
       
       form.reset({
-        serviceId: appointment.service.id.toString(),
-        staffId: appointment.staff.id.toString(),
-        clientId: appointment.client.id.toString(),
-        date: date,
-        time: timeString,
+        serviceId: appointment.serviceId?.toString() || "",
+        staffId: appointment.staffId?.toString() || "",
+        clientId: appointment.clientId?.toString() || "",
+        date: appointmentDate,
+        time: appointmentTime,
         notes: appointment.notes || "",
-        sendReminder: true, // Assuming default is true
+        sendReminder: true,
       });
-    } else if (open && !appointmentId) {
-      // Reset form for a new appointment
+    }
+  }, [appointment, appointmentId, form]);
+
+  // Reset form when closing
+  useEffect(() => {
+    if (!open) {
       form.reset({
         serviceId: "",
         staffId: "",
@@ -234,317 +199,450 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         sendReminder: true,
       });
     }
-  }, [appointment, appointmentId, open, form, selectedDate]);
-  
-  // When user selects a service, find staff who can provide it
-  const serviceId = form.watch("serviceId");
-  
-  // Calculate end time based on service duration
-  const selectedService = services?.find(s => s.id.toString() === serviceId);
-  const startTimeString = form.watch("time");
-  const formDate = form.watch("date");
-  
-  let endTime = "";
-  if (selectedService && startTimeString && formDate) {
-    const [hours, minutes] = startTimeString.split(":").map(Number);
-    const startTime = new Date(formDate);
-    startTime.setHours(hours, minutes);
-    
-    const end = addMinutes(startTime, selectedService.duration);
-    endTime = format(end, "h:mm a");
-  }
-  
+  }, [open, selectedDate, form]);
+
+  const createMutation = useMutation({
+    mutationFn: async (values: AppointmentFormValues) => {
+      const [hours, minutes] = values.time.split(':').map(Number);
+      const startTime = new Date(values.date);
+      startTime.setHours(hours, minutes, 0, 0);
+
+      const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
+      const endTime = addMinutes(startTime, selectedServiceData?.duration || 60);
+
+      const appointmentData = {
+        serviceId: parseInt(values.serviceId),
+        staffId: parseInt(values.staffId),
+        clientId: parseInt(values.clientId),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: "confirmed",
+        notes: values.notes || null,
+      };
+
+      return apiRequest("POST", "/api/appointments", appointmentData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      onOpenChange(false);
+      toast({
+        title: "Success",
+        description: "Appointment created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create appointment.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (values: AppointmentFormValues) => {
+      if (!appointmentId || appointmentId <= 0) {
+        throw new Error("No appointment ID provided");
+      }
+
+      const [hours, minutes] = values.time.split(':').map(Number);
+      const startTime = new Date(values.date);
+      startTime.setHours(hours, minutes, 0, 0);
+
+      const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
+      const endTime = addMinutes(startTime, selectedServiceData?.duration || 60);
+
+      const appointmentData = {
+        serviceId: parseInt(values.serviceId),
+        staffId: parseInt(values.staffId),
+        clientId: parseInt(values.clientId),
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        status: "confirmed",
+        notes: values.notes || null,
+      };
+
+      return apiRequest("PUT", `/api/appointments/${appointmentId}`, appointmentData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      onOpenChange(false);
+      toast({
+        title: "Success",
+        description: "Appointment updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update appointment.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!appointmentId || appointmentId <= 0) {
+        throw new Error("No appointment ID provided");
+      }
+      return apiRequest("DELETE", `/api/appointments/${appointmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      onOpenChange(false);
+      toast({
+        title: "Success",
+        description: "Appointment deleted successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete appointment.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (values: AppointmentFormValues) => {
-    // Calculate start and end times
-    const { date, time, serviceId, staffId, clientId, notes, sendReminder } = values;
-    const [hours, minutes] = time.split(":").map(Number);
-    
-    const startTime = new Date(date);
-    startTime.setHours(hours, minutes, 0, 0);
-    
-    const endTime = addMinutes(startTime, selectedService?.duration || 60);
-    
-    const appointmentData = {
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-      serviceId: parseInt(serviceId),
-      staffId: parseInt(staffId),
-      clientId: parseInt(clientId),
-      status: "confirmed",
-      notes: notes || null,
-    };
-    
-    mutation.mutate(appointmentData);
+    if (appointmentId && appointmentId > 0) {
+      updateMutation.mutate(values);
+    } else {
+      createMutation.mutate(values);
+    }
   };
-  
-  const handleDelete = () => {
+
+  const handleDelete = async () => {
+    if (!appointmentId || appointmentId <= 0) return;
     setIsDeleting(true);
-    deleteMutation.mutate();
+    try {
+      await deleteMutation.mutateAsync();
+    } finally {
+      setIsDeleting(false);
+    }
   };
-  
-  const isLoading = isLoadingServices || isLoadingStaff || isLoadingClients || isLoadingAppointment || mutation.isPending;
-  
+
+  const isLoading = createMutation.isPending || updateMutation.isPending || isLoadingAppointment;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>
-            {appointmentId && appointmentId > 0 ? "Edit Appointment" : "Create New Appointment"}
-          </DialogTitle>
-          <DialogDescription>
-            {appointmentId && appointmentId > 0 
-              ? "Update the appointment details below." 
-              : "Fill in the information below to schedule a new appointment."}
-          </DialogDescription>
-        </DialogHeader>
-        
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Service Selection */}
-            <FormField
-              control={form.control}
-              name="serviceId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Service</FormLabel>
-                  <Select
-                    disabled={isLoading}
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {appointmentId && appointmentId > 0 ? "Edit Appointment" : "Create Appointment"}
+            </DialogTitle>
+            <DialogDescription>
+              {appointmentId && appointmentId > 0 
+                ? "Update the appointment details below." 
+                : "Fill in the details to create a new appointment."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              
+              {/* Service Selection */}
+              <FormField
+                control={form.control}
+                name="serviceId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a service" />
-                      </SelectTrigger>
+                      <Select 
+                        disabled={isLoading || isLoadingServices} 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {services?.map((service: any) => (
+                            <SelectItem key={service.id} value={service.id.toString()}>
+                              {service.name} - {formatPrice(service.price)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
-                    <SelectContent>
-                      {services?.map((service) => (
-                        <SelectItem key={service.id} value={service.id.toString()}>
-                          {service.name || ''} ({service.duration || 0} min) - {formatPrice(service.price || 0)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Staff Selection */}
-            <FormField
-              control={form.control}
-              name="staffId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Staff Member</FormLabel>
-                  <Select
-                    disabled={isLoading}
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Staff Selection */}
+              <FormField
+                control={form.control}
+                name="staffId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Staff Member</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a staff member" />
-                      </SelectTrigger>
+                      <Select 
+                        disabled={isLoading || isLoadingStaff} 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a staff member" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {staff?.map((staffMember: any) => {
+                            const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+                            return (
+                              <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
+                                {staffName} - {staffMember.title}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
-                    <SelectContent>
-                      {staff?.map((staffMember) => (
-                        <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
-                          {staffMember.user?.firstName || ''} {staffMember.user?.lastName || ''} - {staffMember.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Client Selection */}
-            <FormField
-              control={form.control}
-              name="clientId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Client</FormLabel>
-                  <Select
-                    disabled={isLoading}
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Client Selection */}
+              <FormField
+                control={form.control}
+                name="clientId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a client" />
-                      </SelectTrigger>
+                      <Select 
+                        disabled={isLoading || isLoadingClients} 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a client" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {clients?.map((client: any) => (
+                            <SelectItem key={client.id} value={client.id.toString()}>
+                              {client.firstName} {client.lastName} - {client.email}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
-                    <SelectContent>
-                      {clients?.map((client) => (
-                        <SelectItem key={client.id} value={client.id.toString()}>
-                          {client.firstName || ''} {client.lastName || ''} ({client.email || ''})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Date Selection */}
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                          disabled={isLoading}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Time Selection */}
-            <FormField
-              control={form.control}
-              name="time"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Time</FormLabel>
-                  <Select
-                    disabled={isLoading}
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Date Selection */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                            disabled={isLoading}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date < new Date(new Date().setHours(0, 0, 0, 0))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Time Selection */}
+              <FormField
+                control={form.control}
+                name="time"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Time</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a time" />
-                      </SelectTrigger>
+                      <Select 
+                        disabled={isLoading} 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a time" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {timeSlots.map((slot) => (
+                            <SelectItem key={slot.value} value={slot.value}>
+                              {slot.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
-                    <SelectContent>
-                      {timeSlots.map((slot) => (
-                        <SelectItem key={slot.value} value={slot.value}>
-                          {slot.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Appointment Duration Summary */}
-            {selectedService && startTimeString && (
-              <div className="bg-muted p-3 rounded-md text-sm">
-                <div className="flex items-center mb-1">
-                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <span className="font-medium">Appointment Duration</span>
-                </div>
-                <div className="pl-6">
-                  <p><strong>Service:</strong> {selectedService.name}</p>
-                  <p><strong>Duration:</strong> {selectedService.duration} minutes</p>
-                  <p><strong>End Time:</strong> {endTime}</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Any special instructions or notes for this appointment"
-                      disabled={isLoading}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            {/* Send Reminder Option */}
-            <FormField
-              control={form.control}
-              name="sendReminder"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={isLoading}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel>Send Reminder</FormLabel>
-                    <FormDescription>
-                      Send an email reminder to the client 24 hours before the appointment
-                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Appointment Duration Summary */}
+              {selectedService && startTimeString && (
+                <div className="bg-muted p-3 rounded-md text-sm">
+                  <div className="flex items-center mb-1">
+                    <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+                    <span className="font-medium">Appointment Duration</span>
                   </div>
-                </FormItem>
-              )}
-            />
-            
-            <DialogFooter className="flex justify-between">
-              {appointmentId && appointmentId > 0 ? (
-                <Button 
-                  type="button" 
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={isDeleting || isLoading}
-                >
-                  {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Delete Appointment
-                </Button>
-              ) : (
-                <div /> // Empty div to maintain spacing
+                  <div className="pl-6">
+                    <p><strong>Service:</strong> {selectedService.name}</p>
+                    <p><strong>Duration:</strong> {selectedService.duration} minutes</p>
+                    <p><strong>End Time:</strong> {endTime}</p>
+                  </div>
+                </div>
               )}
               
-              <Button 
-                type="submit"
-                disabled={isLoading}
-              >
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              {/* Notes */}
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Any special instructions or notes for this appointment"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Send Reminder Option */}
+              <FormField
+                control={form.control}
+                name="sendReminder"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Send Reminder</FormLabel>
+                      <FormDescription>
+                        Send an email reminder to the client 24 hours before the appointment
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+              
+              {/* Payment Section - Only show for existing appointments */}
+              {appointmentId && appointmentId > 0 && appointment && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-medium">Payment</h3>
+                    {appointment.paymentStatus === 'paid' ? (
+                      <div className="flex items-center gap-2 text-green-600">
+                        <DollarSign className="h-4 w-4" />
+                        <span className="text-sm font-medium">Paid</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Amount: {formatPrice(selectedService?.price || 0)}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => setShowCheckout(true)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Pay Now
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              <DialogFooter className="flex justify-between">
+                {appointmentId && appointmentId > 0 ? (
+                  <Button 
+                    type="button" 
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={isDeleting || isLoading}
+                  >
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete Appointment
+                  </Button>
+                ) : (
+                  <div /> 
+                )}
+                
+                <Button 
+                  type="submit"
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Checkout Component */}
+      {showCheckout && appointment && (
+        <AppointmentCheckout
+          appointment={appointment}
+          isOpen={showCheckout}
+          onClose={() => setShowCheckout(false)}
+          onSuccess={() => {
+            setShowCheckout(false);
+            queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+            toast({
+              title: "Payment Successful",
+              description: "The appointment has been paid for successfully.",
+            });
+          }}
+        />
+      )}
+    </>
   );
 };
 
