@@ -369,11 +369,7 @@ export class MemStorage implements IStorage {
   // Service Category operations
   async createServiceCategory(category: InsertServiceCategory): Promise<ServiceCategory> {
     const id = this.currentServiceCategoryId++;
-    const newCategory: ServiceCategory = { 
-      id,
-      name: category.name,
-      description: category.description || null
-    };
+    const newCategory = { ...category, id } as ServiceCategory;
     this.serviceCategories.set(id, newCategory);
     return newCategory;
   }
@@ -403,13 +399,7 @@ export class MemStorage implements IStorage {
   // Room operations
   async createRoom(room: InsertRoom): Promise<Room> {
     const id = this.currentRoomId++;
-    const newRoom: Room = { 
-      id,
-      name: room.name,
-      description: room.description || null,
-      capacity: room.capacity || null,
-      isActive: room.isActive !== undefined ? room.isActive : null
-    };
+    const newRoom = { ...room, id } as Room;
     this.rooms.set(id, newRoom);
     return newRoom;
   }
@@ -439,7 +429,7 @@ export class MemStorage implements IStorage {
   // Device operations
   async createDevice(device: InsertDevice): Promise<Device> {
     const id = this.currentDeviceId++;
-    const newDevice: Device = { ...device, id };
+    const newDevice = { ...device, id } as Device;
     this.devices.set(id, newDevice);
     return newDevice;
   }
@@ -469,7 +459,7 @@ export class MemStorage implements IStorage {
   // Service operations
   async createService(service: InsertService): Promise<Service> {
     const id = this.currentServiceId++;
-    const newService: Service = { ...service, id };
+    const newService = { ...service, id } as Service;
     this.services.set(id, newService);
     return newService;
   }
@@ -527,7 +517,7 @@ export class MemStorage implements IStorage {
   // Staff operations
   async createStaff(staffMember: InsertStaff): Promise<Staff> {
     const id = this.currentStaffId++;
-    const newStaff: Staff = { ...staffMember, id };
+    const newStaff = { ...staffMember, id } as Staff;
     this.staff.set(id, newStaff);
     return newStaff;
   }
@@ -618,7 +608,7 @@ export class MemStorage implements IStorage {
   // Appointment operations
   async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
     const id = this.currentAppointmentId++;
-    const newAppointment: Appointment = { ...appointment, id, createdAt: new Date() };
+    const newAppointment = { ...appointment, id, createdAt: new Date() } as Appointment;
     this.appointments.set(id, newAppointment);
     return newAppointment;
   }
@@ -663,7 +653,7 @@ export class MemStorage implements IStorage {
   // Membership operations
   async createMembership(membership: InsertMembership): Promise<Membership> {
     const id = this.currentMembershipId++;
-    const newMembership: Membership = { ...membership, id };
+    const newMembership = { ...membership, id } as Membership;
     this.memberships.set(id, newMembership);
     return newMembership;
   }
@@ -693,7 +683,7 @@ export class MemStorage implements IStorage {
   // Client Membership operations
   async createClientMembership(clientMembership: InsertClientMembership): Promise<ClientMembership> {
     const id = this.currentClientMembershipId++;
-    const newClientMembership: ClientMembership = { ...clientMembership, id };
+    const newClientMembership = { ...clientMembership, id } as ClientMembership;
     this.clientMemberships.set(id, newClientMembership);
     return newClientMembership;
   }
@@ -725,7 +715,7 @@ export class MemStorage implements IStorage {
   // Payment operations
   async createPayment(payment: InsertPayment): Promise<Payment> {
     const id = this.currentPaymentId++;
-    const newPayment: Payment = { ...payment, id, createdAt: new Date() };
+    const newPayment = { ...payment, id, createdAt: new Date() } as Payment;
     this.payments.set(id, newPayment);
     return newPayment;
   }
