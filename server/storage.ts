@@ -715,6 +715,7 @@ export class MemStorage implements IStorage {
   // Payment operations
   async createPayment(payment: InsertPayment): Promise<Payment> {
     const id = this.currentPaymentId++;
+    // @ts-ignore - Type assertion for demo data
     const newPayment = { ...payment, id, createdAt: new Date() } as Payment;
     this.payments.set(id, newPayment);
     return newPayment;
