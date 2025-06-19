@@ -626,9 +626,35 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       </Dialog>
       
       {/* Checkout Component */}
-      {showCheckout && appointment && (
+      {showCheckout && appointment && services && staff && clients && (
         <AppointmentCheckout
-          appointment={appointment}
+          appointment={{
+            id: appointment.id,
+            clientName: (() => {
+              const client = clients.find((c: any) => c.id === appointment.clientId);
+              return client ? `${client.firstName} ${client.lastName}` : 'Unknown Client';
+            })(),
+            serviceName: (() => {
+              const service = services.find((s: any) => s.id === appointment.serviceId);
+              return service?.name || 'Unknown Service';
+            })(),
+            staffName: (() => {
+              const staffMember = staff.find((s: any) => s.id === appointment.staffId);
+              if (staffMember) {
+                const staffUser = clients.find((c: any) => c.id === staffMember.userId);
+                return staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Unknown Staff';
+              }
+              return 'Unknown Staff';
+            })(),
+            startTime: new Date(appointment.startTime),
+            endTime: new Date(appointment.endTime),
+            amount: (() => {
+              const service = services.find((s: any) => s.id === appointment.serviceId);
+              return service?.price || 0;
+            })(),
+            status: appointment.status,
+            paymentStatus: appointment.paymentStatus || 'unpaid'
+          }}
           isOpen={showCheckout}
           onClose={() => setShowCheckout(false)}
           onSuccess={() => {
