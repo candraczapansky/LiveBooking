@@ -16,7 +16,6 @@ import Devices from "@/pages/devices";
 import Appointments from "@/pages/appointments";
 import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
-import PayrollReport from "@/pages/payroll-report";
 import Marketing from "@/pages/marketing";
 import Settings from "@/pages/settings";
 import Schedule from "@/pages/schedule";
@@ -73,7 +72,6 @@ function Router() {
       <Route path="/appointments" component={Appointments} />
       <Route path="/memberships" component={Memberships} />
       <Route path="/reports" component={Reports} />
-      <Route path="/payroll" component={PayrollReport} />
       <Route path="/marketing" component={Marketing} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
