@@ -297,6 +297,7 @@ export default function AppointmentCheckout({
                 <p><strong>Expiry:</strong> 12/25 (any future date)</p>
                 <p><strong>CVC:</strong> 123 (any 3 digits)</p>
                 <p><strong>Name:</strong> Test User</p>
+                <p><strong>ZIP Code:</strong> 12345 (any valid ZIP)</p>
               </div>
             </div>
           </div>
