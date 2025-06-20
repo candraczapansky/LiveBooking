@@ -14,7 +14,8 @@ import {
   insertAppointmentSchema,
   insertMembershipSchema,
   insertClientMembershipSchema,
-  insertPaymentSchema
+  insertPaymentSchema,
+  insertSavedPaymentMethodSchema
 } from "@shared/schema";
 
 // Custom schema for service with staff assignments

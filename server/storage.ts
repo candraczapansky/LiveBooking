@@ -146,6 +146,7 @@ export class MemStorage implements IStorage {
     this.memberships = new Map();
     this.clientMemberships = new Map();
     this.payments = new Map();
+    this.savedPaymentMethods = new Map();
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
@@ -158,6 +159,7 @@ export class MemStorage implements IStorage {
     this.currentMembershipId = 1;
     this.currentClientMembershipId = 1;
     this.currentPaymentId = 1;
+    this.currentSavedPaymentMethodId = 1;
 
     // Initialize with admin user
     this.createUser({
@@ -400,6 +402,7 @@ export class MemStorage implements IStorage {
       firstName: insertUser.firstName || null,
       lastName: insertUser.lastName || null,
       phone: insertUser.phone || null,
+      stripeCustomerId: null,
       createdAt: new Date()
     };
     this.users.set(id, user);
@@ -804,6 +807,61 @@ export class MemStorage implements IStorage {
     const updatedPayment = { ...payment, ...paymentData };
     this.payments.set(id, updatedPayment);
     return updatedPayment;
+  }
+
+  // Saved Payment Methods operations
+  async createSavedPaymentMethod(paymentMethod: InsertSavedPaymentMethod): Promise<SavedPaymentMethod> {
+    const id = this.currentSavedPaymentMethodId++;
+    const savedMethod: SavedPaymentMethod = {
+      id,
+      ...paymentMethod,
+      isDefault: paymentMethod.isDefault || false,
+      createdAt: new Date()
+    };
+    this.savedPaymentMethods.set(id, savedMethod);
+    return savedMethod;
+  }
+
+  async getSavedPaymentMethod(id: number): Promise<SavedPaymentMethod | undefined> {
+    return this.savedPaymentMethods.get(id);
+  }
+
+  async getSavedPaymentMethodsByClient(clientId: number): Promise<SavedPaymentMethod[]> {
+    return Array.from(this.savedPaymentMethods.values()).filter(
+      method => method.clientId === clientId
+    );
+  }
+
+  async updateSavedPaymentMethod(id: number, data: Partial<InsertSavedPaymentMethod>): Promise<SavedPaymentMethod> {
+    const method = await this.getSavedPaymentMethod(id);
+    if (!method) {
+      throw new Error('Saved payment method not found');
+    }
+    const updatedMethod = { ...method, ...data };
+    this.savedPaymentMethods.set(id, updatedMethod);
+    return updatedMethod;
+  }
+
+  async deleteSavedPaymentMethod(id: number): Promise<boolean> {
+    return this.savedPaymentMethods.delete(id);
+  }
+
+  async setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean> {
+    // First, remove default status from all other payment methods for this client
+    const clientMethods = await this.getSavedPaymentMethodsByClient(clientId);
+    for (const method of clientMethods) {
+      if (method.isDefault) {
+        await this.updateSavedPaymentMethod(method.id, { isDefault: false });
+      }
+    }
+    
+    // Set the specified method as default
+    await this.updateSavedPaymentMethod(paymentMethodId, { isDefault: true });
+    return true;
+  }
+
+  async updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User> {
+    return this.updateUser(userId, { stripeCustomerId });
   }
 }
 
