@@ -172,13 +172,30 @@ export default function AppointmentCheckout({
   const [isCashProcessing, setIsCashProcessing] = useState(false);
   const [isGiftCardProcessing, setIsGiftCardProcessing] = useState(false);
   const [giftCardCode, setGiftCardCode] = useState('');
+  const [savedGiftCards, setSavedGiftCards] = useState<any[]>([]);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<any>(null);
+  const [showAddNew, setShowAddNew] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && appointment.paymentStatus === 'unpaid' && paymentMethod === 'card') {
       createPaymentIntent();
     }
+    if (isOpen && paymentMethod === 'gift_card') {
+      fetchSavedGiftCards();
+    }
   }, [isOpen, appointment.id, paymentMethod]);
+
+  const fetchSavedGiftCards = async () => {
+    try {
+      const response = await apiRequest("GET", "/api/saved-gift-cards");
+      const data = await response.json();
+      setSavedGiftCards(data);
+    } catch (error) {
+      console.error('Error fetching saved gift cards:', error);
+      setSavedGiftCards([]);
+    }
+  };
 
   const createPaymentIntent = async () => {
     try {
@@ -233,10 +250,12 @@ export default function AppointmentCheckout({
   };
 
   const handleGiftCardPayment = async () => {
-    if (!giftCardCode.trim()) {
+    const codeToUse = selectedSavedCard ? selectedSavedCard.giftCard.code : giftCardCode.trim();
+    
+    if (!codeToUse) {
       toast({
         title: "Error",
-        description: "Please enter a gift card code",
+        description: "Please select a gift card or enter a gift card code",
         variant: "destructive",
       });
       return;
@@ -247,7 +266,7 @@ export default function AppointmentCheckout({
     try {
       await apiRequest("POST", "/api/confirm-gift-card-payment", {
         appointmentId: appointment.id,
-        giftCardCode: giftCardCode.trim()
+        giftCardCode: codeToUse
       });
       
       toast({
@@ -264,6 +283,40 @@ export default function AppointmentCheckout({
       });
     } finally {
       setIsGiftCardProcessing(false);
+    }
+  };
+
+  const handleAddNewGiftCard = async () => {
+    if (!giftCardCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a gift card code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await apiRequest("POST", "/api/add-gift-card", {
+        giftCardCode: giftCardCode.trim()
+      });
+      
+      toast({
+        title: "Gift Card Added",
+        description: "Gift card has been saved to your account",
+      });
+      
+      // Refresh saved cards and reset form
+      await fetchSavedGiftCards();
+      setGiftCardCode('');
+      setShowAddNew(false);
+    } catch (error: any) {
+      console.error('Add gift card error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add gift card",
+        variant: "destructive",
+      });
     }
   };
 
@@ -440,8 +493,8 @@ export default function AppointmentCheckout({
               </div>
             </div>
           ) : paymentMethod === 'gift_card' ? (
-            <div className="space-y-6 text-center">
-              <div className="flex flex-col items-center gap-4">
+            <div className="space-y-6">
+              <div className="flex flex-col items-center gap-4 text-center">
                 <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
                   <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -450,27 +503,101 @@ export default function AppointmentCheckout({
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold">Pay with Gift Card</h3>
-                  <p className="text-muted-foreground">Enter your gift card code below</p>
+                  <p className="text-muted-foreground">Amount: {formatPrice(appointment.amount)}</p>
                 </div>
               </div>
-              
-              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                <p className="text-lg font-semibold mb-4">Amount: {formatPrice(appointment.amount)}</p>
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Enter gift card code (e.g., GIFT2025)"
-                    value={giftCardCode}
-                    onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    disabled={isGiftCardProcessing}
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    Test codes: GIFT2025 ($100), HOLIDAY50 ($25)
+
+              {/* Saved Gift Cards */}
+              {savedGiftCards.length > 0 && !showAddNew && (
+                <div className="space-y-4">
+                  <h4 className="font-medium">Your Saved Gift Cards</h4>
+                  <div className="space-y-2">
+                    {savedGiftCards.map((saved) => (
+                      <Card
+                        key={saved.id}
+                        className={`cursor-pointer border-2 transition-colors ${
+                          selectedSavedCard?.id === saved.id 
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' 
+                            : 'border-gray-200 hover:border-purple-300'
+                        }`}
+                        onClick={() => setSelectedSavedCard(saved)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <div className="font-medium">
+                                {saved.nickname || `Gift Card ${saved.giftCard.code.slice(-4)}`}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                Balance: {formatPrice(saved.giftCard.currentBalance)}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Code: ****{saved.giftCard.code.slice(-4)}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              {saved.giftCard.currentBalance >= appointment.amount ? (
+                                <div className="text-green-600 text-sm font-medium">✓ Sufficient</div>
+                              ) : (
+                                <div className="text-red-600 text-sm">Insufficient</div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
                   </div>
                 </div>
-              </div>
-              
+              )}
+
+              {/* Add New Gift Card or Enter Code */}
+              {(savedGiftCards.length === 0 || showAddNew) && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium">
+                      {savedGiftCards.length > 0 ? 'Add New Gift Card' : 'Enter Gift Card Code'}
+                    </h4>
+                    {savedGiftCards.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowAddNew(false)}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Enter gift card code (e.g., GIFT2025)"
+                      value={giftCardCode}
+                      onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      disabled={isGiftCardProcessing}
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Test codes: GIFT2025 ($100), HOLIDAY50 ($25)
+                    </div>
+                    {savedGiftCards.length === 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleAddNewGiftCard}
+                          disabled={!giftCardCode.trim()}
+                          className="flex-1"
+                        >
+                          Save & Use Card
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
               <div className="flex gap-3 justify-center">
                 <Button 
                   onClick={() => setPaymentMethod(null)} 
@@ -479,9 +606,25 @@ export default function AppointmentCheckout({
                 >
                   Back
                 </Button>
+                
+                {savedGiftCards.length > 0 && !showAddNew && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAddNew(true)}
+                    disabled={isGiftCardProcessing}
+                  >
+                    Use Different Card
+                  </Button>
+                )}
+
                 <Button 
                   onClick={handleGiftCardPayment}
-                  disabled={isGiftCardProcessing || !giftCardCode.trim()}
+                  disabled={
+                    isGiftCardProcessing || 
+                    (!selectedSavedCard && !giftCardCode.trim()) ||
+                    (selectedSavedCard && selectedSavedCard.giftCard.currentBalance < appointment.amount)
+                  }
                   className="bg-purple-600 hover:bg-purple-700"
                 >
                   {isGiftCardProcessing ? (
