@@ -358,7 +358,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                           className="grid grid-cols-1 md:grid-cols-2 gap-4"
                         >
                           {filteredServices?.length === 0 ? (
@@ -417,7 +417,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value}
                           className="grid grid-cols-1 gap-4"
                         >
                           {staff?.map((staffMember: Staff) => (
