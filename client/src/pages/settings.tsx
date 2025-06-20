@@ -864,138 +864,148 @@ const SettingsPage = () => {
                         </div>
                       </div>
                       
-                      <div className="pt-4">
-                        <h3 className="text-base font-medium mb-4">Branding</h3>
-                        <Form {...appearanceForm}>
-                          <form onSubmit={appearanceForm.handleSubmit(handleSaveAppearance)} className="space-y-4">
-                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                              <h4 className="text-sm font-medium mb-2">Logo</h4>
-                              <div className="flex items-center space-x-4">
-                                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-300">
-                                  {appearanceForm.watch('logo') ? (
-                                    <img 
-                                      src={appearanceForm.watch('logo')} 
-                                      alt="Logo" 
-                                      className="w-full h-full object-contain rounded"
-                                    />
-                                  ) : (
-                                    <Globe className="h-8 w-8" />
-                                  )}
-                                </div>
-                                <div>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLogoUpload}
-                                    className="hidden"
-                                    id="logo-upload"
-                                  />
-                                  <label htmlFor="logo-upload">
-                                    <Button type="button" variant="outline" asChild>
-                                      <span className="cursor-pointer">Upload Logo</span>
-                                    </Button>
-                                  </label>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                              <h4 className="text-sm font-medium mb-2">Primary Color</h4>
-                              <div className="flex items-center space-x-4">
-                                <div 
-                                  className="w-8 h-8 rounded border border-gray-300"
-                                  style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
-                                ></div>
-                                <FormField
-                                  control={appearanceForm.control}
-                                  name="primaryColor"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormControl>
-                                        <Input 
-                                          {...field} 
-                                          className="w-32 font-mono text-sm"
-                                          placeholder="#4F46E5"
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <input
-                                  type="color"
-                                  value={appearanceForm.watch('primaryColor')}
-                                  onChange={(e) => appearanceForm.setValue('primaryColor', e.target.value)}
-                                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-                                  style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
-                                />
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => {
-                                    const input = document.querySelector('input[type="color"]') as HTMLInputElement;
-                                    input?.click();
-                                  }}
-                                >
-                                  Change
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                              <h4 className="text-sm font-medium mb-2">Secondary Color</h4>
-                              <div className="flex items-center space-x-4">
-                                <div 
-                                  className="w-8 h-8 rounded border border-gray-300"
-                                  style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
-                                ></div>
-                                <FormField
-                                  control={appearanceForm.control}
-                                  name="secondaryColor"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormControl>
-                                        <Input 
-                                          {...field} 
-                                          className="w-32 font-mono text-sm"
-                                          placeholder="#10B981"
-                                        />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <input
-                                  type="color"
-                                  value={appearanceForm.watch('secondaryColor')}
-                                  onChange={(e) => appearanceForm.setValue('secondaryColor', e.target.value)}
-                                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-                                  style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
-                                />
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => {
-                                    const inputs = document.querySelectorAll('input[type="color"]');
-                                    (inputs[1] as HTMLInputElement)?.click();
-                                  }}
-                                >
-                                  Change
-                                </Button>
-                              </div>
-                            </div>
-                          </form>
-                        </Form>
-                      </div>
-                      
-                      <div className="pt-4 flex justify-end">
-                        <Button onClick={() => toast({ title: "Appearance Settings Saved", description: "Your appearance settings have been updated." })}>
-                          Save Appearance Settings
-                        </Button>
-                      </div>
                     </div>
                   </CardContent>
                 </Card>
+                
+                <Form {...appearanceForm}>
+                  <form onSubmit={appearanceForm.handleSubmit(handleSaveAppearance)} className="space-y-6">
+                    <Card className="mt-6">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold">Branding</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {/* Logo Upload */}
+                        <div className="space-y-3">
+                          <h3 className="text-base font-medium">Logo</h3>
+                          <div className="flex items-center space-x-4">
+                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+                              {appearanceForm.watch('logo') ? (
+                                <img 
+                                  src={appearanceForm.watch('logo')} 
+                                  alt="Logo" 
+                                  className="w-full h-full object-contain rounded-lg"
+                                />
+                              ) : (
+                                <Globe className="h-8 w-8 text-gray-400" />
+                              )}
+                            </div>
+                            <div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleLogoUpload}
+                                className="hidden"
+                                id="logo-upload"
+                              />
+                              <label htmlFor="logo-upload">
+                                <Button type="button" variant="outline" asChild>
+                                  <span className="cursor-pointer">Upload Logo</span>
+                                </Button>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Primary Color */}
+                        <div className="space-y-3">
+                          <h3 className="text-base font-medium">Primary Color</h3>
+                          <div className="flex items-center space-x-4">
+                            <div 
+                              className="w-8 h-8 rounded border border-gray-300"
+                              style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
+                            ></div>
+                            <FormField
+                              control={appearanceForm.control}
+                              name="primaryColor"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      className="w-24 font-mono text-sm"
+                                      placeholder="#4F46E5"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <input
+                              type="color"
+                              value={appearanceForm.watch('primaryColor')}
+                              onChange={(e) => appearanceForm.setValue('primaryColor', e.target.value)}
+                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                const input = document.querySelector('input[type="color"]') as HTMLInputElement;
+                                input?.click();
+                              }}
+                            >
+                              Change
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Secondary Color */}
+                        <div className="space-y-3">
+                          <h3 className="text-base font-medium">Secondary Color</h3>
+                          <div className="flex items-center space-x-4">
+                            <div 
+                              className="w-8 h-8 rounded border border-gray-300"
+                              style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
+                            ></div>
+                            <FormField
+                              control={appearanceForm.control}
+                              name="secondaryColor"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Input 
+                                      {...field} 
+                                      className="w-24 font-mono text-sm"
+                                      placeholder="#10B981"
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                            <input
+                              type="color"
+                              value={appearanceForm.watch('secondaryColor')}
+                              onChange={(e) => appearanceForm.setValue('secondaryColor', e.target.value)}
+                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                const inputs = document.querySelectorAll('input[type="color"]');
+                                (inputs[1] as HTMLInputElement)?.click();
+                              }}
+                            >
+                              Change
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="pt-4 flex justify-end">
+                          <Button 
+                            type="submit"
+                            className="bg-primary hover:bg-primary/90"
+                            style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
+                          >
+                            Save Appearance Settings
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </form>
+                </Form>
                 
                 <Card className="mt-6">
                   <CardHeader>
