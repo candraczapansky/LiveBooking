@@ -41,6 +41,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isCashProcessing, setIsCashProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +113,31 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     }
   };
 
+  const handleCashPayment = async () => {
+    setIsCashProcessing(true);
+    
+    try {
+      await apiRequest("POST", "/api/confirm-cash-payment", {
+        appointmentId: appointment.id
+      });
+      
+      toast({
+        title: "Cash Payment Confirmed",
+        description: "Payment marked as cash paid successfully!",
+      });
+      onSuccess();
+    } catch (error: any) {
+      console.error('Cash payment error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to mark payment as cash paid",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCashProcessing(false);
+    }
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
@@ -119,32 +145,53 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         <PaymentElement />
       </div>
       
-      <div className="flex gap-3">
+      <div className="space-y-4">
+        <div className="flex gap-3">
+          <Button 
+            type="submit" 
+            disabled={!stripe || isProcessing || isCashProcessing}
+            className="flex-1"
+          >
+            {isProcessing ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+                Processing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Pay {formatPrice(appointment.amount)}
+              </div>
+            )}
+          </Button>
+          <Button 
+            type="button" 
+            variant="outline"
+            onClick={handleCashPayment}
+            disabled={isProcessing || isCashProcessing}
+            className="flex-1 border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+          >
+            {isCashProcessing ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full" />
+                Processing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Mark as Cash Paid
+              </div>
+            )}
+          </Button>
+        </div>
         <Button 
           type="button" 
           variant="outline" 
           onClick={onCancel}
-          disabled={isProcessing}
-          className="flex-1"
+          disabled={isProcessing || isCashProcessing}
+          className="w-full"
         >
           Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={!stripe || isProcessing}
-          className="flex-1"
-        >
-          {isProcessing ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
-              Processing...
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              Pay {formatPrice(appointment.amount)}
-            </div>
-          )}
         </Button>
       </div>
     </form>

@@ -766,6 +766,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cash payment confirmation route
+  app.post("/api/confirm-cash-payment", async (req, res) => {
+    try {
+      const { appointmentId } = req.body;
+      
+      if (!appointmentId) {
+        return res.status(400).json({ error: "Appointment ID is required" });
+      }
+
+      // Get the appointment to verify it exists and get amount
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Update appointment status to paid
+      await storage.updateAppointment(appointmentId, {
+        status: 'confirmed',
+        paymentStatus: 'paid'
+      });
+
+      // Create payment record for cash payment
+      await storage.createPayment({
+        clientId: appointment.clientId,
+        amount: appointment.amount || 0,
+        method: 'cash',
+        status: 'completed',
+        appointmentId: appointmentId
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Cash payment confirmed successfully",
+        appointment 
+      });
+    } catch (error: any) {
+      console.error('Cash payment confirmation error:', error);
+      res.status(500).json({ 
+        error: "Error confirming cash payment: " + error.message 
+      });
+    }
+  });
+
   // Stripe payment routes for appointment checkout
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
