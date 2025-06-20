@@ -128,7 +128,13 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
             className="flex items-center text-sm font-medium text-destructive w-full justify-start"
             onClick={() => {
               console.log("Sign out button clicked");
-              logout();
+              console.log("Logout function:", logout);
+              console.log("Logout function type:", typeof logout);
+              if (logout) {
+                logout();
+              } else {
+                console.error("Logout function is not available");
+              }
             }}
           >
             <LogOut className="w-5 h-5 mr-3" />
