@@ -790,7 +790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create payment record for cash payment
       await storage.createPayment({
         clientId: appointment.clientId,
-        amount: appointment.amount || 0,
+        amount: appointment.totalAmount || 0,
         method: 'cash',
         status: 'completed',
         appointmentId: appointmentId
