@@ -45,7 +45,9 @@ export const AuthContext = React.createContext<AuthContextType>({
   },
   logout: () => {
     console.log("Default logout function called - context not properly provided");
-    window.location.replace('/login');
+    localStorage.removeItem('user');
+    localStorage.clear();
+    window.location.replace('/');
   },
 });
 
