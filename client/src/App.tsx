@@ -112,6 +112,8 @@ function useAuth() {
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('user');
+    // Force redirect to login page
+    window.location.replace('/login');
   };
 
   return { user, isAuthenticated, login, logout };

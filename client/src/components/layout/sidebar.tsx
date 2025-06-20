@@ -126,11 +126,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
           <Button 
             variant="ghost" 
             className="flex items-center text-sm font-medium text-destructive w-full justify-start"
-            onClick={() => {
-              logout();
-              // Force immediate redirect to login page
-              window.location.href = '/login';
-            }}
+            onClick={logout}
           >
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out
