@@ -126,7 +126,10 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
           <Button 
             variant="ghost" 
             className="flex items-center text-sm font-medium text-destructive w-full justify-start"
-            onClick={logout}
+            onClick={() => {
+              console.log("Sign out button clicked");
+              logout();
+            }}
           >
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out

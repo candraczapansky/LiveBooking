@@ -109,9 +109,11 @@ function useAuth() {
   };
 
   const logout = () => {
+    console.log("Logout function called");
     setUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('user');
+    console.log("About to redirect to login");
     // Force redirect to login page
     window.location.replace('/login');
   };
