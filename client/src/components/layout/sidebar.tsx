@@ -128,7 +128,8 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
             className="flex items-center text-sm font-medium text-destructive w-full justify-start"
             onClick={() => {
               logout();
-              setLocation('/login');
+              // Force immediate redirect to login page
+              window.location.href = '/login';
             }}
           >
             <LogOut className="w-5 h-5 mr-3" />
