@@ -100,9 +100,18 @@ const notificationSchema = z.object({
   marketingNotifications: z.boolean().default(true),
 });
 
+// Appearance Settings Form Schema
+const appearanceSchema = z.object({
+  logo: z.string().optional(),
+  primaryColor: z.string().default("#4F46E5"),
+  secondaryColor: z.string().default("#10B981"),
+  theme: z.enum(["light", "dark", "system"]).default("light"),
+});
+
 type BusinessInfoValues = z.infer<typeof businessInfoSchema>;
 type ProfileValues = z.infer<typeof profileSchema>;
 type NotificationValues = z.infer<typeof notificationSchema>;
+type AppearanceValues = z.infer<typeof appearanceSchema>;
 
 const SettingsPage = () => {
   useDocumentTitle("Settings | BeautyBook");
@@ -165,6 +174,17 @@ const SettingsPage = () => {
     },
   });
 
+  // Appearance Settings Form
+  const appearanceForm = useForm<AppearanceValues>({
+    resolver: zodResolver(appearanceSchema),
+    defaultValues: {
+      logo: "",
+      primaryColor: "#4F46E5",
+      secondaryColor: "#10B981",
+      theme: "light",
+    },
+  });
+
   const handleSaveBusinessInfo = (values: BusinessInfoValues) => {
     console.log("Business info values:", values);
     toast({
@@ -187,6 +207,64 @@ const SettingsPage = () => {
       title: "Notification Settings Saved",
       description: "Your notification preferences have been updated.",
     });
+  };
+
+  const handleSaveAppearance = (values: AppearanceValues) => {
+    console.log("Appearance values:", values);
+    
+    // Apply the colors to CSS variables
+    const root = document.documentElement;
+    const primaryHsl = hexToHsl(values.primaryColor);
+    const secondaryHsl = hexToHsl(values.secondaryColor);
+    
+    root.style.setProperty('--primary', primaryHsl);
+    root.style.setProperty('--primary-foreground', '210 40% 98%');
+    
+    // Save to localStorage for persistence
+    localStorage.setItem('beautybook-appearance', JSON.stringify(values));
+    
+    toast({
+      title: "Appearance Settings Saved",
+      description: "Your branding preferences have been updated.",
+    });
+  };
+
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        appearanceForm.setValue('logo', result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const hexToHsl = (hex: string): string => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+        default: h = 0;
+      }
+      h /= 6;
+    }
+
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
   };
 
   return (
@@ -788,35 +866,126 @@ const SettingsPage = () => {
                       
                       <div className="pt-4">
                         <h3 className="text-base font-medium mb-4">Branding</h3>
-                        <div className="space-y-4">
-                          <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                            <h4 className="text-sm font-medium mb-2">Logo</h4>
-                            <div className="flex items-center space-x-4">
-                              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center text-gray-400">
-                                <Globe className="h-8 w-8" />
+                        <Form {...appearanceForm}>
+                          <form onSubmit={appearanceForm.handleSubmit(handleSaveAppearance)} className="space-y-4">
+                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                              <h4 className="text-sm font-medium mb-2">Logo</h4>
+                              <div className="flex items-center space-x-4">
+                                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center text-gray-400 border-2 border-dashed border-gray-300">
+                                  {appearanceForm.watch('logo') ? (
+                                    <img 
+                                      src={appearanceForm.watch('logo')} 
+                                      alt="Logo" 
+                                      className="w-full h-full object-contain rounded"
+                                    />
+                                  ) : (
+                                    <Globe className="h-8 w-8" />
+                                  )}
+                                </div>
+                                <div>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleLogoUpload}
+                                    className="hidden"
+                                    id="logo-upload"
+                                  />
+                                  <label htmlFor="logo-upload">
+                                    <Button type="button" variant="outline" asChild>
+                                      <span className="cursor-pointer">Upload Logo</span>
+                                    </Button>
+                                  </label>
+                                </div>
                               </div>
-                              <Button variant="outline">Upload Logo</Button>
                             </div>
-                          </div>
-                          
-                          <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                            <h4 className="text-sm font-medium mb-2">Primary Color</h4>
-                            <div className="flex items-center space-x-4">
-                              <div className="w-8 h-8 bg-primary rounded"></div>
-                              <Input type="text" value="#4F46E5" readOnly className="w-32" />
-                              <Button variant="outline">Change</Button>
+                            
+                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                              <h4 className="text-sm font-medium mb-2">Primary Color</h4>
+                              <div className="flex items-center space-x-4">
+                                <div 
+                                  className="w-8 h-8 rounded border border-gray-300"
+                                  style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
+                                ></div>
+                                <FormField
+                                  control={appearanceForm.control}
+                                  name="primaryColor"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input 
+                                          {...field} 
+                                          className="w-32 font-mono text-sm"
+                                          placeholder="#4F46E5"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <input
+                                  type="color"
+                                  value={appearanceForm.watch('primaryColor')}
+                                  onChange={(e) => appearanceForm.setValue('primaryColor', e.target.value)}
+                                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                                  style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
+                                />
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    const input = document.querySelector('input[type="color"]') as HTMLInputElement;
+                                    input?.click();
+                                  }}
+                                >
+                                  Change
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                          
-                          <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                            <h4 className="text-sm font-medium mb-2">Secondary Color</h4>
-                            <div className="flex items-center space-x-4">
-                              <div className="w-8 h-8 bg-secondary rounded"></div>
-                              <Input type="text" value="#10B981" readOnly className="w-32" />
-                              <Button variant="outline">Change</Button>
+                            
+                            <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
+                              <h4 className="text-sm font-medium mb-2">Secondary Color</h4>
+                              <div className="flex items-center space-x-4">
+                                <div 
+                                  className="w-8 h-8 rounded border border-gray-300"
+                                  style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
+                                ></div>
+                                <FormField
+                                  control={appearanceForm.control}
+                                  name="secondaryColor"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input 
+                                          {...field} 
+                                          className="w-32 font-mono text-sm"
+                                          placeholder="#10B981"
+                                        />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <input
+                                  type="color"
+                                  value={appearanceForm.watch('secondaryColor')}
+                                  onChange={(e) => appearanceForm.setValue('secondaryColor', e.target.value)}
+                                  className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
+                                  style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
+                                />
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    const inputs = document.querySelectorAll('input[type="color"]');
+                                    (inputs[1] as HTMLInputElement)?.click();
+                                  }}
+                                >
+                                  Change
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        </div>
+                          </form>
+                        </Form>
                       </div>
                       
                       <div className="pt-4 flex justify-end">
