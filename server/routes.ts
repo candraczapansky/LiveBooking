@@ -880,6 +880,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Saved Payment Methods routes
+  app.get("/api/saved-payment-methods", async (req, res) => {
+    const { clientId } = req.query;
+    
+    if (!clientId) {
+      return res.status(400).json({ error: "Client ID is required" });
+    }
+    
+    const savedMethods = await storage.getSavedPaymentMethodsByClient(parseInt(clientId as string));
+    return res.status(200).json(savedMethods);
+  });
+
+  app.post("/api/saved-payment-methods", validateBody(insertSavedPaymentMethodSchema), async (req, res) => {
+    try {
+      const savedMethod = await storage.createSavedPaymentMethod(req.body);
+      return res.status(201).json(savedMethod);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error saving payment method: " + error.message });
+    }
+  });
+
+  app.delete("/api/saved-payment-methods/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const success = await storage.deleteSavedPaymentMethod(id);
+    
+    if (success) {
+      return res.status(204).end();
+    } else {
+      return res.status(404).json({ error: "Payment method not found" });
+    }
+  });
+
+  app.put("/api/saved-payment-methods/:id/default", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { clientId } = req.body;
+    
+    try {
+      await storage.setDefaultPaymentMethod(clientId, id);
+      return res.status(200).json({ success: true });
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error setting default payment method: " + error.message });
+    }
+  });
+
+  // Setup SetupIntent for saving cards
+  app.post("/api/create-setup-intent", async (req, res) => {
+    try {
+      const { clientId } = req.body;
+      
+      if (!clientId) {
+        return res.status(400).json({ error: "Client ID is required" });
+      }
+
+      // Get or create Stripe customer
+      const user = await storage.getUser(clientId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      let customerId = user.stripeCustomerId;
+      
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`,
+        });
+        customerId = customer.id;
+        await storage.updateUserStripeCustomerId(clientId, customerId);
+      }
+
+      const setupIntent = await stripe.setupIntents.create({
+        customer: customerId,
+        payment_method_types: ['card'],
+      });
+
+      res.json({ 
+        clientSecret: setupIntent.client_secret,
+        customerId: customerId
+      });
+    } catch (error: any) {
+      console.error('Setup intent creation error:', error);
+      res.status(500).json({ 
+        error: "Error creating setup intent: " + error.message 
+      });
+    }
+  });
+
+  // Save payment method after successful setup
+  app.post("/api/save-payment-method", async (req, res) => {
+    try {
+      const { paymentMethodId, clientId } = req.body;
+      
+      if (!paymentMethodId || !clientId) {
+        return res.status(400).json({ error: "Payment method ID and client ID are required" });
+      }
+
+      // Get payment method details from Stripe
+      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      
+      if (!paymentMethod.card) {
+        return res.status(400).json({ error: "Invalid payment method" });
+      }
+
+      // Check if this is the first payment method for this client
+      const existingMethods = await storage.getSavedPaymentMethodsByClient(clientId);
+      const isDefault = existingMethods.length === 0;
+
+      // Save to database
+      const savedMethod = await storage.createSavedPaymentMethod({
+        clientId: clientId,
+        stripePaymentMethodId: paymentMethodId,
+        cardBrand: paymentMethod.card.brand,
+        cardLast4: paymentMethod.card.last4,
+        cardExpMonth: paymentMethod.card.exp_month,
+        cardExpYear: paymentMethod.card.exp_year,
+        isDefault: isDefault
+      });
+
+      res.json(savedMethod);
+    } catch (error: any) {
+      console.error('Save payment method error:', error);
+      res.status(500).json({ 
+        error: "Error saving payment method: " + error.message 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

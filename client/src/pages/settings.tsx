@@ -49,6 +49,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import SavedPaymentMethods from "@/components/payment/saved-payment-methods";
 
 // Business Information Form Schema
 const businessInfoSchema = z.object({
@@ -221,6 +222,10 @@ const SettingsPage = () => {
                 <TabsTrigger value="notifications" className="flex items-center">
                   <Bell className="h-4 w-4 mr-2" />
                   Notifications
+                </TabsTrigger>
+                <TabsTrigger value="payment" className="flex items-center">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  Payment Methods
                 </TabsTrigger>
                 <TabsTrigger value="appearance" className="flex items-center">
                   <PaintBucket className="h-4 w-4 mr-2" />
