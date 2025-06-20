@@ -168,8 +168,10 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [clientSecret, setClientSecret] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'gift_card' | null>(null);
   const [isCashProcessing, setIsCashProcessing] = useState(false);
+  const [isGiftCardProcessing, setIsGiftCardProcessing] = useState(false);
+  const [giftCardCode, setGiftCardCode] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {

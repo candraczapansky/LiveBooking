@@ -401,6 +401,27 @@ export class MemStorage implements IStorage {
       duration: 30, // 30 days
       benefits: 'Includes 10% off all services, one free blowout per month'
     });
+
+    // Create sample gift cards
+    this.createGiftCard({
+      code: 'GIFT2025',
+      initialAmount: 100.00,
+      currentBalance: 100.00,
+      issuedToEmail: 'test@example.com',
+      issuedToName: 'Test User',
+      status: 'active',
+      expiryDate: new Date('2025-12-31')
+    });
+
+    this.createGiftCard({
+      code: 'HOLIDAY50',
+      initialAmount: 50.00,
+      currentBalance: 25.00,
+      issuedToEmail: 'user@example.com',
+      issuedToName: 'Holiday Gift',
+      status: 'active',
+      expiryDate: new Date('2025-06-30')
+    });
   }
 
   // User operations
@@ -885,6 +906,78 @@ export class MemStorage implements IStorage {
 
   async updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User> {
     return this.updateUser(userId, { stripeCustomerId });
+  }
+
+  // Gift Card operations
+  async createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard> {
+    const id = this.currentGiftCardId++;
+    const newGiftCard: GiftCard = {
+      id,
+      createdAt: new Date(),
+      code: giftCard.code,
+      initialAmount: giftCard.initialAmount,
+      currentBalance: giftCard.currentBalance,
+      issuedToEmail: giftCard.issuedToEmail || null,
+      issuedToName: giftCard.issuedToName || null,
+      purchasedByUserId: giftCard.purchasedByUserId || null,
+      status: giftCard.status || 'active',
+      expiryDate: giftCard.expiryDate || null,
+    };
+    this.giftCards.set(id, newGiftCard);
+    return newGiftCard;
+  }
+
+  async getGiftCard(id: number): Promise<GiftCard | undefined> {
+    return this.giftCards.get(id);
+  }
+
+  async getGiftCardByCode(code: string): Promise<GiftCard | undefined> {
+    return Array.from(this.giftCards.values()).find(card => card.code === code);
+  }
+
+  async getAllGiftCards(): Promise<GiftCard[]> {
+    return Array.from(this.giftCards.values());
+  }
+
+  async updateGiftCard(id: number, giftCardData: Partial<InsertGiftCard>): Promise<GiftCard> {
+    const giftCard = await this.getGiftCard(id);
+    if (!giftCard) {
+      throw new Error('Gift card not found');
+    }
+    const updatedGiftCard = { ...giftCard, ...giftCardData };
+    this.giftCards.set(id, updatedGiftCard);
+    return updatedGiftCard;
+  }
+
+  async deleteGiftCard(id: number): Promise<boolean> {
+    return this.giftCards.delete(id);
+  }
+
+  // Gift Card Transaction operations
+  async createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction> {
+    const id = this.currentGiftCardTransactionId++;
+    const newTransaction: GiftCardTransaction = {
+      id,
+      createdAt: new Date(),
+      giftCardId: transaction.giftCardId,
+      appointmentId: transaction.appointmentId || null,
+      transactionType: transaction.transactionType,
+      amount: transaction.amount,
+      balanceAfter: transaction.balanceAfter,
+      notes: transaction.notes || null,
+    };
+    this.giftCardTransactions.set(id, newTransaction);
+    return newTransaction;
+  }
+
+  async getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined> {
+    return this.giftCardTransactions.get(id);
+  }
+
+  async getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]> {
+    return Array.from(this.giftCardTransactions.values()).filter(
+      transaction => transaction.giftCardId === giftCardId
+    );
   }
 }
 
