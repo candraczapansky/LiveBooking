@@ -232,6 +232,41 @@ export default function AppointmentCheckout({
     }
   };
 
+  const handleGiftCardPayment = async () => {
+    if (!giftCardCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a gift card code",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGiftCardProcessing(true);
+    
+    try {
+      await apiRequest("POST", "/api/confirm-gift-card-payment", {
+        appointmentId: appointment.id,
+        giftCardCode: giftCardCode.trim()
+      });
+      
+      toast({
+        title: "Gift Card Payment Successful",
+        description: "Payment processed with gift card successfully!",
+      });
+      handleSuccess();
+    } catch (error: any) {
+      console.error('Gift card payment error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process gift card payment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGiftCardProcessing(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   // If already paid, show confirmation
@@ -338,7 +373,7 @@ export default function AppointmentCheckout({
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold mb-4">Choose Payment Method</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Card Payment Option */}
                   <Card 
                     className="cursor-pointer border-2 hover:border-primary/50 transition-colors"
@@ -352,6 +387,27 @@ export default function AppointmentCheckout({
                         <div>
                           <h4 className="font-semibold">Pay with Card</h4>
                           <p className="text-sm text-muted-foreground">Credit or Debit Card</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Gift Card Payment Option */}
+                  <Card 
+                    className="cursor-pointer border-2 hover:border-purple-500/50 transition-colors"
+                    onClick={() => setPaymentMethod('gift_card')}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                          <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 16h6" />
+                          </svg>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">Gift Card</h4>
+                          <p className="text-sm text-muted-foreground">Use gift card code</p>
                         </div>
                       </div>
                     </CardContent>
@@ -380,6 +436,62 @@ export default function AppointmentCheckout({
               <div className="flex justify-center">
                 <Button onClick={onClose} variant="outline">
                   Cancel
+                </Button>
+              </div>
+            </div>
+          ) : paymentMethod === 'gift_card' ? (
+            <div className="space-y-6 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 16h6" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Pay with Gift Card</h3>
+                  <p className="text-muted-foreground">Enter your gift card code below</p>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-lg font-semibold mb-4">Amount: {formatPrice(appointment.amount)}</p>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    placeholder="Enter gift card code (e.g., GIFT2025)"
+                    value={giftCardCode}
+                    onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    disabled={isGiftCardProcessing}
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    Test codes: GIFT2025 ($100), HOLIDAY50 ($25)
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-center">
+                <Button 
+                  onClick={() => setPaymentMethod(null)} 
+                  variant="outline"
+                  disabled={isGiftCardProcessing}
+                >
+                  Back
+                </Button>
+                <Button 
+                  onClick={handleGiftCardPayment}
+                  disabled={isGiftCardProcessing || !giftCardCode.trim()}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {isGiftCardProcessing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+                      Processing...
+                    </div>
+                  ) : (
+                    'Pay with Gift Card'
+                  )}
                 </Button>
               </div>
             </div>

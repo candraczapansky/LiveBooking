@@ -809,6 +809,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Gift card payment confirmation route
+  app.post("/api/confirm-gift-card-payment", async (req, res) => {
+    try {
+      const { appointmentId, giftCardCode } = req.body;
+      
+      if (!appointmentId || !giftCardCode) {
+        return res.status(400).json({ error: "Appointment ID and gift card code are required" });
+      }
+
+      // Get the appointment to verify it exists and get amount
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      // Get the gift card by code
+      const giftCard = await storage.getGiftCardByCode(giftCardCode);
+      if (!giftCard) {
+        return res.status(404).json({ error: "Gift card not found" });
+      }
+
+      // Check if gift card is active
+      if (giftCard.status !== 'active') {
+        return res.status(400).json({ error: "Gift card is not active" });
+      }
+
+      // Check if gift card has expired
+      if (giftCard.expiryDate && new Date() > giftCard.expiryDate) {
+        return res.status(400).json({ error: "Gift card has expired" });
+      }
+
+      // Check if gift card has sufficient balance
+      const appointmentAmount = appointment.totalAmount || 0;
+      if (giftCard.currentBalance < appointmentAmount) {
+        return res.status(400).json({ 
+          error: `Insufficient gift card balance. Available: $${giftCard.currentBalance.toFixed(2)}, Required: $${appointmentAmount.toFixed(2)}` 
+        });
+      }
+
+      // Deduct amount from gift card
+      const newBalance = giftCard.currentBalance - appointmentAmount;
+      await storage.updateGiftCard(giftCard.id, {
+        currentBalance: newBalance,
+        status: newBalance <= 0 ? 'used' : 'active'
+      });
+
+      // Create gift card transaction record
+      await storage.createGiftCardTransaction({
+        giftCardId: giftCard.id,
+        appointmentId: appointmentId,
+        transactionType: 'redemption',
+        amount: appointmentAmount,
+        balanceAfter: newBalance,
+        notes: `Payment for appointment #${appointmentId}`
+      });
+
+      // Update appointment status to paid
+      await storage.updateAppointment(appointmentId, {
+        status: 'confirmed',
+        paymentStatus: 'paid'
+      });
+
+      // Create payment record for gift card payment
+      await storage.createPayment({
+        clientId: appointment.clientId,
+        amount: appointmentAmount,
+        method: 'gift_card',
+        status: 'completed',
+        appointmentId: appointmentId
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Gift card payment processed successfully",
+        remainingBalance: newBalance,
+        appointment 
+      });
+    } catch (error: any) {
+      console.error('Gift card payment confirmation error:', error);
+      res.status(500).json({ 
+        error: "Error processing gift card payment: " + error.message 
+      });
+    }
+  });
+
   // Stripe payment routes for appointment checkout
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
