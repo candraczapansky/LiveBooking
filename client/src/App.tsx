@@ -40,8 +40,13 @@ export type AuthContextType = {
 export const AuthContext = React.createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
-  login: () => {},
-  logout: () => {},
+  login: () => {
+    console.log("Default login function called - context not properly provided");
+  },
+  logout: () => {
+    console.log("Default logout function called - context not properly provided");
+    window.location.replace('/login');
+  },
 });
 
 function Router() {
