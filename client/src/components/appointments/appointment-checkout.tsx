@@ -41,7 +41,6 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
   const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isCashProcessing, setIsCashProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,30 +112,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     }
   };
 
-  const handleCashPayment = async () => {
-    setIsCashProcessing(true);
-    
-    try {
-      await apiRequest("POST", "/api/confirm-cash-payment", {
-        appointmentId: appointment.id
-      });
-      
-      toast({
-        title: "Cash Payment Confirmed",
-        description: "Payment marked as cash paid successfully!",
-      });
-      onSuccess();
-    } catch (error: any) {
-      console.error('Cash payment error:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to mark payment as cash paid",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCashProcessing(false);
-    }
-  };
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -145,53 +121,32 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         <PaymentElement />
       </div>
       
-      <div className="space-y-4">
-        <div className="flex gap-3">
-          <Button 
-            type="submit" 
-            disabled={!stripe || isProcessing || isCashProcessing}
-            className="flex-1"
-          >
-            {isProcessing ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
-                Processing...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4" />
-                Pay {formatPrice(appointment.amount)}
-              </div>
-            )}
-          </Button>
-          <Button 
-            type="button" 
-            variant="outline"
-            onClick={handleCashPayment}
-            disabled={isProcessing || isCashProcessing}
-            className="flex-1 border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
-          >
-            {isCashProcessing ? (
-              <div className="flex items-center gap-2">
-                <div className="animate-spin w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full" />
-                Processing...
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                Mark as Cash Paid
-              </div>
-            )}
-          </Button>
-        </div>
+      <div className="flex gap-3">
         <Button 
           type="button" 
           variant="outline" 
           onClick={onCancel}
-          disabled={isProcessing || isCashProcessing}
-          className="w-full"
+          disabled={isProcessing}
+          className="flex-1"
         >
-          Cancel
+          Back
+        </Button>
+        <Button 
+          type="submit" 
+          disabled={!stripe || isProcessing}
+          className="flex-1"
+        >
+          {isProcessing ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+              Processing...
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              Pay {formatPrice(appointment.amount)}
+            </div>
+          )}
         </Button>
       </div>
     </form>
@@ -213,13 +168,15 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [clientSecret, setClientSecret] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
+  const [isCashProcessing, setIsCashProcessing] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    if (isOpen && appointment.paymentStatus === 'unpaid') {
+    if (isOpen && appointment.paymentStatus === 'unpaid' && paymentMethod === 'card') {
       createPaymentIntent();
     }
-  }, [isOpen, appointment.id]);
+  }, [isOpen, appointment.id, paymentMethod]);
 
   const createPaymentIntent = async () => {
     try {
@@ -246,6 +203,31 @@ export default function AppointmentCheckout({
   const handleSuccess = async () => {
     onSuccess();
     onClose();
+  };
+
+  const handleCashPayment = async () => {
+    setIsCashProcessing(true);
+    
+    try {
+      await apiRequest("POST", "/api/confirm-cash-payment", {
+        appointmentId: appointment.id
+      });
+      
+      toast({
+        title: "Cash Payment Confirmed",
+        description: "Payment marked as cash paid successfully!",
+      });
+      handleSuccess();
+    } catch (error: any) {
+      console.error('Cash payment error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to mark payment as cash paid",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCashProcessing(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -349,8 +331,97 @@ export default function AppointmentCheckout({
             </div>
           </div>
 
-          {/* Payment Form */}
-          {isLoading ? (
+          {/* Payment Method Selection or Payment Form */}
+          {!paymentMethod ? (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Choose Payment Method</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Card Payment Option */}
+                  <Card 
+                    className="cursor-pointer border-2 hover:border-primary/50 transition-colors"
+                    onClick={() => setPaymentMethod('card')}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                          <CreditCard className="w-6 h-6 text-primary" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">Pay with Card</h4>
+                          <p className="text-sm text-muted-foreground">Credit or Debit Card</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Cash Payment Option */}
+                  <Card 
+                    className="cursor-pointer border-2 hover:border-green-500/50 transition-colors"
+                    onClick={() => setPaymentMethod('cash')}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                          <DollarSign className="w-6 h-6 text-green-600" />
+                        </div>
+                        <div>
+                          <h4 className="font-semibold">Cash Payment</h4>
+                          <p className="text-sm text-muted-foreground">Mark as cash paid</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+              
+              <div className="flex justify-center">
+                <Button onClick={onClose} variant="outline">
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : paymentMethod === 'cash' ? (
+            <div className="space-y-6 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <DollarSign className="w-8 h-8 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">Confirm Cash Payment</h3>
+                  <p className="text-muted-foreground">Mark this appointment as paid with cash</p>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <p className="text-lg font-semibold">Amount: {formatPrice(appointment.amount)}</p>
+              </div>
+              
+              <div className="flex gap-3 justify-center">
+                <Button 
+                  onClick={() => setPaymentMethod(null)} 
+                  variant="outline"
+                  disabled={isCashProcessing}
+                >
+                  Back
+                </Button>
+                <Button 
+                  onClick={handleCashPayment}
+                  disabled={isCashProcessing}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {isCashProcessing ? (
+                    <div className="flex items-center gap-2">
+                      <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+                      Processing...
+                    </div>
+                  ) : (
+                    'Confirm Cash Payment'
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
             </div>
@@ -367,15 +438,20 @@ export default function AppointmentCheckout({
               <CheckoutForm 
                 appointment={appointment}
                 onSuccess={handleSuccess}
-                onCancel={onClose}
+                onCancel={() => setPaymentMethod(null)}
               />
             </Elements>
           ) : (
             <div className="text-center py-4">
               <p className="text-muted-foreground">Unable to load payment form</p>
-              <Button onClick={onClose} variant="outline" className="mt-4">
-                Close
-              </Button>
+              <div className="flex gap-3 justify-center mt-4">
+                <Button onClick={() => setPaymentMethod(null)} variant="outline">
+                  Back
+                </Button>
+                <Button onClick={onClose} variant="outline">
+                  Close
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

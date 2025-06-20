@@ -617,32 +617,19 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                         <span className="text-sm font-medium">Paid</span>
                       </div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         <span className="text-sm text-muted-foreground">Amount: {formatPrice(selectedService?.price || 0)}</span>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => {
-                              setShowCheckout(true);
-                              onOpenChange(false); // Close the appointment dialog
-                            }}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CreditCard className="mr-2 h-4 w-4" />
-                            Pay with Card
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={handleCashPayment}
-                            variant="outline"
-                            className="border-green-600 text-green-600 hover:bg-green-50"
-                          >
-                            <DollarSign className="mr-2 h-4 w-4" />
-                            Mark as Cash Paid
-                          </Button>
-                        </div>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setShowCheckout(true);
+                            onOpenChange(false); // Close the appointment dialog
+                          }}
+                          className="w-full bg-green-600 hover:bg-green-700"
+                        >
+                          <CreditCard className="mr-2 h-4 w-4" />
+                          Process Payment
+                        </Button>
                       </div>
                     )}
                   </div>
