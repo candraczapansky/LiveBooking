@@ -9,7 +9,8 @@ import {
   appointments, Appointment, InsertAppointment,
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
-  payments, Payment, InsertPayment
+  payments, Payment, InsertPayment,
+  savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod
 } from "@shared/schema";
 
 export interface IStorage {
@@ -93,6 +94,17 @@ export interface IStorage {
   getPaymentsByClient(clientId: number): Promise<Payment[]>;
   getAllPayments(): Promise<Payment[]>;
   updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment>;
+
+  // Saved Payment Methods operations
+  createSavedPaymentMethod(paymentMethod: InsertSavedPaymentMethod): Promise<SavedPaymentMethod>;
+  getSavedPaymentMethod(id: number): Promise<SavedPaymentMethod | undefined>;
+  getSavedPaymentMethodsByClient(clientId: number): Promise<SavedPaymentMethod[]>;
+  updateSavedPaymentMethod(id: number, data: Partial<InsertSavedPaymentMethod>): Promise<SavedPaymentMethod>;
+  deleteSavedPaymentMethod(id: number): Promise<boolean>;
+  setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean>;
+
+  // User Stripe operations
+  updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User>;
 }
 
 export class MemStorage implements IStorage {
@@ -107,6 +119,7 @@ export class MemStorage implements IStorage {
   private memberships: Map<number, Membership>;
   private clientMemberships: Map<number, ClientMembership>;
   private payments: Map<number, Payment>;
+  private savedPaymentMethods: Map<number, SavedPaymentMethod>;
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
@@ -119,6 +132,7 @@ export class MemStorage implements IStorage {
   private currentMembershipId: number;
   private currentClientMembershipId: number;
   private currentPaymentId: number;
+  private currentSavedPaymentMethodId: number;
 
   constructor() {
     this.users = new Map();

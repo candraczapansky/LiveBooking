@@ -12,6 +12,7 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   phone: text("phone"),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -182,6 +183,24 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
 });
 
+// Saved payment methods schema
+export const savedPaymentMethods = pgTable("saved_payment_methods", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  stripePaymentMethodId: text("stripe_payment_method_id").notNull(),
+  cardBrand: text("card_brand").notNull(), // visa, mastercard, amex, etc.
+  cardLast4: text("card_last4").notNull(),
+  cardExpMonth: integer("card_exp_month").notNull(),
+  cardExpYear: integer("card_exp_year").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSavedPaymentMethodSchema = createInsertSchema(savedPaymentMethods).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -212,6 +231,9 @@ export type InsertClientMembership = z.infer<typeof insertClientMembershipSchema
 
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+
+export type SavedPaymentMethod = typeof savedPaymentMethods.$inferSelect;
+export type InsertSavedPaymentMethod = z.infer<typeof insertSavedPaymentMethodSchema>;
 
 export type Device = typeof devices.$inferSelect;
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
