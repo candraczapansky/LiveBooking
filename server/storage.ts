@@ -10,7 +10,9 @@ import {
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
-  savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod
+  savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
+  giftCards, GiftCard, InsertGiftCard,
+  giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction
 } from "@shared/schema";
 
 export interface IStorage {
@@ -105,6 +107,19 @@ export interface IStorage {
 
   // User Stripe operations
   updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User>;
+
+  // Gift Card operations
+  createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard>;
+  getGiftCard(id: number): Promise<GiftCard | undefined>;
+  getGiftCardByCode(code: string): Promise<GiftCard | undefined>;
+  getAllGiftCards(): Promise<GiftCard[]>;
+  updateGiftCard(id: number, giftCardData: Partial<InsertGiftCard>): Promise<GiftCard>;
+  deleteGiftCard(id: number): Promise<boolean>;
+
+  // Gift Card Transaction operations
+  createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction>;
+  getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined>;
+  getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -120,6 +135,8 @@ export class MemStorage implements IStorage {
   private clientMemberships: Map<number, ClientMembership>;
   private payments: Map<number, Payment>;
   private savedPaymentMethods: Map<number, SavedPaymentMethod>;
+  private giftCards: Map<number, GiftCard>;
+  private giftCardTransactions: Map<number, GiftCardTransaction>;
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
@@ -133,6 +150,8 @@ export class MemStorage implements IStorage {
   private currentClientMembershipId: number;
   private currentPaymentId: number;
   private currentSavedPaymentMethodId: number;
+  private currentGiftCardId: number;
+  private currentGiftCardTransactionId: number;
 
   constructor() {
     this.users = new Map();
@@ -147,6 +166,8 @@ export class MemStorage implements IStorage {
     this.clientMemberships = new Map();
     this.payments = new Map();
     this.savedPaymentMethods = new Map();
+    this.giftCards = new Map();
+    this.giftCardTransactions = new Map();
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
@@ -160,6 +181,8 @@ export class MemStorage implements IStorage {
     this.currentClientMembershipId = 1;
     this.currentPaymentId = 1;
     this.currentSavedPaymentMethodId = 1;
+    this.currentGiftCardId = 1;
+    this.currentGiftCardTransactionId = 1;
 
     // Initialize with admin user
     this.createUser({

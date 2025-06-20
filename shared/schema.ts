@@ -201,6 +201,42 @@ export const insertSavedPaymentMethodSchema = createInsertSchema(savedPaymentMet
   createdAt: true,
 });
 
+// Gift cards schema
+export const giftCards = pgTable("gift_cards", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  initialAmount: doublePrecision("initial_amount").notNull(),
+  currentBalance: doublePrecision("current_balance").notNull(),
+  issuedToEmail: text("issued_to_email"),
+  issuedToName: text("issued_to_name"),
+  purchasedByUserId: integer("purchased_by_user_id"),
+  status: text("status").notNull().default("active"), // active, inactive, expired, used
+  expiryDate: timestamp("expiry_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGiftCardSchema = createInsertSchema(giftCards).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Gift card transactions schema
+export const giftCardTransactions = pgTable("gift_card_transactions", {
+  id: serial("id").primaryKey(),
+  giftCardId: integer("gift_card_id").notNull(),
+  appointmentId: integer("appointment_id"),
+  transactionType: text("transaction_type").notNull(), // purchase, redemption, refund
+  amount: doublePrecision("amount").notNull(),
+  balanceAfter: doublePrecision("balance_after").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGiftCardTransactionSchema = createInsertSchema(giftCardTransactions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -234,6 +270,12 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type SavedPaymentMethod = typeof savedPaymentMethods.$inferSelect;
 export type InsertSavedPaymentMethod = z.infer<typeof insertSavedPaymentMethodSchema>;
+
+export type GiftCard = typeof giftCards.$inferSelect;
+export type InsertGiftCard = z.infer<typeof insertGiftCardSchema>;
+
+export type GiftCardTransaction = typeof giftCardTransactions.$inferSelect;
+export type InsertGiftCardTransaction = z.infer<typeof insertGiftCardTransactionSchema>;
 
 export type Device = typeof devices.$inferSelect;
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
