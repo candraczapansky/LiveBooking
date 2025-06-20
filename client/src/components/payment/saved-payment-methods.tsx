@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { AuthContext } from "@/lib/auth";
+import { AuthContext } from "@/App";
 import { CreditCard, Plus, Trash2, Star } from "lucide-react";
 import AddPaymentMethod from "./add-payment-method";
 

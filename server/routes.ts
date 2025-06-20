@@ -36,7 +36,7 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_51RbYANP6cNUB4dEVf1nyRTSD5c5CeEntQf6BNkv7stG7VboQ1uRREl6GUdTe9v7nwC2ymFdbL8ns5wHNm0VhZckX00vFoAdCq8";
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2023-10-16",
+  apiVersion: "2024-06-20",
 });
 
 // Helper to validate request body using schema

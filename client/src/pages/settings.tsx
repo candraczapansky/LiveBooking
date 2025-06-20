@@ -741,6 +741,11 @@ const SettingsPage = () => {
                 </Card>
               </TabsContent>
               
+              {/* Payment Methods Tab */}
+              <TabsContent value="payment">
+                <SavedPaymentMethods />
+              </TabsContent>
+              
               {/* Appearance Tab */}
               <TabsContent value="appearance">
                 <Card>
