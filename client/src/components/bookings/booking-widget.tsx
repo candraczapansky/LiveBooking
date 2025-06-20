@@ -356,29 +356,23 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   render={({ field }) => (
                     <FormItem className="space-y-0">
                       <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                        >
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {filteredServices?.length === 0 ? (
                             <div className="col-span-2 text-center py-4 text-gray-500 dark:text-gray-400">
                               No services found. Please try a different search term.
                             </div>
                           ) : (
                             filteredServices?.map((service: Service) => (
-                              <FormItem key={service.id} className="space-y-0">
-                                <FormControl>
-                                  <RadioGroupItem 
-                                    value={service.id.toString()} 
-                                    id={`service-${service.id}`}
-                                    className="hidden peer"
-                                  />
-                                </FormControl>
-                                <label
-                                  htmlFor={`service-${service.id}`}
-                                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer block peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary"
-                                >
+                              <Card
+                                key={service.id}
+                                className={`cursor-pointer transition-all hover:shadow-md ${
+                                  field.value === service.id.toString()
+                                    ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                                }`}
+                                onClick={() => field.onChange(service.id.toString())}
+                              >
+                                <CardContent className="p-4">
                                   <div className="flex justify-between items-start">
                                     <div>
                                       <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">{service.name}</h4>
@@ -391,11 +385,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                                       {formatPrice(service.price)}
                                     </div>
                                   </div>
-                                </label>
-                              </FormItem>
+                                </CardContent>
+                              </Card>
                             ))
                           )}
-                        </RadioGroup>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -415,24 +409,18 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   render={({ field }) => (
                     <FormItem className="space-y-1">
                       <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="grid grid-cols-1 gap-4"
-                        >
+                        <div className="grid grid-cols-1 gap-4">
                           {staff?.map((staffMember: Staff) => (
-                            <FormItem key={staffMember.id} className="space-y-0">
-                              <FormControl>
-                                <RadioGroupItem 
-                                  value={staffMember.id.toString()} 
-                                  id={`staff-${staffMember.id}`}
-                                  className="hidden peer"
-                                />
-                              </FormControl>
-                              <label
-                                htmlFor={`staff-${staffMember.id}`}
-                                className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer block peer-checked:border-primary peer-checked:ring-1 peer-checked:ring-primary"
-                              >
+                            <Card
+                              key={staffMember.id}
+                              className={`cursor-pointer transition-all hover:shadow-md ${
+                                field.value === staffMember.id.toString()
+                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                              }`}
+                              onClick={() => field.onChange(staffMember.id.toString())}
+                            >
+                              <CardContent className="p-4">
                                 <div className="flex items-center">
                                   <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-medium text-lg">
                                     {staffMember.user.firstName?.[0] || ""}{staffMember.user.lastName?.[0] || ""}
@@ -444,10 +432,10 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
                                   </div>
                                 </div>
-                              </label>
-                            </FormItem>
+                              </CardContent>
+                            </Card>
                           ))}
-                        </RadioGroup>
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
