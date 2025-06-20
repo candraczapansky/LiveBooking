@@ -11,6 +11,7 @@ import {
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
   savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
+  savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   giftCards, GiftCard, InsertGiftCard,
   giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction
 } from "@shared/schema";
@@ -120,6 +121,12 @@ export interface IStorage {
   createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction>;
   getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined>;
   getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]>;
+
+  // Saved Gift Card operations
+  createSavedGiftCard(savedGiftCard: InsertSavedGiftCard): Promise<SavedGiftCard>;
+  getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined>;
+  getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]>;
+  deleteSavedGiftCard(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -137,6 +144,7 @@ export class MemStorage implements IStorage {
   private savedPaymentMethods: Map<number, SavedPaymentMethod>;
   private giftCards: Map<number, GiftCard>;
   private giftCardTransactions: Map<number, GiftCardTransaction>;
+  private savedGiftCards: Map<number, SavedGiftCard>;
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
@@ -152,6 +160,7 @@ export class MemStorage implements IStorage {
   private currentSavedPaymentMethodId: number;
   private currentGiftCardId: number;
   private currentGiftCardTransactionId: number;
+  private currentSavedGiftCardId: number;
 
   constructor() {
     this.users = new Map();
@@ -168,6 +177,7 @@ export class MemStorage implements IStorage {
     this.savedPaymentMethods = new Map();
     this.giftCards = new Map();
     this.giftCardTransactions = new Map();
+    this.savedGiftCards = new Map();
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
@@ -183,6 +193,7 @@ export class MemStorage implements IStorage {
     this.currentSavedPaymentMethodId = 1;
     this.currentGiftCardId = 1;
     this.currentGiftCardTransactionId = 1;
+    this.currentSavedGiftCardId = 1;
 
     // Initialize with admin user
     this.createUser({
@@ -978,6 +989,34 @@ export class MemStorage implements IStorage {
     return Array.from(this.giftCardTransactions.values()).filter(
       transaction => transaction.giftCardId === giftCardId
     );
+  }
+
+  // Saved Gift Card operations
+  async createSavedGiftCard(savedGiftCard: InsertSavedGiftCard): Promise<SavedGiftCard> {
+    const id = this.currentSavedGiftCardId++;
+    const newSavedGiftCard: SavedGiftCard = {
+      id,
+      addedAt: new Date(),
+      clientId: savedGiftCard.clientId,
+      giftCardId: savedGiftCard.giftCardId,
+      nickname: savedGiftCard.nickname || null,
+    };
+    this.savedGiftCards.set(id, newSavedGiftCard);
+    return newSavedGiftCard;
+  }
+
+  async getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined> {
+    return this.savedGiftCards.get(id);
+  }
+
+  async getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]> {
+    return Array.from(this.savedGiftCards.values()).filter(
+      savedCard => savedCard.clientId === clientId
+    );
+  }
+
+  async deleteSavedGiftCard(id: number): Promise<boolean> {
+    return this.savedGiftCards.delete(id);
   }
 }
 

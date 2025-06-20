@@ -196,9 +196,23 @@ export const savedPaymentMethods = pgTable("saved_payment_methods", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Saved gift cards schema (for customers to save their gift card codes)
+export const savedGiftCards = pgTable("saved_gift_cards", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  giftCardId: integer("gift_card_id").notNull(),
+  nickname: text("nickname"), // Optional nickname for the gift card
+  addedAt: timestamp("added_at").defaultNow(),
+});
+
 export const insertSavedPaymentMethodSchema = createInsertSchema(savedPaymentMethods).omit({
   id: true,
   createdAt: true,
+});
+
+export const insertSavedGiftCardSchema = createInsertSchema(savedGiftCards).omit({
+  id: true,
+  addedAt: true,
 });
 
 // Gift cards schema
@@ -270,6 +284,9 @@ export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 export type SavedPaymentMethod = typeof savedPaymentMethods.$inferSelect;
 export type InsertSavedPaymentMethod = z.infer<typeof insertSavedPaymentMethodSchema>;
+
+export type SavedGiftCard = typeof savedGiftCards.$inferSelect;
+export type InsertSavedGiftCard = z.infer<typeof insertSavedGiftCardSchema>;
 
 export type GiftCard = typeof giftCards.$inferSelect;
 export type InsertGiftCard = z.infer<typeof insertGiftCardSchema>;

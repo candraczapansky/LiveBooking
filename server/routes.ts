@@ -894,6 +894,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Gift card management routes
+  app.post("/api/add-gift-card", async (req, res) => {
+    try {
+      const { giftCardCode, nickname } = req.body;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      if (!giftCardCode) {
+        return res.status(400).json({ error: "Gift card code is required" });
+      }
+
+      // Check if gift card exists and is valid
+      const giftCard = await storage.getGiftCardByCode(giftCardCode);
+      if (!giftCard) {
+        return res.status(404).json({ error: "Gift card not found" });
+      }
+
+      if (giftCard.status !== 'active') {
+        return res.status(400).json({ error: "Gift card is not active" });
+      }
+
+      // Check if gift card is already saved by this user
+      const userSavedCards = await storage.getSavedGiftCardsByClient(userId);
+      const alreadySaved = userSavedCards.some(saved => saved.giftCardId === giftCard.id);
+      
+      if (alreadySaved) {
+        return res.status(400).json({ error: "Gift card is already saved to your account" });
+      }
+
+      // Save the gift card
+      const savedGiftCard = await storage.createSavedGiftCard({
+        clientId: userId,
+        giftCardId: giftCard.id,
+        nickname: nickname || null
+      });
+
+      res.json({ 
+        success: true, 
+        savedGiftCard,
+        giftCard: {
+          id: giftCard.id,
+          code: giftCard.code,
+          currentBalance: giftCard.currentBalance,
+          initialAmount: giftCard.initialAmount,
+          status: giftCard.status
+        }
+      });
+    } catch (error: any) {
+      console.error('Add gift card error:', error);
+      res.status(500).json({ 
+        error: "Error adding gift card: " + error.message 
+      });
+    }
+  });
+
+  app.get("/api/saved-gift-cards", async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const savedCards = await storage.getSavedGiftCardsByClient(userId);
+      const detailedCards = await Promise.all(
+        savedCards.map(async (saved) => {
+          const giftCard = await storage.getGiftCard(saved.giftCardId);
+          return {
+            ...saved,
+            giftCard: giftCard ? {
+              id: giftCard.id,
+              code: giftCard.code,
+              currentBalance: giftCard.currentBalance,
+              initialAmount: giftCard.initialAmount,
+              status: giftCard.status,
+              expiryDate: giftCard.expiryDate
+            } : null
+          };
+        })
+      );
+
+      res.json(detailedCards.filter(card => card.giftCard !== null));
+    } catch (error: any) {
+      console.error('Get saved gift cards error:', error);
+      res.status(500).json({ 
+        error: "Error retrieving saved gift cards: " + error.message 
+      });
+    }
+  });
+
+  app.delete("/api/saved-gift-cards/:id", async (req, res) => {
+    try {
+      const savedCardId = parseInt(req.params.id);
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const savedCard = await storage.getSavedGiftCard(savedCardId);
+      if (!savedCard) {
+        return res.status(404).json({ error: "Saved gift card not found" });
+      }
+
+      if (savedCard.clientId !== userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      await storage.deleteSavedGiftCard(savedCardId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete saved gift card error:', error);
+      res.status(500).json({ 
+        error: "Error deleting saved gift card: " + error.message 
+      });
+    }
+  });
+
+  app.get("/api/gift-card-balance/:code", async (req, res) => {
+    try {
+      const { code } = req.params;
+      
+      const giftCard = await storage.getGiftCardByCode(code);
+      if (!giftCard) {
+        return res.status(404).json({ error: "Gift card not found" });
+      }
+
+      res.json({
+        code: giftCard.code,
+        currentBalance: giftCard.currentBalance,
+        initialAmount: giftCard.initialAmount,
+        status: giftCard.status,
+        expiryDate: giftCard.expiryDate
+      });
+    } catch (error: any) {
+      console.error('Check gift card balance error:', error);
+      res.status(500).json({ 
+        error: "Error checking gift card balance: " + error.message 
+      });
+    }
+  });
+
   // Stripe payment routes for appointment checkout
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
