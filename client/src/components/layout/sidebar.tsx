@@ -48,7 +48,7 @@ type SidebarProps = {
 };
 
 const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
 
   const sidebarClass = `sidebar fixed inset-y-0 left-0 z-30 w-64 bg-sidebar-background shadow-lg transform transition-transform ${
@@ -126,7 +126,10 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
           <Button 
             variant="ghost" 
             className="flex items-center text-sm font-medium text-destructive w-full justify-start"
-            onClick={() => logout()}
+            onClick={() => {
+              logout();
+              setLocation('/login');
+            }}
           >
             <LogOut className="w-5 h-5 mr-3" />
             Sign Out
