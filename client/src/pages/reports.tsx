@@ -444,8 +444,8 @@ const ReportsPage = () => {
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-900 rounded-md p-3">
-                      <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <div className="flex-shrink-0 bg-pink-100 dark:bg-pink-900 rounded-md p-3">
+                      <Calendar className="h-5 w-5 text-pink-600 dark:text-pink-400" />
                     </div>
                     <div className="ml-5 w-0 flex-1">
                       <dl>

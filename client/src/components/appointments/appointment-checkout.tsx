@@ -495,8 +495,8 @@ export default function AppointmentCheckout({
           ) : paymentMethod === 'gift_card' ? (
             <div className="space-y-6">
               <div className="flex flex-col items-center gap-4 text-center">
-                <div className="w-16 h-16 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="w-16 h-16 bg-pink-100 dark:bg-pink-900/30 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 16h6" />
                   </svg>
@@ -517,8 +517,8 @@ export default function AppointmentCheckout({
                         key={saved.id}
                         className={`cursor-pointer border-2 transition-colors ${
                           selectedSavedCard?.id === saved.id 
-                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' 
-                            : 'border-gray-200 hover:border-purple-300'
+                            ? 'border-pink-500 bg-pink-50 dark:bg-pink-900/20' 
+                            : 'border-gray-200 hover:border-pink-300'
                         }`}
                         onClick={() => setSelectedSavedCard(saved)}
                       >
@@ -574,7 +574,7 @@ export default function AppointmentCheckout({
                       placeholder="Enter gift card code (e.g., GIFT2025)"
                       value={giftCardCode}
                       onChange={(e) => setGiftCardCode(e.target.value.toUpperCase())}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                       disabled={isGiftCardProcessing}
                     />
                     <div className="text-xs text-muted-foreground">
@@ -625,7 +625,7 @@ export default function AppointmentCheckout({
                     (!selectedSavedCard && !giftCardCode.trim()) ||
                     (selectedSavedCard && selectedSavedCard.giftCard.currentBalance < appointment.amount)
                   }
-                  className="bg-purple-600 hover:bg-purple-700"
+                  className="bg-pink-600 hover:bg-pink-700"
                 >
                   {isGiftCardProcessing ? (
                     <div className="flex items-center gap-2">
