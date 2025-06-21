@@ -394,6 +394,63 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     });
   };
 
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (JPEG, PNG, GIF, etc.)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setUploadingPhoto(true);
+
+    try {
+      // Convert file to data URL for preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        form.setValue('photo', dataUrl);
+        setUploadingPhoto(false);
+      };
+      reader.onerror = () => {
+        toast({
+          title: "Upload failed",
+          description: "Failed to read the image file",
+          variant: "destructive",
+        });
+        setUploadingPhoto(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast({
+        title: "Upload failed",
+        description: "Failed to process the image file",
+        variant: "destructive",
+      });
+      setUploadingPhoto(false);
+    }
+  };
+
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -577,21 +634,62 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => field.onChange("")}
+                            onClick={() => {
+                              field.onChange("");
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = "";
+                              }
+                            }}
                           >
+                            <X className="h-4 w-4 mr-2" />
                             Remove Photo
                           </Button>
                         </div>
                       )}
-                      <Input 
-                        type="url"
-                        placeholder="Enter photo URL (e.g., https://example.com/photo.jpg)"
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                      />
-                      <p className="text-xs text-gray-500">
-                        Upload your photo to a hosting service and paste the URL here, or use a professional headshot URL.
-                      </p>
+                      
+                      <div className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-gray-400 transition-colors">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                        
+                        {!field.value && (
+                          <div className="text-center">
+                            <Upload className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-600 mb-2">
+                              Upload a profile photo
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={triggerFileUpload}
+                              disabled={uploadingPhoto}
+                            >
+                              {uploadingPhoto ? "Uploading..." : "Choose File"}
+                            </Button>
+                            <p className="text-xs text-gray-500 mt-2">
+                              JPEG, PNG, GIF up to 5MB
+                            </p>
+                          </div>
+                        )}
+                        
+                        {field.value && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={triggerFileUpload}
+                            disabled={uploadingPhoto}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            {uploadingPhoto ? "Uploading..." : "Change Photo"}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </FormControl>
                   <FormMessage />
