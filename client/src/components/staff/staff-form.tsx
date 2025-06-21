@@ -117,17 +117,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           fetch(`/api/staff/${staffId}/services`)
             .then(res => res.json())
             .then(staffServices => {
+              // Map to actual service IDs from the merged service data
               const assignedServiceIds = staffServices.map((service: any) => service.id);
               
-              // Build service rates object from existing assignments
+              // Build service rates object from existing assignments using service IDs
               const serviceRates: Record<string, { customRate?: number; customCommissionRate?: number }> = {};
               staffServices.forEach((service: any) => {
-                if (service.customRate || service.customCommissionRate) {
-                  serviceRates[service.id.toString()] = {
-                    customRate: service.customRate,
-                    customCommissionRate: service.customCommissionRate,
-                  };
-                }
+                serviceRates[service.id.toString()] = {
+                  customRate: service.customRate,
+                  customCommissionRate: service.customCommissionRate,
+                };
               });
               
               form.reset({
@@ -312,9 +311,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const existingServiceIds = existingServices.map((service: any) => service.id);
 
       // Remove services that are no longer assigned
-      for (const existingServiceId of existingServiceIds) {
-        if (!data.assignedServices.includes(existingServiceId)) {
-          await apiRequest("DELETE", `/api/staff-services/staff/${staffId}/service/${existingServiceId}`);
+      for (const existingService of existingServices) {
+        if (!data.assignedServices.includes(existingService.id)) {
+          await apiRequest("DELETE", `/api/staff-services/staff/${staffId}/service/${existingService.id}`);
         }
       }
 
