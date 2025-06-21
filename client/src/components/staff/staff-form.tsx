@@ -291,7 +291,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         phone: data.phone,
       };
 
-      const userResponse = await apiRequest("PATCH", `/api/users/${staffId}`, userData);
+      const userId = staffData?.userId;
+      if (!userId) throw new Error("Staff user ID not found");
+      
+      console.log("Updating user:", userId, "with data:", userData);
+      const userResponse = await apiRequest("PATCH", `/api/users/${userId}`, userData);
       if (!userResponse.ok) {
         const errorData = await userResponse.json();
         throw new Error(errorData.error || "Failed to update user");
