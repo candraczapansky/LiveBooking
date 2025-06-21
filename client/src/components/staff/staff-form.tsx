@@ -70,6 +70,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [staffData, setStaffData] = useState<any>(null);
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -113,6 +114,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       fetch(`/api/staff/${staffId}`)
         .then(res => res.json())
         .then(data => {
+          setStaffData(data); // Store staff data for later use
           // Fetch staff services
           fetch(`/api/staff/${staffId}/services`)
             .then(res => res.json())
@@ -278,6 +280,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const updateStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
       if (!staffId) throw new Error("Staff ID is required for update");
+      
+      console.log("Updating staff with data:", data);
 
       // Update user information
       const userData = {
@@ -307,12 +311,18 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
 
       // Update service assignments
+      console.log("Fetching existing services for staff:", staffId);
       const existingServices = await fetch(`/api/staff/${staffId}/services`).then(res => res.json());
+      console.log("Existing services:", existingServices);
       const existingServiceIds = existingServices.map((service: any) => service.id);
+      console.log("Existing service IDs:", existingServiceIds);
+      console.log("New assigned services:", data.assignedServices);
+      console.log("Service rates:", data.serviceRates);
 
       // Remove services that are no longer assigned
       for (const existingService of existingServices) {
         if (!data.assignedServices.includes(existingService.id)) {
+          console.log(`Removing service ${existingService.id} from staff ${staffId}`);
           await apiRequest("DELETE", `/api/staff-services/staff/${staffId}/service/${existingService.id}`);
         }
       }
@@ -325,15 +335,18 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           customRate: data.serviceRates[serviceId.toString()]?.customRate,
           customCommissionRate: data.serviceRates[serviceId.toString()]?.customCommissionRate,
         };
+        console.log(`Processing service ${serviceId} with assignment:`, serviceAssignment);
 
         if (existingServiceIds.includes(serviceId)) {
           // Update existing assignment
           const existingAssignment = existingServices.find((s: any) => s.id === serviceId);
           if (existingAssignment) {
+            console.log(`Updating existing assignment ${existingAssignment.staffServiceId}`);
             await apiRequest("PATCH", `/api/staff-services/${existingAssignment.staffServiceId}`, serviceAssignment);
           }
         } else {
           // Create new assignment
+          console.log(`Creating new service assignment`);
           await apiRequest("POST", "/api/staff-services", serviceAssignment);
         }
       }
