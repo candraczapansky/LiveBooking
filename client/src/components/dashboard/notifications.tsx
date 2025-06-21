@@ -19,7 +19,7 @@ const getNotificationIcon = (type: string) => {
     case 'payment_received':
       return <DollarSign className="text-green-600" />;
     case 'new_membership':
-      return <CreditCard className="text-purple-600" />;
+      return <CreditCard className="text-pink-600" />;
     default:
       return <Calendar className="text-gray-600" />;
   }
@@ -34,7 +34,7 @@ const getNotificationIconBg = (type: string) => {
     case 'payment_received':
       return 'bg-green-100';
     case 'new_membership':
-      return 'bg-purple-100';
+      return 'bg-pink-100';
     default:
       return 'bg-gray-100';
   }

@@ -79,8 +79,8 @@ const StatsOverview = () => {
       />
       
       <StatsCard 
-        icon={<CreditCard className="h-5 w-5 text-purple-600" />}
-        iconBgColor="bg-purple-100"
+        icon={<CreditCard className="h-5 w-5 text-pink-600" />}
+        iconBgColor="bg-pink-100"
         title="Active Memberships"
         value={activeMemberships}
         linkText="Manage memberships"

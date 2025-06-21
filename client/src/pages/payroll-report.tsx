@@ -302,7 +302,7 @@ export default function PayrollReport() {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Services</p>
                 <p className="text-2xl font-bold">{summaryStats.totalServices}</p>
               </div>
-              <UsersIcon className="h-8 w-8 text-purple-600" />
+              <UsersIcon className="h-8 w-8 text-pink-600" />
             </div>
           </CardContent>
         </Card>
