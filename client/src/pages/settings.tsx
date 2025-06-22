@@ -401,7 +401,8 @@ export default function Settings() {
                   </div>
                   <Input
                     type="color"
-                    defaultValue="#6b7280"
+                    value={iconColor}
+                    onChange={(e) => handleColorChange('icon', e.target.value)}
                     className="w-16 h-8 p-1 border rounded"
                     title="Custom icon color"
                   />
@@ -413,16 +414,16 @@ export default function Settings() {
                 <Label className="text-sm font-medium">Preview</Label>
                 <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
                   <div className="flex items-center space-x-3">
-                    <Button size="sm" className="bg-pink-500 hover:bg-pink-600">
+                    <Button size="sm" style={{ backgroundColor: primaryColor, borderColor: primaryColor }}>
                       <Save className="h-4 w-4 mr-2" />
                       Primary Button
                     </Button>
-                    <Button variant="outline" size="sm" className="border-cyan-500 text-cyan-500 hover:bg-cyan-50">
+                    <Button variant="outline" size="sm" style={{ borderColor: accentColor, color: accentColor }}>
                       <Bell className="h-4 w-4 mr-2" />
                       Accent Button
                     </Button>
                   </div>
-                  <div className="flex items-center space-x-2 text-gray-500">
+                  <div className="flex items-center space-x-2" style={{ color: iconColor }}>
                     <User className="h-4 w-4" />
                     <Settings className="h-4 w-4" />
                     <Shield className="h-4 w-4" />
@@ -432,7 +433,11 @@ export default function Settings() {
               </div>
             </div>
 
-            <Button className="w-full bg-pink-500 hover:bg-pink-600">
+            <Button 
+              className="w-full" 
+              style={{ backgroundColor: primaryColor }}
+              onClick={applyColorTheme}
+            >
               <Save className="h-4 w-4 mr-2" />
               Save Appearance Settings
             </Button>
