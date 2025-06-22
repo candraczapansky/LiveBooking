@@ -13,8 +13,8 @@
   --card-foreground: 20 14.3% 4.1%;
   --border: 20 5.9% 90%;
   --input: 20 5.9% 90%;
-  --primary: 330 81% 60%; /* Pink #E91E63 */
-  --primary-foreground: 210 40% 98%;
+  --primary: var(--dropdown-selected);
+  --primary-foreground: var(--dropdown-selected-foreground);
   --secondary: var(--dropdown-selected);
   --secondary-foreground: var(--dropdown-selected-foreground);
   --accent: var(--dropdown-selected);
@@ -57,8 +57,8 @@
   --card-foreground: 0 0% 98%;
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
-  --primary: 330 81% 60%;
-  --primary-foreground: 210 40% 98%;
+  --primary: var(--dropdown-selected);
+  --primary-foreground: var(--dropdown-selected-foreground);
   --secondary: var(--dropdown-selected);
   --secondary-foreground: var(--dropdown-selected-foreground);
   --accent: var(--dropdown-selected);
