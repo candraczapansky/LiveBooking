@@ -85,6 +85,8 @@ const PaymentForm = ({ total, onSuccess, onError }: {
       // Create payment intent
       const response = await apiRequest("POST", "/api/create-payment-intent", {
         amount: total,
+        type: "pos_payment",
+        description: "Point of Sale Transaction"
       });
       const { clientSecret } = await response.json();
 

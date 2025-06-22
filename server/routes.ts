@@ -1105,10 +1105,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment routes for appointment checkout
+  // Stripe payment routes for appointment checkout and POS
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
-      const { amount, appointmentId, description } = req.body;
+      const { amount, appointmentId, description, type = "appointment_payment" } = req.body;
       
       if (!amount) {
         return res.status(400).json({ error: "Amount is required" });
@@ -1119,9 +1119,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currency: "usd",
         metadata: {
           appointmentId: appointmentId?.toString() || "",
-          type: "appointment_payment"
+          type: type
         },
-        description: description || "Appointment Payment"
+        description: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment")
       });
 
       res.json({ 
