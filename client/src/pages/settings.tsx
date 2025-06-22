@@ -536,15 +536,15 @@ export default function Settings() {
                   onChange={(e) => setPresetName(e.target.value)}
                   className="w-full"
                 />
-                <button 
+                <div 
+                  key={customColor}
                   onClick={savePrimaryColorPreset}
-                  disabled={!presetName.trim() || customColor === '#3b82f6'}
-                  className="w-full text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-md font-medium flex items-center justify-center"
+                  className={`w-full text-white hover:opacity-90 cursor-pointer px-4 py-3 rounded-md font-medium flex items-center justify-center transition-all ${(!presetName.trim() || customColor === '#3b82f6') ? 'opacity-50 cursor-not-allowed' : ''}`}
                   style={{ backgroundColor: customColor, border: 'none', boxShadow: 'none' }}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Primary Color
-                </button>
+                </div>
               </div>
 
               {savedPresets.length > 0 && (
@@ -588,15 +588,15 @@ export default function Settings() {
                   onChange={(e) => setSecondaryPresetName(e.target.value)}
                   className="flex-1"
                 />
-                <button 
+                <div 
+                  key={secondaryColor}
                   onClick={saveSecondaryColorPreset}
-                  disabled={!secondaryPresetName.trim() || secondaryColor === '#6b7280'}
-                  className="text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-md font-medium flex items-center justify-center"
-                  style={{ backgroundColor: secondaryColor }}
+                  className={`text-white hover:opacity-90 cursor-pointer px-4 py-2 rounded-md font-medium flex items-center justify-center transition-all ${(!secondaryPresetName.trim() || secondaryColor === '#6b7280') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  style={{ backgroundColor: secondaryColor, border: 'none', boxShadow: 'none' }}
                 >
                   <Save className="h-4 w-4 mr-1" />
                   Save Text Color
-                </button>
+                </div>
               </div>
 
               {savedSecondaryPresets.length > 0 && (
@@ -697,14 +697,15 @@ export default function Settings() {
               )}
             </div>
 
-            <button 
+            <div 
+              key={customColor}
               onClick={handleSaveAppearance} 
-              className="w-full text-white hover:opacity-90 px-4 py-3 rounded-md font-medium flex items-center justify-center"
-              style={{ backgroundColor: customColor }}
+              className="w-full text-white hover:opacity-90 cursor-pointer px-4 py-3 rounded-md font-medium flex items-center justify-center transition-all"
+              style={{ backgroundColor: customColor, border: 'none', boxShadow: 'none' }}
             >
               <Save className="h-4 w-4 mr-2" />
               Save Appearance Settings
-            </button>
+            </div>
           </CardContent>
         </Card>
 
