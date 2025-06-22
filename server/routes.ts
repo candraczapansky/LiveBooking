@@ -1529,6 +1529,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get saved payment methods for a client
+  app.get("/api/clients/:clientId/payment-methods", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      const paymentMethods = await storage.getSavedPaymentMethodsByClient(clientId);
+      res.json(paymentMethods);
+    } catch (error: any) {
+      console.error('Error fetching payment methods:', error);
+      res.status(500).json({ error: "Error fetching payment methods: " + error.message });
+    }
+  });
+
+  // Delete a saved payment method
+  app.delete("/api/payment-methods/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const paymentMethod = await storage.getSavedPaymentMethod(id);
+      
+      if (!paymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // Detach payment method from Stripe customer
+      await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
+      
+      // Delete from database
+      await storage.deleteSavedPaymentMethod(id);
+      
+      res.json({ message: "Payment method deleted successfully" });
+    } catch (error: any) {
+      console.error('Delete payment method error:', error);
+      res.status(500).json({ error: "Error deleting payment method: " + error.message });
+    }
+  });
+
+  // Set default payment method
+  app.put("/api/payment-methods/:id/set-default", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const paymentMethod = await storage.getSavedPaymentMethod(id);
+      
+      if (!paymentMethod) {
+        return res.status(404).json({ error: "Payment method not found" });
+      }
+
+      // Remove default from all other methods for this client
+      const allMethods = await storage.getSavedPaymentMethodsByClient(paymentMethod.clientId);
+      for (const method of allMethods) {
+        if (method.id !== id && method.isDefault) {
+          await storage.updateSavedPaymentMethod(method.id, { isDefault: false });
+        }
+      }
+
+      // Set this method as default
+      await storage.updateSavedPaymentMethod(id, { isDefault: true });
+      
+      res.json({ message: "Default payment method updated successfully" });
+    } catch (error: any) {
+      console.error('Set default payment method error:', error);
+      res.status(500).json({ error: "Error setting default payment method: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

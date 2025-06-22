@@ -50,7 +50,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar } from "lucide-react";
+import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -61,6 +61,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getInitials, getFullName } from "@/lib/utils";
+import ClientPaymentMethods from "@/components/payment/client-payment-methods";
 
 type Client = {
   id: number;
@@ -93,6 +94,8 @@ const ClientsPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
+  const [clientDetail, setClientDetail] = useState<Client | null>(null);
 
   useEffect(() => {
     const checkSidebarState = () => {
