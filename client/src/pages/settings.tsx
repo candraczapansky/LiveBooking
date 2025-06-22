@@ -1,4 +1,4 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { AuthContext } from "@/App";
+import { SidebarController } from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import { 
   Bell, 
   Moon, 
@@ -39,6 +41,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
@@ -47,6 +50,18 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   const passwordForm = useForm<PasswordChangeForm>({
     resolver: zodResolver(passwordChangeSchema),
@@ -106,14 +121,22 @@ export default function Settings() {
   };
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Manage your account preferences and security settings.
-          </p>
-        </div>
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <SidebarController />
+      
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        sidebarOpen ? 'ml-64' : 'ml-0'
+      }`}>
+        <Header />
+        
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Manage your account preferences and security settings.
+              </p>
+            </div>
 
         {/* Appearance Settings */}
         <Card>
@@ -363,6 +386,8 @@ export default function Settings() {
             </Button>
           </CardContent>
         </Card>
+          </div>
+        </main>
       </div>
     </div>
   );
