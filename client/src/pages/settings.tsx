@@ -433,8 +433,21 @@ export default function Settings() {
                         style={{ backgroundColor: customColor }}
                       />
                       <div className="flex space-x-1">
-                        <Button size="sm" className="text-xs">Primary</Button>
-                        <Button size="sm" variant="secondary" className="text-xs">Secondary</Button>
+                        <Button 
+                          size="sm" 
+                          className="text-xs"
+                          onClick={() => toast({ title: "Primary Button", description: "This uses your selected theme color!" })}
+                        >
+                          Primary
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="secondary" 
+                          className="text-xs"
+                          onClick={() => toast({ title: "Secondary Button", description: "This uses neutral gray colors for visual hierarchy." })}
+                        >
+                          Secondary
+                        </Button>
                       </div>
                     </div>
                   </div>
