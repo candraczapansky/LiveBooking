@@ -195,27 +195,39 @@ const MarketingPage = () => {
   // Create campaign mutation
   const createCampaignMutation = useMutation({
     mutationFn: async (campaignData: CampaignFormValues) => {
+      console.log('Creating campaign with data:', campaignData);
+      
+      const payload = {
+        name: campaignData.name,
+        type: campaignData.type,
+        audience: campaignData.audience,
+        subject: campaignData.type === 'email' ? campaignData.subject : undefined,
+        content: campaignData.content,
+        sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
+        status: 'draft'
+      };
+      
+      console.log('API payload:', payload);
+      
       const response = await fetch('/api/marketing-campaigns', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          name: campaignData.name,
-          type: campaignData.type,
-          audience: campaignData.audience,
-          subject: campaignData.type === 'email' ? campaignData.subject : undefined,
-          content: campaignData.content,
-          sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
-          status: 'draft'
-        }),
+        body: JSON.stringify(payload),
       });
       
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to create campaign');
+        const errorText = await response.text();
+        console.error('API error response:', errorText);
+        throw new Error(`Failed to create campaign: ${response.status} ${errorText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('API response data:', result);
+      return result;
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
@@ -278,11 +290,16 @@ const MarketingPage = () => {
 
   // Form submission handlers
   const onCampaignSubmit = async (data: CampaignFormValues) => {
+    console.log('Campaign form submitted with data:', data);
+    console.log('Form errors:', campaignForm.formState.errors);
+    
     if (createCampaignMutation.isPending) {
+      console.log('Campaign mutation already pending, skipping');
       return; // Prevent duplicate submissions
     }
     
     if (data.type === 'sms' && !smsConfig?.configured) {
+      console.log('SMS not configured, showing error');
       toast({
         title: "SMS not configured",
         description: "Please configure Twilio credentials to send SMS campaigns.",
@@ -291,6 +308,7 @@ const MarketingPage = () => {
       return;
     }
     
+    console.log('Submitting campaign mutation...');
     createCampaignMutation.mutate(data);
   };
 
