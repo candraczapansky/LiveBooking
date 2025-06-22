@@ -1367,6 +1367,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      if (campaign.type === 'email' && !process.env.SENDGRID_FROM_EMAIL) {
+        return res.status(400).json({ 
+          error: "Email service not configured. Please configure SendGrid verified sender email." 
+        });
+      }
+
       // Get recipients based on audience
       const recipients = await storage.getUsersByAudience(campaign.audience);
       

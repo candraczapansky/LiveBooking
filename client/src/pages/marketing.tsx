@@ -129,6 +129,8 @@ const MarketingPage = () => {
   const [isPromoFormOpen, setIsPromoFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [viewCampaign, setViewCampaign] = useState<any>(null);
+  const [isViewCampaignOpen, setIsViewCampaignOpen] = useState(false);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -267,13 +269,13 @@ const MarketingPage = () => {
       queryClient.refetchQueries({ queryKey: ['/api/marketing-campaigns'] });
       toast({
         title: "Campaign sent",
-        description: `SMS campaign sent to ${data.results?.sentCount || 0} recipients`,
+        description: `Campaign sent to ${data.results?.sentCount || 0} recipients`,
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error sending campaign",
-        description: error.message || "Failed to send SMS campaign",
+        description: error.message || "Failed to send campaign",
         variant: "destructive",
       });
     },
@@ -308,6 +310,11 @@ const MarketingPage = () => {
     }
     
     sendCampaignMutation.mutate(campaignId);
+  };
+
+  const handleViewCampaign = (campaign: any) => {
+    setViewCampaign(campaign);
+    setIsViewCampaignOpen(true);
   };
 
   // Mock promo data - would be replaced with API call
@@ -507,6 +514,14 @@ const MarketingPage = () => {
                         
                         <CardFooter className="bg-muted/50 pt-4">
                           <div className="flex justify-between w-full">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleViewCampaign(campaign)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
                             {campaign.status === "draft" && (
                               <>
                                 <Button 
