@@ -15,8 +15,8 @@
   --input: 20 5.9% 90%;
   --primary: 330 81% 60%; /* Pink #E91E63 */
   --primary-foreground: 210 40% 98%;
-  --secondary: 160 84% 39%; /* #10B981 */
-  --secondary-foreground: 24 9.8% 10%;
+  --secondary: var(--dropdown-selected);
+  --secondary-foreground: var(--dropdown-selected-foreground);
   --accent: var(--dropdown-selected);
   --accent-foreground: var(--dropdown-selected-foreground);
   --destructive: 0 84.2% 60.2%;
@@ -59,8 +59,8 @@
   --input: 240 3.7% 15.9%;
   --primary: 330 81% 60%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 160 84% 39%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary: var(--dropdown-selected);
+  --secondary-foreground: var(--dropdown-selected-foreground);
   --accent: var(--dropdown-selected);
   --accent-foreground: var(--dropdown-selected-foreground);
   --destructive: 0 62.8% 30.6%;
