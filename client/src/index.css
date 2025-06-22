@@ -118,6 +118,20 @@ nav a,
   color: hsl(var(--secondary-foreground)) !important;
 }
 
+/* Apply primary color to icons specifically */
+svg,
+.lucide,
+[class*="icon"],
+.sidebar-item svg,
+[data-sidebar="menu-button"] svg,
+[data-sidebar="menu-item"] svg,
+label svg,
+button svg:not(.bg-secondary svg) {
+  color: hsl(var(--primary)) !important;
+  stroke: hsl(var(--primary)) !important;
+  fill: hsl(var(--primary)) !important;
+}
+
 /* Theme color variations */
 [data-theme="blue"] {
   --primary: 221 83% 53%;
