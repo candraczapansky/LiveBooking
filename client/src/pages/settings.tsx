@@ -238,6 +238,7 @@ export default function Settings() {
     const root = document.documentElement;
     root.style.setProperty('--dropdown-selected', hslColor);
     root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+    root.style.setProperty('--primary-color', color);
     
     // Set theme to custom
     setSelectedTheme('custom');
@@ -256,6 +257,7 @@ export default function Settings() {
       root.style.setProperty('--secondary', '210 40% 96%'); // Light background
     }
     root.style.setProperty('--secondary-foreground', hslColor); // Use custom color for text
+    root.style.setProperty('--secondary-color', color);
     
     // Save to localStorage
     localStorage.setItem('secondary-color', color);
@@ -537,10 +539,13 @@ export default function Settings() {
                   className="w-full"
                 />
                 <div 
-                  key={customColor}
                   onClick={savePrimaryColorPreset}
                   className={`w-full text-white hover:opacity-90 cursor-pointer px-4 py-3 rounded-md font-medium flex items-center justify-center transition-all ${(!presetName.trim() || customColor === '#3b82f6') ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  style={{ backgroundColor: customColor, border: 'none', boxShadow: 'none' }}
+                  style={{ 
+                    backgroundColor: `${customColor} !important`,
+                    border: 'none', 
+                    boxShadow: 'none'
+                  } as React.CSSProperties}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Primary Color
@@ -589,10 +594,13 @@ export default function Settings() {
                   className="flex-1"
                 />
                 <div 
-                  key={secondaryColor}
                   onClick={saveSecondaryColorPreset}
                   className={`text-white hover:opacity-90 cursor-pointer px-4 py-2 rounded-md font-medium flex items-center justify-center transition-all ${(!secondaryPresetName.trim() || secondaryColor === '#6b7280') ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  style={{ backgroundColor: secondaryColor, border: 'none', boxShadow: 'none' }}
+                  style={{ 
+                    backgroundColor: `${secondaryColor} !important`,
+                    border: 'none', 
+                    boxShadow: 'none'
+                  } as React.CSSProperties}
                 >
                   <Save className="h-4 w-4 mr-1" />
                   Save Text Color
@@ -698,10 +706,13 @@ export default function Settings() {
             </div>
 
             <div 
-              key={customColor}
               onClick={handleSaveAppearance} 
               className="w-full text-white hover:opacity-90 cursor-pointer px-4 py-3 rounded-md font-medium flex items-center justify-center transition-all"
-              style={{ backgroundColor: customColor, border: 'none', boxShadow: 'none' }}
+              style={{ 
+                backgroundColor: `${customColor} !important`,
+                border: 'none', 
+                boxShadow: 'none'
+              } as React.CSSProperties}
             >
               <Save className="h-4 w-4 mr-2" />
               Save Appearance Settings
