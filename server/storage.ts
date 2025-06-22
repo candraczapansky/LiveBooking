@@ -18,6 +18,8 @@ import {
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -57,12 +59,12 @@ export interface IStorage {
   deleteService(id: number): Promise<boolean>;
 
   // Product operations
-  createProduct(product: any): Promise<any>;
-  getProduct(id: number): Promise<any | undefined>;
-  getAllProducts(): Promise<any[]>;
-  updateProduct(id: number, productData: any): Promise<any>;
+  createProduct(product: InsertProduct): Promise<Product>;
+  getProduct(id: number): Promise<Product | undefined>;
+  getAllProducts(): Promise<Product[]>;
+  updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<boolean>;
-  updateProductStock(id: number, quantity: number): Promise<any>;
+  updateProductStock(id: number, quantity: number): Promise<Product>;
 
   // Staff operations
   createStaff(staffMember: InsertStaff): Promise<Staff>;
@@ -157,7 +159,7 @@ export interface IStorage {
   getUsersByAudience(audience: string): Promise<User[]>;
 }
 
-export class MemStorage implements IStorage {
+export class DatabaseStorage implements IStorage {
   private users: Map<number, User>;
   private serviceCategories: Map<number, ServiceCategory>;
   private rooms: Map<number, Room>;
@@ -1239,6 +1241,44 @@ export class MemStorage implements IStorage {
         return allUsers.filter(user => user.role === "client");
     }
   }
+
+  // Product operations
+  async createProduct(product: InsertProduct): Promise<Product> {
+    const [newProduct] = await db.insert(products).values(product).returning();
+    return newProduct;
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product || undefined;
+  }
+
+  async getAllProducts(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+
+  async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
+    const [updatedProduct] = await db
+      .update(products)
+      .set(productData)
+      .where(eq(products.id, id))
+      .returning();
+    return updatedProduct;
+  }
+
+  async deleteProduct(id: number): Promise<boolean> {
+    const result = await db.delete(products).where(eq(products.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async updateProductStock(id: number, quantity: number): Promise<Product> {
+    const [updatedProduct] = await db
+      .update(products)
+      .set({ stockQuantity: quantity })
+      .where(eq(products.id, id))
+      .returning();
+    return updatedProduct;
+  }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

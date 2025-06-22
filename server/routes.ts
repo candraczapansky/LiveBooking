@@ -10,6 +10,7 @@ import {
   insertRoomSchema,
   insertDeviceSchema,
   insertServiceSchema,
+  insertProductSchema,
   insertStaffSchema,
   insertStaffServiceSchema,
   insertAppointmentSchema,
@@ -1623,78 +1624,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Products API endpoints
   app.get("/api/products", async (req, res) => {
-    const products = [
-      {
-        id: 1,
-        name: "Premium Hair Shampoo",
-        description: "Professional-grade sulfate-free shampoo for all hair types",
-        price: 28.99,
-        category: "Hair Care",
-        brand: "SalonPro",
-        stockQuantity: 45,
-        imageUrl: null,
-        isActive: true
-      },
-      {
-        id: 2,
-        name: "Luxury Hair Conditioner",
-        description: "Moisturizing conditioner with argan oil and keratin",
-        price: 32.99,
-        category: "Hair Care",
-        brand: "SalonPro",
-        stockQuantity: 38,
-        imageUrl: null,
-        isActive: true
-      },
-      {
-        id: 3,
-        name: "Volumizing Hair Mousse",
-        description: "Lightweight mousse for added volume and hold",
-        price: 24.99,
-        category: "Styling",
-        brand: "VoluMax",
-        stockQuantity: 22,
-        imageUrl: null,
-        isActive: true
-      },
-      {
-        id: 4,
-        name: "Hydrating Face Mask",
-        description: "Deep moisturizing face mask with hyaluronic acid",
-        price: 45.99,
-        category: "Skincare",
-        brand: "GlowSkin",
-        stockQuantity: 15,
-        imageUrl: null,
-        isActive: true
-      },
-      {
-        id: 5,
-        name: "Anti-Aging Serum",
-        description: "Vitamin C serum for brightening and anti-aging",
-        price: 68.99,
-        category: "Skincare",
-        brand: "GlowSkin",
-        stockQuantity: 8,
-        imageUrl: null,
-        isActive: true
-      }
-    ];
-    res.json(products);
+    try {
+      const products = await storage.getAllProducts();
+      res.json(products);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error fetching products: " + error.message });
+    }
   });
 
-  app.post("/api/products", async (req, res) => {
+  app.post("/api/products", validateBody(insertProductSchema), async (req, res) => {
     try {
-      const productData = req.body;
-      // In a real implementation, this would save to database
-      const newProduct = {
-        id: Date.now(),
-        ...productData,
-        createdAt: new Date()
-      };
+      const newProduct = await storage.createProduct(req.body);
       res.status(201).json(newProduct);
     } catch (error: any) {
       res.status(500).json({ error: "Error creating product: " + error.message });
+    }
+  });
+
+  app.get("/api/products/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const product = await storage.getProduct(id);
+      
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      res.json(product);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error fetching product: " + error.message });
+    }
+  });
+
+  app.put("/api/products/:id", validateBody(insertProductSchema.partial()), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedProduct = await storage.updateProduct(id, req.body);
+      res.json(updatedProduct);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error updating product: " + error.message });
+    }
+  });
+
+  app.delete("/api/products/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteProduct(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      res.json({ message: "Product deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Error deleting product: " + error.message });
+    }
+  });
+
+  app.patch("/api/products/:id/stock", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { quantity } = req.body;
+      
+      if (typeof quantity !== 'number' || quantity < 0) {
+        return res.status(400).json({ error: "Valid quantity is required" });
+      }
+      
+      const updatedProduct = await storage.updateProductStock(id, quantity);
+      res.json(updatedProduct);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error updating stock: " + error.message });
     }
   });
 
