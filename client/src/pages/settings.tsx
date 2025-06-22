@@ -539,8 +539,9 @@ export default function Settings() {
                 <Button 
                   onClick={savePrimaryColorPreset}
                   disabled={!presetName.trim() || customColor === '#3b82f6'}
-                  className="w-full"
+                  className="w-full text-white hover:opacity-90"
                   size="lg"
+                  style={{ backgroundColor: customColor }}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Primary Color
