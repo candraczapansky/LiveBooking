@@ -70,6 +70,7 @@ export default function Settings() {
     const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
     const savedPresetColors = localStorage.getItem('savedPresets');
+    const savedSecondaryPresetColors = localStorage.getItem('savedSecondaryPresets');
 
     setSelectedTheme(savedTheme);
     setCustomColor(savedCustomColor);
@@ -78,6 +79,10 @@ export default function Settings() {
     
     if (savedPresetColors) {
       setSavedPresets(JSON.parse(savedPresetColors));
+    }
+    
+    if (savedSecondaryPresetColors) {
+      setSavedSecondaryPresets(JSON.parse(savedSecondaryPresetColors));
     }
 
     // Apply saved custom colors
