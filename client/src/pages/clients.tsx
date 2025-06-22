@@ -71,6 +71,7 @@ type Client = {
   lastName?: string;
   phone?: string;
   role: string;
+  createdAt?: string;
 };
 
 const clientFormSchema = z.object({
@@ -348,7 +349,6 @@ const ClientsPage = () => {
             )}
             
             {viewMode === 'list' ? (
-              // Clients Table
               <Card>
               <CardHeader className="px-6 py-4">
                 <CardTitle>All Clients</CardTitle>
