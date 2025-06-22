@@ -353,6 +353,8 @@ export default function Settings() {
         const result = e.target?.result as string;
         setProfilePicture(result);
         localStorage.setItem('profilePicture', result);
+        // Dispatch custom event to update header
+        window.dispatchEvent(new CustomEvent('profilePictureUpdated', { detail: result }));
         toast({
           title: "Profile picture updated",
           description: "Your profile picture has been changed successfully.",

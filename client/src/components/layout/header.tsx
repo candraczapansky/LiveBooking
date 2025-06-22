@@ -29,6 +29,30 @@ const Header = () => {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const savedProfilePicture = localStorage.getItem('profilePicture');
+    setProfilePicture(savedProfilePicture);
+
+    // Listen for profile picture changes via custom event
+    const handleProfilePictureUpdate = (event: CustomEvent) => {
+      setProfilePicture(event.detail);
+    };
+
+    // Listen for storage changes from other tabs
+    const handleStorageChange = () => {
+      const updatedPicture = localStorage.getItem('profilePicture');
+      setProfilePicture(updatedPicture);
+    };
+
+    window.addEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -61,7 +85,7 @@ const Header = () => {
                       </span>
                       <Avatar className="h-8 w-8">
                         <AvatarImage 
-                          src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120" 
+                          src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
                           alt="User profile"
                         />
                         <AvatarFallback>
