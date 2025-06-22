@@ -4,6 +4,7 @@ import {
   rooms, Room, InsertRoom,
   devices, Device, InsertDevice,
   services, Service, InsertService,
+  products, Product, InsertProduct,
   staff, Staff, InsertStaff,
   staffServices, StaffService, InsertStaffService,
   appointments, Appointment, InsertAppointment,
@@ -54,6 +55,14 @@ export interface IStorage {
   getAllServices(): Promise<Service[]>;
   updateService(id: number, serviceData: Partial<InsertService>): Promise<Service>;
   deleteService(id: number): Promise<boolean>;
+
+  // Product operations
+  createProduct(product: any): Promise<any>;
+  getProduct(id: number): Promise<any | undefined>;
+  getAllProducts(): Promise<any[]>;
+  updateProduct(id: number, productData: any): Promise<any>;
+  deleteProduct(id: number): Promise<boolean>;
+  updateProductStock(id: number, quantity: number): Promise<any>;
 
   // Staff operations
   createStaff(staffMember: InsertStaff): Promise<Staff>;

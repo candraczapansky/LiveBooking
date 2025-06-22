@@ -45,6 +45,17 @@ type Service = {
   category: string;
 };
 
+type Product = {
+  id: number;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  brand?: string;
+  stockQuantity: number;
+  imageUrl?: string;
+};
+
 type Client = {
   id: number;
   username: string;
@@ -55,7 +66,8 @@ type Client = {
 };
 
 type CartItem = {
-  service: Service;
+  item: Service | Product;
+  type: 'service' | 'product';
   quantity: number;
   total: number;
 };

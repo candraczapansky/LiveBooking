@@ -103,6 +103,32 @@ export const insertServiceSchema = createInsertSchema(services).omit({
   id: true,
 });
 
+// Products schema
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sku: text("sku").unique(),
+  barcode: text("barcode"),
+  price: doublePrecision("price").notNull(),
+  costPrice: doublePrecision("cost_price"),
+  category: text("category").notNull(),
+  brand: text("brand"),
+  stockQuantity: integer("stock_quantity").default(0),
+  minStockLevel: integer("min_stock_level").default(0),
+  isActive: boolean("is_active").default(true),
+  isTaxable: boolean("is_taxable").default(true),
+  weight: doublePrecision("weight"), // in grams
+  dimensions: text("dimensions"), // "length x width x height"
+  imageUrl: text("image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Staff schema (extends users)
 export const staff = pgTable("staff", {
   id: serial("id").primaryKey(),
@@ -363,3 +389,6 @@ export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSche
 
 export type MarketingCampaignRecipient = typeof marketingCampaignRecipients.$inferSelect;
 export type InsertMarketingCampaignRecipient = z.infer<typeof insertMarketingCampaignRecipientSchema>;
+
+export type Product = typeof products.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;

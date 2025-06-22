@@ -1621,6 +1621,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Products API endpoints
+  app.get("/api/products", async (req, res) => {
+    const products = [
+      {
+        id: 1,
+        name: "Premium Hair Shampoo",
+        description: "Professional-grade sulfate-free shampoo for all hair types",
+        price: 28.99,
+        category: "Hair Care",
+        brand: "SalonPro",
+        stockQuantity: 45,
+        imageUrl: null,
+        isActive: true
+      },
+      {
+        id: 2,
+        name: "Luxury Hair Conditioner",
+        description: "Moisturizing conditioner with argan oil and keratin",
+        price: 32.99,
+        category: "Hair Care",
+        brand: "SalonPro",
+        stockQuantity: 38,
+        imageUrl: null,
+        isActive: true
+      },
+      {
+        id: 3,
+        name: "Volumizing Hair Mousse",
+        description: "Lightweight mousse for added volume and hold",
+        price: 24.99,
+        category: "Styling",
+        brand: "VoluMax",
+        stockQuantity: 22,
+        imageUrl: null,
+        isActive: true
+      },
+      {
+        id: 4,
+        name: "Hydrating Face Mask",
+        description: "Deep moisturizing face mask with hyaluronic acid",
+        price: 45.99,
+        category: "Skincare",
+        brand: "GlowSkin",
+        stockQuantity: 15,
+        imageUrl: null,
+        isActive: true
+      },
+      {
+        id: 5,
+        name: "Anti-Aging Serum",
+        description: "Vitamin C serum for brightening and anti-aging",
+        price: 68.99,
+        category: "Skincare",
+        brand: "GlowSkin",
+        stockQuantity: 8,
+        imageUrl: null,
+        isActive: true
+      }
+    ];
+    res.json(products);
+  });
+
+  app.post("/api/products", async (req, res) => {
+    try {
+      const productData = req.body;
+      // In a real implementation, this would save to database
+      const newProduct = {
+        id: Date.now(),
+        ...productData,
+        createdAt: new Date()
+      };
+      res.status(201).json(newProduct);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error creating product: " + error.message });
+    }
+  });
+
   // Transactions endpoint for Point of Sale
   app.post("/api/transactions", async (req, res) => {
     try {
