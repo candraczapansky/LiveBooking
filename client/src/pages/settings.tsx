@@ -401,8 +401,11 @@ export default function Settings() {
   };
 
   const handleEditProfile = () => {
-    console.log('Edit profile clicked, setting isEditingProfile to true');
+    console.log('Edit profile clicked, current state:', isEditingProfile);
+    console.log('User data:', user);
+    console.log('Profile data:', profileData);
     setIsEditingProfile(true);
+    console.log('Edit profile state set to true');
   };
 
   const handleSaveProfile = () => {
@@ -814,7 +817,7 @@ export default function Settings() {
                           onClick={() => handleCustomColorChange(preset.color)}
                         />
                         <button
-                          onClick={() => deletePreset(index)}
+                          onClick={() => deletePrimaryColorPreset(preset.name)}
                           className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                           title="Delete preset"
                         >
