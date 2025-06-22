@@ -125,6 +125,7 @@ const MarketingPage = () => {
   
   const [activeTab, setActiveTab] = useState("campaigns");
   const [isCampaignFormOpen, setIsCampaignFormOpen] = useState(location.includes("new=true"));
+  const [campaignToEdit, setCampaignToEdit] = useState<any>(null);
   const [isPromoFormOpen, setIsPromoFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -439,9 +440,9 @@ const MarketingPage = () => {
                               <Badge 
                                 variant={
                                   campaign.status === "sent" 
-                                    ? "success" 
+                                    ? "secondary" 
                                     : campaign.status === "scheduled" 
-                                    ? "warning" 
+                                    ? "outline" 
                                     : "outline"
                                 }
                                 className="mb-2"
@@ -502,7 +503,17 @@ const MarketingPage = () => {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  onClick={() => toast({ title: "Feature Coming Soon", description: "Campaign editing will be available soon!" })}
+                                  onClick={() => {
+                                    setCampaignToEdit(campaign);
+                                    setIsCampaignFormOpen(true);
+                                    campaignForm.reset({
+                                      name: campaign.name,
+                                      type: campaign.type as 'email' | 'sms',
+                                      audience: campaign.audience,
+                                      content: campaign.content,
+                                      subject: campaign.subject || '',
+                                    });
+                                  }}
                                 >
                                   <Edit className="h-4 w-4 mr-1" />
                                   Edit
