@@ -40,6 +40,10 @@
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 330 81% 60%;
+  
+  /* Dropdown colors */
+  --dropdown-selected: 330 81% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 .dark {
@@ -79,6 +83,10 @@
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-border: 240 3.7% 15.9%;
   --sidebar-ring: 330 81% 60%;
+  
+  /* Dropdown colors for dark mode */
+  --dropdown-selected: 330 81% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 /* Theme color variations */
@@ -89,6 +97,8 @@
   --sidebar-accent: 221 83% 95%;
   --sidebar-accent-foreground: 221 83% 53%;
   --sidebar-ring: 221 83% 53%;
+  --dropdown-selected: 221 83% 53%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="purple"] {
@@ -98,6 +108,8 @@
   --sidebar-accent: 262 83% 95%;
   --sidebar-accent-foreground: 262 83% 58%;
   --sidebar-ring: 262 83% 58%;
+  --dropdown-selected: 262 83% 58%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="pink"] {
@@ -107,6 +119,8 @@
   --sidebar-accent: 330 81% 95%;
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-ring: 330 81% 60%;
+  --dropdown-selected: 330 81% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="green"] {
@@ -116,6 +130,8 @@
   --sidebar-accent: 142 76% 95%;
   --sidebar-accent-foreground: 142 76% 36%;
   --sidebar-ring: 142 76% 36%;
+  --dropdown-selected: 142 76% 36%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="orange"] {
@@ -125,6 +141,8 @@
   --sidebar-accent: 24 94% 95%;
   --sidebar-accent-foreground: 24 94% 53%;
   --sidebar-ring: 24 94% 53%;
+  --dropdown-selected: 24 94% 53%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="red"] {
@@ -134,6 +152,8 @@
   --sidebar-accent: 0 84% 95%;
   --sidebar-accent-foreground: 0 84% 60%;
   --sidebar-ring: 0 84% 60%;
+  --dropdown-selected: 0 84% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="teal"] {
@@ -143,6 +163,8 @@
   --sidebar-accent: 173 80% 95%;
   --sidebar-accent-foreground: 173 80% 40%;
   --sidebar-ring: 173 80% 40%;
+  --dropdown-selected: 173 80% 40%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="indigo"] {
@@ -152,6 +174,8 @@
   --sidebar-accent: 231 48% 95%;
   --sidebar-accent-foreground: 231 48% 48%;
   --sidebar-ring: 231 48% 48%;
+  --dropdown-selected: 231 48% 48%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="rose"] {
@@ -161,6 +185,8 @@
   --sidebar-accent: 330 81% 95%;
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-ring: 330 81% 60%;
+  --dropdown-selected: 330 81% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="emerald"] {
@@ -170,6 +196,8 @@
   --sidebar-accent: 160 84% 95%;
   --sidebar-accent-foreground: 160 84% 39%;
   --sidebar-ring: 160 84% 39%;
+  --dropdown-selected: 160 84% 39%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="amber"] {
@@ -179,6 +207,8 @@
   --sidebar-accent: 45 93% 95%;
   --sidebar-accent-foreground: 45 93% 58%;
   --sidebar-ring: 45 93% 58%;
+  --dropdown-selected: 45 93% 58%;
+  --dropdown-selected-foreground: 26 83% 14%;
 }
 
 [data-theme="cyan"] {
@@ -188,6 +218,8 @@
   --sidebar-accent: 188 94% 95%;
   --sidebar-accent-foreground: 188 94% 42%;
   --sidebar-ring: 188 94% 42%;
+  --dropdown-selected: 188 94% 42%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="violet"] {
@@ -197,6 +229,8 @@
   --sidebar-accent: 262 83% 95%;
   --sidebar-accent-foreground: 262 83% 58%;
   --sidebar-ring: 262 83% 58%;
+  --dropdown-selected: 262 83% 58%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="lime"] {
@@ -206,6 +240,8 @@
   --sidebar-accent: 84 81% 95%;
   --sidebar-accent-foreground: 84 81% 44%;
   --sidebar-ring: 84 81% 44%;
+  --dropdown-selected: 84 81% 44%;
+  --dropdown-selected-foreground: 20 14.3% 4.1%;
 }
 
 [data-theme="fuchsia"] {
@@ -215,6 +251,8 @@
   --sidebar-accent: 292 84% 95%;
   --sidebar-accent-foreground: 292 84% 61%;
   --sidebar-ring: 292 84% 61%;
+  --dropdown-selected: 292 84% 61%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="sky"] {
@@ -224,6 +262,8 @@
   --sidebar-accent: 198 93% 95%;
   --sidebar-accent-foreground: 198 93% 60%;
   --sidebar-ring: 198 93% 60%;
+  --dropdown-selected: 198 93% 60%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="slate"] {
@@ -233,6 +273,8 @@
   --sidebar-accent: 215 28% 95%;
   --sidebar-accent-foreground: 215 28% 17%;
   --sidebar-ring: 215 28% 17%;
+  --dropdown-selected: 215 28% 17%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 [data-theme="stone"] {
@@ -242,6 +284,8 @@
   --sidebar-accent: 25 5% 95%;
   --sidebar-accent-foreground: 25 5% 45%;
   --sidebar-ring: 25 5% 45%;
+  --dropdown-selected: 25 5% 45%;
+  --dropdown-selected-foreground: 210 40% 98%;
 }
 
 @layer base {
@@ -276,6 +320,34 @@
   .sidebar.open {
     @apply translate-x-0;
   }
+}
+
+/* Dropdown theme colors */
+[data-state="open"] > [data-radix-select-trigger] {
+  background-color: hsl(var(--dropdown-selected));
+  color: hsl(var(--dropdown-selected-foreground));
+  border-color: hsl(var(--dropdown-selected));
+}
+
+[data-radix-select-item][data-highlighted] {
+  background-color: hsl(var(--dropdown-selected));
+  color: hsl(var(--dropdown-selected-foreground));
+}
+
+[data-radix-select-item][data-state="checked"] {
+  background-color: hsl(var(--dropdown-selected));
+  color: hsl(var(--dropdown-selected-foreground));
+}
+
+/* Custom select trigger styling */
+.select-trigger-themed {
+  transition: all 0.2s ease;
+}
+
+.select-trigger-themed[data-state="open"] {
+  background-color: hsl(var(--dropdown-selected));
+  color: hsl(var(--dropdown-selected-foreground));
+  border-color: hsl(var(--dropdown-selected));
 }
 
 /* Stats card hover effect */
