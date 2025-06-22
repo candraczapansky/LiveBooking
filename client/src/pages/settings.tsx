@@ -27,7 +27,8 @@ import {
   Save,
   Camera,
   User,
-  Palette
+  Palette,
+  Trash2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -51,6 +52,9 @@ export default function Settings() {
   const [customColor, setCustomColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#6b7280');
   const [savedPresets, setSavedPresets] = useState<Array<{name: string, color: string}>>([]);
+  const [presetName, setPresetName] = useState('');
+  const [secondaryPresetName, setSecondaryPresetName] = useState('');
+  const [savedSecondaryPresets, setSavedSecondaryPresets] = useState<Array<{name: string, color: string}>>([]);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
@@ -278,6 +282,33 @@ export default function Settings() {
     toast({
       title: "Preset deleted",
       description: "Color preset has been removed.",
+    });
+  };
+
+  const saveSecondaryColorPreset = () => {
+    if (!secondaryPresetName.trim() || secondaryColor === '#6b7280') return;
+    
+    const newPreset = { name: secondaryPresetName.trim(), color: secondaryColor };
+    const updatedPresets = [...savedSecondaryPresets, newPreset];
+    setSavedSecondaryPresets(updatedPresets);
+    localStorage.setItem('savedSecondaryPresets', JSON.stringify(updatedPresets));
+    
+    toast({
+      title: "Text color saved",
+      description: `"${secondaryPresetName}" has been added to your text color presets.`,
+    });
+    
+    setSecondaryPresetName('');
+  };
+
+  const deleteSecondaryColorPreset = (nameToDelete: string) => {
+    const updatedPresets = savedSecondaryPresets.filter(preset => preset.name !== nameToDelete);
+    setSavedSecondaryPresets(updatedPresets);
+    localStorage.setItem('savedSecondaryPresets', JSON.stringify(updatedPresets));
+    
+    toast({
+      title: "Text color preset deleted",
+      description: "Text color preset has been removed.",
     });
   };
 
@@ -542,6 +573,55 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+
+              <div className="flex items-center space-x-2 mt-4">
+                <Input
+                  type="text"
+                  placeholder="Enter text color preset name..."
+                  value={secondaryPresetName}
+                  onChange={(e) => setSecondaryPresetName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={saveSecondaryColorPreset}
+                  disabled={!secondaryPresetName.trim() || secondaryColor === '#6b7280'}
+                  size="sm"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save Text Color
+                </Button>
+              </div>
+
+              {savedSecondaryPresets.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Saved Text Color Presets</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {savedSecondaryPresets.map((preset) => (
+                      <div key={preset.name} className="flex items-center justify-between p-2 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <div 
+                            className="w-4 h-4 rounded border cursor-pointer"
+                            style={{ backgroundColor: preset.color }}
+                            onClick={() => {
+                              setSecondaryColor(preset.color);
+                              handleSecondaryColorChange(preset.color);
+                            }}
+                          />
+                          <span className="text-sm font-medium">{preset.name}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteSecondaryColorPreset(preset.name)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <Separator />
 
