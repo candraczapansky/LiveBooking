@@ -84,9 +84,7 @@ type Client = {
 };
 
 const clientFormSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -136,9 +134,7 @@ const ClientsPage = () => {
   const addForm = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
     defaultValues: {
-      username: "",
       email: "",
-      password: "",
       firstName: "",
       lastName: "",
       phone: "",
@@ -146,11 +142,9 @@ const ClientsPage = () => {
   });
 
   const editForm = useForm<ClientFormValues>({
-    resolver: zodResolver(clientFormSchema.partial({ password: true })),
+    resolver: zodResolver(clientFormSchema),
     defaultValues: {
-      username: "",
       email: "",
-      password: "",
       firstName: "",
       lastName: "",
       phone: "",
@@ -278,7 +272,6 @@ const ClientsPage = () => {
   const openEditDialog = (client: Client) => {
     setSelectedClient(client);
     editForm.reset({
-      username: client.username,
       email: client.email,
       firstName: client.firstName || "",
       lastName: client.lastName || "",
@@ -568,36 +561,6 @@ const ClientsPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={addForm.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="johndoe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={addForm.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={addForm.control}
                   name="email"
                   render={({ field }) => (
                     <FormItem>
@@ -795,24 +758,7 @@ const ClientsPage = () => {
                 />
               </div>
               
-              <FormField
-                control={editForm.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>New Password (Optional)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="Leave blank to keep current password" 
-                        {...field} 
-                        value={field.value || ""} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
