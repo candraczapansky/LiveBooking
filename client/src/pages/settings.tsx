@@ -53,11 +53,6 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  // Color theme state
-  const [primaryColor, setPrimaryColor] = useState('#ec4899');
-  const [accentColor, setAccentColor] = useState('#06b6d4');
-  const [iconColor, setIconColor] = useState('#6b7280');
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -127,59 +122,6 @@ export default function Settings() {
   const handleChangePassword = (data: PasswordChangeForm) => {
     changePasswordMutation.mutate(data);
   };
-
-  const handleColorChange = (colorType: 'primary' | 'accent' | 'icon', color: string) => {
-    switch (colorType) {
-      case 'primary':
-        setPrimaryColor(color);
-        break;
-      case 'accent':
-        setAccentColor(color);
-        break;
-      case 'icon':
-        setIconColor(color);
-        break;
-    }
-  };
-
-  const applyColorTheme = () => {
-    // Apply the color theme to CSS custom properties
-    document.documentElement.style.setProperty('--primary-color', primaryColor);
-    document.documentElement.style.setProperty('--accent-color', accentColor);
-    document.documentElement.style.setProperty('--icon-color', iconColor);
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('colorTheme', JSON.stringify({
-      primary: primaryColor,
-      accent: accentColor,
-      icon: iconColor
-    }));
-
-    toast({
-      title: "Theme updated",
-      description: "Your color preferences have been saved and applied.",
-    });
-  };
-
-  // Load saved color theme on component mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('colorTheme');
-    if (savedTheme) {
-      try {
-        const theme = JSON.parse(savedTheme);
-        setPrimaryColor(theme.primary || '#ec4899');
-        setAccentColor(theme.accent || '#06b6d4');
-        setIconColor(theme.icon || '#6b7280');
-        
-        // Apply saved colors to CSS
-        document.documentElement.style.setProperty('--primary-color', theme.primary || '#ec4899');
-        document.documentElement.style.setProperty('--accent-color', theme.accent || '#06b6d4');
-        document.documentElement.style.setProperty('--icon-color', theme.icon || '#6b7280');
-      } catch (error) {
-        console.error('Error loading saved theme:', error);
-      }
-    }
-  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -288,7 +230,7 @@ export default function Settings() {
               Customize how the application looks and feels.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base">Dark Mode</Label>
@@ -301,146 +243,6 @@ export default function Settings() {
                 onCheckedChange={setDarkMode}
               />
             </div>
-
-            <Separator />
-
-            {/* Color Customization */}
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-3">Color Theme</h4>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  Customize colors for icons, buttons, and interface elements
-                </p>
-              </div>
-
-              {/* Primary Color */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Primary Color</Label>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Used for buttons, links, and active states</p>
-                <div className="flex items-center space-x-3">
-                  <div className="flex space-x-2">
-                    {[
-                      { name: 'Blue', value: '#3b82f6', class: 'bg-blue-500' },
-                      { name: 'Purple', value: '#8b5cf6', class: 'bg-purple-500' },
-                      { name: 'Pink', value: '#ec4899', class: 'bg-pink-500' },
-                      { name: 'Green', value: '#10b981', class: 'bg-green-500' },
-                      { name: 'Orange', value: '#f59e0b', class: 'bg-orange-500' },
-                      { name: 'Red', value: '#ef4444', class: 'bg-red-500' },
-                    ].map((color) => (
-                      <button
-                        key={color.name}
-                        className={`w-8 h-8 rounded-full border-2 ${primaryColor === color.value ? 'border-gray-800 ring-2 ring-offset-2 ring-gray-300' : 'border-gray-300 hover:border-gray-400'} transition-all ${color.class}`}
-                        title={color.name}
-                        onClick={() => handleColorChange('primary', color.value)}
-                      />
-                    ))}
-                  </div>
-                  <Input
-                    type="color"
-                    value={primaryColor}
-                    onChange={(e) => handleColorChange('primary', e.target.value)}
-                    className="w-16 h-8 p-1 border rounded"
-                    title="Custom primary color"
-                  />
-                </div>
-              </div>
-
-              {/* Accent Color */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Accent Color</Label>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Used for highlights and secondary elements</p>
-                <div className="flex items-center space-x-3">
-                  <div className="flex space-x-2">
-                    {[
-                      { name: 'Cyan', value: '#06b6d4', class: 'bg-cyan-500' },
-                      { name: 'Teal', value: '#14b8a6', class: 'bg-teal-500' },
-                      { name: 'Indigo', value: '#6366f1', class: 'bg-indigo-500' },
-                      { name: 'Rose', value: '#f43f5e', class: 'bg-rose-500' },
-                      { name: 'Amber', value: '#f59e0b', class: 'bg-amber-500' },
-                      { name: 'Lime', value: '#84cc16', class: 'bg-lime-500' },
-                    ].map((color) => (
-                      <button
-                        key={color.name}
-                        className={`w-8 h-8 rounded-full border-2 ${accentColor === color.value ? 'border-gray-800 ring-2 ring-offset-2 ring-gray-300' : 'border-gray-300 hover:border-gray-400'} transition-all ${color.class}`}
-                        title={color.name}
-                        onClick={() => handleColorChange('accent', color.value)}
-                      />
-                    ))}
-                  </div>
-                  <Input
-                    type="color"
-                    value={accentColor}
-                    onChange={(e) => handleColorChange('accent', e.target.value)}
-                    className="w-16 h-8 p-1 border rounded"
-                    title="Custom accent color"
-                  />
-                </div>
-              </div>
-
-              {/* Icon Color */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Icon Color</Label>
-                <p className="text-xs text-gray-600 dark:text-gray-400">Default color for icons throughout the app</p>
-                <div className="flex items-center space-x-3">
-                  <div className="flex space-x-2">
-                    {[
-                      { name: 'Gray', value: '#6b7280', class: 'bg-gray-500' },
-                      { name: 'Slate', value: '#64748b', class: 'bg-slate-500' },
-                      { name: 'Stone', value: '#78716c', class: 'bg-stone-500' },
-                      { name: 'Neutral', value: '#737373', class: 'bg-neutral-500' },
-                      { name: 'Zinc', value: '#71717a', class: 'bg-zinc-500' },
-                      { name: 'Black', value: '#000000', class: 'bg-black' },
-                    ].map((color) => (
-                      <button
-                        key={color.name}
-                        className={`w-8 h-8 rounded-full border-2 ${iconColor === color.value ? 'border-gray-800 ring-2 ring-offset-2 ring-gray-300' : 'border-gray-300 hover:border-gray-400'} transition-all ${color.class}`}
-                        title={color.name}
-                        onClick={() => handleColorChange('icon', color.value)}
-                      />
-                    ))}
-                  </div>
-                  <Input
-                    type="color"
-                    value={iconColor}
-                    onChange={(e) => handleColorChange('icon', e.target.value)}
-                    className="w-16 h-8 p-1 border rounded"
-                    title="Custom icon color"
-                  />
-                </div>
-              </div>
-
-              {/* Preview Section */}
-              <div className="space-y-3 pt-4 border-t">
-                <Label className="text-sm font-medium">Preview</Label>
-                <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg space-y-3">
-                  <div className="flex items-center space-x-3">
-                    <Button size="sm" style={{ backgroundColor: primaryColor, borderColor: primaryColor }}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Primary Button
-                    </Button>
-                    <Button variant="outline" size="sm" style={{ borderColor: accentColor, color: accentColor }}>
-                      <Bell className="h-4 w-4 mr-2" />
-                      Accent Button
-                    </Button>
-                  </div>
-                  <div className="flex items-center space-x-2" style={{ color: iconColor }}>
-                    <User className="h-4 w-4" />
-                    <Settings className="h-4 w-4" />
-                    <Shield className="h-4 w-4" />
-                    <span className="text-sm">Sample icons</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <Button 
-              className="w-full" 
-              style={{ backgroundColor: primaryColor }}
-              onClick={applyColorTheme}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              Save Appearance Settings
-            </Button>
           </CardContent>
         </Card>
 

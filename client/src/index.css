@@ -40,11 +40,6 @@
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 330 81% 60%;
-  
-  /* Custom Color Theme Variables */
-  --primary-color: #ec4899;
-  --accent-color: #06b6d4;
-  --icon-color: #6b7280;
 }
 
 .dark {
@@ -127,51 +122,4 @@
 
 .stats-card:hover {
   @apply shadow-lg transform -translate-y-1;
-}
-
-/* Custom color utilities for theme system */
-@layer utilities {
-  .text-theme-primary {
-    color: var(--primary-color);
-  }
-  
-  .text-theme-accent {
-    color: var(--accent-color);
-  }
-  
-  .text-theme-icon {
-    color: var(--icon-color);
-  }
-  
-  .bg-theme-primary {
-    background-color: var(--primary-color);
-  }
-  
-  .bg-theme-accent {
-    background-color: var(--accent-color);
-  }
-  
-  .border-theme-primary {
-    border-color: var(--primary-color);
-  }
-  
-  .border-theme-accent {
-    border-color: var(--accent-color);
-  }
-  
-  .hover\:bg-theme-primary:hover {
-    background-color: var(--primary-color);
-  }
-  
-  .hover\:bg-theme-accent:hover {
-    background-color: var(--accent-color);
-  }
-  
-  .hover\:text-theme-primary:hover {
-    color: var(--primary-color);
-  }
-  
-  .hover\:text-theme-accent:hover {
-    color: var(--accent-color);
-  }
 }
