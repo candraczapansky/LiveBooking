@@ -195,11 +195,7 @@ const ClientsPage = () => {
 
   const createClientMutation = useMutation({
     mutationFn: async (data: ClientFormValues) => {
-      // In a real app, we would have a dedicated endpoint for creating clients
-      return apiRequest("POST", "/api/register", {
-        ...data,
-        role: "client"
-      });
+      return apiRequest("POST", "/api/clients", data);
     },
     onSuccess: async (response) => {
       const newClient = await response.json();

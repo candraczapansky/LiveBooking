@@ -488,7 +488,17 @@ export class MemStorage implements IStorage {
       firstName: insertUser.firstName || null,
       lastName: insertUser.lastName || null,
       phone: insertUser.phone || null,
-      stripeCustomerId: null,
+      address: insertUser.address || null,
+      city: insertUser.city || null,
+      state: insertUser.state || null,
+      zipCode: insertUser.zipCode || null,
+      stripeCustomerId: insertUser.stripeCustomerId || null,
+      emailAccountManagement: insertUser.emailAccountManagement ?? true,
+      emailAppointmentReminders: insertUser.emailAppointmentReminders ?? true,
+      emailPromotions: insertUser.emailPromotions ?? false,
+      smsAccountManagement: insertUser.smsAccountManagement ?? false,
+      smsAppointmentReminders: insertUser.smsAppointmentReminders ?? true,
+      smsPromotions: insertUser.smsPromotions ?? false,
       createdAt: new Date()
     };
     this.users.set(id, user);

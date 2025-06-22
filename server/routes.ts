@@ -175,8 +175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", async (req, res) => {
     console.log("GET /api/users called");
     try {
-      // Get all users from storage (this would typically be from a database)
-      const users = Array.from((storage as any).users.values());
+      const users = await storage.getAllUsers();
       console.log("Users found:", users.length);
       
       // Remove passwords from all users before sending
