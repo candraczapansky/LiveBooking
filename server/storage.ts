@@ -204,6 +204,7 @@ export class DatabaseStorage implements IStorage {
   private currentSavedGiftCardId: number;
   private currentMarketingCampaignId: number;
   private currentMarketingCampaignRecipientId: number;
+  private currentEmailUnsubscribeId: number;
 
   constructor() {
     this.users = new Map();
@@ -223,6 +224,7 @@ export class DatabaseStorage implements IStorage {
     this.savedGiftCards = new Map();
     this.marketingCampaigns = new Map();
     this.marketingCampaignRecipients = new Map();
+    this.emailUnsubscribes = new Map();
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
@@ -241,6 +243,7 @@ export class DatabaseStorage implements IStorage {
     this.currentSavedGiftCardId = 1;
     this.currentMarketingCampaignId = 1;
     this.currentMarketingCampaignRecipientId = 1;
+    this.currentEmailUnsubscribeId = 1;
 
     // Initialize with admin user
     this.createUser({
@@ -1140,6 +1143,7 @@ export class DatabaseStorage implements IStorage {
   // Marketing Campaign Recipient operations
   async createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient> {
     const id = this.currentMarketingCampaignRecipientId++;
+    const trackingToken = this.generateTrackingToken();
     const newRecipient: MarketingCampaignRecipient = {
       id,
       campaignId: recipient.campaignId,
@@ -1147,10 +1151,18 @@ export class DatabaseStorage implements IStorage {
       status: recipient.status || "pending",
       sentAt: recipient.sentAt || null,
       deliveredAt: recipient.deliveredAt || null,
+      openedAt: recipient.openedAt || null,
+      clickedAt: recipient.clickedAt || null,
+      unsubscribedAt: recipient.unsubscribedAt || null,
+      trackingToken,
       errorMessage: recipient.errorMessage || null,
     };
     this.marketingCampaignRecipients.set(id, newRecipient);
     return newRecipient;
+  }
+
+  private generateTrackingToken(): string {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
   }
 
   async getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined> {
@@ -1252,6 +1264,44 @@ export class DatabaseStorage implements IStorage {
       default:
         return allUsers.filter(user => user.role === "client");
     }
+  }
+
+  // Email tracking methods
+  async getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined> {
+    return Array.from(this.marketingCampaignRecipients.values()).find(
+      recipient => recipient.trackingToken === token
+    );
+  }
+
+  async createEmailUnsubscribe(unsubscribe: InsertEmailUnsubscribe): Promise<EmailUnsubscribe> {
+    const id = this.currentEmailUnsubscribeId++;
+    const newUnsubscribe: EmailUnsubscribe = {
+      id,
+      userId: unsubscribe.userId,
+      email: unsubscribe.email,
+      unsubscribedAt: new Date(),
+      campaignId: unsubscribe.campaignId || null,
+      reason: unsubscribe.reason || null,
+      ipAddress: unsubscribe.ipAddress || null,
+    };
+    this.emailUnsubscribes.set(id, newUnsubscribe);
+    return newUnsubscribe;
+  }
+
+  async getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined> {
+    return Array.from(this.emailUnsubscribes.values()).find(
+      unsubscribe => unsubscribe.userId === userId
+    );
+  }
+
+  async getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]> {
+    return Array.from(this.emailUnsubscribes.values());
+  }
+
+  async isUserUnsubscribed(email: string): Promise<boolean> {
+    return Array.from(this.emailUnsubscribes.values()).some(
+      unsubscribe => unsubscribe.email === email
+    );
   }
 
   // Product operations

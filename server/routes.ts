@@ -1480,6 +1480,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Email tracking endpoints
+  
+  // Track email opens with 1x1 pixel
+  app.get("/api/track/open/:token", async (req, res) => {
+    try {
+      const token = req.params.token;
+      const recipient = await storage.getMarketingCampaignRecipientByToken(token);
+      
+      if (recipient && !recipient.openedAt) {
+        // Mark as opened
+        await storage.updateMarketingCampaignRecipient(recipient.id, {
+          openedAt: new Date()
+        });
+        
+        // Update campaign open count
+        const campaign = await storage.getMarketingCampaign(recipient.campaignId);
+        if (campaign) {
+          await storage.updateMarketingCampaign(recipient.campaignId, {
+            openedCount: (campaign.openedCount || 0) + 1
+          });
+        }
+      }
+      
+      // Return 1x1 transparent pixel
+      const pixel = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64'
+      );
+      
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': pixel.length,
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
+      });
+      
+      res.end(pixel);
+    } catch (error: any) {
+      console.error('Error tracking email open:', error);
+      // Still return pixel even on error to not break email display
+      const pixel = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+        'base64'
+      );
+      res.writeHead(200, {
+        'Content-Type': 'image/png',
+        'Content-Length': pixel.length
+      });
+      res.end(pixel);
+    }
+  });
+
+  // Handle email unsubscribes
+  app.get("/api/unsubscribe/:token", async (req, res) => {
+    try {
+      const token = req.params.token;
+      const reason = req.query.reason as string;
+      const recipient = await storage.getMarketingCampaignRecipientByToken(token);
+      
+      if (!recipient) {
+        return res.status(404).send(`
+          <html>
+            <head><title>Unsubscribe</title></head>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+              <h2>Invalid Unsubscribe Link</h2>
+              <p>This unsubscribe link is not valid or has expired.</p>
+            </body>
+          </html>
+        `);
+      }
+
+      const user = await storage.getUser(recipient.userId);
+      if (!user) {
+        return res.status(404).send("User not found");
+      }
+
+      // Check if already unsubscribed
+      const existingUnsubscribe = await storage.getEmailUnsubscribe(user.id);
+      
+      if (!existingUnsubscribe) {
+        // Create unsubscribe record
+        await storage.createEmailUnsubscribe({
+          userId: user.id,
+          email: user.email,
+          campaignId: recipient.campaignId,
+          reason: reason || null,
+          ipAddress: req.ip || null
+        });
+
+        // Mark recipient as unsubscribed
+        await storage.updateMarketingCampaignRecipient(recipient.id, {
+          unsubscribedAt: new Date()
+        });
+
+        // Update campaign unsubscribe count
+        const campaign = await storage.getMarketingCampaign(recipient.campaignId);
+        if (campaign) {
+          await storage.updateMarketingCampaign(recipient.campaignId, {
+            unsubscribedCount: (campaign.unsubscribedCount || 0) + 1
+          });
+        }
+      }
+
+      // Return unsubscribe confirmation page
+      res.send(`
+        <html>
+          <head>
+            <title>Unsubscribed Successfully</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+          </head>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background-color: #f5f5f5;">
+            <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #e91e63; margin: 0;">BeautyBook</h1>
+              </div>
+              <h2 style="color: #333; text-align: center;">You've Been Unsubscribed</h2>
+              <p style="color: #666; line-height: 1.6;">
+                You have successfully unsubscribed from our marketing emails. 
+                You will no longer receive promotional emails from us.
+              </p>
+              <p style="color: #666; line-height: 1.6;">
+                <strong>Note:</strong> You may still receive important account-related 
+                emails such as appointment confirmations and reminders.
+              </p>
+              <div style="text-align: center; margin-top: 30px;">
+                <p style="color: #999; font-size: 14px;">
+                  If you unsubscribed by mistake, please contact us to resubscribe.
+                </p>
+              </div>
+            </div>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error('Error processing unsubscribe:', error);
+      res.status(500).send(`
+        <html>
+          <head><title>Error</title></head>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <h2>Error Processing Unsubscribe</h2>
+            <p>There was an error processing your unsubscribe request. Please try again later.</p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
+  // Get unsubscribe statistics
+  app.get("/api/unsubscribes", async (req, res) => {
+    try {
+      const unsubscribes = await storage.getAllEmailUnsubscribes();
+      res.json(unsubscribes);
+    } catch (error: any) {
+      console.error('Error fetching unsubscribes:', error);
+      res.status(500).json({ error: "Error fetching unsubscribes: " + error.message });
+    }
+  });
+
   // Send appointment reminder emails
   app.post("/api/appointments/:id/send-reminder", async (req, res) => {
     try {
