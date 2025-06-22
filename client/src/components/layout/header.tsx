@@ -1,12 +1,20 @@
 import { useContext, useState, useEffect } from "react";
-import { Bell, Menu } from "lucide-react";
+import { Bell, Menu, Settings, User, LogOut, ChevronDown } from "lucide-react";
 import { AuthContext } from "@/App";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
 
 const Header = () => {
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
   const [showMenuButton, setShowMenuButton] = useState(false);
 
   useEffect(() => {
@@ -43,20 +51,51 @@ const Header = () => {
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
               </Button>
               <div className="ml-3 relative">
-                <div className="flex items-center">
-                  <span className="hidden md:inline-block mr-2 text-sm">
-                    {getFullName(user?.firstName, user?.lastName)}
-                  </span>
-                  <Avatar>
-                    <AvatarImage 
-                      src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120" 
-                      alt="User profile"
-                    />
-                    <AvatarFallback>
-                      {getInitials(user?.firstName, user?.lastName)}
-                    </AvatarFallback>
-                  </Avatar>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
+                      <span className="hidden md:inline-block text-sm font-medium">
+                        {getFullName(user?.firstName, user?.lastName)}
+                      </span>
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage 
+                          src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120" 
+                          alt="User profile"
+                        />
+                        <AvatarFallback>
+                          {getInitials(user?.firstName, user?.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <ChevronDown className="h-4 w-4 text-gray-500" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {getFullName(user?.firstName, user?.lastName)}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user?.email}
+                        </p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
