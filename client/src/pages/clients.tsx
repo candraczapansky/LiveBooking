@@ -255,6 +255,16 @@ const ClientsPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const handleViewClient = (client: Client) => {
+    setClientDetail(client);
+    setViewMode('detail');
+  };
+
+  const handleBackToList = () => {
+    setViewMode('list');
+    setClientDetail(null);
+  };
+
   const filteredClients = clients?.filter((client: Client) =>
     client.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -274,34 +284,72 @@ const ClientsPage = () => {
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Clients</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Manage your salon clients
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-                  <Input
-                    type="search"
-                    placeholder="Search clients..."
-                    className="pl-8 w-[250px]"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
+            {viewMode === 'list' ? (
+              <>
+                {/* Page Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Clients</h1>
+                    <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                      Manage your salon clients
+                    </p>
+                  </div>
+                  <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <Input
+                        type="search"
+                        placeholder="Search clients..."
+                        className="pl-8 w-[250px]"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add Client
+                    </Button>
+                  </div>
                 </div>
-                <Button onClick={() => setIsAddDialogOpen(true)}>
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Add Client
-                </Button>
-              </div>
-            </div>
+              </>
+            ) : (
+              <>
+                {/* Client Detail Header */}
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      onClick={handleBackToList}
+                      className="flex items-center gap-2"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back to Clients
+                    </Button>
+                    <div>
+                      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        {getFullName(clientDetail?.firstName, clientDetail?.lastName) || clientDetail?.username}
+                      </h1>
+                      <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                        Client Profile & Payment Methods
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => clientDetail && openEditDialog(clientDetail)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Client
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
             
-            {/* Clients Table */}
-            <Card>
+            {viewMode === 'list' ? (
+              // Clients Table
+              <Card>
               <CardHeader className="px-6 py-4">
                 <CardTitle>All Clients</CardTitle>
                 <CardDescription>
@@ -357,6 +405,9 @@ const ClientsPage = () => {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                                  <CreditCard className="h-4 w-4 mr-2" /> View Details & Cards
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => toast({ title: "Feature Coming Soon", description: "Appointments view will be available soon!" })}>
                                   <Calendar className="h-4 w-4 mr-2" /> Appointments
                                 </DropdownMenuItem>
@@ -379,6 +430,60 @@ const ClientsPage = () => {
                 )}
               </CardContent>
             </Card>
+            ) : (
+              // Client Detail View with Payment Methods
+              <div className="space-y-6">
+                {/* Client Information Card */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-3">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="text-lg">
+                          {getInitials(clientDetail?.firstName, clientDetail?.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <h3 className="text-xl font-semibold">
+                          {getFullName(clientDetail?.firstName, clientDetail?.lastName) || clientDetail?.username}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          Client since {new Date(clientDetail?.createdAt || Date.now()).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="font-medium mb-3">Contact Information</h4>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Email:</span>
+                            <span className="ml-2">{clientDetail?.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Phone:</span>
+                            <span className="ml-2">{clientDetail?.phone || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Username:</span>
+                            <span className="ml-2">{clientDetail?.username}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Payment Methods */}
+                {clientDetail && (
+                  <ClientPaymentMethods 
+                    clientId={clientDetail.id} 
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
