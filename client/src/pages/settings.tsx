@@ -104,6 +104,8 @@ export default function Settings() {
         root.style.setProperty('--secondary', '210 40% 96%'); // Light background
       }
       root.style.setProperty('--secondary-foreground', hslSecondaryColor); // Use custom color for text
+      root.style.setProperty('--foreground', hslSecondaryColor); // Update main text color
+      root.style.setProperty('--muted-foreground', hslSecondaryColor); // Update muted text color
     }
   }, []);
 
@@ -258,6 +260,8 @@ export default function Settings() {
     }
     root.style.setProperty('--secondary-foreground', hslColor); // Use custom color for text
     root.style.setProperty('--secondary-color', color);
+    root.style.setProperty('--foreground', hslColor); // Update main text color
+    root.style.setProperty('--muted-foreground', hslColor); // Update muted text color
     
     // Save to localStorage
     localStorage.setItem('secondary-color', color);
