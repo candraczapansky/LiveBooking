@@ -512,8 +512,8 @@ export default function Settings() {
                       boxShadow: 'none'
                     } as React.CSSProperties}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Primary Color
+                    <Save className="h-4 w-4 mr-2" style={{ color: 'white' }} />
+                    <span style={{ color: 'white' }}>Save Primary Color</span>
                   </div>
                 </div>
 
@@ -574,8 +574,8 @@ export default function Settings() {
                     boxShadow: 'none'
                   } as React.CSSProperties}
                 >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save Text Color
+                  <Save className="h-4 w-4 mr-1" style={{ color: 'white' }} />
+                  <span style={{ color: 'white' }}>Save Text Color</span>
                 </div>
               </div>
 
@@ -686,8 +686,8 @@ export default function Settings() {
                 boxShadow: 'none'
               } as React.CSSProperties}
             >
-              <Save className="h-4 w-4 mr-2" />
-              Save Appearance Settings
+              <Save className="h-4 w-4 mr-2" style={{ color: 'white' }} />
+              <span style={{ color: 'white' }}>Save Appearance Settings</span>
             </div>
           </CardContent>
         </Card>
