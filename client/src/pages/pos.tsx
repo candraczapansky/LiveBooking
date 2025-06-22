@@ -90,6 +90,7 @@ export default function PointOfSale() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [cashReceived, setCashReceived] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -99,6 +100,11 @@ export default function PointOfSale() {
   // Fetch services
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["/api/services"],
+  });
+
+  // Fetch products
+  const { data: products, isLoading: productsLoading } = useQuery({
+    queryKey: ["/api/products"],
   });
 
   // Fetch clients
@@ -133,38 +139,53 @@ export default function PointOfSale() {
     },
   });
 
-  const addToCart = (service: Service) => {
+  const addServiceToCart = (service: Service) => {
     setCart(prev => {
-      const existingItem = prev.find(item => item.service.id === service.id);
+      const existingItem = prev.find(item => item.type === 'service' && item.item.id === service.id);
       if (existingItem) {
         return prev.map(item =>
-          item.service.id === service.id
+          item.type === 'service' && item.item.id === service.id
             ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * service.price }
             : item
         );
       } else {
-        return [...prev, { service, quantity: 1, total: service.price }];
+        return [...prev, { item: service, type: 'service', quantity: 1, total: service.price }];
       }
     });
   };
 
-  const updateCartQuantity = (serviceId: number, newQuantity: number) => {
+  const addProductToCart = (product: Product) => {
+    setCart(prev => {
+      const existingItem = prev.find(item => item.type === 'product' && item.item.id === product.id);
+      if (existingItem) {
+        return prev.map(item =>
+          item.type === 'product' && item.item.id === product.id
+            ? { ...item, quantity: item.quantity + 1, total: (item.quantity + 1) * product.price }
+            : item
+        );
+      } else {
+        return [...prev, { item: product, type: 'product', quantity: 1, total: product.price }];
+      }
+    });
+  };
+
+  const updateCartQuantity = (itemId: number, type: 'service' | 'product', newQuantity: number) => {
     if (newQuantity === 0) {
-      removeFromCart(serviceId);
+      removeFromCart(itemId, type);
       return;
     }
     
     setCart(prev =>
       prev.map(item =>
-        item.service.id === serviceId
-          ? { ...item, quantity: newQuantity, total: newQuantity * item.service.price }
+        item.item.id === itemId && item.type === type
+          ? { ...item, quantity: newQuantity, total: newQuantity * item.item.price }
           : item
       )
     );
   };
 
-  const removeFromCart = (serviceId: number) => {
-    setCart(prev => prev.filter(item => item.service.id !== serviceId));
+  const removeFromCart = (itemId: number, type: 'service' | 'product') => {
+    setCart(prev => prev.filter(item => !(item.item.id === itemId && item.type === type)));
   };
 
   const clearCart = () => {
@@ -291,7 +312,7 @@ export default function PointOfSale() {
                               </div>
                               <Button
                                 size="sm"
-                                onClick={() => addToCart(service)}
+                                onClick={() => addServiceToCart(service)}
                                 className="flex items-center gap-1"
                               >
                                 <Plus className="h-4 w-4" />
@@ -356,16 +377,22 @@ export default function PointOfSale() {
                         </div>
                       ) : (
                         cart.map((item) => (
-                          <div key={item.service.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                          <div key={`${item.type}-${item.item.id}`} className="flex items-center gap-3 p-3 border rounded-lg">
                             <div className="flex-1">
-                              <h4 className="font-medium">{item.service.name}</h4>
-                              <p className="text-sm text-gray-600">${item.service.price.toFixed(2)} each</p>
+                              <h4 className="font-medium">{item.item.name}</h4>
+                              <p className="text-sm text-gray-600">${item.item.price.toFixed(2)} each</p>
+                              {item.type === 'service' && (
+                                <p className="text-xs text-gray-500">{(item.item as Service).duration}min</p>
+                              )}
+                              {item.type === 'product' && (
+                                <p className="text-xs text-gray-500">Stock: {(item.item as Product).stockQuantity}</p>
+                              )}
                             </div>
                             <div className="flex items-center gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => updateCartQuantity(item.service.id, item.quantity - 1)}
+                                onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity - 1)}
                               >
                                 <Minus className="h-3 w-3" />
                               </Button>
@@ -373,14 +400,14 @@ export default function PointOfSale() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                onClick={() => updateCartQuantity(item.service.id, item.quantity + 1)}
+                                onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity + 1)}
                               >
                                 <Plus className="h-3 w-3" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="destructive"
-                                onClick={() => removeFromCart(item.service.id)}
+                                onClick={() => removeFromCart(item.item.id, item.type)}
                               >
                                 <Trash2 className="h-3 w-3" />
                               </Button>
