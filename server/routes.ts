@@ -1952,6 +1952,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test email endpoint for debugging
+  app.post("/api/test-email", async (req, res) => {
+    const { to, subject, content } = req.body;
+    
+    if (!to || !subject || !content) {
+      return res.status(400).json({ error: "Missing required fields: to, subject, content" });
+    }
+
+    try {
+      const emailParams = {
+        to: to,
+        from: process.env.SENDGRID_FROM_EMAIL || 'test@example.com',
+        subject: subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Test Email from BeautyBook</h2>
+            <p style="color: #666; line-height: 1.6;">${content}</p>
+            <hr style="border: 1px solid #eee; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px;">This is a test email sent from your salon management system.</p>
+          </div>
+        `,
+        text: `Test Email from BeautyBook\n\n${content}\n\nThis is a test email sent from your salon management system.`
+      };
+
+      const success = await sendEmail(emailParams);
+      
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: `Test email sent to ${to}`,
+          details: "Check your inbox and spam folder. If using Gmail, check the Promotions tab."
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to send test email",
+          details: "Check server logs for SendGrid error details"
+        });
+      }
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Email sending error", 
+        error: error.message 
+      });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
