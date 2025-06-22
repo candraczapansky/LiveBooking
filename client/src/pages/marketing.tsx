@@ -61,7 +61,9 @@ import {
   ArrowRight,
   Edit,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Eye,
+  Users
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -843,6 +845,185 @@ const MarketingPage = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Campaign View Dialog */}
+      <Dialog open={isViewCampaignOpen} onOpenChange={setIsViewCampaignOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {viewCampaign && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <DialogTitle className="text-2xl">{viewCampaign.name}</DialogTitle>
+                    <DialogDescription className="mt-2">
+                      <div className="flex items-center gap-4">
+                        <Badge variant={viewCampaign.type === "email" ? "default" : "secondary"}>
+                          {viewCampaign.type === "email" ? "Email Campaign" : "SMS Campaign"}
+                        </Badge>
+                        <Badge 
+                          variant="outline"
+                          className={`${
+                            viewCampaign.status === "sent" 
+                              ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" 
+                              : viewCampaign.status === "scheduled" 
+                              ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100"
+                              : ""
+                          }`}
+                        >
+                          {viewCampaign.status === "sent" 
+                            ? "Sent" 
+                            : viewCampaign.status === "scheduled" 
+                            ? "Scheduled" 
+                            : "Draft"}
+                        </Badge>
+                      </div>
+                    </DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              
+              <div className="space-y-6">
+                {/* Campaign Details */}
+                <div className="grid gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Audience</label>
+                    <p className="text-lg">{viewCampaign.audience}</p>
+                  </div>
+                  
+                  {viewCampaign.subject && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Subject</label>
+                      <p className="text-lg">{viewCampaign.subject}</p>
+                    </div>
+                  )}
+                  
+                  {viewCampaign.sendDate && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Send Date</label>
+                      <p className="text-lg">{new Date(viewCampaign.sendDate).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  
+                  {viewCampaign.createdAt && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Created</label>
+                      <p className="text-lg">{new Date(viewCampaign.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                  
+                  {viewCampaign.sentAt && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Sent</label>
+                      <p className="text-lg">{new Date(viewCampaign.sentAt).toLocaleDateString()}</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Campaign Content */}
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Content</label>
+                  <div className="mt-2 p-4 bg-muted rounded-lg">
+                    <p className="whitespace-pre-wrap">{viewCampaign.content}</p>
+                  </div>
+                </div>
+                
+                {/* Analytics - Only show for sent campaigns */}
+                {viewCampaign.status === "sent" && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 block">Campaign Analytics</label>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="text-center p-4 bg-muted rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                          {viewCampaign.sentCount || 0}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Total Sent</div>
+                      </div>
+                      
+                      <div className="text-center p-4 bg-muted rounded-lg">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                          {viewCampaign.deliveredCount || 0}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Delivered</div>
+                      </div>
+                      
+                      <div className="text-center p-4 bg-muted rounded-lg">
+                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                          {viewCampaign.failedCount || 0}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">Failed</div>
+                      </div>
+                    </div>
+                    
+                    {viewCampaign.type === "email" && viewCampaign.sentCount && viewCampaign.sentCount > 0 && (
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="text-center p-4 bg-muted rounded-lg">
+                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                            {viewCampaign.openRate || 0}%
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Open Rate</div>
+                        </div>
+                        
+                        <div className="text-center p-4 bg-muted rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                            {Math.round(((viewCampaign.deliveredCount || 0) / viewCampaign.sentCount) * 100)}%
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Delivery Rate</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {/* Recipient Information */}
+                <div>
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2 block">Recipient Information</label>
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <Users className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                      <span className="text-sm">
+                        Targeted to: <strong>{viewCampaign.audience}</strong> audience segment
+                      </span>
+                    </div>
+                    {viewCampaign.sentCount && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <MessageSquare className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                        <span className="text-sm">
+                          Sent to <strong>{viewCampaign.sentCount}</strong> recipients
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsViewCampaignOpen(false)}>
+                  Close
+                </Button>
+                {viewCampaign.status === "draft" && (
+                  <Button 
+                    onClick={() => {
+                      setIsViewCampaignOpen(false);
+                      setCampaignToEdit(viewCampaign);
+                      setIsCampaignFormOpen(true);
+                      campaignForm.reset({
+                        name: viewCampaign.name,
+                        type: viewCampaign.type as 'email' | 'sms',
+                        audience: viewCampaign.audience,
+                        content: viewCampaign.content,
+                        subject: viewCampaign.subject || '',
+                      });
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Campaign
+                  </Button>
+                )}
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
       
