@@ -51,7 +51,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight } from "lucide-react";
+import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -340,6 +340,68 @@ const ClientsPage = () => {
     setClientDetail(null);
   };
 
+  const handleExportClients = () => {
+    if (!clients || clients.length === 0) {
+      toast({
+        title: "No data to export",
+        description: "There are no clients to export.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Define CSV headers
+    const headers = [
+      'ID', 'First Name', 'Last Name', 'Email', 'Phone', 'Username',
+      'Address', 'City', 'State', 'ZIP Code', 'Join Date',
+      'Email Account Management', 'Email Appointment Reminders', 'Email Promotions',
+      'SMS Account Management', 'SMS Appointment Reminders', 'SMS Promotions'
+    ];
+
+    // Convert clients data to CSV format
+    const csvData = clients.map(client => [
+      client.id,
+      client.firstName || '',
+      client.lastName || '',
+      client.email,
+      client.phone || '',
+      client.username,
+      client.address || '',
+      client.city || '',
+      client.state || '',
+      client.zipCode || '',
+      client.createdAt ? new Date(client.createdAt).toLocaleDateString() : '',
+      client.emailAccountManagement ? 'Yes' : 'No',
+      client.emailAppointmentReminders ? 'Yes' : 'No',
+      client.emailPromotions ? 'Yes' : 'No',
+      client.smsAccountManagement ? 'Yes' : 'No',
+      client.smsAppointmentReminders ? 'Yes' : 'No',
+      client.smsPromotions ? 'Yes' : 'No'
+    ]);
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+    ].join('\n');
+
+    // Create and download the file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `clients_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast({
+      title: "Export successful",
+      description: `Exported ${clients.length} clients to CSV file.`,
+    });
+  };
+
   const filteredClients = clients?.filter((client: Client) =>
     client.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
     client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -380,6 +442,14 @@ const ClientsPage = () => {
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
+                    <Button
+                      variant="outline"
+                      onClick={handleExportClients}
+                      className="mr-2"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </Button>
                     <Button onClick={() => setIsAddDialogOpen(true)}>
                       <PlusCircle className="h-4 w-4 mr-2" />
                       Add Client
