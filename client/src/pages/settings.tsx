@@ -26,7 +26,8 @@ import {
   EyeOff,
   Save,
   Camera,
-  User
+  User,
+  Palette
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -47,6 +48,7 @@ export default function Settings() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('blue');
+  const [customColor, setCustomColor] = useState('#3b82f6');
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
@@ -54,6 +56,25 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Load saved appearance settings on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'blue';
+    const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+
+    setSelectedTheme(savedTheme);
+    setCustomColor(savedCustomColor);
+    setDarkMode(savedDarkMode);
+
+    // Apply saved custom color
+    if (savedTheme === 'custom' || savedCustomColor !== '#3b82f6') {
+      const hslColor = hexToHsl(savedCustomColor);
+      const root = document.documentElement;
+      root.style.setProperty('--dropdown-selected', hslColor);
+      root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+    }
+  }, []);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -146,15 +167,55 @@ export default function Settings() {
     });
   };
 
+  // Convert hex to HSL format
+  const hexToHsl = (hex: string) => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if (max === min) {
+      h = s = 0;
+    } else {
+      const d = max - min;
+      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+      switch (max) {
+        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+        case g: h = (b - r) / d + 2; break;
+        case b: h = (r - g) / d + 4; break;
+        default: h = 0;
+      }
+      h /= 6;
+    }
+
+    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+  };
+
   const handleThemeChange = (theme: string) => {
     setSelectedTheme(theme);
-    // Apply theme to document root for immediate visual feedback
     document.documentElement.setAttribute('data-theme', theme);
+  };
+
+  const handleCustomColorChange = (color: string) => {
+    setCustomColor(color);
+    const hslColor = hexToHsl(color);
+    
+    // Apply custom color to CSS variables immediately
+    const root = document.documentElement;
+    root.style.setProperty('--dropdown-selected', hslColor);
+    root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+    
+    // Set theme to custom
+    setSelectedTheme('custom');
   };
 
   const handleSaveAppearance = () => {
     // Save appearance settings to localStorage
     localStorage.setItem('theme', selectedTheme);
+    localStorage.setItem('customColor', customColor);
     localStorage.setItem('darkMode', darkMode.toString());
     
     toast({
@@ -290,41 +351,82 @@ export default function Settings() {
 
             <Separator />
 
-            <div className="space-y-4">
-              <div>
-                <Label className="text-base">Theme Color</Label>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  Choose your preferred accent color
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <Label className="text-base flex items-center">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Custom Theme Color
+                </Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Choose any color for your theme accent
                 </p>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={customColor}
+                      onChange={(e) => handleCustomColorChange(e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Color Value</Label>
+                      <Input
+                        type="text"
+                        value={customColor}
+                        onChange={(e) => handleCustomColorChange(e.target.value)}
+                        className="w-32 text-sm"
+                        placeholder="#3b82f6"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Preview</Label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <div 
+                        className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                        style={{ backgroundColor: customColor }}
+                      />
+                      <div className="flex space-x-1">
+                        <Button size="sm" className="text-xs">Primary</Button>
+                        <Button size="sm" variant="secondary" className="text-xs">Secondary</Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label className="text-base">Quick Color Presets</Label>
                 <div className="grid grid-cols-6 gap-3">
                   {[
-                    { name: 'Default', color: 'bg-blue-500', value: 'blue' },
-                    { name: 'Purple', color: 'bg-purple-500', value: 'purple' },
-                    { name: 'Pink', color: 'bg-pink-500', value: 'pink' },
-                    { name: 'Green', color: 'bg-green-500', value: 'green' },
-                    { name: 'Orange', color: 'bg-orange-500', value: 'orange' },
-                    { name: 'Red', color: 'bg-red-500', value: 'red' },
-                    { name: 'Teal', color: 'bg-teal-500', value: 'teal' },
-                    { name: 'Indigo', color: 'bg-indigo-500', value: 'indigo' },
-                    { name: 'Rose', color: 'bg-rose-500', value: 'rose' },
-                    { name: 'Emerald', color: 'bg-emerald-500', value: 'emerald' },
-                    { name: 'Amber', color: 'bg-amber-500', value: 'amber' },
-                    { name: 'Cyan', color: 'bg-cyan-500', value: 'cyan' },
-                    { name: 'Violet', color: 'bg-violet-500', value: 'violet' },
-                    { name: 'Lime', color: 'bg-lime-500', value: 'lime' },
-                    { name: 'Fuchsia', color: 'bg-fuchsia-500', value: 'fuchsia' },
-                    { name: 'Sky', color: 'bg-sky-500', value: 'sky' },
-                    { name: 'Slate', color: 'bg-slate-500', value: 'slate' },
-                    { name: 'Stone', color: 'bg-stone-500', value: 'stone' },
-                  ].map((theme) => (
+                    { name: 'Blue', color: '#3b82f6', value: 'blue' },
+                    { name: 'Purple', color: '#8b5cf6', value: 'purple' },
+                    { name: 'Pink', color: '#ec4899', value: 'pink' },
+                    { name: 'Green', color: '#10b981', value: 'green' },
+                    { name: 'Orange', color: '#f97316', value: 'orange' },
+                    { name: 'Red', color: '#ef4444', value: 'red' },
+                    { name: 'Teal', color: '#14b8a6', value: 'teal' },
+                    { name: 'Indigo', color: '#6366f1', value: 'indigo' },
+                    { name: 'Rose', color: '#f43f5e', value: 'rose' },
+                    { name: 'Emerald', color: '#059669', value: 'emerald' },
+                    { name: 'Amber', color: '#f59e0b', value: 'amber' },
+                    { name: 'Cyan', color: '#06b6d4', value: 'cyan' },
+                  ].map((preset) => (
                     <div
-                      key={theme.value}
-                      className="cursor-pointer group"
-                      onClick={() => handleThemeChange(theme.value)}
+                      key={preset.value}
+                      className="cursor-pointer group text-center"
+                      onClick={() => handleCustomColorChange(preset.color)}
                     >
-                      <div className={`w-8 h-8 rounded-full ${theme.color} group-hover:scale-110 transition-transform border-2 ${selectedTheme === theme.value ? 'border-gray-900 dark:border-gray-100' : 'border-transparent'}`} />
-                      <p className="text-xs text-center mt-1 text-gray-600 dark:text-gray-400">
-                        {theme.name}
+                      <div 
+                        className="w-8 h-8 mx-auto rounded-full group-hover:scale-110 transition-transform border-2 border-gray-300 dark:border-gray-600"
+                        style={{ backgroundColor: preset.color }}
+                      />
+                      <p className="text-xs mt-1 text-gray-600 dark:text-gray-400">
+                        {preset.name}
                       </p>
                     </div>
                   ))}
