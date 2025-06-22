@@ -1417,7 +1417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
               campaign.subject || 'Marketing Update from BeautyBook',
               campaign.content,
-              'noreply@beautybook.com'
+              process.env.SENDGRID_FROM_EMAIL || 'test@example.com' // Use verified sender email
             );
             success = await sendEmail(emailParams);
           }
@@ -1604,12 +1604,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Check email service configuration
   app.get("/api/email-config-status", async (req, res) => {
-    res.json({
-      configured: !!process.env.SENDGRID_API_KEY,
-      message: process.env.SENDGRID_API_KEY
-        ? "Email service is configured and ready"
-        : "Email service requires SendGrid configuration (SENDGRID_API_KEY)"
-    });
+    if (!process.env.SENDGRID_API_KEY) {
+      return res.json({
+        configured: false,
+        message: "Email service requires SendGrid configuration (SENDGRID_API_KEY)"
+      });
+    }
+
+    // Test the API key by attempting to verify sender identity
+    try {
+      const response = await fetch('https://api.sendgrid.com/v3/verified_senders', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.status === 403) {
+        return res.json({
+          configured: false,
+          message: "SendGrid API key lacks permissions. Please ensure your API key has 'Mail Send' permissions and verify your sender identity in SendGrid.",
+          error: "API key permissions insufficient"
+        });
+      } else if (response.ok) {
+        return res.json({
+          configured: true,
+          message: "Email service is configured and ready"
+        });
+      } else {
+        return res.json({
+          configured: false,
+          message: "SendGrid API key validation failed",
+          error: `HTTP ${response.status}`
+        });
+      }
+    } catch (error: any) {
+      return res.json({
+        configured: false,
+        message: "Failed to validate SendGrid API key",
+        error: error.message
+      });
+    }
   });
 
   // Get campaign recipients
