@@ -46,6 +46,7 @@ export default function Settings() {
   const { user } = useContext(AuthContext);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState('blue');
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
@@ -116,6 +117,23 @@ export default function Settings() {
     toast({
       title: "Settings saved",
       description: "Your notification preferences have been updated.",
+    });
+  };
+
+  const handleThemeChange = (theme: string) => {
+    setSelectedTheme(theme);
+    // Apply theme to document root for immediate visual feedback
+    document.documentElement.setAttribute('data-theme', theme);
+  };
+
+  const handleSaveAppearance = () => {
+    // Save appearance settings to localStorage
+    localStorage.setItem('theme', selectedTheme);
+    localStorage.setItem('darkMode', darkMode.toString());
+    
+    toast({
+      title: "Appearance saved",
+      description: "Your appearance preferences have been updated.",
     });
   };
 
@@ -230,7 +248,7 @@ export default function Settings() {
               Customize how the application looks and feels.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <Label className="text-base">Dark Mode</Label>
@@ -243,6 +261,43 @@ export default function Settings() {
                 onCheckedChange={setDarkMode}
               />
             </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base">Theme Color</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Choose your preferred accent color
+                </p>
+                <div className="grid grid-cols-6 gap-3">
+                  {[
+                    { name: 'Default', color: 'bg-blue-500', value: 'blue' },
+                    { name: 'Purple', color: 'bg-purple-500', value: 'purple' },
+                    { name: 'Pink', color: 'bg-pink-500', value: 'pink' },
+                    { name: 'Green', color: 'bg-green-500', value: 'green' },
+                    { name: 'Orange', color: 'bg-orange-500', value: 'orange' },
+                    { name: 'Red', color: 'bg-red-500', value: 'red' },
+                  ].map((theme) => (
+                    <div
+                      key={theme.value}
+                      className="cursor-pointer group"
+                      onClick={() => handleThemeChange(theme.value)}
+                    >
+                      <div className={`w-8 h-8 rounded-full ${theme.color} group-hover:scale-110 transition-transform border-2 ${selectedTheme === theme.value ? 'border-gray-900 dark:border-gray-100' : 'border-transparent'}`} />
+                      <p className="text-xs text-center mt-1 text-gray-600 dark:text-gray-400">
+                        {theme.name}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={handleSaveAppearance} className="w-full">
+              <Save className="h-4 w-4 mr-2" />
+              Save Appearance Settings
+            </Button>
           </CardContent>
         </Card>
 
