@@ -21,6 +21,13 @@ import {
   insertMarketingCampaignSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
+import { 
+  sendEmail, 
+  sendBulkEmail, 
+  createAppointmentReminderEmail, 
+  createMarketingCampaignEmail, 
+  createAccountUpdateEmail 
+} from "./email";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -1343,14 +1350,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Campaign not found" });
       }
 
-      if (campaign.type !== 'sms') {
-        return res.status(400).json({ error: "This endpoint only supports SMS campaigns" });
+      if (campaign.type !== 'sms' && campaign.type !== 'email') {
+        return res.status(400).json({ error: "Campaign type must be either 'sms' or 'email'" });
       }
 
-      // Check if Twilio is configured
-      if (!isTwilioConfigured()) {
+      // Check if the required service is configured
+      if (campaign.type === 'sms' && !isTwilioConfigured()) {
         return res.status(400).json({ 
           error: "SMS service not configured. Please configure Twilio credentials." 
+        });
+      }
+
+      if (campaign.type === 'email' && !process.env.SENDGRID_API_KEY) {
+        return res.status(400).json({ 
+          error: "Email service not configured. Please configure SendGrid API key." 
         });
       }
 
@@ -1361,19 +1374,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No recipients found for the selected audience" });
       }
 
-      // Filter recipients with phone numbers
-      const recipientsWithPhone = recipients.filter(user => user.phone);
-      
-      if (recipientsWithPhone.length === 0) {
-        return res.status(400).json({ error: "No recipients have phone numbers" });
+      // Filter recipients based on campaign type
+      let validRecipients: any[] = [];
+      if (campaign.type === 'sms') {
+        validRecipients = recipients.filter(user => user.phone);
+        if (validRecipients.length === 0) {
+          return res.status(400).json({ error: "No recipients have phone numbers" });
+        }
+      } else if (campaign.type === 'email') {
+        validRecipients = recipients.filter(user => user.email);
+        if (validRecipients.length === 0) {
+          return res.status(400).json({ error: "No recipients have email addresses" });
+        }
       }
 
       let sentCount = 0;
       let deliveredCount = 0;
       let failedCount = 0;
 
-      // Send SMS to each recipient
-      for (const recipient of recipientsWithPhone) {
+      // Send campaign to each recipient
+      for (const recipient of validRecipients) {
         try {
           // Create recipient record
           const campaignRecipient = await storage.createMarketingCampaignRecipient({
@@ -1382,12 +1402,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: 'pending'
           });
 
-          // Send SMS
-          const smsResult = await sendSMS(recipient.phone!, campaign.content);
+          let success = false;
+          let errorMessage = '';
+
+          if (campaign.type === 'sms') {
+            // Send SMS
+            const smsResult = await sendSMS(recipient.phone!, campaign.content);
+            success = smsResult.success;
+            errorMessage = smsResult.error || '';
+          } else if (campaign.type === 'email') {
+            // Send Email
+            const emailParams = createMarketingCampaignEmail(
+              recipient.email,
+              recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
+              campaign.subject || 'Marketing Update from BeautyBook',
+              campaign.content,
+              'noreply@beautybook.com'
+            );
+            success = await sendEmail(emailParams);
+          }
           
-          if (smsResult.success) {
+          if (success) {
             sentCount++;
-            deliveredCount++; // For SMS we assume delivered if sent successfully
+            deliveredCount++; // We assume delivered if sent successfully
             
             // Update recipient status
             await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
@@ -1401,12 +1438,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Update recipient status with error
             await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
               status: 'failed',
-              errorMessage: smsResult.error
+              errorMessage: errorMessage || `Failed to send ${campaign.type}`
             });
           }
         } catch (error: any) {
           failedCount++;
-          console.error(`Error sending SMS to ${recipient.phone}:`, error);
+          const contactInfo = campaign.type === 'sms' ? recipient.phone : recipient.email;
+          console.error(`Error sending ${campaign.type} to ${contactInfo}:`, error);
         }
       }
 
