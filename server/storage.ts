@@ -16,7 +16,8 @@ import {
   giftCards, GiftCard, InsertGiftCard,
   giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction,
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
-  marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient
+  marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
+  emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -154,6 +155,13 @@ export interface IStorage {
   getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined>;
   getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]>;
   updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient>;
+  getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined>;
+
+  // Email unsubscribe operations
+  createEmailUnsubscribe(unsubscribe: InsertEmailUnsubscribe): Promise<EmailUnsubscribe>;
+  getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined>;
+  getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]>;
+  isUserUnsubscribed(email: string): Promise<boolean>;
 
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
@@ -177,6 +185,7 @@ export class DatabaseStorage implements IStorage {
   private savedGiftCards: Map<number, SavedGiftCard>;
   private marketingCampaigns: Map<number, MarketingCampaign>;
   private marketingCampaignRecipients: Map<number, MarketingCampaignRecipient>;
+  private emailUnsubscribes: Map<number, EmailUnsubscribe>;
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
@@ -1086,6 +1095,9 @@ export class DatabaseStorage implements IStorage {
       sentCount: campaign.sentCount || 0,
       deliveredCount: campaign.deliveredCount || 0,
       failedCount: campaign.failedCount || 0,
+      openedCount: campaign.openedCount || 0,
+      clickedCount: campaign.clickedCount || 0,
+      unsubscribedCount: campaign.unsubscribedCount || 0,
       createdAt: new Date(),
       sentAt: null,
     };

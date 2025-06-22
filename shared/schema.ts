@@ -357,6 +357,9 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
   sentCount: integer("sent_count").default(0),
   deliveredCount: integer("delivered_count").default(0),
   failedCount: integer("failed_count").default(0),
+  openedCount: integer("opened_count").default(0), // Track email opens
+  clickedCount: integer("clicked_count").default(0), // Track link clicks
+  unsubscribedCount: integer("unsubscribed_count").default(0), // Track unsubscribes
   createdAt: timestamp("created_at").defaultNow(),
   sentAt: timestamp("sent_at"),
 });
@@ -377,6 +380,10 @@ export const marketingCampaignRecipients = pgTable("marketing_campaign_recipient
   status: text("status").notNull().default("pending"), // pending, sent, delivered, failed
   sentAt: timestamp("sent_at"),
   deliveredAt: timestamp("delivered_at"),
+  openedAt: timestamp("opened_at"), // Track when email was opened
+  clickedAt: timestamp("clicked_at"), // Track when links were clicked
+  unsubscribedAt: timestamp("unsubscribed_at"), // Track when user unsubscribed
+  trackingToken: text("tracking_token").unique(), // Unique token for tracking pixels and links
   errorMessage: text("error_message"),
 });
 
@@ -389,6 +396,25 @@ export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSche
 
 export type MarketingCampaignRecipient = typeof marketingCampaignRecipients.$inferSelect;
 export type InsertMarketingCampaignRecipient = z.infer<typeof insertMarketingCampaignRecipientSchema>;
+
+// Email unsubscribes schema (global unsubscribe tracking)
+export const emailUnsubscribes = pgTable("email_unsubscribes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  email: text("email").notNull(),
+  unsubscribedAt: timestamp("unsubscribed_at").defaultNow(),
+  campaignId: integer("campaign_id"), // Which campaign triggered the unsubscribe
+  reason: text("reason"), // Optional reason for unsubscribing
+  ipAddress: text("ip_address"), // Track where unsubscribe came from
+});
+
+export const insertEmailUnsubscribeSchema = createInsertSchema(emailUnsubscribes).omit({
+  id: true,
+  unsubscribedAt: true,
+});
+
+export type EmailUnsubscribe = typeof emailUnsubscribes.$inferSelect;
+export type InsertEmailUnsubscribe = z.infer<typeof insertEmailUnsubscribeSchema>;
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
