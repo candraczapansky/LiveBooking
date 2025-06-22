@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Edit, Trash2, Package, BarChart3 } from "lucide-react";
+import { Plus, Search, Edit, Trash2, Package, BarChart3, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +79,9 @@ export default function Products() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ProductFormData>({
     name: "",
     description: "",
@@ -194,6 +197,79 @@ export default function Products() {
       dimensions: "",
       imageUrl: "",
     });
+    setSelectedFile(null);
+    setImagePreview("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+      
+      setSelectedFile(file);
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setSelectedFile(null);
+    setImagePreview("");
+    setFormData({ ...formData, imageUrl: "" });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let productData = { ...formData };
+    
+    // If a file is selected, convert it to base64
+    if (selectedFile) {
+      try {
+        const base64Image = await convertFileToBase64(selectedFile);
+        productData.imageUrl = base64Image;
+      } catch (error) {
+        console.error('Error converting file to base64:', error);
+        alert('Error processing image file');
+        return;
+      }
+    }
+    
+    if (editingProduct) {
+      updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+    } else {
+      createProductMutation.mutate(productData);
+    }
   };
 
   const handleEdit = (product: Product) => {
@@ -224,14 +300,7 @@ export default function Products() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: formData });
-    } else {
-      createProductMutation.mutate(formData);
-    }
-  };
+
 
   const filteredProducts = (products as Product[])?.filter((product: Product) =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
