@@ -21,6 +21,7 @@ import Settings from "@/pages/settings";
 import Schedule from "@/pages/schedule";
 import ClientBooking from "@/pages/client-booking";
 import PointOfSale from "@/pages/pos";
+import Products from "@/pages/products";
 
 type User = {
   id: number;
@@ -79,6 +80,7 @@ function Router() {
       <Route path="/clients" component={Clients} />
       <Route path="/staff" component={Staff} />
       <Route path="/pos" component={PointOfSale} />
+      <Route path="/products" component={Products} />
       <Route path="/rooms" component={Rooms} />
       <Route path="/devices" component={Devices} />
       <Route path="/appointments" component={Appointments} />
