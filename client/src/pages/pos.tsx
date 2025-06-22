@@ -580,8 +580,9 @@ export default function PointOfSale() {
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => removeFromCart(item.item.id, item.type)}
+                                className="p-2"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                             <div className="text-right">
