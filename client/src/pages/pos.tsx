@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements, useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,95 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { apiRequest } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+
+// Initialize Stripe
+if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
+  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+}
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+
+// Card element styling
+const CARD_ELEMENT_OPTIONS = {
+  style: {
+    base: {
+      fontSize: '16px',
+      color: '#424770',
+      '::placeholder': {
+        color: '#aab7c4',
+      },
+    },
+    invalid: {
+      color: '#9e2146',
+    },
+  },
+};
+
+// Payment form component
+const PaymentForm = ({ total, onSuccess, onError }: { 
+  total: number; 
+  onSuccess: () => void; 
+  onError: (error: string) => void; 
+}) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!stripe || !elements) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Create payment intent
+      const response = await apiRequest("POST", "/api/create-payment-intent", {
+        amount: total,
+      });
+      const { clientSecret } = await response.json();
+
+      const cardElement = elements.getElement(CardElement);
+      if (!cardElement) {
+        throw new Error('Card element not found');
+      }
+
+      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+        payment_method: {
+          card: cardElement,
+        },
+      });
+
+      if (error) {
+        onError(error.message || 'Payment failed');
+      } else if (paymentIntent.status === 'succeeded') {
+        onSuccess();
+      }
+    } catch (error: any) {
+      onError(error.message || 'Payment failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="p-3 border rounded-md bg-white dark:bg-gray-800">
+        <CardElement options={CARD_ELEMENT_OPTIONS} />
+      </div>
+      <Button 
+        type="submit" 
+        disabled={!stripe || isLoading}
+        className="w-full"
+      >
+        {isLoading ? "Processing..." : `Pay $${total.toFixed(2)}`}
+      </Button>
+    </form>
+  );
+};
 
 type Service = {
   id: number;
@@ -88,8 +179,9 @@ export default function PointOfSale() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>("cash");
+  const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [cashReceived, setCashReceived] = useState<string>("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -601,6 +693,36 @@ export default function PointOfSale() {
               </div>
             )}
 
+            {paymentMethod === "card" && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Card Information</label>
+                <Elements stripe={stripePromise}>
+                  <PaymentForm
+                    total={getGrandTotal()}
+                    onSuccess={() => {
+                      // Process transaction after successful payment
+                      const transaction = {
+                        clientId: selectedClient?.id,
+                        items: cart,
+                        subtotal: getSubtotal(),
+                        tax: getTax(),
+                        total: getGrandTotal(),
+                        paymentMethod: "card",
+                      };
+                      processTransactionMutation.mutate(transaction);
+                    }}
+                    onError={(error) => {
+                      toast({
+                        title: "Payment Failed",
+                        description: error,
+                        variant: "destructive",
+                      });
+                    }}
+                  />
+                </Elements>
+              </div>
+            )}
+
             <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total Amount:</span>
@@ -613,19 +735,21 @@ export default function PointOfSale() {
             <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              onClick={processTransaction}
-              disabled={processTransactionMutation.isPending}
-            >
-              {processTransactionMutation.isPending ? (
-                "Processing..."
-              ) : (
-                <>
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Complete Sale
-                </>
-              )}
-            </Button>
+            {paymentMethod !== "card" && (
+              <Button 
+                onClick={processTransaction}
+                disabled={processTransactionMutation.isPending}
+              >
+                {processTransactionMutation.isPending ? (
+                  "Processing..."
+                ) : (
+                  <>
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Complete Sale
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
