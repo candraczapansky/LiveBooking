@@ -129,8 +129,15 @@ export default function Settings() {
     if (savedTheme === 'custom' || savedCustomColor !== '#3b82f6') {
       const hslColor = hexToHsl(savedCustomColor);
       const root = document.documentElement;
+      
+      // Update all primary color variables
+      root.style.setProperty('--primary', hslColor);
+      root.style.setProperty('--primary-foreground', '0 0% 98%');
       root.style.setProperty('--dropdown-selected', hslColor);
       root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+      root.style.setProperty('--accent', hslColor);
+      root.style.setProperty('--accent-foreground', '0 0% 98%');
+      root.style.setProperty('--primary-color', savedCustomColor);
     }
 
     // Apply saved secondary color to font
@@ -278,12 +285,39 @@ export default function Settings() {
     
     // Apply custom color to CSS variables immediately
     const root = document.documentElement;
+    
+    // Update primary color variables that affect buttons, links, etc.
+    root.style.setProperty('--primary', hslColor);
+    root.style.setProperty('--primary-foreground', '0 0% 98%');
+    
+    // Update dropdown and selection colors
     root.style.setProperty('--dropdown-selected', hslColor);
     root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+    
+    // Update accent colors for consistency
+    root.style.setProperty('--accent', hslColor);
+    root.style.setProperty('--accent-foreground', '0 0% 98%');
+    
+    // Store the hex color for reference
     root.style.setProperty('--primary-color', color);
+    
+    // Save to localStorage
+    localStorage.setItem('custom-color', color);
+    localStorage.setItem('selected-theme', 'custom');
     
     // Set theme to custom
     setSelectedTheme('custom');
+    
+    // Force a re-render and style update
+    setTimeout(() => {
+      // Re-apply styles to ensure they stick
+      root.style.setProperty('--primary', hslColor);
+      root.style.setProperty('--accent', hslColor);
+      setForceRerender(prev => prev + 1);
+      
+      console.log('Applied primary color:', color, 'HSL:', hslColor);
+      console.log('Current CSS primary:', getComputedStyle(root).getPropertyValue('--primary'));
+    }, 50);
   };
 
   const handleSecondaryColorChange = (color: string) => {
@@ -637,7 +671,13 @@ export default function Settings() {
                     </div>
                   </div>
                   
-
+                  {/* Test Button */}
+                  <Button 
+                    onClick={() => console.log('Primary color test button clicked')}
+                    className="px-4 py-2"
+                  >
+                    Test Color
+                  </Button>
                 </div>
 
                 {/* Save Primary Color Section */}
