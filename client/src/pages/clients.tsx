@@ -507,6 +507,27 @@ const ClientsPage = () => {
             ) : (
               // Client Detail View with Payment Methods
               <div className="space-y-6">
+                {/* Back Button and Actions */}
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={handleBackToList}
+                    className="flex items-center gap-2"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Clients
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => openEditDialog(clientDetail!)}
+                      className="flex items-center gap-2"
+                    >
+                      <Edit className="h-4 w-4" />
+                      Edit Client
+                    </Button>
+                  </div>
+                </div>
                 {/* Client Information Card */}
                 <Card>
                   <CardHeader>
@@ -527,9 +548,10 @@ const ClientsPage = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {/* Contact Information */}
                       <div>
-                        <h4 className="font-medium mb-3">Contact Information</h4>
+                        <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">Contact Information</h4>
                         <div className="space-y-2 text-sm">
                           <div>
                             <span className="text-gray-500 dark:text-gray-400">Email:</span>
@@ -542,6 +564,83 @@ const ClientsPage = () => {
                           <div>
                             <span className="text-gray-500 dark:text-gray-400">Username:</span>
                             <span className="ml-2">{clientDetail?.username}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Address Information */}
+                      <div>
+                        <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">Address</h4>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">Street:</span>
+                            <span className="ml-2">{clientDetail?.address || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">City:</span>
+                            <span className="ml-2">{clientDetail?.city || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">State:</span>
+                            <span className="ml-2">{clientDetail?.state || "Not provided"}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 dark:text-gray-400">ZIP Code:</span>
+                            <span className="ml-2">{clientDetail?.zipCode || "Not provided"}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Communication Preferences */}
+                      <div>
+                        <h4 className="font-medium mb-3 text-gray-900 dark:text-gray-100">Communication Preferences</h4>
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <h5 className="font-medium text-xs text-gray-700 dark:text-gray-300 mb-2">Email Notifications</h5>
+                            <div className="space-y-1 pl-2">
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Account Management:</span>
+                                <span className={`ml-2 ${clientDetail?.emailAccountManagement ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.emailAccountManagement ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Appointment Reminders:</span>
+                                <span className={`ml-2 ${clientDetail?.emailAppointmentReminders ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.emailAppointmentReminders ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Promotions:</span>
+                                <span className={`ml-2 ${clientDetail?.emailPromotions ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.emailPromotions ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h5 className="font-medium text-xs text-gray-700 dark:text-gray-300 mb-2">SMS Notifications</h5>
+                            <div className="space-y-1 pl-2">
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Account Management:</span>
+                                <span className={`ml-2 ${clientDetail?.smsAccountManagement ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.smsAccountManagement ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Appointment Reminders:</span>
+                                <span className={`ml-2 ${clientDetail?.smsAppointmentReminders ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.smsAppointmentReminders ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-gray-500 dark:text-gray-400">Promotions:</span>
+                                <span className={`ml-2 ${clientDetail?.smsPromotions ? 'text-green-600' : 'text-red-600'}`}>
+                                  {clientDetail?.smsPromotions ? 'Enabled' : 'Disabled'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
