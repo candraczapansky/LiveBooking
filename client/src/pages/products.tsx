@@ -291,6 +291,13 @@ export default function Products() {
       dimensions: product.dimensions || "",
       imageUrl: product.imageUrl || "",
     });
+    // Show existing image preview if available
+    if (product.imageUrl) {
+      setImagePreview(product.imageUrl);
+    } else {
+      setImagePreview("");
+    }
+    setSelectedFile(null);
     setIsEditDialogOpen(true);
   };
 
@@ -547,13 +554,53 @@ export default function Products() {
                     </div>
 
                     <div>
-                      <Label htmlFor="imageUrl">Image URL</Label>
-                      <Input
-                        id="imageUrl"
-                        type="url"
-                        value={formData.imageUrl}
-                        onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                      />
+                      <Label htmlFor="productImage">Product Image</Label>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            id="productImage"
+                            accept="image/*"
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex items-center gap-2"
+                          >
+                            <Upload className="h-4 w-4" />
+                            {selectedFile ? 'Change Image' : 'Upload Image'}
+                          </Button>
+                          {selectedFile && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={removeImage}
+                              className="text-destructive"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                        {imagePreview && (
+                          <div className="mt-2">
+                            <img
+                              src={imagePreview}
+                              alt="Product preview"
+                              className="h-20 w-20 object-cover rounded-md border"
+                            />
+                          </div>
+                        )}
+                        {selectedFile && (
+                          <p className="text-sm text-muted-foreground">
+                            {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="flex items-center space-x-6">
@@ -690,7 +737,6 @@ export default function Products() {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                  {/* Same form fields as add dialog */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="edit-name">Product Name *</Label>
@@ -716,6 +762,195 @@ export default function Products() {
                     <Label htmlFor="edit-description">Description</Label>
                     <Textarea
                       id="edit-description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor="edit-sku">SKU</Label>
+                      <Input
+                        id="edit-sku"
+                        value={formData.sku}
+                        onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-barcode">Barcode</Label>
+                      <Input
+                        id="edit-barcode"
+                        value={formData.barcode}
+                        onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-brand">Brand</Label>
+                      <Input
+                        id="edit-brand"
+                        value={formData.brand}
+                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-price">Retail Price *</Label>
+                      <Input
+                        id="edit-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price}
+                        onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-costPrice">Cost Price</Label>
+                      <Input
+                        id="edit-costPrice"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.costPrice}
+                        onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-stockQuantity">Stock Quantity *</Label>
+                      <Input
+                        id="edit-stockQuantity"
+                        type="number"
+                        min="0"
+                        value={formData.stockQuantity}
+                        onChange={(e) => setFormData({ ...formData, stockQuantity: parseInt(e.target.value) || 0 })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-minStockLevel">Minimum Stock Level</Label>
+                      <Input
+                        id="edit-minStockLevel"
+                        type="number"
+                        min="0"
+                        value={formData.minStockLevel}
+                        onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-weight">Weight (grams)</Label>
+                      <Input
+                        id="edit-weight"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.weight}
+                        onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="edit-dimensions">Dimensions (L x W x H)</Label>
+                      <Input
+                        id="edit-dimensions"
+                        value={formData.dimensions}
+                        onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
+                        placeholder="e.g., 10 x 5 x 3 cm"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-productImage">Product Image</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          id="edit-productImage"
+                          accept="image/*"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center gap-2"
+                        >
+                          <Upload className="h-4 w-4" />
+                          {selectedFile ? 'Change Image' : 'Upload Image'}
+                        </Button>
+                        {(selectedFile || imagePreview) && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={removeImage}
+                            className="text-destructive"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {imagePreview && (
+                        <div className="mt-2">
+                          <img
+                            src={imagePreview}
+                            alt="Product preview"
+                            className="h-20 w-20 object-cover rounded-md border"
+                          />
+                        </div>
+                      )}
+                      {selectedFile && (
+                        <p className="text-sm text-muted-foreground">
+                          {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-6">
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="edit-isActive"
+                        checked={formData.isActive}
+                        onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                      />
+                      <Label htmlFor="edit-isActive">Active</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="edit-isTaxable"
+                        checked={formData.isTaxable}
+                        onCheckedChange={(checked) => setFormData({ ...formData, isTaxable: checked })}
+                      />
+                      <Label htmlFor="edit-isTaxable">Taxable</Label>
+                    </div>
+                  </div>
+
+                  <DialogFooter>
+                    <Button type="submit" disabled={updateProductMutation.isPending}>
+                      {updateProductMutation.isPending ? "Updating..." : "Update Product"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                       rows={3}
