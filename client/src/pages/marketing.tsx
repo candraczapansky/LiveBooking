@@ -438,14 +438,14 @@ const MarketingPage = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <Badge 
-                                variant={
+                                variant="outline"
+                                className={`mb-2 ${
                                   campaign.status === "sent" 
-                                    ? "secondary" 
+                                    ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" 
                                     : campaign.status === "scheduled" 
-                                    ? "outline" 
-                                    : "outline"
-                                }
-                                className="mb-2"
+                                    ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100"
+                                    : ""
+                                }`}
                               >
                                 {campaign.status === "sent" 
                                   ? "Sent" 
@@ -570,7 +570,7 @@ const MarketingPage = () => {
                           <div className="flex justify-between items-start">
                             <div className="flex items-center">
                               <CardTitle className="text-lg mr-3">{promo.code}</CardTitle>
-                              <Badge variant={promo.active ? "success" : "secondary"}>
+                              <Badge variant={promo.active ? "default" : "secondary"}>
                                 {promo.active ? "Active" : "Inactive"}
                               </Badge>
                             </div>
