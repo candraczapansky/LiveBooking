@@ -8,7 +8,17 @@ const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 let twilioClient: twilio.Twilio | null = null;
 
 if (accountSid && authToken) {
-  twilioClient = twilio(accountSid, authToken);
+  try {
+    // Validate Account SID format
+    if (!accountSid.startsWith('AC')) {
+      console.error('Invalid Twilio Account SID format. Account SID must start with "AC". You may have provided an API Key instead.');
+    } else {
+      twilioClient = twilio(accountSid, authToken);
+      console.log('Twilio client initialized successfully');
+    }
+  } catch (error) {
+    console.error('Failed to initialize Twilio client:', error);
+  }
 }
 
 export interface SMSResult {

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useQuery, useMutation, queryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -180,40 +181,101 @@ const MarketingPage = () => {
     },
   });
 
-  // Mock data - in a real app, these would come from API calls
-  const campaigns: Campaign[] = [
-    {
-      id: 1,
-      name: "Summer Special",
-      type: "email",
-      status: "sent",
-      audience: "All Clients",
-      subject: "Summer Special - 20% Off All Services",
-      content: "Get ready for summer with our special promotion! Book any service and get 20% off until July 31st.",
-      sendDate: "2023-06-15",
-      sentCount: 450,
-      openRate: 32,
-    },
-    {
-      id: 2,
-      name: "New Service Announcement",
-      type: "email",
-      status: "scheduled",
-      audience: "Regular Clients",
-      subject: "Introducing Our New Facial Treatments",
-      content: "We're excited to announce our new line of facial treatments featuring organic products!",
-      sendDate: "2023-07-20",
-    },
-    {
-      id: 3,
-      name: "Appointment Reminder",
-      type: "sms",
-      status: "draft",
-      audience: "Upcoming Appointments",
-      content: "Reminder: You have an appointment at BeautyBook tomorrow at {time}. Reply C to confirm or R to reschedule.",
-    },
-  ];
+  // Fetch campaigns from API
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+    queryKey: ['/api/marketing-campaigns'],
+  });
 
+  // Fetch SMS configuration status
+  const { data: smsConfig } = useQuery({
+    queryKey: ['/api/sms-config-status'],
+  });
+
+  // Create campaign mutation
+  const createCampaignMutation = useMutation({
+    mutationFn: async (campaignData: CampaignFormValues) => {
+      return apiRequest('/api/marketing-campaigns', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: campaignData.name,
+          type: campaignData.type,
+          audience: campaignData.audience,
+          subject: campaignData.type === 'email' ? campaignData.subject : undefined,
+          content: campaignData.content,
+          sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
+          status: campaignData.sendNow ? 'scheduled' : 'draft'
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
+      setIsCampaignFormOpen(false);
+      campaignForm.reset();
+      toast({
+        title: "Campaign created",
+        description: "Your marketing campaign has been created successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send campaign mutation
+  const sendCampaignMutation = useMutation({
+    mutationFn: async (campaignId: number) => {
+      return apiRequest(`/api/marketing-campaigns/${campaignId}/send`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
+      toast({
+        title: "Campaign sent",
+        description: `SMS campaign sent to ${data.results?.sentCount || 0} recipients`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error sending campaign",
+        description: error.message || "Failed to send SMS campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Form submission handlers
+  const onCampaignSubmit = async (data: CampaignFormValues) => {
+    if (data.type === 'sms' && !smsConfig?.configured) {
+      toast({
+        title: "SMS not configured",
+        description: "Please configure Twilio credentials to send SMS campaigns.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    createCampaignMutation.mutate(data);
+  };
+
+  const handleSendCampaign = (campaignId: number, campaignType: string) => {
+    if (campaignType === 'sms' && !smsConfig?.configured) {
+      toast({
+        title: "SMS not configured",
+        description: "Please configure Twilio credentials to send SMS campaigns.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    sendCampaignMutation.mutate(campaignId);
+  };
+
+  // Mock promo data - would be replaced with API call
   const promos: Promo[] = [
     {
       id: 1,
@@ -259,20 +321,7 @@ const MarketingPage = () => {
     promo.service?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateCampaign = (values: CampaignFormValues) => {
-    // In a real app, this would send the data to an API
-    console.log("Creating campaign:", values);
-    
-    toast({
-      title: "Campaign Created",
-      description: values.sendNow 
-        ? "Your campaign has been created and queued for sending."
-        : "Your campaign has been saved as a draft.",
-    });
-    
-    campaignForm.reset();
-    setIsCampaignFormOpen(false);
-  };
+
 
   const handleCreatePromo = (values: PromoFormValues) => {
     // In a real app, this would send the data to an API
