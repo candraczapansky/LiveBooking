@@ -63,6 +63,14 @@ export default function Settings() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    username: ''
+  });
 
   // Load saved appearance settings on mount
   useEffect(() => {
@@ -79,6 +87,34 @@ export default function Settings() {
     setSecondaryColor(savedSecondaryColor);
     setDarkMode(savedDarkMode);
     setProfilePicture(savedProfilePicture);
+    
+    // Initialize profile data when user is available
+    if (user) {
+      // Check if there's saved profile data in localStorage
+      const savedProfileData = localStorage.getItem('profileData');
+      if (savedProfileData) {
+        try {
+          setProfileData(JSON.parse(savedProfileData));
+        } catch {
+          // If parsing fails, use user data
+          setProfileData({
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            username: user.username || ''
+          });
+        }
+      } else {
+        setProfileData({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          email: user.email || '',
+          phone: user.phone || '',
+          username: user.username || ''
+        });
+      }
+    }
     
     if (savedPresetColors) {
       setSavedPresets(JSON.parse(savedPresetColors));
@@ -110,7 +146,7 @@ export default function Settings() {
       root.style.setProperty('--foreground', hslSecondaryColor); // Update main text color
       root.style.setProperty('--muted-foreground', hslSecondaryColor); // Update muted text color
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -364,6 +400,41 @@ export default function Settings() {
     }
   };
 
+  const handleEditProfile = () => {
+    setIsEditingProfile(true);
+  };
+
+  const handleSaveProfile = () => {
+    // Save to localStorage (since we don't have a real API endpoint)
+    localStorage.setItem('profileData', JSON.stringify(profileData));
+    setIsEditingProfile(false);
+    toast({
+      title: "Profile updated",
+      description: "Your profile information has been saved successfully.",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    // Reset to original user data
+    if (user) {
+      setProfileData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        username: user.username || ''
+      });
+    }
+    setIsEditingProfile(false);
+  };
+
+  const handleProfileInputChange = (field: string, value: string) => {
+    setProfileData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
@@ -435,26 +506,51 @@ export default function Settings() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>First Name</Label>
-                <Input value={user?.firstName || ""} disabled className="mt-1" />
+                <Input 
+                  value={isEditingProfile ? profileData.firstName : (user?.firstName || "")}
+                  disabled={!isEditingProfile}
+                  onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
+                  className="mt-1" 
+                />
               </div>
               <div>
                 <Label>Last Name</Label>
-                <Input value={user?.lastName || ""} disabled className="mt-1" />
+                <Input 
+                  value={isEditingProfile ? profileData.lastName : (user?.lastName || "")}
+                  disabled={!isEditingProfile}
+                  onChange={(e) => handleProfileInputChange('lastName', e.target.value)}
+                  className="mt-1" 
+                />
               </div>
               <div>
                 <Label>Email</Label>
-                <Input value={user?.email || ""} disabled className="mt-1" />
+                <Input 
+                  value={isEditingProfile ? profileData.email : (user?.email || "")}
+                  disabled={!isEditingProfile}
+                  onChange={(e) => handleProfileInputChange('email', e.target.value)}
+                  className="mt-1" 
+                />
               </div>
               <div>
                 <Label>Phone Number</Label>
-                <Input value={user?.phone || ""} disabled className="mt-1" />
+                <Input 
+                  value={isEditingProfile ? profileData.phone : (user?.phone || "")}
+                  disabled={!isEditingProfile}
+                  onChange={(e) => handleProfileInputChange('phone', e.target.value)}
+                  className="mt-1" 
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Username</Label>
-                <Input value={user?.username || ""} disabled className="mt-1" />
+                <Input 
+                  value={isEditingProfile ? profileData.username : (user?.username || "")}
+                  disabled={!isEditingProfile}
+                  onChange={(e) => handleProfileInputChange('username', e.target.value)}
+                  className="mt-1" 
+                />
               </div>
               <div>
                 <Label>Member Since</Label>
@@ -466,10 +562,22 @@ export default function Settings() {
               </div>
             </div>
 
-            <Button className="w-full">
-              <User className="h-4 w-4 mr-2" />
-              Edit Profile Information
-            </Button>
+            {!isEditingProfile ? (
+              <Button onClick={handleEditProfile} className="w-full">
+                <User className="h-4 w-4 mr-2" />
+                Edit Profile Information
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button onClick={handleSaveProfile} className="flex-1">
+                  <User className="h-4 w-4 mr-2" />
+                  Save Changes
+                </Button>
+                <Button onClick={handleCancelEdit} variant="outline" className="flex-1">
+                  Cancel
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
