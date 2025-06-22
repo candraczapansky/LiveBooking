@@ -1459,9 +1459,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: `SMS campaign sent successfully`,
+        message: `${campaign.type.toUpperCase()} campaign sent successfully`,
         results: {
-          totalRecipients: recipientsWithPhone.length,
+          totalRecipients: validRecipients.length,
           sentCount,
           deliveredCount,
           failedCount
@@ -1469,9 +1469,147 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
     } catch (error: any) {
-      console.error('Error sending SMS campaign:', error);
-      res.status(500).json({ error: "Error sending SMS campaign: " + error.message });
+      console.error('Error sending campaign:', error);
+      res.status(500).json({ error: "Error sending campaign: " + error.message });
     }
+  });
+
+  // Send appointment reminder emails
+  app.post("/api/appointments/:id/send-reminder", async (req, res) => {
+    try {
+      const appointmentId = parseInt(req.params.id);
+      const appointment = await storage.getAppointment(appointmentId);
+      
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      const client = await storage.getUser(appointment.clientId);
+      if (!client || !client.email) {
+        return res.status(400).json({ error: "Client email not found" });
+      }
+
+      const service = await storage.getService(appointment.serviceId);
+      if (!service) {
+        return res.status(400).json({ error: "Service not found" });
+      }
+
+      const appointmentDate = new Date(appointment.startTime).toLocaleDateString();
+      const appointmentTime = new Date(appointment.startTime).toLocaleTimeString();
+
+      const emailParams = createAppointmentReminderEmail(
+        client.email,
+        client.firstName ? `${client.firstName} ${client.lastName || ''}`.trim() : client.username,
+        appointmentDate,
+        appointmentTime,
+        service.name,
+        'noreply@beautybook.com'
+      );
+
+      const success = await sendEmail(emailParams);
+
+      if (success) {
+        res.json({ 
+          success: true, 
+          message: "Appointment reminder sent successfully" 
+        });
+      } else {
+        res.status(500).json({ 
+          error: "Failed to send appointment reminder" 
+        });
+      }
+    } catch (error: any) {
+      console.error('Error sending appointment reminder:', error);
+      res.status(500).json({ 
+        error: "Error sending appointment reminder: " + error.message 
+      });
+    }
+  });
+
+  // Send bulk appointment reminders for tomorrow's appointments
+  app.post("/api/appointments/send-daily-reminders", async (req, res) => {
+    try {
+      if (!process.env.SENDGRID_API_KEY) {
+        return res.status(400).json({ 
+          error: "Email service not configured" 
+        });
+      }
+
+      // Get tomorrow's appointments
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
+      
+      const dayAfter = new Date(tomorrow);
+      dayAfter.setDate(dayAfter.getDate() + 1);
+
+      const appointments = await storage.getAppointmentsByDateRange(tomorrow, dayAfter);
+      let remindersSent = 0;
+      let remindersFailed = 0;
+
+      for (const appointment of appointments) {
+        try {
+          const client = await storage.getUser(appointment.clientId);
+          if (!client || !client.email) {
+            remindersFailed++;
+            continue;
+          }
+
+          const service = await storage.getService(appointment.serviceId);
+          if (!service) {
+            remindersFailed++;
+            continue;
+          }
+
+          const appointmentDate = new Date(appointment.startTime).toLocaleDateString();
+          const appointmentTime = new Date(appointment.startTime).toLocaleTimeString();
+
+          const emailParams = createAppointmentReminderEmail(
+            client.email,
+            client.firstName ? `${client.firstName} ${client.lastName || ''}`.trim() : client.username,
+            appointmentDate,
+            appointmentTime,
+            service.name,
+            'noreply@beautybook.com'
+          );
+
+          const success = await sendEmail(emailParams);
+          if (success) {
+            remindersSent++;
+          } else {
+            remindersFailed++;
+          }
+        } catch (error) {
+          remindersFailed++;
+          console.error('Error sending reminder for appointment:', appointment.id, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `Daily reminders processed`,
+        results: {
+          totalAppointments: appointments.length,
+          remindersSent,
+          remindersFailed
+        }
+      });
+    } catch (error: any) {
+      console.error('Error sending daily reminders:', error);
+      res.status(500).json({ 
+        error: "Error sending daily reminders: " + error.message 
+      });
+    }
+  });
+
+  // Check email service configuration
+  app.get("/api/email-config-status", async (req, res) => {
+    res.json({
+      configured: !!process.env.SENDGRID_API_KEY,
+      message: process.env.SENDGRID_API_KEY
+        ? "Email service is configured and ready"
+        : "Email service requires SendGrid configuration (SENDGRID_API_KEY)"
+    });
   });
 
   // Get campaign recipients
