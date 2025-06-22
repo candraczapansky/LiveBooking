@@ -246,8 +246,15 @@ const ClientsPage = () => {
     }
   });
 
-  const handleAddClient = (values: ClientFormValues) => {
-    createClientMutation.mutate(values);
+  const handleAddClient = async (values: ClientFormValues) => {
+    // If payment method is selected, we need to handle both client creation and payment setup
+    if (isAddingPaymentMethod) {
+      // Create client first, then handle payment method in the success callback
+      createClientMutation.mutate(values);
+    } else {
+      // Regular client creation without payment method
+      createClientMutation.mutate(values);
+    }
   };
 
   const handleEditClient = (values: ClientFormValues) => {
@@ -638,16 +645,49 @@ const ClientsPage = () => {
                 {showPaymentSection && (
                   <div className="mt-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      Save time by adding a payment method during client creation. This will redirect to the client's profile after creation.
+                      Save time by adding a payment method during client creation.
                     </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsAddingPaymentMethod(!isAddingPaymentMethod)}
-                      className="w-full"
-                    >
-                      {isAddingPaymentMethod ? "Skip Payment Method" : "I'll Add Payment Method After Creation"}
-                    </Button>
+                    
+                    <div className="space-y-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsAddingPaymentMethod(!isAddingPaymentMethod)}
+                        className="w-full"
+                      >
+                        {isAddingPaymentMethod ? "Skip Payment Method" : "Add Payment Method Now"}
+                      </Button>
+                      
+                      {isAddingPaymentMethod && (
+                        <Elements stripe={stripePromise}>
+                          <div className="space-y-4 border-t pt-4">
+                            <div className="text-sm font-medium">Payment Card Information</div>
+                            <div className="p-3 border rounded-lg bg-white dark:bg-gray-700">
+                              <CardElement
+                                options={{
+                                  style: {
+                                    base: {
+                                      fontSize: '16px',
+                                      color: '#424770',
+                                      '::placeholder': {
+                                        color: '#aab7c4',
+                                      },
+                                      iconColor: '#666EE8',
+                                    },
+                                    invalid: {
+                                      color: '#9e2146',
+                                    },
+                                  },
+                                }}
+                              />
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              The card will be saved securely using Stripe after the client is created.
+                            </p>
+                          </div>
+                        </Elements>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
