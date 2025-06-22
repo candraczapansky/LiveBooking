@@ -1055,7 +1055,7 @@ export class MemStorage implements IStorage {
       audience: campaign.audience,
       subject: campaign.subject || null,
       content: campaign.content,
-      sendDate: campaign.sendDate || null,
+      sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
       status: campaign.status || "draft",
       sentCount: campaign.sentCount || 0,
       deliveredCount: campaign.deliveredCount || 0,
@@ -1081,9 +1081,15 @@ export class MemStorage implements IStorage {
       throw new Error(`Marketing campaign with id ${id} not found`);
     }
 
+    // Handle date conversion for sendDate if it's a string
+    const processedData = { ...campaignData };
+    if (processedData.sendDate && typeof processedData.sendDate === 'string') {
+      processedData.sendDate = new Date(processedData.sendDate);
+    }
+
     const updatedCampaign: MarketingCampaign = {
       ...existingCampaign,
-      ...campaignData,
+      ...processedData,
     };
     this.marketingCampaigns.set(id, updatedCampaign);
     return updatedCampaign;

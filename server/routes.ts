@@ -1212,7 +1212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/marketing-campaigns", validateBody(insertMarketingCampaignSchema), async (req, res) => {
     try {
-      const campaign = await storage.createMarketingCampaign(req.body);
+      // Convert sendDate string to Date object if provided
+      const campaignData = { ...req.body };
+      if (campaignData.sendDate && typeof campaignData.sendDate === 'string') {
+        campaignData.sendDate = new Date(campaignData.sendDate);
+      }
+      
+      const campaign = await storage.createMarketingCampaign(campaignData);
       res.status(201).json(campaign);
     } catch (error: any) {
       console.error('Error creating campaign:', error);
