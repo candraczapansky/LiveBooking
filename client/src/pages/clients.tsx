@@ -83,6 +83,12 @@ type Client = {
   city?: string;
   state?: string;
   zipCode?: string;
+  emailAccountManagement?: boolean;
+  emailAppointmentReminders?: boolean;
+  emailPromotions?: boolean;
+  smsAccountManagement?: boolean;
+  smsAppointmentReminders?: boolean;
+  smsPromotions?: boolean;
   role: string;
   createdAt?: string;
 };
@@ -96,6 +102,13 @@ const clientFormSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zipCode: z.string().optional(),
+  // Communication preferences
+  emailAccountManagement: z.boolean().optional(),
+  emailAppointmentReminders: z.boolean().optional(),
+  emailPromotions: z.boolean().optional(),
+  smsAccountManagement: z.boolean().optional(),
+  smsAppointmentReminders: z.boolean().optional(),
+  smsPromotions: z.boolean().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -150,6 +163,12 @@ const ClientsPage = () => {
       city: "",
       state: "",
       zipCode: "",
+      emailAccountManagement: true,
+      emailAppointmentReminders: true,
+      emailPromotions: false,
+      smsAccountManagement: false,
+      smsAppointmentReminders: true,
+      smsPromotions: false,
     },
   });
 
@@ -164,6 +183,12 @@ const ClientsPage = () => {
       city: "",
       state: "",
       zipCode: "",
+      emailAccountManagement: true,
+      emailAppointmentReminders: true,
+      emailPromotions: false,
+      smsAccountManagement: false,
+      smsAppointmentReminders: true,
+      smsPromotions: false,
     },
   });
 
@@ -293,6 +318,12 @@ const ClientsPage = () => {
       city: client.city || "",
       state: client.state || "",
       zipCode: client.zipCode || "",
+      emailAccountManagement: client.emailAccountManagement ?? true,
+      emailAppointmentReminders: client.emailAppointmentReminders ?? true,
+      emailPromotions: client.emailPromotions ?? false,
+      smsAccountManagement: client.smsAccountManagement ?? false,
+      smsAppointmentReminders: client.smsAppointmentReminders ?? true,
+      smsPromotions: client.smsPromotions ?? false,
     });
     setIsEditDialogOpen(true);
   };
@@ -666,6 +697,145 @@ const ClientsPage = () => {
                 </div>
               </div>
               
+              {/* Communication Preferences Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Communication Preferences</h4>
+                
+                <div className="space-y-3">
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Email Notifications</div>
+                  <div className="grid grid-cols-1 gap-3 pl-4">
+                    <FormField
+                      control={addForm.control}
+                      name="emailAccountManagement"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Account Management</FormLabel>
+                            <FormDescription className="text-xs">Login alerts, password changes, account updates</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={addForm.control}
+                      name="emailAppointmentReminders"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                            <FormDescription className="text-xs">Booking confirmations and upcoming appointment alerts</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={addForm.control}
+                      name="emailPromotions"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Promotions & Marketing</FormLabel>
+                            <FormDescription className="text-xs">Special offers, new services, and promotional content</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">SMS Notifications</div>
+                  <div className="grid grid-cols-1 gap-3 pl-4">
+                    <FormField
+                      control={addForm.control}
+                      name="smsAccountManagement"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Account Management</FormLabel>
+                            <FormDescription className="text-xs">Critical account security alerts via text</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={addForm.control}
+                      name="smsAppointmentReminders"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                            <FormDescription className="text-xs">Text reminders for upcoming appointments</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={addForm.control}
+                      name="smsPromotions"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Promotions & Marketing</FormLabel>
+                            <FormDescription className="text-xs">Special offers and promotional texts</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+              
               {/* Optional Payment Method Section */}
               <div className="border-t pt-4">
                 <Button
@@ -882,6 +1052,145 @@ const ClientsPage = () => {
                       </FormItem>
                     )}
                   />
+                </div>
+              </div>
+              
+              {/* Communication Preferences Section */}
+              <div className="space-y-4 border-t pt-4">
+                <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Communication Preferences</h4>
+                
+                <div className="space-y-3">
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Email Notifications</div>
+                  <div className="grid grid-cols-1 gap-3 pl-4">
+                    <FormField
+                      control={editForm.control}
+                      name="emailAccountManagement"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Account Management</FormLabel>
+                            <FormDescription className="text-xs">Login alerts, password changes, account updates</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="emailAppointmentReminders"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                            <FormDescription className="text-xs">Booking confirmations and upcoming appointment alerts</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="emailPromotions"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Promotions & Marketing</FormLabel>
+                            <FormDescription className="text-xs">Special offers, new services, and promotional content</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  
+                  <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2 mt-4">SMS Notifications</div>
+                  <div className="grid grid-cols-1 gap-3 pl-4">
+                    <FormField
+                      control={editForm.control}
+                      name="smsAccountManagement"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Account Management</FormLabel>
+                            <FormDescription className="text-xs">Critical account security alerts via text</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="smsAppointmentReminders"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                            <FormDescription className="text-xs">Text reminders for upcoming appointments</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={editForm.control}
+                      name="smsPromotions"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <input
+                              type="checkbox"
+                              checked={field.value}
+                              onChange={field.onChange}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-sm">Promotions & Marketing</FormLabel>
+                            <FormDescription className="text-xs">Special offers and promotional texts</FormDescription>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </div>
 

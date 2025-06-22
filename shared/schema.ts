@@ -17,6 +17,13 @@ export const users = pgTable("users", {
   state: text("state"),
   zipCode: text("zip_code"),
   stripeCustomerId: text("stripe_customer_id"),
+  // Communication preferences
+  emailAccountManagement: boolean("email_account_management").default(true),
+  emailAppointmentReminders: boolean("email_appointment_reminders").default(true),
+  emailPromotions: boolean("email_promotions").default(false),
+  smsAccountManagement: boolean("sms_account_management").default(false),
+  smsAppointmentReminders: boolean("sms_appointment_reminders").default(true),
+  smsPromotions: boolean("sms_promotions").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
