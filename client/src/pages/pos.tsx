@@ -246,6 +246,12 @@ export default function PointOfSale() {
     service.category.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
+  const filteredProducts = (products as any[])?.filter((product: any) =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase()))
+  ) || [];
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
@@ -260,13 +266,33 @@ export default function PointOfSale() {
               {/* Services Selection Panel */}
               <div className="flex-1 flex flex-col">
                 <div className="mb-6">
-                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Point of Sale</h1>
+                  <div className="flex justify-between items-center mb-4">
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
+                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                      <Button
+                        size="sm"
+                        variant={activeTab === 'services' ? 'default' : 'ghost'}
+                        onClick={() => setActiveTab('services')}
+                        className="px-4"
+                      >
+                        Services
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={activeTab === 'products' ? 'default' : 'ghost'}
+                        onClick={() => setActiveTab('products')}
+                        className="px-4"
+                      >
+                        Products
+                      </Button>
+                    </div>
+                  </div>
                   <div className="flex gap-4">
                     <div className="relative flex-1">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                       <Input
                         type="search"
-                        placeholder="Search services..."
+                        placeholder={`Search ${activeTab}...`}
                         className="pl-8"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
@@ -275,54 +301,106 @@ export default function PointOfSale() {
                   </div>
                 </div>
 
-                {/* Services Grid */}
+                {/* Services/Products Grid */}
                 <div className="flex-1 overflow-y-auto">
-                  {servicesLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {[1, 2, 3, 4, 5, 6].map((i) => (
-                        <Card key={i} className="animate-pulse">
-                          <CardContent className="p-4">
-                            <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                            <div className="h-3 bg-gray-200 rounded mb-4"></div>
-                            <div className="h-6 bg-gray-200 rounded"></div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                  {activeTab === 'services' ? (
+                    servicesLoading ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <Card key={i} className="animate-pulse">
+                            <CardContent className="p-4">
+                              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                              <div className="h-3 bg-gray-200 rounded mb-4"></div>
+                              <div className="h-6 bg-gray-200 rounded"></div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredServices.map((service: Service) => (
+                          <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-semibold text-lg">{service.name}</h3>
+                                <Badge variant="secondary">{service.category}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                                {service.description}
+                              </p>
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <span className="text-lg font-bold text-primary">
+                                    ${service.price.toFixed(2)}
+                                  </span>
+                                  <span className="text-sm text-gray-500 ml-2">
+                                    {service.duration}min
+                                  </span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => addServiceToCart(service)}
+                                  className="flex items-center gap-1"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Add
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredServices.map((service: Service) => (
-                        <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-lg">{service.name}</h3>
-                              <Badge variant="secondary">{service.category}</Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                              {service.description}
-                            </p>
-                            <div className="flex justify-between items-center">
-                              <div>
+                    productsLoading ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {[1, 2, 3, 4, 5, 6].map((i) => (
+                          <Card key={i} className="animate-pulse">
+                            <CardContent className="p-4">
+                              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                              <div className="h-3 bg-gray-200 rounded mb-4"></div>
+                              <div className="h-6 bg-gray-200 rounded"></div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredProducts.map((product: Product) => (
+                          <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-semibold text-lg">{product.name}</h3>
+                                <Badge variant="secondary">{product.category}</Badge>
+                              </div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                                {product.description}
+                              </p>
+                              <div className="flex justify-between items-center mb-2">
                                 <span className="text-lg font-bold text-primary">
-                                  ${service.price.toFixed(2)}
+                                  ${product.price.toFixed(2)}
                                 </span>
-                                <span className="text-sm text-gray-500 ml-2">
-                                  {service.duration}min
-                                </span>
+                                <div className="text-right">
+                                  <div className="text-xs text-gray-500">Stock: {product.stockQuantity}</div>
+                                  {product.brand && (
+                                    <div className="text-xs text-gray-400">{product.brand}</div>
+                                  )}
+                                </div>
                               </div>
                               <Button
                                 size="sm"
-                                onClick={() => addServiceToCart(service)}
-                                className="flex items-center gap-1"
+                                onClick={() => addProductToCart(product)}
+                                className="flex items-center gap-1 w-full"
+                                disabled={product.stockQuantity <= 0}
                               >
                                 <Plus className="h-4 w-4" />
-                                Add
+                                {product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
                               </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )
                   )}
                 </div>
               </div>
@@ -373,7 +451,7 @@ export default function PointOfSale() {
                         <div className="text-center text-gray-500 py-8">
                           <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-50" />
                           <p>Cart is empty</p>
-                          <p className="text-sm">Add services to get started</p>
+                          <p className="text-sm">Add services or products to get started</p>
                         </div>
                       ) : (
                         cart.map((item) => (
