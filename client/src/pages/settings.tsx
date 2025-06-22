@@ -540,7 +540,7 @@ export default function Settings() {
                   onClick={savePrimaryColorPreset}
                   disabled={!presetName.trim() || customColor === '#3b82f6'}
                   className="w-full text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-3 rounded-md font-medium flex items-center justify-center"
-                  style={{ backgroundColor: customColor }}
+                  style={{ backgroundColor: customColor, border: 'none', boxShadow: 'none' }}
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Primary Color
