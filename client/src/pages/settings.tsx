@@ -64,6 +64,7 @@ export default function Settings() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [forceRerender, setForceRerender] = useState(0);
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -402,15 +403,12 @@ export default function Settings() {
 
   const handleEditProfile = () => {
     console.log('=== EDIT PROFILE BUTTON CLICKED ===');
-    console.log('Current isEditingProfile state:', isEditingProfile);
-    console.log('User data:', user);
-    console.log('Profile data:', profileData);
-    setIsEditingProfile(true);
-    console.log('Setting isEditingProfile to true...');
-    // Force a re-render by updating a dummy state
-    setTimeout(() => {
-      console.log('After timeout - isEditingProfile should be:', isEditingProfile);
-    }, 100);
+    setIsEditingProfile(prev => {
+      console.log('Previous state:', prev);
+      console.log('Setting to true');
+      return true;
+    });
+    setForceRerender(prev => prev + 1);
   };
 
   const handleSaveProfile = () => {
@@ -476,21 +474,59 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             
-            {/* Simple Test Button */}
-            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Debug Information</h4>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                Current Edit Mode: <strong>{isEditingProfile ? 'ENABLED' : 'DISABLED'}</strong>
+            {/* Emergency Fix - Always Editable Fields */}
+            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">Always Editable Fields</h4>
+              <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+                These fields are always editable as a workaround:
               </p>
-              <button 
-                onClick={() => {
-                  console.log('Direct button click - setting edit mode to true');
-                  setIsEditingProfile(!isEditingProfile);
-                }}
-                className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>First Name</Label>
+                  <Input 
+                    value={profileData.firstName}
+                    onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter first name"
+                  />
+                </div>
+                <div>
+                  <Label>Last Name</Label>
+                  <Input 
+                    value={profileData.lastName}
+                    onChange={(e) => handleProfileInputChange('lastName', e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter last name"
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input 
+                    value={profileData.email}
+                    onChange={(e) => handleProfileInputChange('email', e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter email"
+                  />
+                </div>
+                <div>
+                  <Label>Phone Number</Label>
+                  <Input 
+                    value={profileData.phone}
+                    onChange={(e) => handleProfileInputChange('phone', e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter phone number"
+                  />
+                </div>
+              </div>
+              
+              <Button 
+                onClick={handleSaveProfile} 
+                className="w-full mt-4 bg-green-600 hover:bg-green-700"
               >
-                Toggle Edit Mode (Direct)
-              </button>
+                <Save className="h-4 w-4 mr-2" />
+                Save Personal Information
+              </Button>
             </div>
             {/* Profile Picture */}
             <div className="flex items-center space-x-4">
