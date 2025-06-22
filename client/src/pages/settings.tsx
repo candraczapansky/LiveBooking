@@ -473,13 +473,45 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Profile Picture */}
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage
+                  src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"}
+                  alt="Profile picture"
+                />
+                <AvatarFallback className="text-lg">
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-medium">{user?.firstName} {user?.lastName}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                  {user?.role || "User"}
+                </p>
+                <div className="mt-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                    id="profile-picture-upload"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => document.getElementById('profile-picture-upload')?.click()}
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Change Photo
+                  </Button>
+                </div>
+              </div>
+            </div>
             
             {/* Personal Information Editor */}
             <div className="p-4 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg">
-              <h4 className="font-medium text-primary mb-2">Edit Personal Information</h4>
-              <p className="text-sm text-muted-foreground mb-4">
-                Update your personal details below:
-              </p>
+              <h4 className="font-medium text-primary mb-4">Edit Personal Information</h4>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -518,6 +550,23 @@ export default function Settings() {
                     placeholder="Enter phone number"
                   />
                 </div>
+                <div>
+                  <Label>Username</Label>
+                  <Input 
+                    value={profileData.username}
+                    onChange={(e) => handleProfileInputChange('username', e.target.value)}
+                    className="mt-1"
+                    placeholder="Enter username"
+                  />
+                </div>
+                <div>
+                  <Label>Member Since</Label>
+                  <Input 
+                    value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"} 
+                    disabled 
+                    className="mt-1" 
+                  />
+                </div>
               </div>
               
               <Button 
@@ -528,129 +577,6 @@ export default function Settings() {
                 Save Personal Information
               </Button>
             </div>
-            {/* Profile Picture */}
-            <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage
-                  src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"}
-                  alt="Profile picture"
-                />
-                <AvatarFallback className="text-lg">
-                  {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-medium">{user?.firstName} {user?.lastName}</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
-                  {user?.role || "User"}
-                </p>
-                <div className="mt-2">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleProfilePictureChange}
-                    className="hidden"
-                    id="profile-picture-upload"
-                  />
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => document.getElementById('profile-picture-upload')?.click()}
-                  >
-                    <Camera className="h-4 w-4 mr-2" />
-                    Change Photo
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Profile Details */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>First Name</Label>
-                <Input 
-                  value={isEditingProfile ? profileData.firstName : (user?.firstName || "")}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
-                  className="mt-1"
-                  placeholder={isEditingProfile ? "Enter first name" : ""}
-                />
-              </div>
-              <div>
-                <Label>Last Name</Label>
-                <Input 
-                  value={isEditingProfile ? profileData.lastName : (user?.lastName || "")}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => handleProfileInputChange('lastName', e.target.value)}
-                  className="mt-1" 
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input 
-                  value={isEditingProfile ? profileData.email : (user?.email || "")}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => handleProfileInputChange('email', e.target.value)}
-                  className="mt-1" 
-                />
-              </div>
-              <div>
-                <Label>Phone Number</Label>
-                <Input 
-                  value={isEditingProfile ? profileData.phone : (user?.phone || "")}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => handleProfileInputChange('phone', e.target.value)}
-                  className="mt-1" 
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label>Username</Label>
-                <Input 
-                  value={isEditingProfile ? profileData.username : (user?.username || "")}
-                  disabled={!isEditingProfile}
-                  onChange={(e) => handleProfileInputChange('username', e.target.value)}
-                  className="mt-1" 
-                />
-              </div>
-              <div>
-                <Label>Member Since</Label>
-                <Input 
-                  value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"} 
-                  disabled 
-                  className="mt-1" 
-                />
-              </div>
-            </div>
-
-            <div className="text-xs text-gray-500 mb-2">
-              Edit Mode: {isEditingProfile ? 'ON' : 'OFF'}
-              <br />
-              Debug: isEditingProfile = {JSON.stringify(isEditingProfile)}
-            </div>
-            
-            {!isEditingProfile ? (
-              <Button 
-                onClick={handleEditProfile} 
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
-                size="lg"
-              >
-                <User className="h-4 w-4 mr-2" />
-                🔓 Click Here to Edit Profile Information
-              </Button>
-            ) : (
-              <div className="flex gap-2">
-                <Button onClick={handleSaveProfile} className="flex-1 bg-green-600 hover:bg-green-700">
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </Button>
-                <Button onClick={handleCancelEdit} variant="outline" className="flex-1">
-                  Cancel
-                </Button>
-              </div>
-            )}
           </CardContent>
         </Card>
 
