@@ -281,6 +281,10 @@ const MarketingPage = () => {
 
   // Form submission handlers
   const onCampaignSubmit = async (data: CampaignFormValues) => {
+    if (createCampaignMutation.isPending) {
+      return; // Prevent duplicate submissions
+    }
+    
     if (data.type === 'sms' && !smsConfig?.configured) {
       toast({
         title: "SMS not configured",
