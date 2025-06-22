@@ -49,6 +49,7 @@ export default function Settings() {
   const [darkMode, setDarkMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('blue');
   const [customColor, setCustomColor] = useState('#3b82f6');
+  const [secondaryColor, setSecondaryColor] = useState('#6b7280');
   const [savedPresets, setSavedPresets] = useState<Array<{name: string, color: string}>>([]);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
@@ -62,23 +63,33 @@ export default function Settings() {
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme') || 'blue';
     const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
+    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
     const savedPresetColors = localStorage.getItem('savedPresets');
 
     setSelectedTheme(savedTheme);
     setCustomColor(savedCustomColor);
+    setSecondaryColor(savedSecondaryColor);
     setDarkMode(savedDarkMode);
     
     if (savedPresetColors) {
       setSavedPresets(JSON.parse(savedPresetColors));
     }
 
-    // Apply saved custom color
+    // Apply saved custom colors
     if (savedTheme === 'custom' || savedCustomColor !== '#3b82f6') {
       const hslColor = hexToHsl(savedCustomColor);
       const root = document.documentElement;
       root.style.setProperty('--dropdown-selected', hslColor);
       root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
+    }
+
+    // Apply saved secondary color
+    if (savedSecondaryColor !== '#6b7280') {
+      const hslSecondaryColor = hexToHsl(savedSecondaryColor);
+      const root = document.documentElement;
+      root.style.setProperty('--secondary', hslSecondaryColor);
+      root.style.setProperty('--secondary-foreground', '0 0% 98%');
     }
   }, []);
 
@@ -218,6 +229,16 @@ export default function Settings() {
     setSelectedTheme('custom');
   };
 
+  const handleSecondaryColorChange = (color: string) => {
+    setSecondaryColor(color);
+    const hslColor = hexToHsl(color);
+    
+    // Apply secondary color to CSS variables immediately
+    const root = document.documentElement;
+    root.style.setProperty('--secondary', hslColor);
+    root.style.setProperty('--secondary-foreground', '0 0% 98%');
+  };
+
   const saveColorAsPreset = () => {
     const colorName = prompt("Enter a name for this color preset:");
     if (colorName && colorName.trim()) {
@@ -248,6 +269,7 @@ export default function Settings() {
     // Save appearance settings to localStorage
     localStorage.setItem('theme', selectedTheme);
     localStorage.setItem('customColor', customColor);
+    localStorage.setItem('secondaryColor', secondaryColor);
     localStorage.setItem('darkMode', darkMode.toString());
     localStorage.setItem('savedPresets', JSON.stringify(savedPresets));
     
@@ -388,10 +410,10 @@ export default function Settings() {
               <div className="space-y-4">
                 <Label className="text-base flex items-center">
                   <Palette className="h-4 w-4 mr-2" />
-                  Custom Theme Color
+                  Primary Theme Color
                 </Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Choose any color for your theme accent
+                  Choose the main accent color for primary buttons and highlights
                 </p>
                 
                 <div className="flex items-center space-x-4">
@@ -449,6 +471,57 @@ export default function Settings() {
                           Secondary
                         </Button>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <Label className="text-base flex items-center">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Secondary Button Color
+                </Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Choose the color for secondary buttons and alternate actions
+                </p>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={secondaryColor}
+                      onChange={(e) => handleSecondaryColorChange(e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Color Value</Label>
+                      <Input
+                        type="text"
+                        value={secondaryColor}
+                        onChange={(e) => handleSecondaryColorChange(e.target.value)}
+                        className="w-32 text-sm"
+                        placeholder="#6b7280"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <Label className="text-sm font-medium">Preview</Label>
+                    <div className="flex items-center space-x-2 mt-1">
+                      <div 
+                        className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
+                        style={{ backgroundColor: secondaryColor }}
+                      />
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="text-xs"
+                        onClick={() => toast({ title: "Secondary Button", description: "This now uses your custom secondary color!" })}
+                      >
+                        Secondary
+                      </Button>
                     </div>
                   </div>
                 </div>
