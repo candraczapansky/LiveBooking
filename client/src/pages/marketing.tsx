@@ -224,10 +224,7 @@ const MarketingPage = () => {
       
       // If "Send Now" was selected, immediately send the campaign
       if (variables.sendNow) {
-        // Use a timeout to ensure the campaign list updates before sending
-        setTimeout(() => {
-          handleSendCampaign(data.id, data.type);
-        }, 100);
+        handleSendCampaign(data.id, data.type);
       } else {
         toast({
           title: "Campaign created",
@@ -819,8 +816,11 @@ const MarketingPage = () => {
                 <Button type="button" variant="outline" onClick={() => setIsCampaignFormOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit">
-                  Create Campaign
+                <Button 
+                  type="submit" 
+                  disabled={createCampaignMutation.isPending}
+                >
+                  {createCampaignMutation.isPending ? "Creating..." : "Create Campaign"}
                 </Button>
               </DialogFooter>
             </form>
