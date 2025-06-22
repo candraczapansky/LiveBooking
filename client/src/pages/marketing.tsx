@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, queryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 import {
   Card,
@@ -69,13 +70,16 @@ type Campaign = {
   id: number;
   name: string;
   type: 'email' | 'sms';
-  status: 'draft' | 'scheduled' | 'sent';
+  status: 'draft' | 'scheduled' | 'sent' | 'failed';
   audience: string;
   subject?: string;
   content: string;
   sendDate?: string;
   sentCount?: number;
-  openRate?: number;
+  deliveredCount?: number;
+  failedCount?: number;
+  createdAt?: string;
+  sentAt?: string;
 };
 
 type Promo = {

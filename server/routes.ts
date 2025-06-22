@@ -15,8 +15,10 @@ import {
   insertMembershipSchema,
   insertClientMembershipSchema,
   insertPaymentSchema,
-  insertSavedPaymentMethodSchema
+  insertSavedPaymentMethodSchema,
+  insertMarketingCampaignSchema
 } from "@shared/schema";
+import { sendSMS, isTwilioConfigured } from "./sms";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -1195,6 +1197,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({ error: "Error setting default payment method: " + error.message });
     }
+  });
+
+  // Marketing Campaign routes
+  app.get("/api/marketing-campaigns", async (req, res) => {
+    try {
+      const campaigns = await storage.getAllMarketingCampaigns();
+      res.json(campaigns);
+    } catch (error: any) {
+      console.error('Error fetching campaigns:', error);
+      res.status(500).json({ error: "Error fetching campaigns: " + error.message });
+    }
+  });
+
+  app.post("/api/marketing-campaigns", validateBody(insertMarketingCampaignSchema), async (req, res) => {
+    try {
+      const campaign = await storage.createMarketingCampaign(req.body);
+      res.status(201).json(campaign);
+    } catch (error: any) {
+      console.error('Error creating campaign:', error);
+      res.status(500).json({ error: "Error creating campaign: " + error.message });
+    }
+  });
+
+  app.get("/api/marketing-campaigns/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const campaign = await storage.getMarketingCampaign(id);
+      
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+      
+      res.json(campaign);
+    } catch (error: any) {
+      console.error('Error fetching campaign:', error);
+      res.status(500).json({ error: "Error fetching campaign: " + error.message });
+    }
+  });
+
+  app.put("/api/marketing-campaigns/:id", validateBody(insertMarketingCampaignSchema.partial()), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const campaign = await storage.updateMarketingCampaign(id, req.body);
+      res.json(campaign);
+    } catch (error: any) {
+      console.error('Error updating campaign:', error);
+      res.status(500).json({ error: "Error updating campaign: " + error.message });
+    }
+  });
+
+  app.delete("/api/marketing-campaigns/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteMarketingCampaign(id);
+      
+      if (success) {
+        res.status(204).end();
+      } else {
+        res.status(404).json({ error: "Campaign not found" });
+      }
+    } catch (error: any) {
+      console.error('Error deleting campaign:', error);
+      res.status(500).json({ error: "Error deleting campaign: " + error.message });
+    }
+  });
+
+  // Send SMS campaign
+  app.post("/api/marketing-campaigns/:id/send", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const campaign = await storage.getMarketingCampaign(id);
+      
+      if (!campaign) {
+        return res.status(404).json({ error: "Campaign not found" });
+      }
+
+      if (campaign.type !== 'sms') {
+        return res.status(400).json({ error: "This endpoint only supports SMS campaigns" });
+      }
+
+      // Check if Twilio is configured
+      if (!isTwilioConfigured()) {
+        return res.status(400).json({ 
+          error: "SMS service not configured. Please configure Twilio credentials." 
+        });
+      }
+
+      // Get recipients based on audience
+      const recipients = await storage.getUsersByAudience(campaign.audience);
+      
+      if (recipients.length === 0) {
+        return res.status(400).json({ error: "No recipients found for the selected audience" });
+      }
+
+      // Filter recipients with phone numbers
+      const recipientsWithPhone = recipients.filter(user => user.phone);
+      
+      if (recipientsWithPhone.length === 0) {
+        return res.status(400).json({ error: "No recipients have phone numbers" });
+      }
+
+      let sentCount = 0;
+      let deliveredCount = 0;
+      let failedCount = 0;
+
+      // Send SMS to each recipient
+      for (const recipient of recipientsWithPhone) {
+        try {
+          // Create recipient record
+          const campaignRecipient = await storage.createMarketingCampaignRecipient({
+            campaignId: campaign.id,
+            userId: recipient.id,
+            status: 'pending'
+          });
+
+          // Send SMS
+          const smsResult = await sendSMS(recipient.phone!, campaign.content);
+          
+          if (smsResult.success) {
+            sentCount++;
+            deliveredCount++; // For SMS we assume delivered if sent successfully
+            
+            // Update recipient status
+            await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
+              status: 'delivered',
+              sentAt: new Date(),
+              deliveredAt: new Date()
+            });
+          } else {
+            failedCount++;
+            
+            // Update recipient status with error
+            await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
+              status: 'failed',
+              errorMessage: smsResult.error
+            });
+          }
+        } catch (error: any) {
+          failedCount++;
+          console.error(`Error sending SMS to ${recipient.phone}:`, error);
+        }
+      }
+
+      // Update campaign with results
+      await storage.updateMarketingCampaign(id, {
+        status: 'sent',
+        sentCount,
+        deliveredCount,
+        failedCount,
+        sentAt: new Date()
+      });
+
+      res.json({
+        success: true,
+        message: `SMS campaign sent successfully`,
+        results: {
+          totalRecipients: recipientsWithPhone.length,
+          sentCount,
+          deliveredCount,
+          failedCount
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Error sending SMS campaign:', error);
+      res.status(500).json({ error: "Error sending SMS campaign: " + error.message });
+    }
+  });
+
+  // Get campaign recipients
+  app.get("/api/marketing-campaigns/:id/recipients", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const recipients = await storage.getMarketingCampaignRecipients(id);
+      
+      // Get user details for each recipient
+      const detailedRecipients = await Promise.all(
+        recipients.map(async (recipient) => {
+          const user = await storage.getUser(recipient.userId);
+          return {
+            ...recipient,
+            user: user ? {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              phone: user.phone
+            } : null
+          };
+        })
+      );
+      
+      res.json(detailedRecipients);
+    } catch (error: any) {
+      console.error('Error fetching campaign recipients:', error);
+      res.status(500).json({ error: "Error fetching campaign recipients: " + error.message });
+    }
+  });
+
+  // Check Twilio configuration status
+  app.get("/api/sms-config-status", async (req, res) => {
+    res.json({
+      configured: isTwilioConfigured(),
+      message: isTwilioConfigured() 
+        ? "SMS service is configured and ready" 
+        : "SMS service requires Twilio configuration (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)"
+    });
   });
 
   // Setup SetupIntent for saving cards

@@ -1044,6 +1044,171 @@ export class MemStorage implements IStorage {
   async deleteSavedGiftCard(id: number): Promise<boolean> {
     return this.savedGiftCards.delete(id);
   }
+
+  // Marketing Campaign operations
+  async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
+    const id = this.currentMarketingCampaignId++;
+    const newCampaign: MarketingCampaign = {
+      id,
+      name: campaign.name,
+      type: campaign.type,
+      audience: campaign.audience,
+      subject: campaign.subject || null,
+      content: campaign.content,
+      sendDate: campaign.sendDate || null,
+      status: campaign.status || "draft",
+      sentCount: campaign.sentCount || 0,
+      deliveredCount: campaign.deliveredCount || 0,
+      failedCount: campaign.failedCount || 0,
+      createdAt: new Date(),
+      sentAt: null,
+    };
+    this.marketingCampaigns.set(id, newCampaign);
+    return newCampaign;
+  }
+
+  async getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined> {
+    return this.marketingCampaigns.get(id);
+  }
+
+  async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
+    return Array.from(this.marketingCampaigns.values());
+  }
+
+  async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
+    const existingCampaign = this.marketingCampaigns.get(id);
+    if (!existingCampaign) {
+      throw new Error(`Marketing campaign with id ${id} not found`);
+    }
+
+    const updatedCampaign: MarketingCampaign = {
+      ...existingCampaign,
+      ...campaignData,
+    };
+    this.marketingCampaigns.set(id, updatedCampaign);
+    return updatedCampaign;
+  }
+
+  async deleteMarketingCampaign(id: number): Promise<boolean> {
+    return this.marketingCampaigns.delete(id);
+  }
+
+  // Marketing Campaign Recipient operations
+  async createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient> {
+    const id = this.currentMarketingCampaignRecipientId++;
+    const newRecipient: MarketingCampaignRecipient = {
+      id,
+      campaignId: recipient.campaignId,
+      userId: recipient.userId,
+      status: recipient.status || "pending",
+      sentAt: recipient.sentAt || null,
+      deliveredAt: recipient.deliveredAt || null,
+      errorMessage: recipient.errorMessage || null,
+    };
+    this.marketingCampaignRecipients.set(id, newRecipient);
+    return newRecipient;
+  }
+
+  async getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined> {
+    return this.marketingCampaignRecipients.get(id);
+  }
+
+  async getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]> {
+    return Array.from(this.marketingCampaignRecipients.values()).filter(
+      recipient => recipient.campaignId === campaignId
+    );
+  }
+
+  async updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient> {
+    const existingRecipient = this.marketingCampaignRecipients.get(id);
+    if (!existingRecipient) {
+      throw new Error(`Marketing campaign recipient with id ${id} not found`);
+    }
+
+    const updatedRecipient: MarketingCampaignRecipient = {
+      ...existingRecipient,
+      ...data,
+    };
+    this.marketingCampaignRecipients.set(id, updatedRecipient);
+    return updatedRecipient;
+  }
+
+  // User filtering for campaigns
+  async getUsersByAudience(audience: string): Promise<User[]> {
+    const allUsers = Array.from(this.users.values());
+    
+    switch (audience) {
+      case "All Clients":
+        return allUsers.filter(user => user.role === "client");
+      case "Regular Clients":
+        // Users with more than 3 appointments
+        const regularClients = [];
+        for (const user of allUsers) {
+          if (user.role === "client") {
+            const userAppointments = Array.from(this.appointments.values()).filter(
+              appointment => appointment.clientId === user.id
+            );
+            if (userAppointments.length > 3) {
+              regularClients.push(user);
+            }
+          }
+        }
+        return regularClients;
+      case "New Clients":
+        // Users with 3 or fewer appointments
+        const newClients = [];
+        for (const user of allUsers) {
+          if (user.role === "client") {
+            const userAppointments = Array.from(this.appointments.values()).filter(
+              appointment => appointment.clientId === user.id
+            );
+            if (userAppointments.length <= 3) {
+              newClients.push(user);
+            }
+          }
+        }
+        return newClients;
+      case "Inactive Clients":
+        // Users with no appointments in the last 60 days
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        const inactiveClients = [];
+        for (const user of allUsers) {
+          if (user.role === "client") {
+            const recentAppointments = Array.from(this.appointments.values()).filter(
+              appointment => 
+                appointment.clientId === user.id && 
+                new Date(appointment.startTime) > sixtyDaysAgo
+            );
+            if (recentAppointments.length === 0) {
+              inactiveClients.push(user);
+            }
+          }
+        }
+        return inactiveClients;
+      case "Upcoming Appointments":
+        // Users with appointments in the next 7 days
+        const nextWeek = new Date();
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const upcomingClients = [];
+        for (const user of allUsers) {
+          if (user.role === "client") {
+            const upcomingAppointments = Array.from(this.appointments.values()).filter(
+              appointment => 
+                appointment.clientId === user.id && 
+                new Date(appointment.startTime) <= nextWeek &&
+                new Date(appointment.startTime) > new Date()
+            );
+            if (upcomingAppointments.length > 0) {
+              upcomingClients.push(user);
+            }
+          }
+        }
+        return upcomingClients;
+      default:
+        return allUsers.filter(user => user.role === "client");
+    }
+  }
 }
 
 export const storage = new MemStorage();
