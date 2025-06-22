@@ -24,8 +24,11 @@ import {
   Lock, 
   Eye, 
   EyeOff,
-  Save
+  Save,
+  Camera,
+  User
 } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -132,11 +135,89 @@ export default function Settings() {
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-2xl mx-auto space-y-6">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Profile & Settings</h1>
               <p className="text-gray-600 dark:text-gray-400">
-                Manage your account preferences and security settings.
+                Manage your profile information, account preferences and security settings.
               </p>
             </div>
+
+        {/* Profile Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Personal Information</CardTitle>
+                <CardDescription>
+                  Update your personal details and contact information.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Profile Picture */}
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage
+                  src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"
+                  alt="Profile picture"
+                />
+                <AvatarFallback className="text-lg">
+                  {user?.firstName?.[0]}{user?.lastName?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-medium">{user?.firstName} {user?.lastName}</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                  {user?.role || "User"}
+                </p>
+                <Button variant="outline" size="sm" className="mt-2">
+                  <Camera className="h-4 w-4 mr-2" />
+                  Change Photo
+                </Button>
+              </div>
+            </div>
+
+            {/* Profile Details */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>First Name</Label>
+                <Input value={user?.firstName || ""} disabled className="mt-1" />
+              </div>
+              <div>
+                <Label>Last Name</Label>
+                <Input value={user?.lastName || ""} disabled className="mt-1" />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input value={user?.email || ""} disabled className="mt-1" />
+              </div>
+              <div>
+                <Label>Phone Number</Label>
+                <Input value={user?.phone || ""} disabled className="mt-1" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Username</Label>
+                <Input value={user?.username || ""} disabled className="mt-1" />
+              </div>
+              <div>
+                <Label>Member Since</Label>
+                <Input 
+                  value={user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"} 
+                  disabled 
+                  className="mt-1" 
+                />
+              </div>
+            </div>
+
+            <Button className="w-full">
+              <User className="h-4 w-4 mr-2" />
+              Edit Profile Information
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Appearance Settings */}
         <Card>
