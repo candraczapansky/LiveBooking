@@ -225,6 +225,10 @@ const MarketingPage = () => {
       // If "Send Now" was selected, immediately send the campaign
       if (variables.sendNow) {
         handleSendCampaign(data.id, data.type);
+        toast({
+          title: "Campaign sent",
+          description: "Your marketing campaign has been sent immediately.",
+        });
       } else {
         toast({
           title: "Campaign created",
@@ -259,7 +263,9 @@ const MarketingPage = () => {
       return response.json();
     },
     onSuccess: (data) => {
+      // Force immediate refresh of campaign data to update status
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
+      queryClient.refetchQueries({ queryKey: ['/api/marketing-campaigns'] });
       toast({
         title: "Campaign sent",
         description: `SMS campaign sent to ${data.results?.sentCount || 0} recipients`,
