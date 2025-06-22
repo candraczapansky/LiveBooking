@@ -489,32 +489,7 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  <div className="flex-1">
-                    <Label className="text-sm font-medium">Preview</Label>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <div 
-                        className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
-                        style={{ backgroundColor: customColor }}
-                      />
-                      <div className="flex space-x-1">
-                        <Button 
-                          size="sm" 
-                          className="text-xs"
-                          onClick={() => toast({ title: "Primary Button", description: "This uses your selected theme color!" })}
-                        >
-                          Primary
-                        </Button>
-                        <Button 
-                          size="sm" 
-                          variant="secondary" 
-                          className="text-xs"
-                          onClick={() => toast({ title: "Secondary Button", description: "This uses neutral gray colors for visual hierarchy." })}
-                        >
-                          Secondary
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+
                 </div>
               </div>
 
@@ -549,23 +524,7 @@ export default function Settings() {
                     </div>
                   </div>
                   
-                  <div className="flex-1">
-                    <Label className="text-sm font-medium">Preview</Label>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <div 
-                        className="w-8 h-8 rounded-lg border-2 border-gray-300 dark:border-gray-600"
-                        style={{ backgroundColor: secondaryColor }}
-                      />
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="text-xs"
-                        onClick={() => toast({ title: "Text Color", description: "This shows your custom font color applied throughout the app!" })}
-                      >
-                        Secondary
-                      </Button>
-                    </div>
-                  </div>
+
                 </div>
               </div>
 
