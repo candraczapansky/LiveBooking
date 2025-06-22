@@ -517,36 +517,7 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {savedPresets.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Saved Primary Color Presets</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {savedPresets.map((preset) => (
-                        <div key={preset.name} className="flex items-center justify-between p-2 border rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-4 h-4 rounded border cursor-pointer"
-                              style={{ backgroundColor: preset.color }}
-                              onClick={() => {
-                                setCustomColor(preset.color);
-                                handleCustomColorChange(preset.color);
-                              }}
-                            />
-                            <span className="text-sm font-medium">{preset.name}</span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => deletePrimaryColorPreset(preset.name)}
-                            className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+
               </div>
 
               <Separator />
