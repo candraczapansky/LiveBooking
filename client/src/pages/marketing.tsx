@@ -194,8 +194,11 @@ const MarketingPage = () => {
   // Create campaign mutation
   const createCampaignMutation = useMutation({
     mutationFn: async (campaignData: CampaignFormValues) => {
-      return apiRequest('/api/marketing-campaigns', {
+      const response = await fetch('/api/marketing-campaigns', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           name: campaignData.name,
           type: campaignData.type,
@@ -206,6 +209,12 @@ const MarketingPage = () => {
           status: campaignData.sendNow ? 'scheduled' : 'draft'
         }),
       });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create campaign');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
@@ -228,9 +237,19 @@ const MarketingPage = () => {
   // Send campaign mutation
   const sendCampaignMutation = useMutation({
     mutationFn: async (campaignId: number) => {
-      return apiRequest(`/api/marketing-campaigns/${campaignId}/send`, {
+      const response = await fetch(`/api/marketing-campaigns/${campaignId}/send`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send campaign');
+      }
+      
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
