@@ -60,7 +60,7 @@
   --primary: var(--dropdown-selected);
   --primary-foreground: var(--dropdown-selected-foreground);
   --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
+  --secondary-foreground: 222.2 84% 4.9%;
   --accent: var(--dropdown-selected);
   --accent-foreground: var(--dropdown-selected-foreground);
   --destructive: 0 62.8% 30.6%;

@@ -84,12 +84,17 @@ export default function Settings() {
       root.style.setProperty('--dropdown-selected-foreground', '0 0% 98%');
     }
 
-    // Apply saved secondary color
+    // Apply saved secondary color to font
     if (savedSecondaryColor !== '#6b7280') {
       const hslSecondaryColor = hexToHsl(savedSecondaryColor);
       const root = document.documentElement;
-      root.style.setProperty('--secondary', hslSecondaryColor);
-      root.style.setProperty('--secondary-foreground', '0 0% 98%');
+      // Keep appropriate background for light/dark mode
+      if (document.documentElement.classList.contains('dark')) {
+        root.style.setProperty('--secondary', '240 3.7% 15.9%'); // Dark background
+      } else {
+        root.style.setProperty('--secondary', '210 40% 96%'); // Light background
+      }
+      root.style.setProperty('--secondary-foreground', hslSecondaryColor); // Use custom color for text
     }
   }, []);
 
@@ -235,8 +240,13 @@ export default function Settings() {
     
     // Apply secondary color to CSS variables immediately
     const root = document.documentElement;
-    root.style.setProperty('--secondary', hslColor);
-    root.style.setProperty('--secondary-foreground', '0 0% 98%');
+    // Keep appropriate background for light/dark mode
+    if (document.documentElement.classList.contains('dark')) {
+      root.style.setProperty('--secondary', '240 3.7% 15.9%'); // Dark background
+    } else {
+      root.style.setProperty('--secondary', '210 40% 96%'); // Light background
+    }
+    root.style.setProperty('--secondary-foreground', hslColor); // Use custom color for text
   };
 
   const saveColorAsPreset = () => {
@@ -484,7 +494,7 @@ export default function Settings() {
                   Secondary Button Color
                 </Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Choose the color for secondary buttons and alternate actions
+                  Choose the text color for secondary buttons and alternate actions
                 </p>
                 
                 <div className="flex items-center space-x-4">
@@ -518,7 +528,7 @@ export default function Settings() {
                         size="sm" 
                         variant="secondary" 
                         className="text-xs"
-                        onClick={() => toast({ title: "Secondary Button", description: "This now uses your custom secondary color!" })}
+                        onClick={() => toast({ title: "Secondary Button", description: "This now uses your custom font color on a neutral background!" })}
                       >
                         Secondary
                       </Button>
