@@ -32,6 +32,16 @@ export const insertUserSchema = createInsertSchema(users).omit({
   createdAt: true,
 });
 
+// Client-specific schema without username/password for client registration
+export const insertClientSchema = createInsertSchema(users).omit({
+  id: true,
+  username: true,
+  password: true,
+  createdAt: true,
+  role: true,
+  stripeCustomerId: true,
+});
+
 // Service Categories schema
 export const serviceCategories = pgTable("service_categories", {
   id: serial("id").primaryKey(),

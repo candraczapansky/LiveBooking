@@ -5,6 +5,7 @@ import { z } from "zod";
 import Stripe from "stripe";
 import {
   insertUserSchema,
+  insertClientSchema,
   insertServiceCategorySchema,
   insertRoomSchema,
   insertDeviceSchema,
@@ -105,6 +106,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { password, ...userWithoutPassword } = newUser;
     
     return res.status(201).json(userWithoutPassword);
+  });
+
+  // Client registration route (without username/password)
+  app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
+    const { email } = req.body;
+    
+    // Check if email already exists
+    const existingUsers = await storage.getAllUsers();
+    const existingUser = existingUsers.find(user => user.email === email);
+    if (existingUser) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+    
+    // Generate a unique username for the client
+    const username = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const password = Math.random().toString(36).substring(2, 12); // Generate temporary password
+    
+    // Create new client
+    const newClient = await storage.createUser({
+      ...req.body,
+      username,
+      password,
+      role: "client"
+    });
+    
+    // Remove password from response
+    const { password: _, ...clientWithoutPassword } = newClient;
+    
+    return res.status(201).json(clientWithoutPassword);
   });
 
   // Change password route
