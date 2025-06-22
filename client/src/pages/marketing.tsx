@@ -484,9 +484,10 @@ const MarketingPage = () => {
                               <Button 
                                 variant="default" 
                                 size="sm"
-                                onClick={() => toast({ title: "Feature Coming Soon", description: "Campaign sending will be available soon!" })}
+                                onClick={() => handleSendCampaign(campaign.id, campaign.type)}
+                                disabled={sendCampaignMutation.isPending}
                               >
-                                Send
+                                {sendCampaignMutation.isPending ? "Sending..." : "Send"}
                                 <ArrowRight className="h-4 w-4 ml-1" />
                               </Button>
                             )}
@@ -608,7 +609,7 @@ const MarketingPage = () => {
           </DialogHeader>
           
           <Form {...campaignForm}>
-            <form onSubmit={campaignForm.handleSubmit(handleCreateCampaign)} className="space-y-4">
+            <form onSubmit={campaignForm.handleSubmit(onCampaignSubmit)} className="space-y-4">
               <FormField
                 control={campaignForm.control}
                 name="name"
