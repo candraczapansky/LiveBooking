@@ -304,6 +304,18 @@ export default function Settings() {
                     { name: 'Green', color: 'bg-green-500', value: 'green' },
                     { name: 'Orange', color: 'bg-orange-500', value: 'orange' },
                     { name: 'Red', color: 'bg-red-500', value: 'red' },
+                    { name: 'Teal', color: 'bg-teal-500', value: 'teal' },
+                    { name: 'Indigo', color: 'bg-indigo-500', value: 'indigo' },
+                    { name: 'Rose', color: 'bg-rose-500', value: 'rose' },
+                    { name: 'Emerald', color: 'bg-emerald-500', value: 'emerald' },
+                    { name: 'Amber', color: 'bg-amber-500', value: 'amber' },
+                    { name: 'Cyan', color: 'bg-cyan-500', value: 'cyan' },
+                    { name: 'Violet', color: 'bg-violet-500', value: 'violet' },
+                    { name: 'Lime', color: 'bg-lime-500', value: 'lime' },
+                    { name: 'Fuchsia', color: 'bg-fuchsia-500', value: 'fuchsia' },
+                    { name: 'Sky', color: 'bg-sky-500', value: 'sky' },
+                    { name: 'Slate', color: 'bg-slate-500', value: 'slate' },
+                    { name: 'Stone', color: 'bg-stone-500', value: 'stone' },
                   ].map((theme) => (
                     <div
                       key={theme.value}
