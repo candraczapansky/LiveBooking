@@ -255,10 +255,7 @@ const ClientsPage = () => {
     if (selectedClient) {
       updateClientMutation.mutate({
         id: selectedClient.id,
-        data: {
-          ...values,
-          password: values.password && values.password.length > 0 ? values.password : undefined
-        }
+        data: values
       });
     }
   };
@@ -714,19 +711,7 @@ const ClientsPage = () => {
                 />
               </div>
               
-              <FormField
-                control={editForm.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="johndoe" {...field} disabled />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
               
               <div className="grid grid-cols-2 gap-4">
                 <FormField
