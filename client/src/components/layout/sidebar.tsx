@@ -93,21 +93,6 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
           </div>
         </div>
         
-        <div className="px-4 py-2 border-b border-sidebar-border">
-          <div className="flex items-center space-x-3">
-            <Avatar>
-              <AvatarImage src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120" />
-              <AvatarFallback>
-                {getInitials(user?.firstName, user?.lastName)}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium">{getFullName(user?.firstName, user?.lastName)}</p>
-              <p className="text-xs text-muted-foreground capitalize">{user?.role || 'User'}</p>
-            </div>
-          </div>
-        </div>
-        
         <nav className="flex-1 px-2 py-4 overflow-y-auto">
           <div className="space-y-1">
             {navigationItems.map((item) => (
