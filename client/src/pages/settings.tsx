@@ -401,11 +401,16 @@ export default function Settings() {
   };
 
   const handleEditProfile = () => {
-    console.log('Edit profile clicked, current state:', isEditingProfile);
+    console.log('=== EDIT PROFILE BUTTON CLICKED ===');
+    console.log('Current isEditingProfile state:', isEditingProfile);
     console.log('User data:', user);
     console.log('Profile data:', profileData);
     setIsEditingProfile(true);
-    console.log('Edit profile state set to true');
+    console.log('Setting isEditingProfile to true...');
+    // Force a re-render by updating a dummy state
+    setTimeout(() => {
+      console.log('After timeout - isEditingProfile should be:', isEditingProfile);
+    }, 100);
   };
 
   const handleSaveProfile = () => {
@@ -470,6 +475,23 @@ export default function Settings() {
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
+            
+            {/* Simple Test Button */}
+            <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">Debug Information</h4>
+              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                Current Edit Mode: <strong>{isEditingProfile ? 'ENABLED' : 'DISABLED'}</strong>
+              </p>
+              <button 
+                onClick={() => {
+                  console.log('Direct button click - setting edit mode to true');
+                  setIsEditingProfile(!isEditingProfile);
+                }}
+                className="mt-2 px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700"
+              >
+                Toggle Edit Mode (Direct)
+              </button>
+            </div>
             {/* Profile Picture */}
             <div className="flex items-center space-x-4">
               <Avatar className="h-20 w-20">
@@ -569,17 +591,23 @@ export default function Settings() {
 
             <div className="text-xs text-gray-500 mb-2">
               Edit Mode: {isEditingProfile ? 'ON' : 'OFF'}
+              <br />
+              Debug: isEditingProfile = {JSON.stringify(isEditingProfile)}
             </div>
             
             {!isEditingProfile ? (
-              <Button onClick={handleEditProfile} className="w-full">
+              <Button 
+                onClick={handleEditProfile} 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3"
+                size="lg"
+              >
                 <User className="h-4 w-4 mr-2" />
-                Edit Profile Information
+                🔓 Click Here to Edit Profile Information
               </Button>
             ) : (
               <div className="flex gap-2">
-                <Button onClick={handleSaveProfile} className="flex-1">
-                  <User className="h-4 w-4 mr-2" />
+                <Button onClick={handleSaveProfile} className="flex-1 bg-green-600 hover:bg-green-700">
+                  <Save className="h-4 w-4 mr-2" />
                   Save Changes
                 </Button>
                 <Button onClick={handleCancelEdit} variant="outline" className="flex-1">
