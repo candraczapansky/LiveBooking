@@ -61,6 +61,7 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
     { icon: <Users />, label: "Clients", href: "/clients" },
     { icon: <UserCircle />, label: "Staff", href: "/staff" },
     { icon: <Scissors />, label: "Services", href: "/services" },
+    { icon: <DollarSign />, label: "Point of Sale", href: "/pos" },
     { icon: <MapPin />, label: "Rooms", href: "/rooms" },
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
