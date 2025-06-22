@@ -206,7 +206,7 @@ const MarketingPage = () => {
           subject: campaignData.type === 'email' ? campaignData.subject : undefined,
           content: campaignData.content,
           sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
-          status: campaignData.sendNow ? 'scheduled' : 'draft'
+          status: 'draft'
         }),
       });
       
@@ -216,14 +216,20 @@ const MarketingPage = () => {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
       setIsCampaignFormOpen(false);
       campaignForm.reset();
-      toast({
-        title: "Campaign created",
-        description: "Your marketing campaign has been created successfully.",
-      });
+      
+      // If "Send Now" was selected, immediately send the campaign
+      if (variables.sendNow) {
+        handleSendCampaign(data.id, data.type);
+      } else {
+        toast({
+          title: "Campaign created",
+          description: "Your marketing campaign has been saved as a draft.",
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -491,24 +497,33 @@ const MarketingPage = () => {
                         
                         <CardFooter className="bg-muted/50 pt-4">
                           <div className="flex justify-between w-full">
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => toast({ title: "Feature Coming Soon", description: "Campaign editing will be available soon!" })}
-                            >
-                              <Edit className="h-4 w-4 mr-1" />
-                              Edit
-                            </Button>
                             {campaign.status === "draft" && (
-                              <Button 
-                                variant="default" 
-                                size="sm"
-                                onClick={() => handleSendCampaign(campaign.id, campaign.type)}
-                                disabled={sendCampaignMutation.isPending}
-                              >
-                                {sendCampaignMutation.isPending ? "Sending..." : "Send"}
-                                <ArrowRight className="h-4 w-4 ml-1" />
-                              </Button>
+                              <>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => toast({ title: "Feature Coming Soon", description: "Campaign editing will be available soon!" })}
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Edit
+                                </Button>
+                                <Button 
+                                  variant="default" 
+                                  size="sm"
+                                  onClick={() => handleSendCampaign(campaign.id, campaign.type)}
+                                  disabled={sendCampaignMutation.isPending}
+                                >
+                                  {sendCampaignMutation.isPending ? "Sending..." : "Send"}
+                                  <ArrowRight className="h-4 w-4 ml-1" />
+                                </Button>
+                              </>
+                            )}
+                            {campaign.status === "sent" && (
+                              <div className="flex justify-center w-full">
+                                <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                                  Campaign sent successfully
+                                </span>
+                              </div>
                             )}
                           </div>
                         </CardFooter>
