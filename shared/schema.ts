@@ -296,3 +296,47 @@ export type InsertGiftCardTransaction = z.infer<typeof insertGiftCardTransaction
 
 export type Device = typeof devices.$inferSelect;
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
+
+// Marketing campaigns schema
+export const marketingCampaigns = pgTable("marketing_campaigns", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // email, sms
+  audience: text("audience").notNull(), // All Clients, Regular Clients, etc.
+  subject: text("subject"), // For email campaigns
+  content: text("content").notNull(),
+  sendDate: timestamp("send_date"),
+  status: text("status").notNull().default("draft"), // draft, scheduled, sent, failed
+  sentCount: integer("sent_count").default(0),
+  deliveredCount: integer("delivered_count").default(0),
+  failedCount: integer("failed_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  sentAt: timestamp("sent_at"),
+});
+
+export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
+  id: true,
+  createdAt: true,
+  sentAt: true,
+});
+
+// Marketing campaign recipients schema (for tracking individual sends)
+export const marketingCampaignRecipients = pgTable("marketing_campaign_recipients", {
+  id: serial("id").primaryKey(),
+  campaignId: integer("campaign_id").notNull(),
+  userId: integer("user_id").notNull(),
+  status: text("status").notNull().default("pending"), // pending, sent, delivered, failed
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  errorMessage: text("error_message"),
+});
+
+export const insertMarketingCampaignRecipientSchema = createInsertSchema(marketingCampaignRecipients).omit({
+  id: true,
+});
+
+export type MarketingCampaign = typeof marketingCampaigns.$inferSelect;
+export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSchema>;
+
+export type MarketingCampaignRecipient = typeof marketingCampaignRecipients.$inferSelect;
+export type InsertMarketingCampaignRecipient = z.infer<typeof insertMarketingCampaignRecipientSchema>;

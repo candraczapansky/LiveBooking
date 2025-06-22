@@ -13,7 +13,9 @@ import {
   savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
   savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   giftCards, GiftCard, InsertGiftCard,
-  giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction
+  giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction,
+  marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
+  marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient
 } from "@shared/schema";
 
 export interface IStorage {
@@ -127,6 +129,22 @@ export interface IStorage {
   getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined>;
   getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]>;
   deleteSavedGiftCard(id: number): Promise<boolean>;
+
+  // Marketing Campaign operations
+  createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign>;
+  getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined>;
+  getAllMarketingCampaigns(): Promise<MarketingCampaign[]>;
+  updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign>;
+  deleteMarketingCampaign(id: number): Promise<boolean>;
+
+  // Marketing Campaign Recipient operations
+  createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient>;
+  getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined>;
+  getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]>;
+  updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient>;
+
+  // User filtering for campaigns
+  getUsersByAudience(audience: string): Promise<User[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -145,6 +163,8 @@ export class MemStorage implements IStorage {
   private giftCards: Map<number, GiftCard>;
   private giftCardTransactions: Map<number, GiftCardTransaction>;
   private savedGiftCards: Map<number, SavedGiftCard>;
+  private marketingCampaigns: Map<number, MarketingCampaign>;
+  private marketingCampaignRecipients: Map<number, MarketingCampaignRecipient>;
 
   private currentUserId: number;
   private currentServiceCategoryId: number;
@@ -161,6 +181,8 @@ export class MemStorage implements IStorage {
   private currentGiftCardId: number;
   private currentGiftCardTransactionId: number;
   private currentSavedGiftCardId: number;
+  private currentMarketingCampaignId: number;
+  private currentMarketingCampaignRecipientId: number;
 
   constructor() {
     this.users = new Map();
@@ -178,6 +200,8 @@ export class MemStorage implements IStorage {
     this.giftCards = new Map();
     this.giftCardTransactions = new Map();
     this.savedGiftCards = new Map();
+    this.marketingCampaigns = new Map();
+    this.marketingCampaignRecipients = new Map();
 
     this.currentUserId = 1;
     this.currentServiceCategoryId = 1;
@@ -194,6 +218,8 @@ export class MemStorage implements IStorage {
     this.currentGiftCardId = 1;
     this.currentGiftCardTransactionId = 1;
     this.currentSavedGiftCardId = 1;
+    this.currentMarketingCampaignId = 1;
+    this.currentMarketingCampaignRecipientId = 1;
 
     // Initialize with admin user
     this.createUser({
