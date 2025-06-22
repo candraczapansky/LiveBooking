@@ -18,6 +18,7 @@ import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
 import Marketing from "@/pages/marketing";
 import Settings from "@/pages/settings";
+import Profile from "@/pages/profile";
 import Schedule from "@/pages/schedule";
 import ClientBooking from "@/pages/client-booking";
 
@@ -28,6 +29,9 @@ type User = {
   role: string;
   firstName?: string;
   lastName?: string;
+  phone?: string;
+  createdAt?: string;
+  stripeCustomerId?: string | null;
 };
 
 export type AuthContextType = {
@@ -80,6 +84,7 @@ function Router() {
       <Route path="/memberships" component={Memberships} />
       <Route path="/reports" component={Reports} />
       <Route path="/marketing" component={Marketing} />
+      <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/booking" component={ClientBooking} />

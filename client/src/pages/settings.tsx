@@ -1,1063 +1,277 @@
-import { useState, useEffect } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
-import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useToast } from "@/hooks/use-toast";
-import { useContext } from "react";
-import { AuthContext } from "@/App";
-
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
 import { 
-  User, 
-  Building, 
   Bell, 
-  Lock, 
-  CreditCard, 
+  Moon, 
+  Sun, 
+  Shield, 
+  Smartphone, 
   Mail, 
-  Smartphone,
-  Globe,
-  Clock,
-  PaintBucket,
-  CheckSquare
+  Lock, 
+  Eye, 
+  EyeOff,
+  Save
 } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import SavedPaymentMethods from "@/components/payment/saved-payment-methods";
 
-// Business Information Form Schema
-const businessInfoSchema = z.object({
-  businessName: z.string().min(1, "Business name is required"),
-  address: z.string().min(1, "Address is required"),
-  city: z.string().min(1, "City is required"),
-  state: z.string().min(1, "State is required"),
-  zipCode: z.string().min(1, "Zip code is required"),
-  phone: z.string().min(1, "Phone number is required"),
-  email: z.string().email("Invalid email address"),
-  website: z.string().url("Invalid URL").optional().or(z.literal("")),
-  description: z.string().optional(),
-});
-
-// User Profile Form Schema
-const profileSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().optional(),
-  currentPassword: z.string().optional(),
-  newPassword: z.string().min(6, "Password must be at least 6 characters").optional(),
-  confirmPassword: z.string().optional(),
-}).refine((data) => {
-  if (data.newPassword && !data.currentPassword) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Current password is required to set a new password",
-  path: ["currentPassword"],
-}).refine((data) => {
-  if (data.newPassword && data.newPassword !== data.confirmPassword) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
-
-// Notification Settings Form Schema
-const notificationSchema = z.object({
-  emailNotifications: z.boolean().default(true),
-  smsNotifications: z.boolean().default(true),
-  newAppointmentNotifications: z.boolean().default(true),
-  appointmentReminderNotifications: z.boolean().default(true),
-  marketingNotifications: z.boolean().default(true),
-});
-
-// Appearance Settings Form Schema
-const appearanceSchema = z.object({
-  logo: z.string().optional(),
-  primaryColor: z.string().default("#4F46E5"),
-  secondaryColor: z.string().default("#10B981"),
-  theme: z.enum(["light", "dark", "system"]).default("light"),
-});
-
-type BusinessInfoValues = z.infer<typeof businessInfoSchema>;
-type ProfileValues = z.infer<typeof profileSchema>;
-type NotificationValues = z.infer<typeof notificationSchema>;
-type AppearanceValues = z.infer<typeof appearanceSchema>;
-
-const SettingsPage = () => {
-  useDocumentTitle("Settings | BeautyBook");
+export default function Settings() {
   const { toast } = useToast();
-  const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState("business");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [smsNotifications, setSmsNotifications] = useState(false);
+  const [appointmentReminders, setAppointmentReminders] = useState(true);
+  const [marketingEmails, setMarketingEmails] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Business Info Form
-  const businessInfoForm = useForm<BusinessInfoValues>({
-    resolver: zodResolver(businessInfoSchema),
-    defaultValues: {
-      businessName: "BeautyBook Salon & Spa",
-      address: "123 Main Street",
-      city: "San Francisco",
-      state: "CA",
-      zipCode: "94105",
-      phone: "(555) 123-4567",
-      email: "contact@beautybook.com",
-      website: "https://beautybook.com",
-      description: "A premium salon and spa offering a wide range of beauty and wellness services.",
-    },
-  });
-
-  // Profile Form
-  const profileForm = useForm<ProfileValues>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      firstName: user?.firstName || "",
-      lastName: user?.lastName || "",
-      email: user?.email || "",
-      phone: "",
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
-
-  // Notification Settings Form
-  const notificationForm = useForm<NotificationValues>({
-    resolver: zodResolver(notificationSchema),
-    defaultValues: {
-      emailNotifications: true,
-      smsNotifications: true,
-      newAppointmentNotifications: true,
-      appointmentReminderNotifications: true,
-      marketingNotifications: false,
-    },
-  });
-
-  // Appearance Settings Form
-  const appearanceForm = useForm<AppearanceValues>({
-    resolver: zodResolver(appearanceSchema),
-    defaultValues: {
-      logo: "",
-      primaryColor: "#4F46E5",
-      secondaryColor: "#10B981",
-      theme: "light",
-    },
-  });
-
-  const handleSaveBusinessInfo = (values: BusinessInfoValues) => {
-    console.log("Business info values:", values);
+  const handleSaveNotifications = () => {
+    // TODO: Implement notification settings API
     toast({
-      title: "Settings Saved",
-      description: "Your business information has been updated.",
-    });
-  };
-
-  const handleSaveProfile = (values: ProfileValues) => {
-    console.log("Profile values:", values);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved.",
-    });
-  };
-
-  const handleSaveNotifications = (values: NotificationValues) => {
-    console.log("Notification values:", values);
-    toast({
-      title: "Notification Settings Saved",
+      title: "Settings saved",
       description: "Your notification preferences have been updated.",
     });
   };
 
-  const handleSaveAppearance = (values: AppearanceValues) => {
-    console.log("Appearance values:", values);
-    
-    // Apply the colors to CSS variables
-    const root = document.documentElement;
-    const primaryHsl = hexToHsl(values.primaryColor);
-    const secondaryHsl = hexToHsl(values.secondaryColor);
-    
-    root.style.setProperty('--primary', primaryHsl);
-    root.style.setProperty('--primary-foreground', '210 40% 98%');
-    
-    // Save to localStorage for persistence
-    localStorage.setItem('beautybook-appearance', JSON.stringify(values));
-    
+  const handleChangePassword = () => {
+    // TODO: Implement password change API
     toast({
-      title: "Appearance Settings Saved",
-      description: "Your branding preferences have been updated.",
+      title: "Password updated",
+      description: "Your password has been changed successfully.",
     });
   };
 
-  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        appearanceForm.setValue('logo', result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const hexToHsl = (hex: string): string => {
-    const r = parseInt(hex.slice(1, 3), 16) / 255;
-    const g = parseInt(hex.slice(3, 5), 16) / 255;
-    const b = parseInt(hex.slice(5, 7), 16) / 255;
-
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    let h, s, l = (max + min) / 2;
-
-    if (max === min) {
-      h = s = 0;
-    } else {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-        case g: h = (b - r) / d + 2; break;
-        case b: h = (r - g) / d + 4; break;
-        default: h = 0;
-      }
-      h /= 6;
-    }
-
-    return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
-  };
-
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
-        <Header />
-        
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Page Header */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Manage your salon settings and preferences
-              </p>
+    <div className="container mx-auto py-6 px-4">
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Manage your account preferences and security settings.
+          </p>
+        </div>
+
+        {/* Appearance Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Sun className="h-5 w-5 mr-2" />
+              Appearance
+            </CardTitle>
+            <CardDescription>
+              Customize how the application looks and feels.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base">Dark Mode</Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Use dark theme for better viewing in low light
+                </p>
+              </div>
+              <Switch
+                checked={darkMode}
+                onCheckedChange={setDarkMode}
+              />
             </div>
-            
-            {/* Settings Tabs */}
-            <Tabs defaultValue="business" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="mb-6">
-                <TabsTrigger value="business" className="flex items-center">
-                  <Building className="h-4 w-4 mr-2" />
-                  Business
-                </TabsTrigger>
-                <TabsTrigger value="profile" className="flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  Profile
-                </TabsTrigger>
-                <TabsTrigger value="notifications" className="flex items-center">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Notifications
-                </TabsTrigger>
-                <TabsTrigger value="payment" className="flex items-center">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Payment Methods
-                </TabsTrigger>
-                <TabsTrigger value="appearance" className="flex items-center">
-                  <PaintBucket className="h-4 w-4 mr-2" />
-                  Appearance
-                </TabsTrigger>
-              </TabsList>
-              
-              {/* Business Information Tab */}
-              <TabsContent value="business">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Business Information</CardTitle>
-                    <CardDescription>
-                      Manage your salon's business details that will appear on customer-facing materials
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Form {...businessInfoForm}>
-                      <form onSubmit={businessInfoForm.handleSubmit(handleSaveBusinessInfo)} className="space-y-6">
-                        <FormField
-                          control={businessInfoForm.control}
-                          name="businessName"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Business Name</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={businessInfoForm.control}
-                            name="address"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Address</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <div className="grid grid-cols-3 gap-4">
-                            <FormField
-                              control={businessInfoForm.control}
-                              name="city"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>City</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={businessInfoForm.control}
-                              name="state"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>State</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={businessInfoForm.control}
-                              name="zipCode"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Zip Code</FormLabel>
-                                  <FormControl>
-                                    <Input {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={businessInfoForm.control}
-                            name="phone"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Phone Number</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={businessInfoForm.control}
-                            name="email"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Email Address</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <FormField
-                          control={businessInfoForm.control}
-                          name="website"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Website (Optional)</FormLabel>
-                              <FormControl>
-                                <Input {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={businessInfoForm.control}
-                          name="description"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Business Description (Optional)</FormLabel>
-                              <FormControl>
-                                <Textarea 
-                                  {...field} 
-                                  rows={3}
-                                  value={field.value || ""}
-                                />
-                              </FormControl>
-                              <FormDescription>
-                                Brief description of your business that will appear on your booking page.
-                              </FormDescription>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <div className="pt-4 flex justify-end">
-                          <Button type="submit">Save Changes</Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </CardContent>
-                </Card>
-                
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Business Hours</CardTitle>
-                    <CardDescription>
-                      Set your salon's operating hours for each day of the week
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                        <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between py-2 border-b">
-                          <div className="font-medium mb-2 sm:mb-0">{day}</div>
-                          <div className="flex items-center space-x-2">
-                            <Clock className="h-4 w-4 text-gray-500" />
-                            <select className="border border-gray-300 dark:border-gray-600 rounded p-1 text-sm">
-                              <option>9:00 AM</option>
-                              <option>10:00 AM</option>
-                              <option>Closed</option>
-                            </select>
-                            <span>to</span>
-                            <select className="border border-gray-300 dark:border-gray-600 rounded p-1 text-sm">
-                              <option>5:00 PM</option>
-                              <option>6:00 PM</option>
-                              <option>7:00 PM</option>
-                              <option>Closed</option>
-                            </select>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <div className="pt-4 flex justify-end">
-                      <Button onClick={() => toast({ title: "Hours Saved", description: "Your business hours have been updated." })}>
-                        Save Hours
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              {/* Profile Tab */}
-              <TabsContent value="profile">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Your Profile</CardTitle>
-                    <CardDescription>
-                      Manage your personal information and account settings
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Form {...profileForm}>
-                      <form onSubmit={profileForm.handleSubmit(handleSaveProfile)} className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={profileForm.control}
-                            name="firstName"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>First Name</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={profileForm.control}
-                            name="lastName"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Last Name</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={profileForm.control}
-                            name="email"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Email Address</FormLabel>
-                                <FormControl>
-                                  <Input {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={profileForm.control}
-                            name="phone"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Phone Number (Optional)</FormLabel>
-                                <FormControl>
-                                  <Input {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="pt-2">
-                          <h3 className="text-base font-medium mb-4">Change Password</h3>
-                          <div className="space-y-4">
-                            <FormField
-                              control={profileForm.control}
-                              name="currentPassword"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Current Password</FormLabel>
-                                  <FormControl>
-                                    <Input type="password" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <FormField
-                                control={profileForm.control}
-                                name="newPassword"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>New Password</FormLabel>
-                                    <FormControl>
-                                      <Input type="password" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              
-                              <FormField
-                                control={profileForm.control}
-                                name="confirmPassword"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Confirm New Password</FormLabel>
-                                    <FormControl>
-                                      <Input type="password" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="pt-4 flex justify-end">
-                          <Button type="submit">Save Profile</Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </CardContent>
-                </Card>
-                
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-red-600">
-                      <Lock className="h-5 w-5 mr-2" />
-                      Danger Zone
-                    </CardTitle>
-                    <CardDescription>
-                      Irreversible actions that affect your account
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                        <div>
-                          <h3 className="font-medium">Delete Account</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">
-                            This will permanently delete your account and all associated data.
-                          </p>
-                        </div>
-                        <Button 
-                          variant="destructive" 
-                          className="mt-3 md:mt-0"
-                          onClick={() => 
-                            toast({
-                              title: "Action Not Available",
-                              description: "Account deletion is disabled in the demo.",
-                              variant: "destructive"
-                            })
-                          }
-                        >
-                          Delete Account
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              {/* Notifications Tab */}
-              <TabsContent value="notifications">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Notification Settings</CardTitle>
-                    <CardDescription>
-                      Control how you receive notifications from the system
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Form {...notificationForm}>
-                      <form onSubmit={notificationForm.handleSubmit(handleSaveNotifications)} className="space-y-6">
-                        <div className="space-y-4">
-                          <h3 className="text-base font-medium flex items-center">
-                            <Mail className="h-4 w-4 mr-2" />
-                            Email Notifications
-                          </h3>
-                          <FormField
-                            control={notificationForm.control}
-                            name="emailNotifications"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Receive Email Notifications</FormLabel>
-                                  <FormDescription>
-                                    Get updates and alerts via email
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <h3 className="text-base font-medium flex items-center">
-                            <Smartphone className="h-4 w-4 mr-2" />
-                            SMS Notifications
-                          </h3>
-                          <FormField
-                            control={notificationForm.control}
-                            name="smsNotifications"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Receive SMS Notifications</FormLabel>
-                                  <FormDescription>
-                                    Get updates and alerts via text message
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <h3 className="text-base font-medium">Notification Types</h3>
-                          
-                          <FormField
-                            control={notificationForm.control}
-                            name="newAppointmentNotifications"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                                <div className="space-y-0.5">
-                                  <FormLabel>New Appointment Notifications</FormLabel>
-                                  <FormDescription>
-                                    Receive alerts when new appointments are booked
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={notificationForm.control}
-                            name="appointmentReminderNotifications"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Appointment Reminder Notifications</FormLabel>
-                                  <FormDescription>
-                                    Receive reminders about upcoming appointments
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={notificationForm.control}
-                            name="marketingNotifications"
-                            render={({ field }) => (
-                              <FormItem className="flex flex-row items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Marketing Notifications</FormLabel>
-                                  <FormDescription>
-                                    Receive promotional offers and updates
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                  />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        
-                        <div className="pt-4 flex justify-end">
-                          <Button type="submit">Save Notification Settings</Button>
-                        </div>
-                      </form>
-                    </Form>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              {/* Payment Methods Tab */}
-              <TabsContent value="payment">
-                <SavedPaymentMethods />
-              </TabsContent>
-              
-              {/* Appearance Tab */}
-              <TabsContent value="appearance">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Appearance Settings</CardTitle>
-                    <CardDescription>
-                      Customize the look and feel of your BeautyBook dashboard
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-6">
-                      <div>
-                        <h3 className="text-base font-medium mb-4">Theme</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-                            <div className="h-24 bg-white"></div>
-                            <div className="p-4 flex items-center justify-between">
-                              <span className="text-sm font-medium">Light</span>
-                              <CheckSquare className="h-5 w-5 text-primary" />
-                            </div>
-                          </div>
-                          
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-                            <div className="h-24 bg-gray-900"></div>
-                            <div className="p-4 flex items-center justify-between">
-                              <span className="text-sm font-medium">Dark</span>
-                              <div className="h-5 w-5"></div>
-                            </div>
-                          </div>
-                          
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
-                            <div className="h-24 bg-gradient-to-b from-white to-gray-900"></div>
-                            <div className="p-4 flex items-center justify-between">
-                              <span className="text-sm font-medium">System</span>
-                              <div className="h-5 w-5"></div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Form {...appearanceForm}>
-                  <form onSubmit={appearanceForm.handleSubmit(handleSaveAppearance)} className="space-y-6">
-                    <Card className="mt-6">
-                      <CardHeader>
-                        <CardTitle className="text-lg font-semibold">Branding</CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-6">
-                        {/* Logo Upload */}
-                        <div className="space-y-3">
-                          <h3 className="text-base font-medium">Logo</h3>
-                          <div className="flex items-center space-x-4">
-                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
-                              {appearanceForm.watch('logo') ? (
-                                <img 
-                                  src={appearanceForm.watch('logo')} 
-                                  alt="Logo" 
-                                  className="w-full h-full object-contain rounded-lg"
-                                />
-                              ) : (
-                                <Globe className="h-8 w-8 text-gray-400" />
-                              )}
-                            </div>
-                            <div>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleLogoUpload}
-                                className="hidden"
-                                id="logo-upload"
-                              />
-                              <label htmlFor="logo-upload">
-                                <Button type="button" variant="outline" asChild>
-                                  <span className="cursor-pointer">Upload Logo</span>
-                                </Button>
-                              </label>
-                            </div>
-                          </div>
-                        </div>
+          </CardContent>
+        </Card>
 
-                        {/* Primary Color */}
-                        <div className="space-y-3">
-                          <h3 className="text-base font-medium">Primary Color</h3>
-                          <div className="flex items-center space-x-4">
-                            <div 
-                              className="w-8 h-8 rounded border border-gray-300"
-                              style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
-                            ></div>
-                            <FormField
-                              control={appearanceForm.control}
-                              name="primaryColor"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input 
-                                      {...field} 
-                                      className="w-24 font-mono text-sm"
-                                      placeholder="#4F46E5"
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <input
-                              type="color"
-                              value={appearanceForm.watch('primaryColor')}
-                              onChange={(e) => appearanceForm.setValue('primaryColor', e.target.value)}
-                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-                            />
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                const input = document.querySelector('input[type="color"]') as HTMLInputElement;
-                                input?.click();
-                              }}
-                            >
-                              Change
-                            </Button>
-                          </div>
-                        </div>
+        {/* Notification Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Bell className="h-5 w-5 mr-2" />
+              Notifications
+            </CardTitle>
+            <CardDescription>
+              Configure how you want to receive notifications.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base flex items-center">
+                    <Mail className="h-4 w-4 mr-2" />
+                    Email Notifications
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive notifications via email
+                  </p>
+                </div>
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                />
+              </div>
 
-                        {/* Secondary Color */}
-                        <div className="space-y-3">
-                          <h3 className="text-base font-medium">Secondary Color</h3>
-                          <div className="flex items-center space-x-4">
-                            <div 
-                              className="w-8 h-8 rounded border border-gray-300"
-                              style={{ backgroundColor: appearanceForm.watch('secondaryColor') }}
-                            ></div>
-                            <FormField
-                              control={appearanceForm.control}
-                              name="secondaryColor"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormControl>
-                                    <Input 
-                                      {...field} 
-                                      className="w-24 font-mono text-sm"
-                                      placeholder="#10B981"
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                              )}
-                            />
-                            <input
-                              type="color"
-                              value={appearanceForm.watch('secondaryColor')}
-                              onChange={(e) => appearanceForm.setValue('secondaryColor', e.target.value)}
-                              className="w-8 h-8 border border-gray-300 rounded cursor-pointer"
-                            />
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => {
-                                const inputs = document.querySelectorAll('input[type="color"]');
-                                (inputs[1] as HTMLInputElement)?.click();
-                              }}
-                            >
-                              Change
-                            </Button>
-                          </div>
-                        </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base flex items-center">
+                    <Smartphone className="h-4 w-4 mr-2" />
+                    SMS Notifications
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive notifications via text message
+                  </p>
+                </div>
+                <Switch
+                  checked={smsNotifications}
+                  onCheckedChange={setSmsNotifications}
+                />
+              </div>
 
-                        <div className="pt-4 flex justify-end">
-                          <Button 
-                            type="submit"
-                            className="bg-primary hover:bg-primary/90"
-                            style={{ backgroundColor: appearanceForm.watch('primaryColor') }}
-                          >
-                            Save Appearance Settings
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </form>
-                </Form>
-                
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Booking Widget Customization</CardTitle>
-                    <CardDescription>
-                      Customize the appearance of your client-facing booking widget
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                        <h4 className="text-sm font-medium mb-2">Widget Header</h4>
-                        <Input defaultValue="Book Your Appointment" />
-                      </div>
-                      
-                      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                        <h4 className="text-sm font-medium mb-2">Welcome Message</h4>
-                        <Textarea 
-                          defaultValue="Welcome to BeautyBook Salon & Spa. Please select a service to get started with your booking."
-                          rows={3}
-                        />
-                      </div>
-                      
-                      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">Show Service Images</h4>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                      
-                      <div className="p-4 border border-gray-200 dark:border-gray-700 rounded-md">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-medium">Show Staff Photos</h4>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="pt-6 flex justify-end">
-                      <Button onClick={() => toast({ title: "Widget Settings Saved", description: "Your booking widget settings have been updated." })}>
-                        Save Widget Settings
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
+              <Separator />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Appointment Reminders</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Get reminded about upcoming appointments
+                  </p>
+                </div>
+                <Switch
+                  checked={appointmentReminders}
+                  onCheckedChange={setAppointmentReminders}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Marketing Emails</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive promotional offers and updates
+                  </p>
+                </div>
+                <Switch
+                  checked={marketingEmails}
+                  onCheckedChange={setMarketingEmails}
+                />
+              </div>
+            </div>
+
+            <Button onClick={handleSaveNotifications} className="w-full">
+              <Save className="h-4 w-4 mr-2" />
+              Save Notification Settings
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Security Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Shield className="h-5 w-5 mr-2" />
+              Security
+            </CardTitle>
+            <CardDescription>
+              Manage your password and security preferences.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="current-password">Current Password</Label>
+                <div className="relative">
+                  <Input
+                    id="current-password"
+                    type={showCurrentPassword ? "text" : "password"}
+                    placeholder="Enter your current password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="new-password"
+                    type={showNewPassword ? "text" : "password"}
+                    placeholder="Enter your new password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <div className="relative">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm your new password"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={handleChangePassword} className="w-full">
+              <Lock className="h-4 w-4 mr-2" />
+              Change Password
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Account Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-red-600">Danger Zone</CardTitle>
+            <CardDescription>
+              Irreversible and destructive actions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="destructive" className="w-full">
+              Delete Account
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
-};
-
-export default SettingsPage;
+}
