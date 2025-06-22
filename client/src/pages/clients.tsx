@@ -50,7 +50,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard } from "lucide-react";
+import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +62,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getInitials, getFullName } from "@/lib/utils";
 import ClientPaymentMethods from "@/components/payment/client-payment-methods";
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements, useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
+
+// Make sure to call `loadStripe` outside of a component's render to avoid
+// recreating the `Stripe` object on every render.
+if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
+  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
+}
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 type Client = {
   id: number;
@@ -97,6 +106,8 @@ const ClientsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
+  const [showPaymentSection, setShowPaymentSection] = useState(false);
+  const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -154,14 +165,32 @@ const ClientsPage = () => {
         role: "client"
       });
     },
-    onSuccess: () => {
+    onSuccess: async (response) => {
+      const newClient = await response.json();
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      toast({
-        title: "Success",
-        description: "Client created successfully",
-      });
-      addForm.reset();
-      setIsAddDialogOpen(false);
+      
+      // If payment method section is shown and we're adding a payment method, proceed
+      if (showPaymentSection && isAddingPaymentMethod) {
+        setClientDetail(newClient);
+        setViewMode('detail');
+        setIsAddDialogOpen(false);
+        addForm.reset();
+        setShowPaymentSection(false);
+        setIsAddingPaymentMethod(false);
+        toast({
+          title: "Success",
+          description: "Client created successfully. You can now add payment methods.",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Client created successfully",
+        });
+        addForm.reset();
+        setIsAddDialogOpen(false);
+        setShowPaymentSection(false);
+        setIsAddingPaymentMethod(false);
+      }
     },
     onError: (error) => {
       toast({
@@ -589,12 +618,51 @@ const ClientsPage = () => {
                 />
               </div>
               
+              {/* Optional Payment Method Section */}
+              <div className="border-t pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowPaymentSection(!showPaymentSection)}
+                  className="flex items-center gap-2 w-full justify-start p-0 h-auto"
+                >
+                  {showPaymentSection ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <CreditCard className="h-4 w-4" />
+                  <span>Add Payment Method (Optional)</span>
+                </Button>
+                
+                {showPaymentSection && (
+                  <div className="mt-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Save time by adding a payment method during client creation. This will redirect to the client's profile after creation.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsAddingPaymentMethod(!isAddingPaymentMethod)}
+                      className="w-full"
+                    >
+                      {isAddingPaymentMethod ? "Skip Payment Method" : "I'll Add Payment Method After Creation"}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                <Button type="button" variant="outline" onClick={() => {
+                  setIsAddDialogOpen(false);
+                  setShowPaymentSection(false);
+                  setIsAddingPaymentMethod(false);
+                }}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={createClientMutation.isPending}>
-                  {createClientMutation.isPending ? "Creating..." : "Create Client"}
+                  {createClientMutation.isPending ? "Creating..." : 
+                   isAddingPaymentMethod ? "Create Client & Add Payment Method" : "Create Client"}
                 </Button>
               </DialogFooter>
             </form>
