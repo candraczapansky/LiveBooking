@@ -79,6 +79,10 @@ type Client = {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
   role: string;
   createdAt?: string;
 };
@@ -88,6 +92,10 @@ const clientFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -138,6 +146,10 @@ const ClientsPage = () => {
       firstName: "",
       lastName: "",
       phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
     },
   });
 
@@ -148,6 +160,10 @@ const ClientsPage = () => {
       firstName: "",
       lastName: "",
       phone: "",
+      address: "",
+      city: "",
+      state: "",
+      zipCode: "",
     },
   });
 
@@ -273,6 +289,10 @@ const ClientsPage = () => {
       firstName: client.firstName || "",
       lastName: client.lastName || "",
       phone: client.phone || "",
+      address: client.address || "",
+      city: client.city || "",
+      state: client.state || "",
+      zipCode: client.zipCode || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -585,6 +605,67 @@ const ClientsPage = () => {
                 />
               </div>
               
+              {/* Address Section */}
+              <div className="space-y-4">
+                <FormField
+                  control={addForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Street Address (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123 Main Street" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={addForm.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="New York" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={addForm.control}
+                    name="state"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="NY" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={addForm.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="10001" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              
               {/* Optional Payment Method Section */}
               <div className="border-t pt-4">
                 <Button
@@ -743,8 +824,67 @@ const ClientsPage = () => {
                 />
               </div>
               
+              {/* Address Section */}
+              <div className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Street Address (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123 Main Street" {...field} value={field.value || ""} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={editForm.control}
+                    name="city"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>City (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="New York" {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="state"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>State (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="NY" {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={editForm.control}
+                    name="zipCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ZIP Code (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="10001" {...field} value={field.value || ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
 
-              
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                   Cancel
