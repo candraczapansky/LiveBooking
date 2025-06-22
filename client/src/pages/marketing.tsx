@@ -224,11 +224,10 @@ const MarketingPage = () => {
       
       // If "Send Now" was selected, immediately send the campaign
       if (variables.sendNow) {
-        handleSendCampaign(data.id, data.type);
-        toast({
-          title: "Campaign sent",
-          description: "Your marketing campaign has been sent immediately.",
-        });
+        // Use a timeout to ensure the campaign list updates before sending
+        setTimeout(() => {
+          handleSendCampaign(data.id, data.type);
+        }, 100);
       } else {
         toast({
           title: "Campaign created",
