@@ -308,15 +308,19 @@ export default function PointOfSale() {
                     {/* Client Selection */}
                     <div className="mb-4">
                       <label className="text-sm font-medium mb-2 block">Customer (Optional)</label>
-                      <Select value={selectedClient?.id?.toString() || ""} onValueChange={(value) => {
-                        const client = clientList.find((c: Client) => c.id.toString() === value);
-                        setSelectedClient(client || null);
+                      <Select value={selectedClient?.id?.toString() || "walk-in"} onValueChange={(value) => {
+                        if (value === "walk-in") {
+                          setSelectedClient(null);
+                        } else {
+                          const client = clientList.find((c: Client) => c.id.toString() === value);
+                          setSelectedClient(client || null);
+                        }
                       }}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select customer..." />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Walk-in Customer</SelectItem>
+                          <SelectItem value="walk-in">Walk-in Customer</SelectItem>
                           {clientList.map((client: Client) => (
                             <SelectItem key={client.id} value={client.id.toString()}>
                               {client.firstName && client.lastName 
