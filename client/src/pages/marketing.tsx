@@ -957,12 +957,15 @@ const MarketingPage = () => {
                     </div>
                     
                     {viewCampaign.type === "email" && viewCampaign.sentCount && viewCampaign.sentCount > 0 && (
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="text-center p-4 bg-muted rounded-lg">
                           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                            {viewCampaign.openRate || 0}%
+                            {viewCampaign.openedCount || 0}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Open Rate</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Opens</div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            {viewCampaign.sentCount > 0 ? Math.round(((viewCampaign.openedCount || 0) / viewCampaign.sentCount) * 100) : 0}% rate
+                          </div>
                         </div>
                         
                         <div className="text-center p-4 bg-muted rounded-lg">
@@ -970,6 +973,16 @@ const MarketingPage = () => {
                             {Math.round(((viewCampaign.deliveredCount || 0) / viewCampaign.sentCount) * 100)}%
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">Delivery Rate</div>
+                        </div>
+                        
+                        <div className="text-center p-4 bg-muted rounded-lg">
+                          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                            {viewCampaign.unsubscribedCount || 0}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">Unsubscribes</div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                            {viewCampaign.sentCount > 0 ? Math.round(((viewCampaign.unsubscribedCount || 0) / viewCampaign.sentCount) * 100) : 0}% rate
+                          </div>
                         </div>
                       </div>
                     )}

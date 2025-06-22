@@ -102,8 +102,21 @@ export function createMarketingCampaignEmail(
   clientName: string,
   subject: string,
   content: string,
-  salonEmail: string
+  salonEmail: string,
+  trackingToken?: string
 ): EmailParams {
+  const baseUrl = process.env.REPLIT_DOMAINS ? 
+    `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
+    'http://localhost:5000';
+  
+  const trackingPixel = trackingToken ? 
+    `<img src="${baseUrl}/api/track/open/${trackingToken}" width="1" height="1" style="display:none;" alt="">` : 
+    '';
+  
+  const unsubscribeLink = trackingToken ? 
+    `${baseUrl}/api/unsubscribe/${trackingToken}` : 
+    '#';
+
   return {
     to: clientEmail,
     from: salonEmail,
@@ -119,11 +132,18 @@ export function createMarketingCampaignEmail(
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
           <p style="font-size: 12px; color: #666;">
             You received this email because you are a valued client of BeautyBook.
+            <br><br>
+            <a href="${unsubscribeLink}" style="color: #999; text-decoration: underline;">
+              Unsubscribe from marketing emails
+            </a>
           </p>
         </div>
+        ${trackingPixel}
       </div>
     `,
-    text: `Dear ${clientName}, ${content.replace(/<[^>]*>/g, '')}`
+    text: `Dear ${clientName}, ${content.replace(/<[^>]*>/g, '')}
+
+To unsubscribe from marketing emails, visit: ${unsubscribeLink}`
   };
 }
 

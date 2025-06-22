@@ -1417,15 +1417,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
             success = smsResult.success;
             errorMessage = smsResult.error || '';
           } else if (campaign.type === 'email') {
-            // Send Email
-            const emailParams = createMarketingCampaignEmail(
-              recipient.email,
-              recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
-              campaign.subject || 'Marketing Update from BeautyBook',
-              campaign.content,
-              process.env.SENDGRID_FROM_EMAIL || 'test@example.com' // Use verified sender email
-            );
-            success = await sendEmail(emailParams);
+            // Check if user is unsubscribed
+            const isUnsubscribed = await storage.isUserUnsubscribed(recipient.email);
+            
+            if (isUnsubscribed) {
+              errorMessage = 'User has unsubscribed from marketing emails';
+            } else {
+              // Send Email with tracking
+              const emailParams = createMarketingCampaignEmail(
+                recipient.email,
+                recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
+                campaign.subject || 'Marketing Update from BeautyBook',
+                campaign.content,
+                process.env.SENDGRID_FROM_EMAIL || 'test@example.com', // Use verified sender email
+                campaignRecipient.trackingToken || undefined
+              );
+              success = await sendEmail(emailParams);
+            }
           }
           
           if (success) {
