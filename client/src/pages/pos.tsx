@@ -578,9 +578,9 @@ export default function PointOfSale() {
                               </Button>
                               <Button
                                 size="sm"
-                                variant="destructive"
+                                variant="outline"
                                 onClick={() => removeFromCart(item.item.id, item.type)}
-                                className="p-2"
+                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
