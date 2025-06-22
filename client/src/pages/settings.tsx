@@ -264,29 +264,30 @@ export default function Settings() {
     setSelectedTheme('custom');
   };
 
-  const saveColorAsPreset = () => {
-    const colorName = prompt("Enter a name for this color preset:");
-    if (colorName && colorName.trim()) {
-      const newPreset = { name: colorName.trim(), color: customColor };
-      const updatedPresets = [...savedPresets, newPreset];
-      setSavedPresets(updatedPresets);
-      localStorage.setItem('savedPresets', JSON.stringify(updatedPresets));
-      
-      toast({
-        title: "Color saved",
-        description: `"${colorName}" has been added to your presets.`,
-      });
-    }
-  };
-
-  const deletePreset = (indexToDelete: number) => {
-    const updatedPresets = savedPresets.filter((_, index) => index !== indexToDelete);
+  const savePrimaryColorPreset = () => {
+    if (!presetName.trim() || customColor === '#3b82f6') return;
+    
+    const newPreset = { name: presetName.trim(), color: customColor };
+    const updatedPresets = [...savedPresets, newPreset];
     setSavedPresets(updatedPresets);
     localStorage.setItem('savedPresets', JSON.stringify(updatedPresets));
     
     toast({
-      title: "Preset deleted",
-      description: "Color preset has been removed.",
+      title: "Primary color saved",
+      description: `"${presetName}" has been added to your primary color presets.`,
+    });
+    
+    setPresetName('');
+  };
+
+  const deletePrimaryColorPreset = (nameToDelete: string) => {
+    const updatedPresets = savedPresets.filter(preset => preset.name !== nameToDelete);
+    setSavedPresets(updatedPresets);
+    localStorage.setItem('savedPresets', JSON.stringify(updatedPresets));
+    
+    toast({
+      title: "Primary color preset deleted",
+      description: "Primary color preset has been removed.",
     });
   };
 
@@ -478,24 +479,13 @@ export default function Settings() {
                     />
                     <div className="space-y-1">
                       <Label className="text-sm font-medium">Color Value</Label>
-                      <div className="flex space-x-2">
-                        <Input
-                          type="text"
-                          value={customColor}
-                          onChange={(e) => handleCustomColorChange(e.target.value)}
-                          className="w-32 text-sm"
-                          placeholder="#3b82f6"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={saveColorAsPreset}
-                          className="text-xs"
-                        >
-                          <Save className="h-3 w-3 mr-1" />
-                          Save
-                        </Button>
-                      </div>
+                      <Input
+                        type="text"
+                        value={customColor}
+                        onChange={(e) => handleCustomColorChange(e.target.value)}
+                        className="w-32 text-sm"
+                        placeholder="#3b82f6"
+                      />
                     </div>
                   </div>
                   
@@ -580,6 +570,57 @@ export default function Settings() {
               </div>
 
               <div className="flex items-center space-x-2 mt-4">
+                <Input
+                  type="text"
+                  placeholder="Enter primary color preset name..."
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={savePrimaryColorPreset}
+                  disabled={!presetName.trim() || customColor === '#3b82f6'}
+                  size="sm"
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save Primary Color
+                </Button>
+              </div>
+
+              {savedPresets.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Saved Primary Color Presets</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {savedPresets.map((preset) => (
+                      <div key={preset.name} className="flex items-center justify-between p-2 border rounded-lg">
+                        <div className="flex items-center space-x-2">
+                          <div 
+                            className="w-4 h-4 rounded border cursor-pointer"
+                            style={{ backgroundColor: preset.color }}
+                            onClick={() => {
+                              setCustomColor(preset.color);
+                              handleCustomColorChange(preset.color);
+                            }}
+                          />
+                          <span className="text-sm font-medium">{preset.name}</span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deletePrimaryColorPreset(preset.name)}
+                          className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-4">
                 <Input
                   type="text"
                   placeholder="Enter text color preset name..."
