@@ -94,7 +94,7 @@ export default function PointOfSale() {
     queryKey: ["/api/users"],
   });
 
-  const clientList = clients?.filter((user: any) => user.role === 'client') || [];
+  const clientList = (clients as any[])?.filter((user: any) => user.role === 'client') || [];
 
   // Process transaction mutation
   const processTransactionMutation = useMutation({
@@ -208,7 +208,7 @@ export default function PointOfSale() {
     processTransactionMutation.mutate(transaction);
   };
 
-  const filteredServices = services?.filter((service: any) =>
+  const filteredServices = (services as any[])?.filter((service: any) =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     service.category.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];

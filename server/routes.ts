@@ -1621,6 +1621,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Transactions endpoint for Point of Sale
+  app.post("/api/transactions", async (req, res) => {
+    try {
+      const { clientId, items, subtotal, tax, total, paymentMethod } = req.body;
+      
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "Transaction must contain at least one item" });
+      }
+
+      if (!subtotal || !total || !paymentMethod) {
+        return res.status(400).json({ error: "Missing required transaction fields" });
+      }
+
+      // Generate transaction ID
+      const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Create transaction record (for now, just return success)
+      // In a real implementation, you would save this to a transactions table
+      const transaction = {
+        id: transactionId,
+        clientId: clientId || null,
+        items,
+        subtotal,
+        tax,
+        total,
+        paymentMethod,
+        timestamp: new Date(),
+        status: 'completed'
+      };
+
+      console.log('Transaction processed:', transaction);
+      
+      res.json({ 
+        success: true, 
+        transactionId: transactionId,
+        message: "Transaction processed successfully" 
+      });
+    } catch (error: any) {
+      console.error('Transaction processing error:', error);
+      res.status(500).json({ error: "Error processing transaction: " + error.message });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
