@@ -67,6 +67,32 @@ export default function Settings() {
     return () => clearInterval(interval);
   }, []);
 
+  // Initialize theme settings from localStorage
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'blue';
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    
+    setSelectedTheme(savedTheme);
+    setDarkMode(savedDarkMode);
+    
+    // Apply saved theme
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    if (savedDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  // Update dark mode class on document
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
+
   const passwordForm = useForm<PasswordChangeForm>({
     resolver: zodResolver(passwordChangeSchema),
     defaultValues: {

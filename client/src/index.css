@@ -81,6 +81,61 @@
   --sidebar-ring: 330 81% 60%;
 }
 
+/* Theme color variations */
+[data-theme="blue"] {
+  --primary: 221 83% 53%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 221 83% 53%;
+  --sidebar-accent: 221 83% 95%;
+  --sidebar-accent-foreground: 221 83% 53%;
+  --sidebar-ring: 221 83% 53%;
+}
+
+[data-theme="purple"] {
+  --primary: 262 83% 58%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 262 83% 58%;
+  --sidebar-accent: 262 83% 95%;
+  --sidebar-accent-foreground: 262 83% 58%;
+  --sidebar-ring: 262 83% 58%;
+}
+
+[data-theme="pink"] {
+  --primary: 330 81% 60%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 330 81% 60%;
+  --sidebar-accent: 330 81% 95%;
+  --sidebar-accent-foreground: 330 81% 60%;
+  --sidebar-ring: 330 81% 60%;
+}
+
+[data-theme="green"] {
+  --primary: 142 76% 36%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 142 76% 36%;
+  --sidebar-accent: 142 76% 95%;
+  --sidebar-accent-foreground: 142 76% 36%;
+  --sidebar-ring: 142 76% 36%;
+}
+
+[data-theme="orange"] {
+  --primary: 24 94% 53%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 24 94% 53%;
+  --sidebar-accent: 24 94% 95%;
+  --sidebar-accent-foreground: 24 94% 53%;
+  --sidebar-ring: 24 94% 53%;
+}
+
+[data-theme="red"] {
+  --primary: 0 84% 60%;
+  --primary-foreground: 210 40% 98%;
+  --sidebar-primary: 0 84% 60%;
+  --sidebar-accent: 0 84% 95%;
+  --sidebar-accent-foreground: 0 84% 60%;
+  --sidebar-ring: 0 84% 60%;
+}
+
 @layer base {
   * {
     @apply border-border;
