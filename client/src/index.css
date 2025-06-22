@@ -89,8 +89,32 @@
   --dropdown-selected-foreground: 210 40% 98%;
 }
 
-/* Force secondary button text color to use custom variable */
+/* Apply secondary color to all text elements */
 .bg-secondary {
+  color: hsl(var(--secondary-foreground)) !important;
+}
+
+/* Apply secondary color to primary text elements globally */
+h1, h2, h3, h4, h5, h6,
+.text-foreground,
+.sidebar-item,
+[data-sidebar="menu-button"],
+[data-sidebar="menu-item"],
+.font-semibold,
+.font-medium,
+label,
+.text-lg,
+.text-base,
+.text-xl,
+.text-2xl,
+.text-3xl,
+p:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
+span:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
+div:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground) > *:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
+.text-sm:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
+nav a,
+.sidebar a,
+.menu-item {
   color: hsl(var(--secondary-foreground)) !important;
 }
 

@@ -497,10 +497,10 @@ export default function Settings() {
               <div className="space-y-4">
                 <Label className="text-base flex items-center">
                   <Palette className="h-4 w-4 mr-2" />
-                  Secondary Button Color
+                  Text Color
                 </Label>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Choose the text color for secondary buttons and alternate actions
+                  Choose the main font color for all text throughout the application
                 </p>
                 
                 <div className="flex items-center space-x-4">
@@ -534,7 +534,7 @@ export default function Settings() {
                         size="sm" 
                         variant="secondary" 
                         className="text-xs"
-                        onClick={() => toast({ title: "Secondary Button", description: "This now uses your custom font color on a neutral background!" })}
+                        onClick={() => toast({ title: "Text Color", description: "This shows your custom font color applied throughout the app!" })}
                       >
                         Secondary
                       </Button>
