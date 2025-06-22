@@ -528,20 +528,21 @@ export default function Settings() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2 mt-4">
+              <div className="space-y-3 mt-4">
                 <Input
                   type="text"
                   placeholder="Enter primary color preset name..."
                   value={presetName}
                   onChange={(e) => setPresetName(e.target.value)}
-                  className="flex-1"
+                  className="w-full"
                 />
                 <Button 
                   onClick={savePrimaryColorPreset}
                   disabled={!presetName.trim() || customColor === '#3b82f6'}
-                  size="sm"
+                  className="w-full"
+                  size="lg"
                 >
-                  <Save className="h-4 w-4 mr-1" />
+                  <Save className="h-4 w-4 mr-2" />
                   Save Primary Color
                 </Button>
               </div>
