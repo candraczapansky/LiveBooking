@@ -588,14 +588,15 @@ export default function Settings() {
                   onChange={(e) => setSecondaryPresetName(e.target.value)}
                   className="flex-1"
                 />
-                <Button 
+                <button 
                   onClick={saveSecondaryColorPreset}
                   disabled={!secondaryPresetName.trim() || secondaryColor === '#6b7280'}
-                  size="sm"
+                  className="text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded-md font-medium flex items-center justify-center"
+                  style={{ backgroundColor: secondaryColor }}
                 >
                   <Save className="h-4 w-4 mr-1" />
                   Save Text Color
-                </Button>
+                </button>
               </div>
 
               {savedSecondaryPresets.length > 0 && (
@@ -696,10 +697,14 @@ export default function Settings() {
               )}
             </div>
 
-            <Button onClick={handleSaveAppearance} className="w-full">
+            <button 
+              onClick={handleSaveAppearance} 
+              className="w-full text-white hover:opacity-90 px-4 py-3 rounded-md font-medium flex items-center justify-center"
+              style={{ backgroundColor: customColor }}
+            >
               <Save className="h-4 w-4 mr-2" />
               Save Appearance Settings
-            </Button>
+            </button>
           </CardContent>
         </Card>
 
