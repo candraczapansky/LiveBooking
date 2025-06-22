@@ -107,6 +107,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(201).json(userWithoutPassword);
   });
 
+  // Change password route
+  app.post("/api/change-password", async (req, res) => {
+    const { userId, currentPassword, newPassword } = req.body;
+    
+    if (!userId || !currentPassword || !newPassword) {
+      return res.status(400).json({ error: "User ID, current password, and new password are required" });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters long" });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Verify current password (in real app, compare hashed passwords)
+      if (user.password !== currentPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      
+      // Update password (in real app, hash the new password)
+      await storage.updateUser(userId, { password: newPassword });
+      
+      return res.status(200).json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // Users routes
   app.get("/api/users", async (req, res) => {
     console.log("GET /api/users called");
