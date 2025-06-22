@@ -62,6 +62,7 @@ export default function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   // Load saved appearance settings on mount
   useEffect(() => {
@@ -71,11 +72,13 @@ export default function Settings() {
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
     const savedPresetColors = localStorage.getItem('savedPresets');
     const savedSecondaryPresetColors = localStorage.getItem('savedSecondaryPresets');
+    const savedProfilePicture = localStorage.getItem('profilePicture');
 
     setSelectedTheme(savedTheme);
     setCustomColor(savedCustomColor);
     setSecondaryColor(savedSecondaryColor);
     setDarkMode(savedDarkMode);
+    setProfilePicture(savedProfilePicture);
     
     if (savedPresetColors) {
       setSavedPresets(JSON.parse(savedPresetColors));
@@ -342,6 +345,23 @@ export default function Settings() {
     changePasswordMutation.mutate(data);
   };
 
+  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setProfilePicture(result);
+        localStorage.setItem('profilePicture', result);
+        toast({
+          title: "Profile picture updated",
+          description: "Your profile picture has been changed successfully.",
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
@@ -377,7 +397,7 @@ export default function Settings() {
             <div className="flex items-center space-x-4">
               <Avatar className="h-20 w-20">
                 <AvatarImage
-                  src="https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"
+                  src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"}
                   alt="Profile picture"
                 />
                 <AvatarFallback className="text-lg">
@@ -389,10 +409,23 @@ export default function Settings() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
                   {user?.role || "User"}
                 </p>
-                <Button variant="outline" size="sm" className="mt-2">
-                  <Camera className="h-4 w-4 mr-2" />
-                  Change Photo
-                </Button>
+                <div className="mt-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePictureChange}
+                    className="hidden"
+                    id="profile-picture-upload"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => document.getElementById('profile-picture-upload')?.click()}
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Change Photo
+                  </Button>
+                </div>
               </div>
             </div>
 

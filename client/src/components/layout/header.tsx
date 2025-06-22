@@ -17,6 +17,7 @@ import { getInitials, getFullName } from "@/lib/utils";
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
   const [showMenuButton, setShowMenuButton] = useState(false);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
     const checkSidebarState = () => {
