@@ -49,6 +49,7 @@ export default function Settings() {
   const [darkMode, setDarkMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('blue');
   const [customColor, setCustomColor] = useState('#3b82f6');
+  const [savedPresets, setSavedPresets] = useState<Array<{name: string, color: string}>>([]);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [appointmentReminders, setAppointmentReminders] = useState(true);
@@ -62,10 +63,15 @@ export default function Settings() {
     const savedTheme = localStorage.getItem('theme') || 'blue';
     const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    const savedPresetColors = localStorage.getItem('savedPresets');
 
     setSelectedTheme(savedTheme);
     setCustomColor(savedCustomColor);
     setDarkMode(savedDarkMode);
+    
+    if (savedPresetColors) {
+      setSavedPresets(JSON.parse(savedPresetColors));
+    }
 
     // Apply saved custom color
     if (savedTheme === 'custom' || savedCustomColor !== '#3b82f6') {
@@ -212,11 +218,38 @@ export default function Settings() {
     setSelectedTheme('custom');
   };
 
+  const saveColorAsPreset = () => {
+    const colorName = prompt("Enter a name for this color preset:");
+    if (colorName && colorName.trim()) {
+      const newPreset = { name: colorName.trim(), color: customColor };
+      const updatedPresets = [...savedPresets, newPreset];
+      setSavedPresets(updatedPresets);
+      localStorage.setItem('savedPresets', JSON.stringify(updatedPresets));
+      
+      toast({
+        title: "Color saved",
+        description: `"${colorName}" has been added to your presets.`,
+      });
+    }
+  };
+
+  const deletePreset = (indexToDelete: number) => {
+    const updatedPresets = savedPresets.filter((_, index) => index !== indexToDelete);
+    setSavedPresets(updatedPresets);
+    localStorage.setItem('savedPresets', JSON.stringify(updatedPresets));
+    
+    toast({
+      title: "Preset deleted",
+      description: "Color preset has been removed.",
+    });
+  };
+
   const handleSaveAppearance = () => {
     // Save appearance settings to localStorage
     localStorage.setItem('theme', selectedTheme);
     localStorage.setItem('customColor', customColor);
     localStorage.setItem('darkMode', darkMode.toString());
+    localStorage.setItem('savedPresets', JSON.stringify(savedPresets));
     
     toast({
       title: "Appearance saved",
@@ -371,13 +404,24 @@ export default function Settings() {
                     />
                     <div className="space-y-1">
                       <Label className="text-sm font-medium">Color Value</Label>
-                      <Input
-                        type="text"
-                        value={customColor}
-                        onChange={(e) => handleCustomColorChange(e.target.value)}
-                        className="w-32 text-sm"
-                        placeholder="#3b82f6"
-                      />
+                      <div className="flex space-x-2">
+                        <Input
+                          type="text"
+                          value={customColor}
+                          onChange={(e) => handleCustomColorChange(e.target.value)}
+                          className="w-32 text-sm"
+                          placeholder="#3b82f6"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={saveColorAsPreset}
+                          className="text-xs"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   
@@ -432,6 +476,36 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
+
+              {savedPresets.length > 0 && (
+                <div className="space-y-4">
+                  <Label className="text-base">Your Saved Colors</Label>
+                  <div className="grid grid-cols-6 gap-3">
+                    {savedPresets.map((preset, index) => (
+                      <div
+                        key={index}
+                        className="group text-center relative"
+                      >
+                        <div 
+                          className="w-8 h-8 mx-auto rounded-full cursor-pointer group-hover:scale-110 transition-transform border-2 border-gray-300 dark:border-gray-600"
+                          style={{ backgroundColor: preset.color }}
+                          onClick={() => handleCustomColorChange(preset.color)}
+                        />
+                        <button
+                          onClick={() => deletePreset(index)}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                          title="Delete preset"
+                        >
+                          ×
+                        </button>
+                        <p className="text-xs mt-1 text-gray-600 dark:text-gray-400 truncate">
+                          {preset.name}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button onClick={handleSaveAppearance} className="w-full">
