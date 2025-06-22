@@ -507,8 +507,8 @@ const ClientsPage = () => {
             ) : (
               // Client Detail View with Payment Methods
               <div className="space-y-6">
-                {/* Back Button and Actions */}
-                <div className="flex items-center justify-between">
+                {/* Back Button */}
+                <div className="flex items-center">
                   <Button
                     variant="outline"
                     onClick={handleBackToList}
@@ -517,16 +517,6 @@ const ClientsPage = () => {
                     <ArrowLeft className="h-4 w-4" />
                     Back to Clients
                   </Button>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => openEditDialog(clientDetail!)}
-                      className="flex items-center gap-2"
-                    >
-                      <Edit className="h-4 w-4" />
-                      Edit Client
-                    </Button>
-                  </div>
                 </div>
                 {/* Client Information Card */}
                 <Card>
