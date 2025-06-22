@@ -401,6 +401,7 @@ export default function Settings() {
   };
 
   const handleEditProfile = () => {
+    console.log('Edit profile clicked, setting isEditingProfile to true');
     setIsEditingProfile(true);
   };
 
@@ -510,7 +511,8 @@ export default function Settings() {
                   value={isEditingProfile ? profileData.firstName : (user?.firstName || "")}
                   disabled={!isEditingProfile}
                   onChange={(e) => handleProfileInputChange('firstName', e.target.value)}
-                  className="mt-1" 
+                  className="mt-1"
+                  placeholder={isEditingProfile ? "Enter first name" : ""}
                 />
               </div>
               <div>
@@ -562,6 +564,10 @@ export default function Settings() {
               </div>
             </div>
 
+            <div className="text-xs text-gray-500 mb-2">
+              Edit Mode: {isEditingProfile ? 'ON' : 'OFF'}
+            </div>
+            
             {!isEditingProfile ? (
               <Button onClick={handleEditProfile} className="w-full">
                 <User className="h-4 w-4 mr-2" />
