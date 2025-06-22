@@ -118,7 +118,7 @@ nav a,
   color: hsl(var(--secondary-foreground)) !important;
 }
 
-/* Apply primary color to icons specifically */
+/* Apply primary color to icons with elegant outline style */
 svg,
 .lucide,
 [class*="icon"],
@@ -129,7 +129,10 @@ label svg,
 button svg:not(.bg-secondary svg) {
   color: hsl(var(--primary)) !important;
   stroke: hsl(var(--primary)) !important;
-  fill: hsl(var(--primary)) !important;
+  fill: none !important;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Theme color variations */
