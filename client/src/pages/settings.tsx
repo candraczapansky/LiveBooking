@@ -474,11 +474,11 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-6">
             
-            {/* Emergency Fix - Always Editable Fields */}
-            <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-              <h4 className="font-medium text-green-800 dark:text-green-200 mb-2">Always Editable Fields</h4>
-              <p className="text-sm text-green-700 dark:text-green-300 mb-4">
-                These fields are always editable as a workaround:
+            {/* Personal Information Editor */}
+            <div className="p-4 bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg">
+              <h4 className="font-medium text-primary mb-2">Edit Personal Information</h4>
+              <p className="text-sm text-muted-foreground mb-4">
+                Update your personal details below:
               </p>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -522,7 +522,7 @@ export default function Settings() {
               
               <Button 
                 onClick={handleSaveProfile} 
-                className="w-full mt-4 bg-green-600 hover:bg-green-700"
+                className="w-full mt-4"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save Personal Information
