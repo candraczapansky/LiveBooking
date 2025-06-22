@@ -89,6 +89,11 @@
   --dropdown-selected-foreground: 210 40% 98%;
 }
 
+/* Force secondary button text color to use custom variable */
+.bg-secondary {
+  color: hsl(var(--secondary-foreground)) !important;
+}
+
 /* Theme color variations */
 [data-theme="blue"] {
   --primary: 221 83% 53%;

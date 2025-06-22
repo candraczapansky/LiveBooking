@@ -248,10 +248,6 @@ export default function Settings() {
     }
     root.style.setProperty('--secondary-foreground', hslColor); // Use custom color for text
     
-    // Debug: Log the values being set
-    console.log('Setting secondary color:', color, 'HSL:', hslColor);
-    console.log('Current --secondary-foreground:', getComputedStyle(root).getPropertyValue('--secondary-foreground'));
-    
     // Save to localStorage
     localStorage.setItem('secondary-color', color);
     
