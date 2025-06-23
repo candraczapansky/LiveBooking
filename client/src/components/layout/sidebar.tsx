@@ -50,9 +50,9 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
   const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
 
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-30 w-64 bg-sidebar-background shadow-lg transform transition-transform ${
+  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-sidebar-background shadow-lg transform transition-transform ${
     isOpen ? "translate-x-0" : "-translate-x-full"
-  }`;
+  } ${isMobile ? "lg:relative lg:translate-x-0" : ""}`;
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
@@ -133,16 +133,22 @@ const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
 };
 
 export const SidebarController = () => {
-  const [isOpen, setIsOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isOpen, setIsOpen] = useState(!isMobile);
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-      if (window.innerWidth < 768) {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
         setIsOpen(false);
+      } else {
+        setIsOpen(true);
       }
     };
+
+    // Set initial state
+    handleResize();
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);

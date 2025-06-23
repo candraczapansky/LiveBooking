@@ -16,17 +16,16 @@ import { getInitials, getFullName } from "@/lib/utils";
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
-  const [showMenuButton, setShowMenuButton] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkSidebarState = () => {
-      const sidebarOpen = (window as any).sidebarIsOpen;
-      setShowMenuButton(!sidebarOpen);
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
     };
 
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -58,17 +57,19 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            {showMenuButton && (
+            {isMobile && (
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="mr-3"
+                className="mr-3 lg:hidden"
                 onClick={() => (window as any).toggleSidebar?.()}
               >
                 <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
               </Button>
             )}
-            <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+            <div className="lg:hidden">
+              <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+            </div>
           </div>
           <div className="flex items-center">
             <div className="ml-4 flex items-center md:ml-6">

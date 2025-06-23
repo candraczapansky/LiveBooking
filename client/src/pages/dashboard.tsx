@@ -30,7 +30,7 @@ const Dashboard = () => {
       <SidebarController />
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'lg:ml-64' : 'ml-0'
       }`}>
         <Header />
         
