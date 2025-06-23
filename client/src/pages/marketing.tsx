@@ -106,6 +106,7 @@ const campaignFormSchema = z.object({
   subject: z.string().optional(),
   content: z.string().min(1, "Content is required"),
   sendDate: z.string().optional(),
+  sendTime: z.string().optional(),
   sendNow: z.boolean().default(false),
 }).refine((data) => {
   if (data.type === 'email' && !data.subject) {
@@ -185,6 +186,7 @@ const MarketingPage = () => {
       subject: "",
       content: "Please create an email template using the editor above.",
       sendDate: "",
+      sendTime: "09:00",
       sendNow: false,
     },
   });
@@ -216,14 +218,21 @@ const MarketingPage = () => {
   // Create campaign mutation
   const createCampaignMutation = useMutation({
     mutationFn: async (campaignData: CampaignFormValues) => {
+      // Combine date and time for proper scheduling
+      let sendDate = undefined;
+      if (campaignData.sendDate && !campaignData.sendNow) {
+        const timeStr = campaignData.sendTime || "09:00";
+        sendDate = new Date(`${campaignData.sendDate}T${timeStr}:00`);
+      }
+      
       const payload = {
         name: campaignData.name,
         type: campaignData.type,
         audience: campaignData.audience,
         subject: campaignData.type === 'email' ? campaignData.subject : undefined,
         content: campaignData.content,
-        sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
-        status: campaignData.sendDate && !campaignData.sendNow ? 'scheduled' : 'draft'
+        sendDate: sendDate,
+        status: sendDate ? 'scheduled' : 'draft'
       };
       
       const response = await fetch('/api/marketing-campaigns', {
@@ -305,11 +314,7 @@ const MarketingPage = () => {
 
   // Form submission handlers
   const onCampaignSubmit = async (data: CampaignFormValues) => {
-    console.log("Form submission attempted with data:", data);
-    console.log("Form errors:", campaignForm.formState.errors);
-    
     if (createCampaignMutation.isPending) {
-      console.log("Mutation already pending, returning");
       return; // Prevent duplicate submissions
     }
     
@@ -322,7 +327,6 @@ const MarketingPage = () => {
       return;
     }
     
-    console.log("Calling mutation with data:", data);
     createCampaignMutation.mutate(data);
   };
 
@@ -853,24 +857,47 @@ const MarketingPage = () => {
                 />
               )}
               
-              <div className="grid grid-cols-2 gap-4 items-end">
-                <FormField
-                  control={campaignForm.control}
-                  name="sendDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Send Date (Optional)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="date" 
-                          {...field} 
-                          disabled={campaignForm.watch("sendNow")}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={campaignForm.control}
+                    name="sendDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Send Date (Optional)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            disabled={campaignForm.watch("sendNow")}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={campaignForm.control}
+                    name="sendTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Send Time</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="time" 
+                            {...field} 
+                            disabled={campaignForm.watch("sendNow") || !campaignForm.watch("sendDate")}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Specify the time to send the campaign
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 
                 <FormField
                   control={campaignForm.control}
@@ -903,12 +930,6 @@ const MarketingPage = () => {
                 <Button 
                   type="submit" 
                   disabled={createCampaignMutation.isPending}
-                  onClick={(e) => {
-                    console.log("Create Campaign button clicked");
-                    console.log("Form is valid:", campaignForm.formState.isValid);
-                    console.log("Form errors:", campaignForm.formState.errors);
-                    console.log("Form values:", campaignForm.getValues());
-                  }}
                 >
                   {createCampaignMutation.isPending ? "Creating..." : "Create Campaign"}
                 </Button>

@@ -33,6 +33,12 @@ Preferred communication style: Simple, everyday language.
   - Fixed campaign status tracking - campaigns now correctly display "draft", "scheduled", or "sent" status
   - Resolved campaign scheduling validation issues - users can now schedule campaigns for future delivery
   - Database properly stores and updates campaign status based on actual email delivery
+  - **Added precise time scheduling for campaigns:**
+    - Implemented time picker alongside date picker for scheduled campaigns
+    - Users can now specify exact delivery time (hour and minute) for scheduled campaigns
+    - Time field automatically disables when "Send immediately" is checked or no date is selected
+    - Backend properly combines date and time into precise timestamp for scheduling
+    - Default time set to 9:00 AM for user convenience
 
 ## System Architecture
 
