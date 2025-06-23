@@ -54,31 +54,33 @@ const MobileSidebar = () => {
       {/* Mobile sidebar overlay */}
       {isOpen && (
         <div 
-          className="mobile-menu-overlay fixed inset-0 lg:hidden"
           style={{ 
             position: "fixed", 
             top: 0, 
             left: 0, 
             right: 0, 
             bottom: 0, 
-            zIndex: 9999, 
+            zIndex: 99999, 
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             width: "100vw",
-            height: "100vh"
+            height: "100vh",
+            display: "block"
           }}
           onClick={closeSidebar}
         >
           {/* Sidebar */}
           <div 
-            className="mobile-menu-sidebar fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl"
             style={{
               position: "fixed",
               left: 0,
               top: 0,
               width: "256px",
               height: "100vh",
-              zIndex: 10000,
-              maxWidth: "256px"
+              zIndex: 100000,
+              backgroundColor: "white",
+              boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
+              display: "flex",
+              flexDirection: "column"
             }}
             onClick={(e) => e.stopPropagation()}
           >

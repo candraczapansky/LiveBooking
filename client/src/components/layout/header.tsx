@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
-import MobileSidebar from "./mobile-sidebar";
+import SimpleMobileMenu from "./simple-mobile-menu";
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
@@ -48,7 +48,7 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <MobileSidebar />
+            <SimpleMobileMenu />
             <div className="lg:hidden ml-3">
               <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
             </div>
