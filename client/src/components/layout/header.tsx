@@ -53,7 +53,9 @@ const Header = () => {
               variant="ghost" 
               size="icon" 
               className="mr-3 lg:hidden"
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 console.log('Mobile menu clicked');
                 toggleSidebar();
               }}

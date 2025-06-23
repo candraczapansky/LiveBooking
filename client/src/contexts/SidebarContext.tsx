@@ -49,7 +49,12 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
 
   const toggleSidebar = () => {
     console.log('toggleSidebar called, current isOpen:', isOpen);
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    
+    // Use setTimeout to ensure state change completes before any other handlers
+    setTimeout(() => {
+      setIsOpen(newState);
+    }, 10);
   };
 
   const closeSidebar = () => {
