@@ -399,20 +399,24 @@ const MarketingPage = () => {
                   Manage campaigns, promotions, and client communications
                 </p>
               </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                <div className="relative">
+              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                <div className="relative flex-1 sm:flex-initial">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
                   <Input
                     type="search"
                     placeholder="Search..."
-                    className="pl-8 w-[250px]"
+                    className="pl-8 w-full sm:w-[250px]"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button onClick={() => activeTab === "campaigns" ? setIsCampaignFormOpen(true) : setIsPromoFormOpen(true)}>
+                <Button 
+                  onClick={() => activeTab === "campaigns" ? setIsCampaignFormOpen(true) : setIsPromoFormOpen(true)}
+                  className="w-full sm:w-auto"
+                >
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  {activeTab === "campaigns" ? "New Campaign" : "New Promo"}
+                  <span className="hidden sm:inline">{activeTab === "campaigns" ? "New Campaign" : "New Promo"}</span>
+                  <span className="sm:hidden">{activeTab === "campaigns" ? "Campaign" : "Promo"}</span>
                 </Button>
               </div>
             </div>
@@ -449,7 +453,7 @@ const MarketingPage = () => {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredCampaigns.map((campaign) => (
                       <Card key={campaign.id} className="overflow-hidden">
                         <CardHeader className="pb-4">
@@ -515,17 +519,18 @@ const MarketingPage = () => {
                         </CardContent>
                         
                         <CardFooter className="bg-muted/50 pt-4">
-                          <div className="flex justify-between w-full">
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              onClick={() => handleViewCampaign(campaign)}
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            {campaign.status === "draft" && (
-                              <>
+                          <div className="flex flex-col sm:flex-row gap-2 sm:gap-0 sm:justify-between w-full">
+                            <div className="flex gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => handleViewCampaign(campaign)}
+                                className="flex-1 sm:flex-initial"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                              {campaign.status === "draft" && (
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
@@ -540,20 +545,24 @@ const MarketingPage = () => {
                                       subject: campaign.subject || '',
                                     });
                                   }}
+                                  className="flex-1 sm:flex-initial"
                                 >
                                   <Edit className="h-4 w-4 mr-1" />
                                   Edit
                                 </Button>
-                                <Button 
-                                  variant="default" 
-                                  size="sm"
-                                  onClick={() => handleSendCampaign(campaign.id, campaign.type)}
-                                  disabled={sendCampaignMutation.isPending}
-                                >
-                                  {sendCampaignMutation.isPending ? "Sending..." : "Send"}
-                                  <ArrowRight className="h-4 w-4 ml-1" />
-                                </Button>
-                              </>
+                              )}
+                            </div>
+                            {campaign.status === "draft" && (
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => handleSendCampaign(campaign.id, campaign.type)}
+                                disabled={sendCampaignMutation.isPending}
+                                className="w-full sm:w-auto"
+                              >
+                                {sendCampaignMutation.isPending ? "Sending..." : "Send"}
+                                <ArrowRight className="h-4 w-4 ml-1" />
+                              </Button>
                             )}
                             {campaign.status === "sent" && (
                               <div className="flex justify-center w-full">
@@ -850,7 +859,7 @@ const MarketingPage = () => {
       
       {/* Campaign View Dialog */}
       <Dialog open={isViewCampaignOpen} onOpenChange={setIsViewCampaignOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
           {viewCampaign && (
             <>
               <DialogHeader>
@@ -933,53 +942,53 @@ const MarketingPage = () => {
                 {viewCampaign.status === "sent" && (
                   <div>
                     <label className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4 block">Campaign Analytics</label>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
+                        <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {viewCampaign.sentCount || 0}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Total Sent</div>
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Total Sent</div>
                       </div>
                       
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
+                        <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
                           {viewCampaign.deliveredCount || 0}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Delivered</div>
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Delivered</div>
                       </div>
                       
-                      <div className="text-center p-4 bg-muted rounded-lg">
-                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      <div className="text-center p-3 sm:p-4 bg-muted rounded-lg col-span-2 sm:col-span-1">
+                        <div className="text-xl sm:text-2xl font-bold text-red-600 dark:text-red-400">
                           {viewCampaign.failedCount || 0}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">Failed</div>
+                        <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Failed</div>
                       </div>
                     </div>
                     
                     {viewCampaign.type === "email" && viewCampaign.sentCount && viewCampaign.sentCount > 0 && (
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-muted rounded-lg">
-                          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                        <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
+                          <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">
                             {viewCampaign.openedCount || 0}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Opens</div>
+                          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Opens</div>
                           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                             {viewCampaign.sentCount > 0 ? Math.round(((viewCampaign.openedCount || 0) / viewCampaign.sentCount) * 100) : 0}% rate
                           </div>
                         </div>
                         
-                        <div className="text-center p-4 bg-muted rounded-lg">
-                          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                        <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
+                          <div className="text-xl sm:text-2xl font-bold text-orange-600 dark:text-orange-400">
                             {Math.round(((viewCampaign.deliveredCount || 0) / viewCampaign.sentCount) * 100)}%
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Delivery Rate</div>
+                          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Delivery Rate</div>
                         </div>
                         
-                        <div className="text-center p-4 bg-muted rounded-lg">
-                          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                        <div className="text-center p-3 sm:p-4 bg-muted rounded-lg">
+                          <div className="text-xl sm:text-2xl font-bold text-yellow-600 dark:text-yellow-400">
                             {viewCampaign.unsubscribedCount || 0}
                           </div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">Unsubscribes</div>
+                          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Unsubscribes</div>
                           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                             {viewCampaign.sentCount > 0 ? Math.round(((viewCampaign.unsubscribedCount || 0) / viewCampaign.sentCount) * 100) : 0}% rate
                           </div>

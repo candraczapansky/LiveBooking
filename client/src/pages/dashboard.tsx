@@ -34,11 +34,11 @@ const Dashboard = () => {
       }`}>
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Page Heading */}
-            <div className="mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+            <div className="mb-4 sm:mb-6">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
               <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                 Welcome back{user?.firstName ? `, ${user.firstName}` : ""}! Here's what's happening with your business today.
               </p>
