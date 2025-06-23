@@ -283,13 +283,46 @@ export default function Settings() {
             </div>
 
             <div className="space-y-6">
-              {/* DEBUG TEST CARD */}
-              <Card className="border-4 border-green-500 bg-blue-100">
+              {/* TEXT COLOR CUSTOMIZATION */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-green-600">
-                    🔧 DEBUG: Settings page is loading! 🔧
-                  </CardTitle>
+                  <CardTitle>Text Color Settings</CardTitle>
+                  <CardDescription>Change the color of text throughout the app</CardDescription>
                 </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <input
+                        type="color"
+                        value={secondaryColor}
+                        onChange={(e) => setSecondaryColor(e.target.value)}
+                        className="w-16 h-16 rounded cursor-pointer border-2"
+                      />
+                      <div>
+                        <Label>Text Color Value</Label>
+                        <Input
+                          value={secondaryColor}
+                          onChange={(e) => setSecondaryColor(e.target.value)}
+                          placeholder="#000000"
+                          className="w-32"
+                        />
+                      </div>
+                      <div 
+                        className="px-4 py-2 border rounded"
+                        style={{ color: secondaryColor }}
+                      >
+                        Sample Text
+                      </div>
+                    </div>
+                    <Button onClick={() => {
+                      const root = document.documentElement;
+                      root.style.setProperty('--foreground', secondaryColor);
+                      localStorage.setItem('textColor', secondaryColor);
+                    }}>
+                      Apply Text Color
+                    </Button>
+                  </div>
+                </CardContent>
               </Card>
 
               {/* Personal Information */}
