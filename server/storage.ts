@@ -1105,22 +1105,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
-    const existingCampaign = this.marketingCampaigns.get(id);
-    if (!existingCampaign) {
-      throw new Error(`Marketing campaign with id ${id} not found`);
-    }
-
     // Handle date conversion for sendDate if it's a string
     const processedData = { ...campaignData };
     if (processedData.sendDate && typeof processedData.sendDate === 'string') {
       processedData.sendDate = new Date(processedData.sendDate);
     }
 
-    const updatedCampaign: MarketingCampaign = {
-      ...existingCampaign,
-      ...processedData,
-    };
-    this.marketingCampaigns.set(id, updatedCampaign);
+    const [updatedCampaign] = await db
+      .update(marketingCampaigns)
+      .set(processedData)
+      .where(eq(marketingCampaigns.id, id))
+      .returning();
+
+    if (!updatedCampaign) {
+      throw new Error(`Marketing campaign with id ${id} not found`);
+    }
+
     return updatedCampaign;
   }
 
