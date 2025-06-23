@@ -2,7 +2,7 @@ import React from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 
@@ -144,51 +144,61 @@ function App() {
 
   // Clear any cached achievement data and toasts on app start
   React.useEffect(() => {
-    localStorage.removeItem("easterEggs");
-    // Force clear all browser storage related to toasts/achievements
-    Object.keys(localStorage).forEach(key => {
-      if (key.includes('toast') || key.includes('achievement') || key.includes('easter')) {
-        localStorage.removeItem(key);
-      }
-    });
+    // Nuclear option - clear ALL localStorage and sessionStorage
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {
+      console.log('Storage clear failed:', e);
+    }
     
-    // Aggressively remove any persistent overlay elements
-    const removeOverlays = () => {
-      // Remove any elements containing achievement text
-      const selectors = [
-        '[data-state="open"]',
-        '[role="status"]',
-        '[data-sonner-toast]',
-        '.toast',
-        '.notification',
-        '.overlay',
-        '.achievement',
-        '.modal'
-      ];
-      
-      selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach(el => {
-          if (el.textContent?.includes('Achievement') || 
-              el.textContent?.includes('Meet the Team') ||
-              el.textContent?.includes('staff management') ||
-              el.textContent?.includes('points')) {
-            el.remove();
+    // Clear any indexedDB
+    if ('indexedDB' in window) {
+      indexedDB.databases().then(databases => {
+        databases.forEach(db => {
+          if (db.name) {
+            indexedDB.deleteDatabase(db.name);
           }
         });
+      }).catch(console.error);
+    }
+    
+    // Clear service worker cache
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => {
+          caches.delete(name);
+        });
       });
+    }
+    
+    // Simple cleanup without complex DOM manipulation
+    const cleanup = () => {
+      try {
+        // Just remove any remaining toasts quietly
+        const toasts = document.querySelectorAll('[data-sonner-toast], [data-state="open"]');
+        toasts.forEach(toast => {
+          if (toast.textContent?.includes('Achievement') || toast.textContent?.includes('Meet the Team')) {
+            toast.remove();
+          }
+        });
+      } catch (e) {
+        // Ignore errors
+      }
     };
     
-    // Run immediately and on interval to catch any delayed overlays
-    removeOverlays();
-    const interval = setInterval(removeOverlays, 100);
+    // Run cleanup once
+    setTimeout(cleanup, 100);
     
     // Clear any existing toast notifications
     const event = new CustomEvent('clear-all-toasts');
     window.dispatchEvent(event);
     
     // Cleanup
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      observer.disconnect();
+    };
   }, []);
 
   return (
@@ -196,7 +206,6 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <SidebarProvider>
-            <Toaster />
             <Router />
           </SidebarProvider>
         </TooltipProvider>
