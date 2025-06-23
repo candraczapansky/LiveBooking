@@ -369,6 +369,8 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
 export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
   id: true,
   createdAt: true,
+}).extend({
+  sendDate: z.union([z.date(), z.string(), z.null()]).optional(),
 });
 
 // Marketing campaign recipients schema (for tracking individual sends)

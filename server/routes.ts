@@ -1327,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/marketing-campaigns", validateBody(insertMarketingCampaignSchema), async (req, res) => {
+  app.post("/api/marketing-campaigns", async (req, res) => {
     try {
       // Convert sendDate string to Date object if provided
       const campaignData = { ...req.body };
@@ -1335,7 +1335,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         campaignData.sendDate = new Date(campaignData.sendDate);
       }
       
-      const campaign = await storage.createMarketingCampaign(campaignData);
+      // Validate the processed data
+      const validatedData = insertMarketingCampaignSchema.parse(campaignData);
+      const campaign = await storage.createMarketingCampaign(validatedData);
       res.status(201).json(campaign);
     } catch (error: any) {
       console.error('Error creating campaign:', error);

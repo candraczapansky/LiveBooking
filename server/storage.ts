@@ -1110,6 +1110,9 @@ export class DatabaseStorage implements IStorage {
     if (processedData.sendDate && typeof processedData.sendDate === 'string') {
       processedData.sendDate = new Date(processedData.sendDate);
     }
+    if (processedData.sentAt && typeof processedData.sentAt === 'string') {
+      processedData.sentAt = new Date(processedData.sentAt);
+    }
 
     const [updatedCampaign] = await db
       .update(marketingCampaigns)
