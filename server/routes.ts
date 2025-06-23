@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { Client, Environment } from "squareup";
+import { SquareClient, SquareEnvironment } from "square";
 import {
   insertUserSchema,
   insertClientSchema,
@@ -47,10 +47,12 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 // Initialize Square
 const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
 const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
-const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox;
+const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
-const squareClient = new Client({
-  accessToken: squareAccessToken,
+const squareClient = new SquareClient({
+  bearerAuthCredentials: {
+    accessToken: squareAccessToken || '',
+  },
   environment: squareEnvironment,
 });
 
@@ -1226,16 +1228,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Confirm payment and update appointment status
   app.post("/api/confirm-payment", async (req, res) => {
     try {
-      const { paymentIntentId, appointmentId } = req.body;
+      const { paymentId, appointmentId } = req.body;
       
-      if (!paymentIntentId || !appointmentId) {
-        return res.status(400).json({ error: "Payment intent ID and appointment ID are required" });
+      if (!paymentId || !appointmentId) {
+        return res.status(400).json({ error: "Payment ID and appointment ID are required" });
       }
 
-      // Retrieve payment intent to verify it was successful
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      // Retrieve payment to verify it was successful
+      const { paymentsApi } = squareClient;
+      const { result } = await paymentsApi.getPayment(paymentId);
       
-      if (paymentIntent.status === 'succeeded') {
+      if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
         const appointment = await storage.getAppointment(appointmentId);
         if (appointment) {
@@ -1247,11 +1250,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create payment record
           await storage.createPayment({
             clientId: appointment.clientId,
-            amount: paymentIntent.amount / 100, // Convert back from cents
+            amount: Number(result.payment.amountMoney?.amount || 0) / 100, // Convert back from cents
             method: 'card',
             status: 'completed',
             appointmentId: appointmentId,
-            stripePaymentIntentId: paymentIntentId
+            squarePaymentId: paymentId
           });
 
           res.json({ success: true, appointment });
@@ -2021,8 +2024,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Payment method not found" });
       }
 
-      // Detach payment method from Stripe customer
-      await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
+      // Disable card in Square
+      const { cardsApi } = squareClient;
+      await cardsApi.disableCard(paymentMethod.squareCardId, {});
       
       // Delete from database
       await storage.deleteSavedPaymentMethod(id);
