@@ -81,19 +81,10 @@ const Sidebar = () => {
 
   return (
     <div 
-      className="sidebar"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '256px',
-        height: '100vh',
-        backgroundColor: 'red',
-        zIndex: 9999
-      }}
+      className="sidebar fixed top-0 left-0 w-64 h-screen bg-white dark:bg-gray-800 shadow-xl z-50"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex flex-col h-full" style={{ backgroundColor: 'blue' }}>
+      <div className="flex flex-col h-full">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center">

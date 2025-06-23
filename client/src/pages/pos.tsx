@@ -348,7 +348,9 @@ export default function PointOfSale() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />

@@ -382,11 +382,11 @@ const MarketingPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
