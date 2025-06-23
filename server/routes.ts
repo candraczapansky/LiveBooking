@@ -1420,7 +1420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Get recipients based on audience
+      console.log(`Getting recipients for audience: ${campaign.audience}`);
       const recipients = await storage.getUsersByAudience(campaign.audience);
+      console.log(`Recipients found: ${recipients.length}`, recipients.map(r => ({ id: r.id, email: r.email })));
       
       if (recipients.length === 0) {
         return res.status(400).json({ error: "No recipients found for the selected audience" });

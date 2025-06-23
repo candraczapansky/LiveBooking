@@ -1179,9 +1179,12 @@ export class DatabaseStorage implements IStorage {
 
   // User filtering for campaigns
   async getUsersByAudience(audience: string): Promise<User[]> {
+    console.log(`getUsersByAudience called with audience: ${audience}`);
     switch (audience) {
       case "All Clients":
-        return await db.select().from(users).where(eq(users.role, "client"));
+        const allClients = await db.select().from(users).where(eq(users.role, "client"));
+        console.log(`Found ${allClients.length} clients:`, allClients.map(c => ({ id: c.id, email: c.email })));
+        return allClients;
         
       case "Regular Clients": {
         // Users with more than 3 appointments - simplified approach
