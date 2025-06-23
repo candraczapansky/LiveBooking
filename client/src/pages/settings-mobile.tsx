@@ -441,19 +441,77 @@ export default function SettingsMobile() {
                 <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
                   Primary Color
                 </label>
-                <input
-                  type="color"
-                  value={customColor}
-                  onChange={(e) => setCustomColor(e.target.value)}
-                  style={{ 
-                    width: "100%", 
-                    height: "48px", 
-                    border: "2px solid #e5e7eb", 
-                    borderRadius: "8px",
-                    cursor: "pointer",
-                    backgroundColor: "white"
-                  }}
-                />
+                
+                {/* Color Preset Options */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Quick Colors
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "8px" }}>
+                    {[
+                      { color: "#3b82f6", name: "Blue" },
+                      { color: "#8b5cf6", name: "Purple" },
+                      { color: "#ef4444", name: "Red" },
+                      { color: "#10b981", name: "Green" },
+                      { color: "#f59e0b", name: "Orange" },
+                      { color: "#ec4899", name: "Pink" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.color}
+                        onClick={() => setCustomColor(preset.color)}
+                        style={{
+                          width: "40px",
+                          height: "40px",
+                          borderRadius: "8px",
+                          backgroundColor: preset.color,
+                          border: customColor === preset.color ? "3px solid #374151" : "2px solid #e5e7eb",
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                        title={preset.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Custom Color Input */}
+                <div style={{ position: "relative" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Custom Color
+                  </label>
+                  <input
+                    type="color"
+                    id="color-picker"
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    style={{ 
+                      width: "100%", 
+                      height: "48px", 
+                      border: "2px solid #e5e7eb", 
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      backgroundColor: "white",
+                      WebkitAppearance: "none",
+                      padding: "4px"
+                    }}
+                  />
+                  <div 
+                    style={{
+                      position: "absolute",
+                      top: "36px",
+                      right: "12px",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                      fontSize: "12px",
+                      color: "#6b7280",
+                      backgroundColor: "white",
+                      padding: "2px 4px",
+                      borderRadius: "4px"
+                    }}
+                  >
+                    {customColor}
+                  </div>
+                </div>
               </div>
 
               <Button onClick={handleSaveAppearance} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
