@@ -111,15 +111,50 @@ export default function SettingsMobile() {
     }
   };
 
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profileData: { firstName: string; lastName: string; email: string; phone: string }) => {
+      const response = await fetch(`/api/users/${user?.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update profile');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (updatedUser) => {
+      // Update the user context with the new data
+      if (user) {
+        const newUser = { ...user, ...updatedUser };
+        localStorage.setItem('user', JSON.stringify(newUser));
+        // Trigger a page refresh to update the context
+        window.location.reload();
+      }
+      
+      checkEasterEgg("profile_perfectionist");
+      
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been saved successfully.",
+      });
+      setIsEditingProfile(false);
+    },
+    onError: (error) => {
+      toast({
+        title: "Update failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleSaveProfile = () => {
-    localStorage.setItem('profileData', JSON.stringify(profileData));
-    checkEasterEgg("profile_perfectionist");
-    
-    toast({
-      title: "Profile updated",
-      description: "Your profile information has been saved.",
-    });
-    setIsEditingProfile(false);
+    updateProfileMutation.mutate(profileData);
   };
 
   return (
@@ -293,9 +328,13 @@ export default function SettingsMobile() {
                     />
                   </div>
                   <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
-                    <Button onClick={handleSaveProfile} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
+                    <Button 
+                      onClick={handleSaveProfile} 
+                      disabled={updateProfileMutation.isPending}
+                      style={{ flex: 1, height: "48px", fontSize: "16px" }}
+                    >
                       <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
-                      Save
+                      {updateProfileMutation.isPending ? "Saving..." : "Save"}
                     </Button>
                     <Button variant="outline" onClick={() => setIsEditingProfile(false)} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
                       Cancel

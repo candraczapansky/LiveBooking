@@ -198,6 +198,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to fetch users" });
     }
   });
+
+  // Update user profile route
+  app.put("/api/users/:id", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { firstName, lastName, email, phone } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update user profile
+      const updatedUser = await storage.updateUser(userId, { 
+        firstName, 
+        lastName, 
+        email, 
+        phone 
+      });
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = updatedUser;
+      
+      return res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      return res.status(500).json({ error: "Failed to update user profile" });
+    }
+  });
   
   // Service Categories routes
   app.get("/api/service-categories", async (req, res) => {
