@@ -731,7 +731,7 @@ export default function Automations() {
                         <CardDescription>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
-                              <strong>Trigger:</strong> {formatTriggerLabel(rule.trigger)}
+                              <strong>Trigger:</strong> {formatTriggerLabel(rule.trigger, rule.customTriggerName)}
                             </div>
                             <div>
                               <strong>Timing:</strong> {rule.timing}
@@ -821,7 +821,7 @@ export default function Automations() {
                         <CardDescription>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div>
-                              <strong>Trigger:</strong> {formatTriggerLabel(rule.trigger)}
+                              <strong>Trigger:</strong> {formatTriggerLabel(rule.trigger, rule.customTriggerName)}
                             </div>
                             <div>
                               <strong>Timing:</strong> {rule.timing}
