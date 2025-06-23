@@ -26,6 +26,10 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   const [isOpen, setIsOpen] = useState(!isMobile);
 
   useEffect(() => {
+    console.log('SidebarProvider state:', { isMobile, isOpen });
+  }, [isMobile, isOpen]);
+
+  useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
@@ -44,6 +48,7 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   }, []);
 
   const toggleSidebar = () => {
+    console.log('toggleSidebar called, current isOpen:', isOpen);
     setIsOpen(!isOpen);
   };
 
