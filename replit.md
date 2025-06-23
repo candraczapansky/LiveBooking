@@ -10,6 +10,16 @@ The system uses a modern tech stack with React for the UI, Express for the API, 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### June 23, 2025 - Text Color Customization Feature
+- Added comprehensive text color editing capabilities to the appearance settings
+- Implemented primary and secondary text color controls with live preview
+- Added text color preset saving and management functionality  
+- Created custom CSS properties for text colors (--text-primary, --text-secondary)
+- Enhanced theming system to support both background and text color customization
+- Completed Square payment integration migration from Stripe
+
 ## System Architecture
 
 ### Frontend Architecture
