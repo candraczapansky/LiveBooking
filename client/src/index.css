@@ -50,6 +50,16 @@ body {
     height: auto !important;
   }
   
+  /* Exception for mobile overlays and modals */
+  .fixed[class*="z-50"], .fixed[class*="z-40"], [role="dialog"], [data-state="open"] {
+    position: fixed !important;
+    z-index: 50 !important;
+    width: auto !important;
+    max-width: none !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
   /* All grid systems become single column */
   .grid, [class*="grid-cols"] {
     display: flex !important;

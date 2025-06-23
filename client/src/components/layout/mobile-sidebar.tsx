@@ -27,6 +27,7 @@ const MobileSidebar = () => {
   ];
 
   const toggleSidebar = () => {
+    console.log("Mobile menu toggle clicked, current state:", isOpen);
     setIsOpen(!isOpen);
   };
 
@@ -50,11 +51,31 @@ const MobileSidebar = () => {
       {isOpen && (
         <div 
           className="fixed inset-0 z-50 lg:hidden"
+          style={{ 
+            position: "fixed", 
+            top: 0, 
+            left: 0, 
+            right: 0, 
+            bottom: 0, 
+            zIndex: 50, 
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            width: "100vw",
+            height: "100vh"
+          }}
           onClick={closeSidebar}
         >
           {/* Sidebar */}
           <div 
             className="fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl"
+            style={{
+              position: "fixed",
+              left: 0,
+              top: 0,
+              width: "256px",
+              height: "100vh",
+              zIndex: 51,
+              maxWidth: "256px"
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col h-full">
