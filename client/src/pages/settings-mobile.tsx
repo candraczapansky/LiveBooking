@@ -57,27 +57,6 @@ export default function SettingsMobile() {
   const [customColor, setCustomColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#6b7280');
 
-  // Track settings page visit
-  useEffect(() => {
-    checkEasterEgg("settings_guru");
-  }, [checkEasterEgg]);
-
-  useEffect(() => {
-    const savedProfilePicture = localStorage.getItem('profilePicture');
-    setProfilePicture(savedProfilePicture);
-    
-    const savedTheme = localStorage.getItem('theme') || 'blue';
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
-    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
-    
-    setSelectedTheme(savedTheme);
-    setDarkMode(savedDarkMode);
-    setCustomColor(savedCustomColor);
-    setSecondaryColor(savedSecondaryColor);
-    
-  }, []);
-
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
     
@@ -135,6 +114,31 @@ export default function SettingsMobile() {
       root.style.setProperty('--card-foreground', '222 84% 4%');
     }
   };
+
+  // Track settings page visit
+  useEffect(() => {
+    checkEasterEgg("settings_guru");
+  }, [checkEasterEgg]);
+
+  useEffect(() => {
+    const savedProfilePicture = localStorage.getItem('profilePicture');
+    setProfilePicture(savedProfilePicture);
+    
+    const savedTheme = localStorage.getItem('theme') || 'blue';
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
+    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
+    
+    setSelectedTheme(savedTheme);
+    setDarkMode(savedDarkMode);
+    setCustomColor(savedCustomColor);
+    setSecondaryColor(savedSecondaryColor);
+    
+    // Apply saved theme after state update
+    setTimeout(() => {
+      applyThemeColors(savedCustomColor, savedDarkMode);
+    }, 100);
+  }, []);
 
   const handleSaveAppearance = () => {
     localStorage.setItem('theme', selectedTheme);
@@ -494,7 +498,10 @@ export default function SettingsMobile() {
                 </div>
                 <Switch
                   checked={darkMode}
-                  onCheckedChange={setDarkMode}
+                  onCheckedChange={(checked) => {
+                    setDarkMode(checked);
+                    applyThemeColors(customColor, checked);
+                  }}
                 />
               </div>
 
@@ -520,7 +527,10 @@ export default function SettingsMobile() {
                     ].map((preset) => (
                       <button
                         key={preset.color}
-                        onClick={() => setCustomColor(preset.color)}
+                        onClick={() => {
+                          setCustomColor(preset.color);
+                          applyThemeColors(preset.color, darkMode);
+                        }}
                         style={{
                           width: "40px",
                           height: "40px",
