@@ -109,7 +109,7 @@ const StaffPageSimple = () => {
         <Header />
         
         {/* Content Area */}
-        <div className="p-3 sm:p-6 max-w-full box-border pb-20 sm:pb-6">
+        <div className="p-4 sm:p-6 max-w-full box-border pb-24 sm:pb-6">
           {/* Header Section */}
           <Card className="mb-4 p-4 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -147,14 +147,14 @@ const StaffPageSimple = () => {
               </p>
             </Card>
           ) : (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-6">
               {filteredStaff?.map((staffMember: StaffMember) => (
-                <Card key={staffMember.id} className="p-5 w-full shadow-sm border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
+                <Card key={staffMember.id} className="p-6 w-full shadow-sm border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-200">
                   {/* Mobile-optimized layout */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                  <div className="space-y-4">
                     {/* Avatar and basic info section */}
-                    <div className="flex items-center gap-3 flex-1">
-                      <Avatar className="w-16 h-16 sm:w-12 sm:h-12 flex-shrink-0">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="w-20 h-20 flex-shrink-0 ring-2 ring-gray-200">
                         {staffMember.photoUrl ? (
                           <img
                             src={staffMember.photoUrl}
@@ -162,46 +162,44 @@ const StaffPageSimple = () => {
                             className="w-full h-full object-cover rounded-full"
                           />
                         ) : (
-                          <AvatarFallback className="text-lg sm:text-sm">
+                          <AvatarFallback className="text-xl font-semibold bg-blue-100 text-blue-700">
                             {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
                           </AvatarFallback>
                         )}
                       </Avatar>
                       
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-lg sm:text-base font-semibold text-gray-900 truncate mb-1">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <h3 className="text-xl font-bold text-gray-900 leading-tight">
                           {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
                         </h3>
-                        <p className="text-sm text-gray-600 truncate mb-1">
+                        <p className="text-base text-gray-700 font-medium">
                           {staffMember.title}
                         </p>
-                        <p className="text-sm text-gray-500 truncate mb-1">
+                        <p className="text-sm text-gray-500 break-all">
                           {staffMember.user?.email}
                         </p>
-                        <p className="text-sm font-medium text-green-600">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-sm font-medium">
                           Commission: {staffMember.commissionRate}%
-                        </p>
+                        </div>
                       </div>
                     </div>
                     
-                    {/* Action buttons - mobile friendly */}
-                    <div className="flex gap-2 justify-end sm:justify-start sm:flex-shrink-0">
+                    {/* Action buttons - optimized for mobile touch */}
+                    <div className="grid grid-cols-2 gap-3 w-full">
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => handleEditStaff(staffMember.id)}
-                        className="h-10 px-4 text-sm"
+                        className="h-14 px-4 text-base font-medium border-2 border-blue-300 text-blue-700 hover:bg-blue-50 active:bg-blue-100 transition-colors"
                       >
-                        <Edit className="w-4 h-4 mr-2" />
+                        <Edit className="w-5 h-5 mr-2" />
                         Edit
                       </Button>
                       <Button
                         variant="outline"
-                        size="sm"
                         onClick={() => openDeleteDialog(staffMember)}
-                        className="h-10 px-4 text-sm text-red-600 border-red-300 hover:bg-red-50"
+                        className="h-14 px-4 text-base font-medium border-2 border-red-300 text-red-700 hover:bg-red-50 active:bg-red-100 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
+                        <Trash2 className="w-5 h-5 mr-2" />
                         Delete
                       </Button>
                     </div>
