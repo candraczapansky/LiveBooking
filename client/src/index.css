@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Perfect circle profile picture */
+.profile-circle {
+  width: 120px !important;
+  height: 120px !important;
+  min-width: 120px !important;
+  min-height: 120px !important;
+  max-width: 120px !important;
+  max-height: 120px !important;
+  border-radius: 60px !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  border: 3px solid #e5e7eb !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  aspect-ratio: 1 / 1 !important;
+  overflow: hidden !important;
+  display: block !important;
+  position: relative !important;
+}
+
+/* Specific mobile override for profile circle */
+@media (max-width: 768px) {
+  .profile-circle {
+    width: 120px !important;
+    height: 120px !important;
+    min-width: 120px !important;
+    min-height: 120px !important;
+    max-width: 120px !important;
+    max-height: 120px !important;
+    border-radius: 60px !important;
+    flex-shrink: 0 !important;
+    transform: none !important;
+  }
+}
+
 /* Mobile optimization */
 * {
   box-sizing: border-box;
@@ -23,7 +59,7 @@ body {
 /* Strict mobile layout enforcement */
 @media (max-width: 768px) {
   /* Reset everything to mobile-safe defaults */
-  *, *::before, *::after {
+  *:not(.profile-circle), *:not(.profile-circle)::before, *:not(.profile-circle)::after {
     max-width: 100vw !important;
     box-sizing: border-box !important;
   }
@@ -38,7 +74,7 @@ body {
     touch-action: pan-y !important;
   }
   
-  main, section, div, article, aside {
+  main, section, div:not(.profile-circle), article, aside {
     width: 100% !important;
     max-width: 100vw !important;
     overflow-x: hidden !important;

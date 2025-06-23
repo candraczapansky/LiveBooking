@@ -200,18 +200,12 @@ export default function SettingsMobile() {
               
               {/* Profile Picture */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "24px", gap: "16px" }}>
-                <div style={{
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  backgroundImage: `url(${profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300"})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
-                  border: "3px solid #e5e7eb",
-                  flexShrink: 0,
-                  boxSizing: "border-box"
-                }}></div>
+                <div 
+                  className="profile-circle"
+                  style={{
+                    backgroundImage: `url(${profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300"})`
+                  }}
+                ></div>
                 <div style={{ textAlign: "center" }}>
                   <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px", color: "#111827" }}>
                     {user?.firstName} {user?.lastName}
