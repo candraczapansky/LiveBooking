@@ -23,7 +23,7 @@ const MobileSidebar = () => {
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
-    { icon: <Zap />, label: "Automations", href: "/automations" },
+    { icon: <Settings />, label: "Automations", href: "/automations" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
