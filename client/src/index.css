@@ -117,9 +117,39 @@ body {
 main, 
 .main-content,
 [data-radix-portal],
-.page-container {
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+.page-container,
+.flex.flex-1,
+.overflow-auto,
+.h-full,
+[class*="flex-1"],
+[class*="bg-background"] {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Force dark mode background on all major layout containers */
+.dark main,
+.dark .main-content,
+.dark .flex.flex-1,
+.dark .overflow-auto,
+.dark .h-full,
+.dark [class*="flex-1"],
+.dark [class*="bg-background"],
+.dark [class*="bg-white"],
+.dark .min-h-screen,
+.dark .w-full,
+.dark .p-6,
+.dark .space-y-6,
+.dark div:not([class*="sidebar"]):not([class*="border"]):not([class*="card"]) {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+}
+
+/* Specifically target the main layout wrapper */
+.dark > div,
+.dark .flex.min-h-screen > div:not(.sidebar),
+.dark .flex.h-full > div:not(.sidebar) {
+  background-color: hsl(var(--background)) !important;
 }
 
 /* Mobile viewport fixes */
