@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { X, Menu, LayoutDashboard, Calendar, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Settings, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
-import { useDebounce } from "@/hooks/use-debounce";
+
 
 const SimpleMobileMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -27,7 +27,10 @@ const SimpleMobileMenu = () => {
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
-  const handleToggle = useCallback(() => {
+  const toggleMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
     if (isAnimating) return;
     
     console.log("Simple mobile menu toggle, current state:", isOpen);
@@ -38,14 +41,6 @@ const SimpleMobileMenu = () => {
     
     setTimeout(() => setIsAnimating(false), 300);
   }, [isOpen, isAnimating]);
-
-  const debouncedToggle = useDebounce(handleToggle, 100);
-
-  const toggleMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    debouncedToggle();
-  }, [debouncedToggle]);
 
   const closeMenu = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (e) {

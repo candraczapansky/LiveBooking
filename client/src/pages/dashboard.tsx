@@ -24,7 +24,7 @@ const Dashboard = () => {
         <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">
-          <div className="max-w-7xl mx-auto w-full">
+          <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
             {/* Page Heading */}
             <div className="mb-4 sm:mb-6">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
@@ -39,14 +39,14 @@ const Dashboard = () => {
             </div>
             
             {/* Dashboard Content */}
-            <div className="space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
+            <div className="space-y-4 sm:space-y-6 lg:space-y-0 lg:grid lg:grid-cols-3 lg:gap-6">
               {/* Appointments Table */}
-              <div className="lg:col-span-2 w-full overflow-hidden">
+              <div className="lg:col-span-2 w-full min-w-0">
                 <AppointmentsTable />
               </div>
               
               {/* Quick Actions & Notifications */}
-              <div className="space-y-4 sm:space-y-6 w-full">
+              <div className="space-y-4 sm:space-y-6 w-full min-w-0">
                 <QuickActions />
                 <RecentNotifications />
               </div>
