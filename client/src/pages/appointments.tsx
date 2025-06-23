@@ -318,13 +318,25 @@ const AppointmentsPage = () => {
 
   const renderDayView = () => {
     const staffCount = staff?.length || 1;
-    const columnWidth = Math.max(280, Math.floor((window.innerWidth - (sidebarOpen ? 280 : 80) - 100) / staffCount));
+    // Calculate column width based on available screen space, with mobile considerations
+    const isMobileView = window.innerWidth < 768;
+    let availableWidth;
+    
+    if (isMobileView) {
+      // On mobile, use full screen width minus padding
+      availableWidth = window.innerWidth - 32; // Account for padding
+    } else {
+      // On desktop, account for sidebar
+      availableWidth = window.innerWidth - 280 - 100; // Sidebar + padding
+    }
+    
+    const columnWidth = Math.max(isMobileView ? 150 : 280, Math.floor(availableWidth / staffCount));
     
     return (
-      <div className="relative">
+      <div className="relative overflow-x-auto">
         {/* Header with staff names */}
-        <div className="flex border-b bg-white dark:bg-gray-800 sticky top-0 z-10">
-          <div className="w-20 flex-shrink-0 border-r p-4 text-sm font-medium text-gray-600 dark:text-gray-300">
+        <div className="flex border-b bg-white dark:bg-gray-800 sticky top-0 z-10 min-w-max">
+          <div className="w-16 lg:w-20 flex-shrink-0 border-r p-2 lg:p-4 text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300">
             Time
           </div>
           {staff?.map((staffMember: any) => {
@@ -332,38 +344,38 @@ const AppointmentsPage = () => {
             return (
               <div 
                 key={staffMember.id}
-                className="border-r p-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
-                style={{ width: columnWidth }}
+                className="border-r p-2 lg:p-4 text-xs lg:text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
+                style={{ width: columnWidth, minWidth: isMobileView ? '150px' : '280px' }}
               >
-                {staffName}
+                <span className="truncate block">{staffName}</span>
               </div>
             );
           })}
         </div>
 
         {/* Time grid */}
-        <div className="relative">
+        <div className="relative min-w-max">
           {/* Time labels and grid lines */}
           <div className="flex">
-            <div className="w-20 flex-shrink-0">
+            <div className="w-16 lg:w-20 flex-shrink-0">
               {timeSlots.map((time, index) => (
                 <div 
                   key={time} 
-                  className="border-r border-b h-8 px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
+                  className="border-r border-b px-1 lg:px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
                   style={{ height: Math.round(30 * zoomLevel) }}
                 >
-                  {time}
+                  <span className="text-xs">{time}</span>
                 </div>
               ))}
             </div>
             
             {/* Staff columns */}
             {staff?.map((staffMember: any) => (
-              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth }}>
+              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth, minWidth: isMobileView ? '150px' : '280px' }}>
                 {timeSlots.map((time, index) => (
                   <div 
                     key={time} 
-                    className={`border-b h-8 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
+                    className={`border-b hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
                       dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
                     }`}
                     style={{ height: Math.round(30 * zoomLevel) }}
@@ -430,7 +442,8 @@ const AppointmentsPage = () => {
               
               if (columnIndex === -1) return null;
 
-              const leftPosition = 80 + (columnIndex * columnWidth);
+              const timeColumnWidth = isMobileView ? 64 : 80; // w-16 on mobile, w-20 on desktop
+              const leftPosition = timeColumnWidth + (columnIndex * columnWidth);
               const appointmentStyle = getAppointmentStyle(appointment);
 
               // Get service color for appointment
@@ -611,7 +624,7 @@ const AppointmentsPage = () => {
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
                   
-                  <span className="text-sm font-medium min-w-48 text-center">
+                  <span className="text-sm font-medium min-w-32 lg:min-w-48 text-center">
                     {formatDate(currentDate)}
                   </span>
                   
