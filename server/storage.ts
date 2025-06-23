@@ -17,7 +17,8 @@ import {
   giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction,
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
-  emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe
+  emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
+  promoCodes, PromoCode, InsertPromoCode
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -162,6 +163,14 @@ export interface IStorage {
   getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined>;
   getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]>;
   isUserUnsubscribed(email: string): Promise<boolean>;
+
+  // Promo code operations
+  createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode>;
+  getPromoCode(id: number): Promise<PromoCode | undefined>;
+  getPromoCodeByCode(code: string): Promise<PromoCode | undefined>;
+  getAllPromoCodes(): Promise<PromoCode[]>;
+  updatePromoCode(id: number, promoCodeData: Partial<InsertPromoCode>): Promise<PromoCode>;
+  deletePromoCode(id: number): Promise<boolean>;
 
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
@@ -1351,6 +1360,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(products.id, id))
       .returning();
     return updatedProduct;
+  }
+
+  // Promo code operations
+  async createPromoCode(promoCode: InsertPromoCode): Promise<PromoCode> {
+    const [newPromoCode] = await db.insert(promoCodes).values(promoCode).returning();
+    return newPromoCode;
+  }
+
+  async getPromoCode(id: number): Promise<PromoCode | undefined> {
+    const [promoCode] = await db.select().from(promoCodes).where(eq(promoCodes.id, id));
+    return promoCode;
+  }
+
+  async getPromoCodeByCode(code: string): Promise<PromoCode | undefined> {
+    const [promoCode] = await db.select().from(promoCodes).where(eq(promoCodes.code, code));
+    return promoCode;
+  }
+
+  async getAllPromoCodes(): Promise<PromoCode[]> {
+    return await db.select().from(promoCodes).orderBy(desc(promoCodes.createdAt));
+  }
+
+  async updatePromoCode(id: number, promoCodeData: Partial<InsertPromoCode>): Promise<PromoCode> {
+    const [updatedPromoCode] = await db
+      .update(promoCodes)
+      .set(promoCodeData)
+      .where(eq(promoCodes.id, id))
+      .returning();
+    return updatedPromoCode;
+  }
+
+  async deletePromoCode(id: number): Promise<boolean> {
+    const result = await db.delete(promoCodes).where(eq(promoCodes.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

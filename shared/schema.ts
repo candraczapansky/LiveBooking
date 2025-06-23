@@ -398,6 +398,29 @@ export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSche
 export type MarketingCampaignRecipient = typeof marketingCampaignRecipients.$inferSelect;
 export type InsertMarketingCampaignRecipient = z.infer<typeof insertMarketingCampaignRecipientSchema>;
 
+// Promo codes schema
+export const promoCodes = pgTable("promo_codes", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  type: text("type").notNull(), // percentage, fixed
+  value: doublePrecision("value").notNull(),
+  service: text("service"), // Optional - specific service or null for all services
+  expirationDate: date("expiration_date").notNull(),
+  usageLimit: integer("usage_limit").notNull(),
+  usedCount: integer("used_count").default(0),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
+  id: true,
+  usedCount: true,
+  createdAt: true,
+});
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
+
 // Email unsubscribes schema (global unsubscribe tracking)
 export const emailUnsubscribes = pgTable("email_unsubscribes", {
   id: serial("id").primaryKey(),
