@@ -18,7 +18,8 @@ import {
   insertClientMembershipSchema,
   insertPaymentSchema,
   insertSavedPaymentMethodSchema,
-  insertMarketingCampaignSchema
+  insertMarketingCampaignSchema,
+  insertPromoCodeSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 
@@ -2231,6 +2232,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Email sending error", 
         error: error.message 
       });
+    }
+  });
+
+  // Promo codes API endpoints
+  app.get("/api/promo-codes", async (req, res) => {
+    try {
+      const promoCodes = await storage.getAllPromoCodes();
+      res.json(promoCodes);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error fetching promo codes: " + error.message });
+    }
+  });
+
+  app.post("/api/promo-codes", validateBody(insertPromoCodeSchema), async (req, res) => {
+    try {
+      const newPromoCode = await storage.createPromoCode(req.body);
+      res.status(201).json(newPromoCode);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error creating promo code: " + error.message });
+    }
+  });
+
+  app.get("/api/promo-codes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const promoCode = await storage.getPromoCode(id);
+      
+      if (!promoCode) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+      
+      res.json(promoCode);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error fetching promo code: " + error.message });
+    }
+  });
+
+  app.put("/api/promo-codes/:id", validateBody(insertPromoCodeSchema.partial()), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedPromoCode = await storage.updatePromoCode(id, req.body);
+      res.json(updatedPromoCode);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error updating promo code: " + error.message });
+    }
+  });
+
+  app.delete("/api/promo-codes/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deletePromoCode(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+      
+      res.json({ message: "Promo code deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Error deleting promo code: " + error.message });
+    }
+  });
+
+  // Validate promo code endpoint
+  app.get("/api/promo-codes/validate/:code", async (req, res) => {
+    try {
+      const code = req.params.code;
+      const promoCode = await storage.getPromoCodeByCode(code);
+      
+      if (!promoCode) {
+        return res.status(404).json({ error: "Promo code not found" });
+      }
+
+      if (!promoCode.active) {
+        return res.status(400).json({ error: "Promo code is not active" });
+      }
+
+      if (new Date() > new Date(promoCode.expirationDate)) {
+        return res.status(400).json({ error: "Promo code has expired" });
+      }
+
+      if (promoCode.usedCount >= promoCode.usageLimit) {
+        return res.status(400).json({ error: "Promo code usage limit reached" });
+      }
+      
+      res.json({ 
+        valid: true, 
+        promoCode: promoCode,
+        remainingUses: promoCode.usageLimit - promoCode.usedCount
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: "Error validating promo code: " + error.message });
     }
   });
 

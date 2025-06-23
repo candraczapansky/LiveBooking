@@ -210,6 +210,11 @@ const MarketingPage = () => {
     queryKey: ['/api/marketing-campaigns'],
   });
 
+  // Fetch promo codes from API
+  const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery({
+    queryKey: ['/api/promo-codes'],
+  });
+
   // Fetch SMS configuration status
   const { data: smsConfig } = useQuery({
     queryKey: ['/api/sms-config-status'],
@@ -307,6 +312,41 @@ const MarketingPage = () => {
       toast({
         title: "Error sending campaign",
         description: error.message || "Failed to send campaign",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create promo code mutation
+  const createPromoCodeMutation = useMutation({
+    mutationFn: async (promoData: PromoFormValues) => {
+      return await apiRequest('/api/promo-codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: promoData.code,
+          description: `${promoData.type === 'percentage' ? promoData.value + '%' : '$' + promoData.value} off${promoData.service ? ' ' + promoData.service : ' all services'}`,
+          discountType: promoData.type,
+          discountValue: promoData.value,
+          minimumAmount: null,
+          usageLimit: promoData.usageLimit,
+          active: promoData.active,
+          expirationDate: new Date(promoData.expirationDate),
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/promo-codes'] });
+      toast({
+        title: "Promo code created",
+        description: "Your promo code has been created successfully.",
+      });
+      setIsPromoFormOpen(false);
+      promoForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error creating promo code",
+        description: error.message || "Failed to create promo code",
         variant: "destructive",
       });
     },
