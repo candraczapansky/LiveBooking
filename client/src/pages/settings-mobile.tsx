@@ -10,7 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import { useEasterEgg } from "@/contexts/EasterEggContext";
+
 import { 
   Bell, 
   Moon, 
