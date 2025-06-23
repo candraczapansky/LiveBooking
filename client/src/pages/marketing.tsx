@@ -138,6 +138,7 @@ const MarketingPage = () => {
   const [isViewCampaignOpen, setIsViewCampaignOpen] = useState(false);
   const [emailTemplateDesign, setEmailTemplateDesign] = useState<any>(null);
   const [emailTemplateHtml, setEmailTemplateHtml] = useState<string>("");
+  const [showEmailEditor, setShowEmailEditor] = useState(false);
 
 
 
@@ -785,15 +786,23 @@ const MarketingPage = () => {
               {campaignForm.watch("type") === "email" ? (
                 <div className="space-y-4">
                   <FormLabel>Email Template</FormLabel>
-                  <EmailTemplateEditor
-                    onDesignChange={setEmailTemplateDesign}
-                    onHtmlChange={(html) => {
-                      setEmailTemplateHtml(html);
-                      campaignForm.setValue("content", html);
-                    }}
-                    initialDesign={emailTemplateDesign}
-                    className="border rounded-lg"
-                  />
+                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                      Create professional email templates with our visual editor
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => setShowEmailEditor(true)}
+                      className="w-full"
+                    >
+                      Open Email Template Editor
+                    </Button>
+                    {emailTemplateHtml && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                        ✓ Email template created
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <FormField
