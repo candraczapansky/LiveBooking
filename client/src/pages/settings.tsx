@@ -66,8 +66,18 @@ export default function Settings() {
     return localStorage.getItem('secondaryColor') || '#6b7280';
   });
 
+  // Text color states
+  const [textColor, setTextColor] = useState(() => {
+    return localStorage.getItem('textColor') || '#1f2937';
+  });
+  
+  const [textColorSecondary, setTextColorSecondary] = useState(() => {
+    return localStorage.getItem('textColorSecondary') || '#6b7280';
+  });
+
   const [presetName, setPresetName] = useState('');
   const [secondaryPresetName, setSecondaryPresetName] = useState('');
+  const [textPresetName, setTextPresetName] = useState('');
   
   const [savedPresets, setSavedPresets] = useState(() => {
     const saved = localStorage.getItem('colorPresets');
@@ -76,6 +86,11 @@ export default function Settings() {
   
   const [savedSecondaryPresets, setSavedSecondaryPresets] = useState(() => {
     const saved = localStorage.getItem('secondaryColorPresets');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [savedTextPresets, setSavedTextPresets] = useState(() => {
+    const saved = localStorage.getItem('textColorPresets');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -170,6 +185,20 @@ export default function Settings() {
     setSecondaryColor(color);
   };
 
+  const handleTextColorChange = (color: string) => {
+    setTextColor(color);
+    localStorage.setItem('textColor', color);
+    // Apply text color to root element
+    document.documentElement.style.setProperty('--text-primary', color);
+  };
+
+  const handleTextColorSecondaryChange = (color: string) => {
+    setTextColorSecondary(color);
+    localStorage.setItem('textColorSecondary', color);
+    // Apply secondary text color to root element
+    document.documentElement.style.setProperty('--text-secondary', color);
+  };
+
   const savePrimaryColorPreset = () => {
     if (presetName.trim() && customColor) {
       const newPreset = { name: presetName.trim(), color: customColor };
@@ -212,6 +241,30 @@ export default function Settings() {
     const updatedPresets = savedSecondaryPresets.filter(preset => preset.name !== presetName);
     setSavedSecondaryPresets(updatedPresets);
     localStorage.setItem('secondaryColorPresets', JSON.stringify(updatedPresets));
+    toast({
+      title: "Text Color Preset Deleted",
+      description: `Text color preset "${presetName}" has been deleted.`,
+    });
+  };
+
+  const saveTextColorPreset = () => {
+    if (textPresetName.trim() && textColor) {
+      const newPreset = { name: textPresetName.trim(), color: textColor };
+      const updatedPresets = [...savedTextPresets, newPreset];
+      setSavedTextPresets(updatedPresets);
+      localStorage.setItem('textColorPresets', JSON.stringify(updatedPresets));
+      setTextPresetName('');
+      toast({
+        title: "Text Color Preset Saved",
+        description: `Text color preset "${newPreset.name}" has been saved.`,
+      });
+    }
+  };
+
+  const deleteTextColorPreset = (presetName: string) => {
+    const updatedPresets = savedTextPresets.filter((preset: any) => preset.name !== presetName);
+    setSavedTextPresets(updatedPresets);
+    localStorage.setItem('textColorPresets', JSON.stringify(updatedPresets));
     toast({
       title: "Text Color Preset Deleted",
       description: `Text color preset "${presetName}" has been deleted.`,
@@ -569,34 +622,145 @@ export default function Settings() {
                 </CardContent>
               </Card>
 
-              {/* Text Color Settings - TEST MARKER */}
-              <Card className="border-4 border-red-500 bg-yellow-100">
+              {/* Text Color Settings */}
+              <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center text-red-600">
+                  <CardTitle className="flex items-center">
                     <Type className="h-5 w-5 mr-2" />
-                    🎨 TEXT COLOR SECTION - YOU SHOULD SEE THIS! 🎨
+                    Text Colors
                   </CardTitle>
-                  <CardDescription className="text-red-800 font-bold">
-                    *** THIS IS THE TEXT COLOR FEATURE YOU REQUESTED ***
-                    Customize the main font color for all text throughout the application.
+                  <CardDescription>
+                    Customize the text colors used throughout the application.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {/* Primary Text Color */}
                   <div className="space-y-4">
+                    <Label className="text-base flex items-center">
+                      <Type className="h-4 w-4 mr-2" />
+                      Primary Text Color
+                    </Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Main text color for headings and primary content
+                    </p>
+                    
                     <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-3">
                         <input
                           type="color"
-                          value={secondaryColor}
-                          onChange={(e) => handleSecondaryColorChange(e.target.value)}
+                          value={textColor}
+                          onChange={(e) => handleTextColorChange(e.target.value)}
                           className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
                         />
                         <div className="space-y-1">
                           <Label className="text-sm font-medium">Color Value</Label>
                           <Input
                             type="text"
-                            value={secondaryColor}
-                            onChange={(e) => handleSecondaryColorChange(e.target.value)}
+                            value={textColor}
+                            onChange={(e) => handleTextColorChange(e.target.value)}
+                            className="w-32 text-sm"
+                            placeholder="#1f2937"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        <div 
+                          className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center font-semibold text-sm bg-white dark:bg-gray-800"
+                          style={{ color: textColor }}
+                        >
+                          Primary Text
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Save Primary Text Color Preset */}
+                    <div className="space-y-3">
+                      <Input
+                        type="text"
+                        placeholder="Enter text color preset name..."
+                        value={textPresetName}
+                        onChange={(e) => setTextPresetName(e.target.value)}
+                        className="w-full"
+                      />
+                      <Button
+                        onClick={saveTextColorPreset}
+                        disabled={!textPresetName.trim() || textColor === '#1f2937'}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Primary Text Color Preset
+                      </Button>
+                    </div>
+
+                    {/* Saved Primary Text Color Presets */}
+                    {savedTextPresets.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Saved Primary Text Color Presets</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {savedTextPresets.map((preset: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-2 border rounded-lg">
+                              <div className="flex items-center space-x-2">
+                                <div 
+                                  className="w-4 h-4 rounded-full border"
+                                  style={{ backgroundColor: preset.color }}
+                                />
+                                <span className="text-sm" style={{ color: preset.color }}>
+                                  {preset.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleTextColorChange(preset.color)}
+                                  className="h-6 w-6 p-0"
+                                >
+                                  <Palette className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteTextColorPreset(preset.name)}
+                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Secondary Text Color */}
+                  <div className="space-y-4">
+                    <Label className="text-base flex items-center">
+                      <Type className="h-4 w-4 mr-2" />
+                      Secondary Text Color
+                    </Label>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Secondary text color for descriptions and less important content
+                    </p>
+                    
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="color"
+                          value={textColorSecondary}
+                          onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
+                          className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
+                        />
+                        <div className="space-y-1">
+                          <Label className="text-sm font-medium">Color Value</Label>
+                          <Input
+                            type="text"
+                            value={textColorSecondary}
+                            onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
                             className="w-32 text-sm"
                             placeholder="#6b7280"
                           />
@@ -605,10 +769,10 @@ export default function Settings() {
                       
                       <div className="flex items-center space-x-2">
                         <div 
-                          className="w-20 h-8 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center font-medium text-sm"
-                          style={{ color: secondaryColor }}
+                          className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-sm bg-white dark:bg-gray-800"
+                          style={{ color: textColorSecondary }}
                         >
-                          Sample Text
+                          Secondary Text
                         </div>
                       </div>
                     </div>
