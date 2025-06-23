@@ -320,6 +320,31 @@ body {
   /* Dropdown colors */
   --dropdown-selected: 330 81% 60%;
   --dropdown-selected-foreground: 210 40% 98%;
+  
+  /* Enhanced theme colors for better UI consistency */
+  --success: 142 76% 36%;
+  --success-foreground: 138 62% 47%;
+  --warning: 45 93% 47%;
+  --warning-foreground: 26 83% 14%;
+  --info: 217 91% 60%;
+  --info-foreground: 222 84% 5%;
+  
+  /* Button variant colors */
+  --button-primary: var(--primary);
+  --button-primary-hover: 330 81% 55%;
+  --button-secondary: var(--secondary);
+  --button-secondary-hover: 210 40% 92%;
+  --button-outline: transparent;
+  --button-outline-border: var(--border);
+  --button-outline-hover: var(--accent);
+  
+  /* Form element colors */
+  --form-label: var(--foreground);
+  --form-input: var(--background);
+  --form-input-border: var(--border);
+  --form-input-focus: var(--ring);
+  --form-error: var(--destructive);
+  --form-success: var(--success);
 }
 
 .dark {
@@ -363,6 +388,130 @@ body {
   /* Dropdown colors for dark mode */
   --dropdown-selected: 330 81% 60%;
   --dropdown-selected-foreground: 210 40% 98%;
+  
+  /* Enhanced theme colors for dark mode */
+  --success: 142 70% 45%;
+  --success-foreground: 138 62% 25%;
+  --warning: 45 93% 58%;
+  --warning-foreground: 26 83% 5%;
+  --info: 217 91% 70%;
+  --info-foreground: 222 84% 10%;
+  
+  /* Button variant colors for dark mode */
+  --button-primary: var(--primary);
+  --button-primary-hover: 330 81% 65%;
+  --button-secondary: var(--secondary);
+  --button-secondary-hover: 240 3.7% 20%;
+  --button-outline: transparent;
+  --button-outline-border: var(--border);
+  --button-outline-hover: var(--accent);
+  
+  /* Form element colors for dark mode */
+  --form-label: var(--foreground);
+  --form-input: var(--background);
+  --form-input-border: var(--border);
+  --form-input-focus: var(--ring);
+  --form-error: var(--destructive);
+  --form-success: var(--success);
+}
+
+/* Enhanced component theming utilities */
+.btn-primary {
+  background-color: hsl(var(--button-primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--button-primary));
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-primary:hover {
+  background-color: hsl(var(--button-primary-hover));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px hsla(var(--button-primary), 0.3);
+}
+
+.btn-secondary {
+  background-color: hsl(var(--button-secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--button-secondary));
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-secondary:hover {
+  background-color: hsl(var(--button-secondary-hover));
+}
+
+.btn-outline {
+  background-color: hsl(var(--button-outline));
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--button-outline-border));
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-outline:hover {
+  background-color: hsl(var(--button-outline-hover));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Form styling enhancements */
+.form-input {
+  background-color: hsl(var(--form-input));
+  border: 1px solid hsl(var(--form-input-border));
+  color: hsl(var(--foreground));
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.form-input:focus {
+  border-color: hsl(var(--form-input-focus));
+  box-shadow: 0 0 0 2px hsla(var(--form-input-focus), 0.2);
+  outline: none;
+}
+
+.form-label {
+  color: hsl(var(--form-label));
+  font-weight: 500;
+}
+
+.form-error {
+  color: hsl(var(--form-error));
+  font-size: 0.875rem;
+}
+
+.form-success {
+  color: hsl(var(--form-success));
+  font-size: 0.875rem;
+}
+
+/* Status indicator utilities */
+.status-success {
+  background-color: hsla(var(--success), 0.1);
+  color: hsl(var(--success));
+  border: 1px solid hsla(var(--success), 0.2);
+}
+
+.status-warning {
+  background-color: hsla(var(--warning), 0.1);
+  color: hsl(var(--warning));
+  border: 1px solid hsla(var(--warning), 0.2);
+}
+
+.status-info {
+  background-color: hsla(var(--info), 0.1);
+  color: hsl(var(--info));
+  border: 1px solid hsla(var(--info), 0.2);
+}
+
+/* Enhanced card styling */
+.card-enhanced {
+  background-color: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: calc(var(--radius) + 2px);
+  box-shadow: 0 2px 8px hsla(var(--foreground), 0.05);
+  transition: box-shadow 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.card-enhanced:hover {
+  box-shadow: 0 4px 16px hsla(var(--foreground), 0.1);
+  transform: translateY(-2px);
 }
 
 /* Apply secondary color to all text elements */
