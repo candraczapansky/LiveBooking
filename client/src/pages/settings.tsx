@@ -524,26 +524,43 @@ export default function Settings() {
             width: "100%",
             minHeight: "calc(100vh - 96px)"
           }}>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Profile & Settings</h1>
-              <p className="text-gray-600 dark:text-gray-400">
+            <div style={{ marginBottom: "24px" }}>
+              <h1 style={{ 
+                fontSize: "24px", 
+                fontWeight: "700", 
+                color: "#111827", 
+                marginBottom: "8px",
+                lineHeight: "1.2" 
+              }}>Profile & Settings</h1>
+              <p style={{ 
+                fontSize: "16px", 
+                color: "#6b7280", 
+                lineHeight: "1.5",
+                margin: 0 
+              }}>
                 Manage your profile information, account preferences and security settings.
               </p>
             </div>
 
         {/* Profile Information */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
+        <div style={{
+          backgroundColor: "white",
+          borderRadius: "8px",
+          border: "1px solid #e5e7eb",
+          marginBottom: "24px",
+          overflow: "hidden"
+        }}>
+          <div style={{ padding: "24px 24px 0 24px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div>
-                <CardTitle>Personal Information</CardTitle>
-                <CardDescription>
+                <h2 style={{ fontSize: "18px", fontWeight: "600", color: "#111827", marginBottom: "4px" }}>Personal Information</h2>
+                <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
                   Update your personal details and contact information.
-                </CardDescription>
+                </p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-6">
+          </div>
+          <div style={{ padding: "24px" }}>
             {/* Profile Picture */}
             <div className="flex items-center space-x-4">
               <div style={{

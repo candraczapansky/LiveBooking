@@ -19,7 +19,7 @@ import Appointments from "@/pages/appointments";
 import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
 import Marketing from "@/pages/marketing";
-import Settings from "@/pages/settings";
+import Settings from "@/pages/settings-mobile";
 import Schedule from "@/pages/schedule";
 import ClientBooking from "@/pages/client-booking";
 import PointOfSale from "@/pages/pos";
