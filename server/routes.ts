@@ -1235,7 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const { paymentsApi } = squareClient;
+      const paymentsApi = squareClient.paymentsApi;
       const { result } = await paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
