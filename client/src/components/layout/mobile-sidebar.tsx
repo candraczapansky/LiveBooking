@@ -100,21 +100,24 @@ const MobileSidebar = () => {
               {/* Navigation */}
               <nav className="flex-1 p-4 overflow-y-auto min-h-0">
                 <div className="space-y-2 pb-4">
-                  {navigationItems.map((item) => (
-                    <Link key={item.href} href={item.href}>
-                      <div 
-                        className={`flex items-center px-3 py-2 rounded-md text-sm font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                          location === item.href || (item.href === "/dashboard" && location === "/")
-                            ? "bg-primary text-primary-foreground"
-                            : "text-gray-700 dark:text-gray-300"
-                        }`}
-                        onClick={closeSidebar}
-                      >
-                        <span className="mr-3">{item.icon}</span>
-                        {item.label}
-                      </div>
-                    </Link>
-                  ))}
+                  {navigationItems.map((item, index) => {
+                    console.log("Rendering item:", item.label, "index:", index);
+                    return (
+                      <Link key={item.href} href={item.href}>
+                        <div 
+                          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                            location === item.href || (item.href === "/dashboard" && location === "/")
+                              ? "bg-primary text-primary-foreground"
+                              : "text-gray-700 dark:text-gray-300"
+                          }`}
+                          onClick={closeSidebar}
+                        >
+                          <span className="mr-3">{item.icon}</span>
+                          {item.label}
+                        </div>
+                      </Link>
+                    );
+                  })}
                 </div>
               </nav>
 
