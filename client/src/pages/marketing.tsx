@@ -320,8 +320,11 @@ const MarketingPage = () => {
   // Create promo code mutation
   const createPromoCodeMutation = useMutation({
     mutationFn: async (promoData: PromoFormValues) => {
-      return await apiRequest('/api/promo-codes', {
+      const response = await fetch('/api/promo-codes', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           code: promoData.code,
           description: `${promoData.type === 'percentage' ? promoData.value + '%' : '$' + promoData.value} off${promoData.service ? ' ' + promoData.service : ' all services'}`,
@@ -333,6 +336,13 @@ const MarketingPage = () => {
           expirationDate: new Date(promoData.expirationDate),
         }),
       });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to create promo code');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/promo-codes'] });
@@ -429,24 +439,15 @@ const MarketingPage = () => {
     campaign.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredPromos = promos.filter(promo =>
+  const filteredPromos = promoCodes.filter((promo: any) =>
     promo.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    promo.service?.toLowerCase().includes(searchQuery.toLowerCase())
+    promo.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
 
 
-  const handleCreatePromo = (values: PromoFormValues) => {
-    // In a real app, this would send the data to an API
-    console.log("Creating promo:", values);
-    
-    toast({
-      title: "Promo Code Created",
-      description: `Promo code ${values.code} has been created.`,
-    });
-    
-    promoForm.reset();
-    setIsPromoFormOpen(false);
+  const onPromoSubmit = (data: PromoFormValues) => {
+    createPromoCodeMutation.mutate(data);
   };
 
   return (
@@ -698,10 +699,9 @@ const MarketingPage = () => {
                             </div>
                           </div>
                           <CardDescription>
-                            {promo.type === "percentage" 
-                              ? `${promo.value}% off` 
-                              : `$${promo.value.toFixed(2)} off`}
-                            {promo.service ? ` ${promo.service}` : " all services"}
+                            {promo.description || (promo.discountType === "percentage" 
+                              ? `${promo.discountValue}% off` 
+                              : `$${promo.discountValue?.toFixed(2)} off`)}
                           </CardDescription>
                         </CardHeader>
                         
@@ -713,11 +713,11 @@ const MarketingPage = () => {
                             </div>
                             <div>
                               <span className="text-sm font-medium">Usage:</span>
-                              <p className="text-sm">{promo.usedCount} / {promo.usageLimit}</p>
+                              <p className="text-sm">{promo.usedCount || 0} / {promo.usageLimit}</p>
                             </div>
                           </div>
                           
-                          {promo.usedCount / promo.usageLimit > 0.8 && (
+                          {(promo.usedCount || 0) / promo.usageLimit > 0.8 && (
                             <div className="mt-4 flex items-center text-amber-600 dark:text-amber-500">
                               <AlertTriangle className="h-4 w-4 mr-1" />
                               <span className="text-sm">Almost reached limit</span>
