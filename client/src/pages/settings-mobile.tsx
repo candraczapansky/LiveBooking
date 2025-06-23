@@ -150,13 +150,13 @@ export default function SettingsMobile() {
           overflow: "auto",
           WebkitOverflowScrolling: "touch",
           backgroundColor: "#f9fafb",
-          padding: "16px"
+          padding: "12px"
         }}>
           <div style={{
-            maxWidth: "768px",
+            maxWidth: "480px",
             margin: "0 auto",
             width: "100%",
-            minHeight: "calc(100vh - 96px)"
+            minHeight: "calc(100vh - 88px)"
           }}>
             
             {/* Header */}
@@ -199,31 +199,33 @@ export default function SettingsMobile() {
               </h2>
               
               {/* Profile Picture */}
-              <div style={{ display: "flex", alignItems: "center", marginBottom: "24px", gap: "16px" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: "24px", gap: "16px" }}>
                 <div style={{
-                  width: "80px",
-                  height: "80px",
+                  width: "120px",
+                  height: "120px",
                   borderRadius: "50%",
                   overflow: "hidden",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   backgroundColor: "#f3f4f6",
-                  border: "2px solid #e5e7eb"
+                  border: "3px solid #e5e7eb",
+                  flexShrink: 0
                 }}>
                   <img
-                    src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"}
+                    src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=240&h=240"}
                     alt="Profile picture"
                     style={{
                       width: "100%",
                       height: "100%",
                       objectFit: "cover",
-                      objectPosition: "center"
+                      objectPosition: "center",
+                      display: "block"
                     }}
                   />
                 </div>
-                <div>
-                  <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "4px" }}>
+                <div style={{ textAlign: "center" }}>
+                  <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px", color: "#111827" }}>
                     {user?.firstName} {user?.lastName}
                   </h3>
                   <input
@@ -238,8 +240,15 @@ export default function SettingsMobile() {
                       variant="outline" 
                       size="sm"
                       type="button"
+                      style={{ 
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "8px",
+                        margin: "0 auto"
+                      }}
                     >
-                      <Camera style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+                      <Camera style={{ width: "16px", height: "16px" }} />
                       Change Photo
                     </Button>
                   </label>
@@ -248,29 +257,31 @@ export default function SettingsMobile() {
 
               {/* Profile Form */}
               {isEditingProfile ? (
-                <div style={{ display: "grid", gap: "16px" }}>
+                <div style={{ display: "grid", gap: "20px" }}>
                   <div>
-                    <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block" }}>
+                    <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
                       First Name
                     </label>
                     <Input
                       value={profileData.firstName}
                       onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
                       placeholder="Enter first name"
+                      style={{ height: "48px", fontSize: "16px" }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block" }}>
+                    <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
                       Last Name
                     </label>
                     <Input
                       value={profileData.lastName}
                       onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
                       placeholder="Enter last name"
+                      style={{ height: "48px", fontSize: "16px" }}
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block" }}>
+                    <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
                       Email
                     </label>
                     <Input
@@ -278,21 +289,22 @@ export default function SettingsMobile() {
                       onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="Enter email"
                       type="email"
+                      style={{ height: "48px", fontSize: "16px" }}
                     />
                   </div>
-                  <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
-                    <Button onClick={handleSaveProfile} style={{ flex: 1 }}>
-                      <Save style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+                  <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+                    <Button onClick={handleSaveProfile} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
+                      <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
                       Save
                     </Button>
-                    <Button variant="outline" onClick={() => setIsEditingProfile(false)} style={{ flex: 1 }}>
+                    <Button variant="outline" onClick={() => setIsEditingProfile(false)} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
                       Cancel
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <Button onClick={() => setIsEditingProfile(true)} style={{ width: "100%" }}>
+                  <Button onClick={() => setIsEditingProfile(true)} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
                     Edit Personal Information
                   </Button>
                 </div>
@@ -324,18 +336,19 @@ export default function SettingsMobile() {
                 display: "flex", 
                 justifyContent: "space-between", 
                 alignItems: "center",
-                marginBottom: "16px",
-                padding: "12px",
+                marginBottom: "20px",
+                padding: "16px",
                 backgroundColor: "#f9fafb",
-                borderRadius: "6px"
+                borderRadius: "8px",
+                minHeight: "56px"
               }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
                   {darkMode ? (
-                    <Moon style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+                    <Moon style={{ width: "20px", height: "20px", marginRight: "12px", color: "#6366f1" }} />
                   ) : (
-                    <Sun style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+                    <Sun style={{ width: "20px", height: "20px", marginRight: "12px", color: "#f59e0b" }} />
                   )}
-                  <span style={{ fontSize: "14px", fontWeight: "500" }}>Dark Mode</span>
+                  <span style={{ fontSize: "16px", fontWeight: "500", color: "#111827" }}>Dark Mode</span>
                 </div>
                 <Switch
                   checked={darkMode}
@@ -344,8 +357,8 @@ export default function SettingsMobile() {
               </div>
 
               {/* Theme Colors */}
-              <div style={{ marginBottom: "16px" }}>
-                <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block" }}>
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
                   Primary Color
                 </label>
                 <input
@@ -354,16 +367,17 @@ export default function SettingsMobile() {
                   onChange={(e) => setCustomColor(e.target.value)}
                   style={{ 
                     width: "100%", 
-                    height: "40px", 
-                    border: "1px solid #e5e7eb", 
-                    borderRadius: "6px",
-                    cursor: "pointer"
+                    height: "48px", 
+                    border: "2px solid #e5e7eb", 
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    backgroundColor: "white"
                   }}
                 />
               </div>
 
-              <Button onClick={handleSaveAppearance} style={{ width: "100%" }}>
-                <Save style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+              <Button onClick={handleSaveAppearance} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
+                <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
                 Save Appearance Settings
               </Button>
             </div>
