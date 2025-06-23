@@ -365,15 +365,15 @@ export default function PointOfSale() {
               
               {/* Services Selection Panel */}
               <div className="flex-1 flex flex-col min-w-0 xl:min-w-[60%]">
-                <div className="mb-4 sm:mb-6">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <div className="mb-3 sm:mb-4 lg:mb-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2 sm:gap-3">
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
+                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
                       <Button
                         size="sm"
                         variant={activeTab === 'services' ? 'default' : 'ghost'}
                         onClick={() => setActiveTab('services')}
-                        className="px-4"
+                        className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
                       >
                         Services
                       </Button>
@@ -381,19 +381,19 @@ export default function PointOfSale() {
                         size="sm"
                         variant={activeTab === 'products' ? 'default' : 'ghost'}
                         onClick={() => setActiveTab('products')}
-                        className="px-4"
+                        className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
                       >
                         Products
                       </Button>
                     </div>
                   </div>
-                  <div className="flex gap-4">
+                  <div className="flex gap-2 sm:gap-4">
                     <div className="relative flex-1">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                       <Input
                         type="search"
                         placeholder={`Search ${activeTab}...`}
-                        className="pl-8"
+                        className="pl-8 text-sm"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
@@ -405,7 +405,7 @@ export default function PointOfSale() {
                 <div className="flex-1 min-h-0">
                   {activeTab === 'services' ? (
                     servicesLoading ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
                             <CardContent className="p-3 sm:p-4">
@@ -417,7 +417,7 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         {filteredServices.map((service: Service) => (
                           <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
                             <CardContent className="p-3 sm:p-4">
@@ -453,7 +453,7 @@ export default function PointOfSale() {
                     )
                   ) : (
                     productsLoading ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
                             <CardContent className="p-3 sm:p-4">
@@ -546,7 +546,7 @@ export default function PointOfSale() {
                     <Separator className="mb-4" />
 
                     {/* Cart Items */}
-                    <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                    <div className="flex-1 overflow-y-auto space-y-2 sm:space-y-3 mb-4 max-h-[40vh] xl:max-h-none">
                       {cart.length === 0 ? (
                         <div className="text-center text-gray-500 py-8">
                           <ShoppingCart className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -654,7 +654,7 @@ export default function PointOfSale() {
 
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Process Payment</DialogTitle>
             <DialogDescription>
