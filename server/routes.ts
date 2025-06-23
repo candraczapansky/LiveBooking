@@ -29,6 +29,16 @@ import {
   createMarketingCampaignEmail, 
   createAccountUpdateEmail 
 } from "./email";
+import { 
+  triggerBookingConfirmation, 
+  triggerCancellation, 
+  triggerNoShow, 
+  triggerCustomAutomation,
+  getAutomationRules,
+  addAutomationRule,
+  updateAutomationRule,
+  deleteAutomationRule
+} from "./automation-triggers";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -710,6 +720,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
     const newAppointment = await storage.createAppointment(req.body);
+    
+    // Trigger booking confirmation automation
+    try {
+      await triggerBookingConfirmation(newAppointment, storage);
+    } catch (error) {
+      console.error('Failed to trigger booking confirmation automation:', error);
+    }
+    
     return res.status(201).json(newAppointment);
   });
   
@@ -753,7 +771,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/appointments/:id", validateBody(insertAppointmentSchema.partial()), async (req, res) => {
     const id = parseInt(req.params.id);
     try {
+      const existingAppointment = await storage.getAppointment(id);
       const updatedAppointment = await storage.updateAppointment(id, req.body);
+      
+      // Trigger automations based on status changes
+      if (existingAppointment && req.body.status && existingAppointment.status !== req.body.status) {
+        try {
+          switch (req.body.status) {
+            case 'cancelled':
+              await triggerCancellation(updatedAppointment, storage);
+              break;
+            case 'no_show':
+              await triggerNoShow(updatedAppointment, storage);
+              break;
+          }
+        } catch (error) {
+          console.error('Failed to trigger status change automation:', error);
+        }
+      }
+      
       return res.status(200).json(updatedAppointment);
     } catch (error) {
       return res.status(404).json({ error: "Appointment not found" });
@@ -2323,6 +2359,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: "Error validating promo code: " + error.message });
+    }
+  });
+
+  // Automation Rules API endpoints
+  app.get("/api/automation-rules", async (req, res) => {
+    try {
+      const rules = getAutomationRules();
+      res.json(rules);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error fetching automation rules: " + error.message });
+    }
+  });
+
+  const automationRuleSchema = z.object({
+    name: z.string().min(1, "Name is required"),
+    type: z.enum(["email", "sms"]),
+    trigger: z.enum(["appointment_reminder", "follow_up", "birthday", "no_show", "booking_confirmation", "cancellation", "custom"]),
+    timing: z.string().min(1, "Timing is required"),
+    template: z.string().min(1, "Template is required"),
+    subject: z.string().optional(),
+    active: z.boolean().default(true),
+    customTriggerName: z.string().optional()
+  });
+
+  app.post("/api/automation-rules", validateBody(automationRuleSchema), async (req, res) => {
+    try {
+      const newRule = addAutomationRule({
+        ...req.body,
+        sentCount: 0
+      });
+      res.status(201).json(newRule);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error creating automation rule: " + error.message });
+    }
+  });
+
+  app.put("/api/automation-rules/:id", validateBody(automationRuleSchema.partial()), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedRule = updateAutomationRule(id, req.body);
+      
+      if (!updatedRule) {
+        return res.status(404).json({ error: "Automation rule not found" });
+      }
+      
+      res.json(updatedRule);
+    } catch (error: any) {
+      res.status(500).json({ error: "Error updating automation rule: " + error.message });
+    }
+  });
+
+  app.delete("/api/automation-rules/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = deleteAutomationRule(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Automation rule not found" });
+      }
+      
+      res.json({ message: "Automation rule deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Error deleting automation rule: " + error.message });
+    }
+  });
+
+  // Trigger custom automation endpoint
+  app.post("/api/automation-rules/trigger", validateBody(z.object({
+    appointmentId: z.number(),
+    customTriggerName: z.string()
+  })), async (req, res) => {
+    try {
+      const { appointmentId, customTriggerName } = req.body;
+      const appointment = await storage.getAppointment(appointmentId);
+      
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      await triggerCustomAutomation(appointment, storage, customTriggerName);
+      res.json({ message: "Custom automation triggered successfully" });
+    } catch (error: any) {
+      res.status(500).json({ error: "Error triggering custom automation: " + error.message });
     }
   });
 
