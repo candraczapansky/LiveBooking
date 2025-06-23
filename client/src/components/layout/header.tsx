@@ -1,8 +1,7 @@
 import { useContext, useState, useEffect } from "react";
-import { Bell, Menu, Settings, User, LogOut, ChevronDown } from "lucide-react";
+import { Bell, Settings, User, LogOut, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/App";
-import { useSidebar } from "@/contexts/SidebarContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,10 +13,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
+import MobileSidebar from "./mobile-sidebar";
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
-  const { isMobile, toggleSidebar } = useSidebar();
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,20 +48,8 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="mr-3 lg:hidden"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Mobile menu clicked');
-                toggleSidebar();
-              }}
-            >
-              <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
-            </Button>
-            <div className="lg:hidden">
+            <MobileSidebar />
+            <div className="lg:hidden ml-3">
               <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
             </div>
           </div>
