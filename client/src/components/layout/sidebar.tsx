@@ -70,7 +70,7 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className={sidebarClass}>
+    <div className={sidebarClass} onClick={(e) => e.stopPropagation()}>
       <div className="flex flex-col h-full">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
@@ -132,20 +132,7 @@ const Sidebar = () => {
 };
 
 export const SidebarController = () => {
-  const { isOpen, isMobile, closeSidebar } = useSidebar();
-
-  return (
-    <>
-      <Sidebar />
-      {/* Overlay for mobile when sidebar is open */}
-      {isMobile && isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
-          onClick={closeSidebar}
-        />
-      )}
-    </>
-  );
+  return <Sidebar />;
 };
 
 export default Sidebar;
