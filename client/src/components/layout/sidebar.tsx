@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -75,14 +75,14 @@ const Sidebar = () => {
                 variant="ghost" 
                 size="icon" 
                 className="mr-3 h-8 w-8"
-                onClick={onToggle}
+                onClick={toggleSidebar}
               >
                 <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </Button>
               <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
             </div>
             {isMobile && (
-              <Button variant="ghost" size="sm" onClick={onClose} className="md:hidden">
+              <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">
                 <X className="h-5 w-5" />
               </Button>
             )}
@@ -128,46 +128,16 @@ const Sidebar = () => {
 };
 
 export const SidebarController = () => {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isOpen, setIsOpen] = useState(!isMobile);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (mobile) {
-        setIsOpen(false);
-      } else {
-        setIsOpen(true);
-      }
-    };
-
-    // Set initial state
-    handleResize();
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Export toggle function and state globally so other components can access it
-  useEffect(() => {
-    (window as any).toggleSidebar = () => setIsOpen(!isOpen);
-    (window as any).sidebarIsOpen = isOpen;
-  }, [isOpen]);
+  const { isOpen, isMobile, closeSidebar } = useSidebar();
 
   return (
     <>
-      <Sidebar
-        isMobile={isMobile}
-        isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
-        onToggle={() => setIsOpen(!isOpen)}
-      />
+      <Sidebar />
       {/* Overlay for mobile when sidebar is open */}
       {isMobile && isOpen && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden" 
-          onClick={() => setIsOpen(false)}
+          onClick={closeSidebar}
         />
       )}
     </>

@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from "react";
 import { Bell, Menu, Settings, User, LogOut, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/App";
+import { useSidebar } from "@/contexts/SidebarContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,17 +17,8 @@ import { getInitials, getFullName } from "@/lib/utils";
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile, toggleSidebar } = useSidebar();
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
 
   useEffect(() => {
     const savedProfilePicture = localStorage.getItem('profilePicture');
@@ -62,7 +54,7 @@ const Header = () => {
                 variant="ghost" 
                 size="icon" 
                 className="mr-3 lg:hidden"
-                onClick={() => (window as any).toggleSidebar?.()}
+                onClick={toggleSidebar}
               >
                 <Menu className="h-6 w-6 text-gray-600 dark:text-gray-300" />
               </Button>

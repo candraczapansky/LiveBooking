@@ -1,6 +1,7 @@
-import { useContext, useState, useEffect } from "react";
+import { useContext } from "react";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
+import { useSidebar } from "@/contexts/SidebarContext";
 import Header from "@/components/layout/header";
 import StatsOverview from "@/components/dashboard/stats-overview";
 import AppointmentsTable from "@/components/dashboard/appointments-table";
@@ -11,19 +12,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 const Dashboard = () => {
   useDocumentTitle("Dashboard | BeautyBook");
   const { user } = useContext(AuthContext);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
+  const { isOpen: sidebarOpen } = useSidebar();
   
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
