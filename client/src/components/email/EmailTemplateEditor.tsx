@@ -141,14 +141,6 @@ export default function EmailTemplateEditor({
         }}
         style={{ height: '100%', minHeight: '700px' }}
       />
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={exportHtml}
-          className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-        >
-          Save Template
-        </button>
-      </div>
     </div>
   );
 }

@@ -1253,9 +1253,9 @@ const MarketingPage = () => {
 
       {/* Email Template Editor Modal */}
       <Dialog open={showEmailEditor} onOpenChange={setShowEmailEditor}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-[95vh] p-0 overflow-hidden">
           <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center justify-between p-4 border-b shrink-0">
               <DialogTitle>Email Template Editor</DialogTitle>
               <Button
                 variant="outline"
@@ -1265,18 +1265,20 @@ const MarketingPage = () => {
                 ×
               </Button>
             </div>
-            <div className="flex-1 p-4">
-              <EmailTemplateEditor
-                onDesignChange={setEmailTemplateDesign}
-                onHtmlChange={(html) => {
-                  setEmailTemplateHtml(html);
-                  campaignForm.setValue("content", html);
-                }}
-                initialDesign={emailTemplateDesign}
-                className="h-full"
-              />
+            <div className="flex-1 min-h-0 p-4">
+              <div className="h-full">
+                <EmailTemplateEditor
+                  onDesignChange={setEmailTemplateDesign}
+                  onHtmlChange={(html) => {
+                    setEmailTemplateHtml(html);
+                    campaignForm.setValue("content", html);
+                  }}
+                  initialDesign={emailTemplateDesign}
+                  className="h-full"
+                />
+              </div>
             </div>
-            <div className="flex justify-end gap-2 p-4 border-t">
+            <div className="flex justify-end gap-2 p-4 border-t shrink-0">
               <Button
                 variant="outline"
                 onClick={() => setShowEmailEditor(false)}
