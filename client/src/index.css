@@ -398,7 +398,37 @@ body {
   --form-input-border: var(--border);
   --form-input-focus: var(--ring);
   --form-error: var(--destructive);
-  --form-success: var(--success);
+}
+
+/* Email Template Editor Specific Styles */
+.email-template-editor {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Ensure Unlayer editor takes full space */
+.email-template-editor > div,
+.email-template-editor iframe {
+  height: 100% !important;
+  width: 100% !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
+/* Modal dialog content for email editor */
+[data-state="open"] .email-template-editor {
+  height: 100% !important;
+  min-height: 500px !important;
+}
+
+/* Override any conflicting Unlayer styles */
+#unlayer-container,
+.unlayer-container,
+[id*="unlayer"] {
+  height: 100% !important;
+  width: 100% !important;
 }
 
 .dark {

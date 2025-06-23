@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import EmailEditor, { EditorRef, EmailEditorProps } from 'react-email-editor';
 
 interface EmailTemplateEditorProps {
@@ -15,6 +15,32 @@ export default function EmailTemplateEditor({
   className = ""
 }: EmailTemplateEditorProps) {
   const emailEditorRef = useRef<EditorRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [editorHeight, setEditorHeight] = useState(600);
+
+  useEffect(() => {
+    // Calculate container height and set editor height
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const containerHeight = containerRef.current.offsetHeight;
+        setEditorHeight(Math.max(containerHeight, 600));
+      }
+    };
+
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    
+    // Also update when container size changes
+    const resizeObserver = new ResizeObserver(updateHeight);
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateHeight);
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     // Load initial design if provided
@@ -39,7 +65,7 @@ export default function EmailTemplateEditor({
     const unlayer = emailEditorRef.current?.editor;
     if (!unlayer) return;
 
-    // Set custom options
+    // Set custom options with full height
     unlayer.setAppearance({
       theme: 'modern_light',
       panels: {
@@ -48,6 +74,14 @@ export default function EmailTemplateEditor({
         }
       }
     });
+
+    // Force editor to resize to container
+    setTimeout(() => {
+      if (unlayer) {
+        // Trigger a resize event to make the editor fit the container
+        window.dispatchEvent(new Event('resize'));
+      }
+    }, 100);
 
     // Load initial design if provided
     if (initialDesign) {
