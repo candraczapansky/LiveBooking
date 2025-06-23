@@ -12,7 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### June 23, 2025 - UI Theming and Data Persistence
+### June 23, 2025 - UI Theming, Data Persistence, and Unlayer Email Editor Integration
 - Added comprehensive text color editing capabilities to the appearance settings
 - Implemented primary and secondary text color controls with live preview
 - Added text color preset saving and management functionality  
@@ -23,6 +23,9 @@ Preferred communication style: Simple, everyday language.
 - Migrated to PostgreSQL database for permanent data storage
 - Client data now persists permanently across sessions
 - Completed Square payment integration migration from Stripe
+- Integrated Unlayer email template editor for professional marketing campaigns
+- Added email template design storage in database with HTML content generation
+- Enhanced marketing campaigns with visual email template creation capabilities
 
 ## System Architecture
 

@@ -370,8 +370,6 @@ export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaig
   id: true,
   createdAt: true,
   sentAt: true,
-}).extend({
-  sendDate: z.string().optional().nullable(),
 });
 
 // Marketing campaign recipients schema (for tracking individual sends)

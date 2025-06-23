@@ -59,18 +59,12 @@ export default function EmailTemplateEditor({
     // Editor instance is loaded
   };
 
-  const onDesignLoad = (data: any) => {
-    // Design has been loaded
-    onDesignChange?.(data);
-  };
-
   return (
     <div className={`email-template-editor ${className}`}>
       <EmailEditor
         ref={emailEditorRef}
         onReady={onReady}
         onLoad={editorLoaded}
-        onDesignLoad={onDesignLoad}
         options={{
           displayMode: 'email',
           locale: 'en',
@@ -112,38 +106,38 @@ export default function EmailTemplateEditor({
               enabled: true
             }
           },
-          mergeTags: [
-            {
+          mergeTags: {
+            'Client Name': {
               name: 'Client Name',
               value: '{{client_name}}',
               sample: 'John Doe'
             },
-            {
+            'Client Email': {
               name: 'Client Email',
               value: '{{client_email}}',
               sample: 'john@example.com'
             },
-            {
+            'Salon Name': {
               name: 'Salon Name',
               value: '{{salon_name}}',
               sample: 'BeautyBook Salon'
             },
-            {
+            'Appointment Date': {
               name: 'Appointment Date',
               value: '{{appointment_date}}',
               sample: 'June 23, 2025'
             },
-            {
+            'Service Name': {
               name: 'Service Name',
               value: '{{service_name}}',
               sample: 'Hair Cut & Style'
             },
-            {
+            'Unsubscribe Link': {
               name: 'Unsubscribe Link',
               value: '{{unsubscribe_link}}',
               sample: 'Click here to unsubscribe'
             }
-          ]
+          }
         }}
         style={{ height: '600px' }}
       />

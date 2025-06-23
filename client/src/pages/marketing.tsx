@@ -782,28 +782,41 @@ const MarketingPage = () => {
                 />
               )}
               
-              <FormField
-                control={campaignForm.control}
-                name="content"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Message Content</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Write your message here..." 
-                        rows={5}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {campaignForm.watch("type") === "sms" 
-                        ? "SMS messages are limited to 160 characters." 
-                        : "You can use HTML formatting in email campaigns."}
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {campaignForm.watch("type") === "email" ? (
+                <div className="space-y-4">
+                  <FormLabel>Email Template</FormLabel>
+                  <EmailTemplateEditor
+                    onDesignChange={setEmailTemplateDesign}
+                    onHtmlChange={(html) => {
+                      setEmailTemplateHtml(html);
+                      campaignForm.setValue("content", html);
+                    }}
+                    initialDesign={emailTemplateDesign}
+                    className="border rounded-lg"
+                  />
+                </div>
+              ) : (
+                <FormField
+                  control={campaignForm.control}
+                  name="content"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Message Content</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Write your SMS message here..." 
+                          rows={5}
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        SMS messages are limited to 160 characters.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               <div className="grid grid-cols-2 gap-4 items-end">
                 <FormField

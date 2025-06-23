@@ -1101,7 +1101,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
-    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
+    return await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
   }
 
   async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
