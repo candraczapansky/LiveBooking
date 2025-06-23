@@ -12,7 +12,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### June 23, 2025 - UI Theming, Data Persistence, and Complete Email Marketing System
+### June 23, 2025 - UI Theming, Data Persistence, Complete Email Marketing System, and Automation Calendar Integration
 - Added comprehensive text color editing capabilities to the appearance settings
 - Implemented primary and secondary text color controls with live preview
 - Added text color preset saving and management functionality  
@@ -39,6 +39,17 @@ Preferred communication style: Simple, everyday language.
     - Time field automatically disables when "Send immediately" is checked or no date is selected
     - Backend properly combines date and time into precise timestamp for scheduling
     - Default time set to 9:00 AM for user convenience
+- **Completed automation calendar integration:**
+  - Created comprehensive automation trigger system in `server/automation-triggers.ts`
+  - Integrated automation triggers with appointment booking, status changes, and checkout
+  - Added automatic booking confirmation emails/SMS when appointments are created
+  - Implemented status-based triggers for cancellations and no-shows
+  - Added checkout completion automation triggers for post-service follow-ups
+  - Created full CRUD API endpoints for managing automation rules
+  - Fixed custom automation popup scrolling with proper overflow handling
+  - Enhanced custom trigger name functionality for personalized automation workflows
+  - Automated email/SMS delivery with dynamic template variable replacement
+  - System now automatically sends appropriate communications based on appointment lifecycle events
 
 ## System Architecture
 

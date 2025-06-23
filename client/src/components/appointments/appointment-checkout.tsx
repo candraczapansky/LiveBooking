@@ -215,6 +215,16 @@ export default function AppointmentCheckout({
   };
 
   const handleSuccess = async () => {
+    // Trigger checkout completion automation
+    try {
+      await apiRequest("POST", "/api/automation-rules/trigger", {
+        appointmentId: appointment.id,
+        customTriggerName: "checkout_completed"
+      });
+    } catch (error) {
+      console.log('Automation trigger failed, continuing with checkout completion');
+    }
+    
     onSuccess();
     onClose();
   };
