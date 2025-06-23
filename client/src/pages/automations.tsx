@@ -207,11 +207,13 @@ export default function Automations() {
       subject: data.subject,
       template: data.template,
       active: data.active,
-      sentCount: 0
+      sentCount: 0,
+      customTriggerName: data.trigger === "custom" ? data.customTriggerName : undefined
     };
 
     setAutomationRules(prev => [...prev, newRule]);
     setIsEmailDialogOpen(false);
+    setSelectedEmailTrigger("");
     emailForm.reset();
   };
 
@@ -224,11 +226,13 @@ export default function Automations() {
       timing: data.timing,
       template: data.template,
       active: data.active,
-      sentCount: 0
+      sentCount: 0,
+      customTriggerName: data.trigger === "custom" ? data.customTriggerName : undefined
     };
 
     setAutomationRules(prev => [...prev, newRule]);
     setIsSMSDialogOpen(false);
+    setSelectedSMSTrigger("");
     smsForm.reset();
   };
 
@@ -244,7 +248,10 @@ export default function Automations() {
     setAutomationRules(prev => prev.filter(rule => rule.id !== id));
   };
 
-  const formatTriggerLabel = (trigger: string) => {
+  const formatTriggerLabel = (trigger: string, customTriggerName?: string) => {
+    if (trigger === "custom" && customTriggerName) {
+      return customTriggerName;
+    }
     return triggerOptions.find(opt => opt.value === trigger)?.label || trigger;
   };
 
@@ -355,6 +362,25 @@ export default function Automations() {
                             )}
                           />
                         </div>
+                        
+                        {selectedEmailTrigger === "custom" && (
+                          <FormField
+                            control={emailForm.control}
+                            name="customTriggerName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Custom Trigger Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g., Cancellation Confirmation, Welcome Message" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Give your custom trigger a descriptive name
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                         
                         <FormField
                           control={emailForm.control}
@@ -467,7 +493,10 @@ export default function Automations() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Trigger</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={(value) => {
+                                  field.onChange(value);
+                                  setSelectedSMSTrigger(value);
+                                }} defaultValue={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select trigger" />
@@ -511,6 +540,25 @@ export default function Automations() {
                             )}
                           />
                         </div>
+                        
+                        {selectedSMSTrigger === "custom" && (
+                          <FormField
+                            control={smsForm.control}
+                            name="customTriggerName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Custom Trigger Name</FormLabel>
+                                <FormControl>
+                                  <Input placeholder="e.g., Cancellation Text, Welcome SMS" {...field} />
+                                </FormControl>
+                                <FormDescription>
+                                  Give your custom trigger a descriptive name
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
                         
                         <FormField
                           control={smsForm.control}
