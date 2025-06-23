@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+import { useEasterEgg } from "@/contexts/EasterEggContext";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,13 @@ export default function PointOfSale() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const { toast } = useToast();
+  const { checkEasterEgg } = useEasterEgg();
   const queryClient = useQueryClient();
+
+  // Track POS page visit
+  useEffect(() => {
+    checkEasterEgg("pos_pioneer");
+  }, [checkEasterEgg]);
 
   // Tax rate (8.5%)
   const TAX_RATE = 0.085;

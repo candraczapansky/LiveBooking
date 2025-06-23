@@ -136,6 +136,11 @@ const MarketingPage = () => {
   const [viewCampaign, setViewCampaign] = useState<any>(null);
   const [isViewCampaignOpen, setIsViewCampaignOpen] = useState(false);
 
+  // Track marketing page visit
+  useEffect(() => {
+    checkEasterEgg("marketing_maven");
+  }, [checkEasterEgg]);
+
   useEffect(() => {
     const checkSidebarState = () => {
       const globalSidebarState = (window as any).sidebarIsOpen;
