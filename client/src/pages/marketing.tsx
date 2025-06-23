@@ -1182,7 +1182,7 @@ const MarketingPage = () => {
           </DialogHeader>
           
           <Form {...promoForm}>
-            <form onSubmit={promoForm.handleSubmit(handleCreatePromo)} className="space-y-4">
+            <form onSubmit={promoForm.handleSubmit(onPromoSubmit)} className="space-y-4">
               <FormField
                 control={promoForm.control}
                 name="code"
