@@ -109,23 +109,26 @@ const StaffPageSimple = () => {
         <Header />
         
         {/* Content Area */}
-        <div style={{ padding: "12px", maxWidth: "100%", boxSizing: "border-box", paddingBottom: "80px" }}>
+        <div className="p-3 sm:p-6 max-w-full box-border pb-20 sm:pb-6">
           {/* Header Section */}
-          <Card style={{ marginBottom: "16px", padding: "16px", width: "100%", boxSizing: "border-box" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-              <h1 style={{ fontSize: "20px", fontWeight: "bold", margin: "0" }}>Staff Management</h1>
-              <Button onClick={handleAddStaff} style={{ flexShrink: "0" }}>
-                <PlusCircle style={{ width: "16px", height: "16px", marginRight: "8px" }} />
+          <Card className="mb-4 p-4 w-full">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">Staff Management</h1>
+              <Button 
+                onClick={handleAddStaff} 
+                className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-medium"
+              >
+                <PlusCircle className="w-5 h-5 mr-2" />
                 Add Staff
               </Button>
             </div>
             
-            <div style={{ position: "relative", width: "100%" }}>
-              <Search style={{ position: "absolute", left: "10px", top: "10px", width: "16px", height: "16px", color: "#6b7280" }} />
+            <div className="relative w-full">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 type="search"
-                placeholder="Search staff..."
-                style={{ paddingLeft: "36px", width: "100%" }}
+                placeholder="Search staff by name, title, or email..."
+                className="pl-10 h-12 text-base w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -144,9 +147,9 @@ const StaffPageSimple = () => {
               </p>
             </Card>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div className="flex flex-col gap-4">
               {filteredStaff?.map((staffMember: StaffMember) => (
-                <Card key={staffMember.id} style={{ padding: "20px", width: "100%", boxSizing: "border-box" }}>
+                <Card key={staffMember.id} className="p-5 w-full shadow-sm border border-gray-200 rounded-lg hover:shadow-md transition-shadow">
                   {/* Mobile-optimized layout */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     {/* Avatar and basic info section */}
