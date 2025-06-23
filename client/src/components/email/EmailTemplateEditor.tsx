@@ -60,7 +60,7 @@ export default function EmailTemplateEditor({
   };
 
   return (
-    <div className={`email-template-editor ${className}`}>
+    <div className={`email-template-editor w-full h-full ${className}`}>
       <EmailEditor
         ref={emailEditorRef}
         onReady={onReady}
@@ -139,7 +139,7 @@ export default function EmailTemplateEditor({
             }
           }
         }}
-        style={{ height: '100%', minHeight: '700px' }}
+        style={{ width: '100%', height: '100%' }}
       />
     </div>
   );

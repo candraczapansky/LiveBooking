@@ -1265,18 +1265,16 @@ const MarketingPage = () => {
                 ×
               </Button>
             </div>
-            <div className="flex-1 min-h-0 p-4">
-              <div className="h-full">
-                <EmailTemplateEditor
-                  onDesignChange={setEmailTemplateDesign}
-                  onHtmlChange={(html) => {
-                    setEmailTemplateHtml(html);
-                    campaignForm.setValue("content", html);
-                  }}
-                  initialDesign={emailTemplateDesign}
-                  className="h-full"
-                />
-              </div>
+            <div className="flex-1 min-h-0">
+              <EmailTemplateEditor
+                onDesignChange={setEmailTemplateDesign}
+                onHtmlChange={(html) => {
+                  setEmailTemplateHtml(html);
+                  campaignForm.setValue("content", html);
+                }}
+                initialDesign={emailTemplateDesign}
+                className="h-full w-full"
+              />
             </div>
             <div className="flex justify-end gap-2 p-4 border-t shrink-0">
               <Button
