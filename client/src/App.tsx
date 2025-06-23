@@ -19,6 +19,7 @@ import Appointments from "@/pages/appointments";
 import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
 import Marketing from "@/pages/marketing";
+import Automations from "@/pages/automations";
 import Settings from "@/pages/settings-mobile";
 import Schedule from "@/pages/schedule";
 import ClientBooking from "@/pages/client-booking";
@@ -90,6 +91,7 @@ function Router() {
       <Route path="/memberships" component={Memberships} />
       <Route path="/reports" component={Reports} />
       <Route path="/marketing" component={Marketing} />
+      <Route path="/automations" component={Automations} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
