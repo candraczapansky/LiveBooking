@@ -72,11 +72,28 @@ const Sidebar = () => {
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
-  console.log('Sidebar DOM element about to render:', { sidebarClass, isOpen });
+  console.log('Sidebar DOM element about to render:', { isOpen, isMobile });
+
+  // For mobile: don't render when closed
+  if (isMobile && !isOpen) {
+    return null;
+  }
 
   return (
-    <div className={sidebarClass} onClick={(e) => e.stopPropagation()}>
-      <div className="flex flex-col h-full bg-blue-500">
+    <div 
+      className="sidebar"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '256px',
+        height: '100vh',
+        backgroundColor: 'red',
+        zIndex: 9999
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex flex-col h-full" style={{ backgroundColor: 'blue' }}>
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
