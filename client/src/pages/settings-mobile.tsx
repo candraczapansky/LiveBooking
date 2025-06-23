@@ -204,26 +204,14 @@ export default function SettingsMobile() {
                   width: "120px",
                   height: "120px",
                   borderRadius: "50%",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: "#f3f4f6",
+                  backgroundImage: `url(${profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300"})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
                   border: "3px solid #e5e7eb",
-                  flexShrink: 0
-                }}>
-                  <img
-                    src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=240&h=240"}
-                    alt="Profile picture"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      objectPosition: "center",
-                      display: "block"
-                    }}
-                  />
-                </div>
+                  flexShrink: 0,
+                  boxSizing: "border-box"
+                }}></div>
                 <div style={{ textAlign: "center" }}>
                   <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px", color: "#111827" }}>
                     {user?.firstName} {user?.lastName}
