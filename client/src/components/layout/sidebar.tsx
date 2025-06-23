@@ -1,6 +1,7 @@
-import { useState, useContext, useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
+import { useSidebar } from "@/contexts/SidebarContext";
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -39,14 +40,8 @@ const SidebarItem = ({ icon, label, href, isActive }: SidebarItemProps) => {
   );
 };
 
-type SidebarProps = {
-  isMobile: boolean;
-  isOpen: boolean;
-  onClose: () => void;
-  onToggle: () => void;
-};
-
-const Sidebar = ({ isMobile, isOpen, onClose, onToggle }: SidebarProps) => {
+const Sidebar = () => {
+  const { isOpen, isMobile, closeSidebar, toggleSidebar } = useSidebar();
   const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
 
