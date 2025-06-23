@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
-  stripeCustomerId: text("stripe_customer_id"),
+  squareCustomerId: text("square_customer_id"),
   // Communication preferences
   emailAccountManagement: boolean("email_account_management").default(true),
   emailAppointmentReminders: boolean("email_appointment_reminders").default(true),
@@ -39,7 +39,7 @@ export const insertClientSchema = createInsertSchema(users).omit({
   password: true,
   createdAt: true,
   role: true,
-  stripeCustomerId: true,
+  squareCustomerId: true,
 });
 
 // Service Categories schema
@@ -204,7 +204,7 @@ export const clientMemberships = pgTable("client_memberships", {
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   active: boolean("active").notNull().default(true),
-  stripeSubscriptionId: text("stripe_subscription_id"),
+  squareSubscriptionId: text("square_subscription_id"),
 });
 
 export const insertClientMembershipSchema = createInsertSchema(clientMemberships).omit({
@@ -220,7 +220,7 @@ export const payments = pgTable("payments", {
   amount: doublePrecision("amount").notNull(),
   method: text("method").notNull().default("card"), // card, cash, check, etc.
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  squarePaymentId: text("square_payment_id"),
   paymentDate: timestamp("payment_date"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -234,7 +234,7 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 export const savedPaymentMethods = pgTable("saved_payment_methods", {
   id: serial("id").primaryKey(),
   clientId: integer("client_id").notNull(),
-  stripePaymentMethodId: text("stripe_payment_method_id").notNull(),
+  squareCardId: text("square_card_id").notNull(),
   cardBrand: text("card_brand").notNull(), // visa, mastercard, amex, etc.
   cardLast4: text("card_last4").notNull(),
   cardExpMonth: integer("card_exp_month").notNull(),

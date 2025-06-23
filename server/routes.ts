@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import Stripe from "stripe";
+import { Client, Environment } from "squareup";
 import {
   insertUserSchema,
   insertClientSchema,
@@ -44,10 +44,14 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
   customCommissionRate: z.number().optional(),
 });
 
-// Initialize Stripe
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "sk_test_51RbYANP6cNUB4dEVf1nyRTSD5c5CeEntQf6BNkv7stG7VboQ1uRREl6GUdTe9v7nwC2ymFdbL8ns5wHNm0VhZckX00vFoAdCq8";
-const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2024-06-20",
+// Initialize Square
+const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
+const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
+const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? Environment.Production : Environment.Sandbox;
+
+const squareClient = new Client({
+  accessToken: squareAccessToken,
+  environment: squareEnvironment,
 });
 
 // Helper to validate request body using schema
