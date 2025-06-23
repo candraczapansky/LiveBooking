@@ -39,6 +39,8 @@ const MobileSidebar = () => {
   };
 
   console.log("MobileSidebar render - isOpen:", isOpen);
+  console.log("MobileSidebar navigationItems count:", navigationItems.length);
+  console.log("MobileSidebar navigationItems:", navigationItems.map(item => item.label));
 
   return (
     <>
