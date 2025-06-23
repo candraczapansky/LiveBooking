@@ -133,39 +133,43 @@ const StaffPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
+      <div className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64">
         <SidebarController />
       </div>
       
-      <div className="lg:ml-64">
+      <div className="lg:pl-64">
         <Header />
         
-        <main className="p-4 md:p-6">
-          <div className="w-full max-w-7xl mx-auto space-y-6">
+        <main className="p-3 lg:p-6">
+          <div className="w-full space-y-4 lg:space-y-6">
             {/* Page Header */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg p-4 md:p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div className="min-w-0 flex-1">
-                  <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100 truncate">Staff</h1>
-                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    Manage your salon staff
-                  </p>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Staff</h1>
+                    <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                      Manage your salon staff
+                    </p>
+                  </div>
+                  <Button onClick={handleAddStaff} size="sm">
+                    <PlusCircle className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">Add</span>
+                  </Button>
                 </div>
-                <Button onClick={handleAddStaff} size="sm" className="ml-4 flex-shrink-0">
-                  <PlusCircle className="h-4 w-4 mr-0 lg:mr-2" />
-                  <span className="hidden lg:inline">Add Staff</span>
-                </Button>
-              </div>
-              
-              <div className="relative max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-                <Input
-                  type="search"
-                  placeholder="Search staff..."
-                  className="pl-8"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+                
+                <div className="w-full">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <Input
+                      type="search"
+                      placeholder="Search staff..."
+                      className="pl-8 w-full"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
             
@@ -179,86 +183,84 @@ const StaffPage = () => {
                 No staff members found. {searchQuery ? 'Try a different search term.' : 'Add your first staff member!'}
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+              <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-6 lg:space-y-0">
                 {filteredStaff?.map((staffMember: StaffMember) => (
-                  <Card key={staffMember.id} className="w-full">
-                    <CardContent className="p-4">
-                      <div className="flex items-start space-x-4">
-                        <Avatar className="h-12 w-12 flex-shrink-0">
-                          {staffMember.photoUrl ? (
-                            <img
-                              src={staffMember.photoUrl}
-                              alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                              className="h-full w-full object-cover rounded-full"
-                            />
-                          ) : (
-                            <AvatarFallback className="text-sm">
-                              {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between">
-                            <div className="min-w-0 flex-1">
-                              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
-                                {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                              </h3>
-                              <div className="flex flex-col gap-1 mt-1">
-                                <Badge variant="outline" className="w-fit text-xs">
-                                  {staffMember.title}
-                                </Badge>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {(staffMember.commissionRate * 100).toFixed(0)}% Commission
-                                </span>
-                              </div>
-                            </div>
-                            
-                            <div className="flex space-x-1 flex-shrink-0 ml-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditStaff(staffMember.id)}
-                                className="h-8 w-8 p-0"
-                              >
-                                <Edit className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => openDeleteDialog(staffMember)}
-                                className="h-8 w-8 p-0 text-red-500 hover:text-red-600"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                  <div key={staffMember.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center space-x-3">
+                      <Avatar className="h-10 w-10 lg:h-12 lg:w-12 flex-shrink-0">
+                        {staffMember.photoUrl ? (
+                          <img
+                            src={staffMember.photoUrl}
+                            alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                            className="h-full w-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-sm">
+                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
+                              {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge variant="outline" className="text-xs px-2 py-0">
+                                {staffMember.title}
+                              </Badge>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {(staffMember.commissionRate * 100).toFixed(0)}%
+                              </span>
                             </div>
                           </div>
                           
-                          <div className="mt-3 space-y-1">
-                            <div className="text-xs">
-                              <span className="text-gray-500 dark:text-gray-400">Email:</span>
-                              <span className="ml-2 text-gray-700 dark:text-gray-300 break-all">
-                                {staffMember.user?.email || "-"}
-                              </span>
-                            </div>
-                            <div className="text-xs">
-                              <span className="text-gray-500 dark:text-gray-400">Phone:</span>
-                              <span className="ml-2 text-gray-700 dark:text-gray-300">
-                                {staffMember.user?.phone || "-"}
-                              </span>
-                            </div>
-                            {staffMember.bio && (
-                              <div className="text-xs mt-2">
-                                <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                                  {staffMember.bio}
-                                </p>
-                              </div>
-                            )}
+                          <div className="flex space-x-1 ml-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditStaff(staffMember.id)}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openDeleteDialog(staffMember)}
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
                           </div>
                         </div>
+                        
+                        <div className="mt-2 space-y-1">
+                          <div className="text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">Email:</span>
+                            <span className="ml-1 text-gray-700 dark:text-gray-300 text-xs break-all">
+                              {staffMember.user?.email || "-"}
+                            </span>
+                          </div>
+                          <div className="text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">Phone:</span>
+                            <span className="ml-1 text-gray-700 dark:text-gray-300">
+                              {staffMember.user?.phone || "-"}
+                            </span>
+                          </div>
+                          {staffMember.bio && (
+                            <div className="text-xs mt-1">
+                              <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                                {staffMember.bio}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
