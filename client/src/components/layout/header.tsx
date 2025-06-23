@@ -45,67 +45,65 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="bg-white dark:bg-gray-800 shadow-sm z-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <SimpleMobileMenu />
-            <div className="lg:hidden ml-3">
-              <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+    <header className="bg-white dark:bg-gray-800 shadow-sm z-10 sticky top-0">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-14 sm:h-16">
+          <div className="flex items-center min-w-0">
+            <div className="lg:hidden">
+              <SimpleMobileMenu />
+            </div>
+            <div className="lg:hidden ml-2 sm:ml-3 truncate">
+              <h1 className="text-lg sm:text-xl font-bold text-primary truncate">BeautyBook</h1>
             </div>
           </div>
-          <div className="flex items-center">
-            <div className="ml-4 flex items-center md:ml-6 space-x-2">
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-              </Button>
-              <div className="ml-3 relative">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center space-x-2 p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md">
-                      <span className="hidden md:inline-block text-sm font-medium">
-                        {getFullName(user?.firstName, user?.lastName)}
-                      </span>
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage 
-                          src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
-                          alt="User profile"
-                        />
-                        <AvatarFallback>
-                          {getInitials(user?.firstName, user?.lastName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <ChevronDown className="h-4 w-4 text-gray-500" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuLabel>
-                      <div className="flex flex-col space-y-1">
-                        <p className="text-sm font-medium leading-none">
-                          {getFullName(user?.firstName, user?.lastName)}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user?.email}
-                        </p>
-                      </div>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link href="/settings" className="flex items-center w-full cursor-pointer">
-                        <Settings className="mr-2 h-4 w-4" />
-                        <span>Profile & Settings</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Sign out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
+          <div className="flex items-center space-x-1 sm:space-x-2">
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10">
+              <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
+              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500"></span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-0">
+                  <span className="hidden sm:inline-block text-sm font-medium truncate max-w-24 lg:max-w-none">
+                    {getFullName(user?.firstName, user?.lastName)}
+                  </span>
+                  <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0">
+                    <AvatarImage 
+                      src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
+                      alt="User profile"
+                    />
+                    <AvatarFallback>
+                      {getInitials(user?.firstName, user?.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 hidden sm:block" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">
+                      {getFullName(user?.firstName, user?.lastName)}
+                    </p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {user?.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center w-full cursor-pointer">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Profile & Settings</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>

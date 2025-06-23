@@ -25,14 +25,20 @@ const SimpleMobileMenu = () => {
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
-  const toggleMenu = () => {
+  const toggleMenu = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log("Simple mobile menu toggle, current state:", isOpen);
     const newState = !isOpen;
     setIsOpen(newState);
     console.log("Menu state changed to:", newState);
   };
 
-  const closeMenu = () => {
+  const closeMenu = (e?: React.MouseEvent | React.TouchEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setIsOpen(false);
   };
 
@@ -43,18 +49,22 @@ const SimpleMobileMenu = () => {
       {/* Menu Button */}
       <button 
         onClick={toggleMenu}
+        onTouchStart={(e) => e.preventDefault()}
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: "40px",
-          height: "40px",
+          width: "44px",
+          height: "44px",
           backgroundColor: "transparent",
           border: "none",
-          borderRadius: "6px",
+          borderRadius: "8px",
           cursor: "pointer",
-          padding: "0"
+          padding: "0",
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent"
         }}
+        aria-label="Toggle mobile menu"
       >
         <Menu style={{ width: "24px", height: "24px", color: "#374151" }} />
       </button>
@@ -105,18 +115,22 @@ const SimpleMobileMenu = () => {
               </h2>
               <button
                 onClick={closeMenu}
+                onTouchStart={(e) => e.preventDefault()}
                 style={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: "32px",
-                  height: "32px",
+                  width: "44px",
+                  height: "44px",
                   backgroundColor: "transparent",
                   border: "none",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
                   cursor: "pointer",
-                  padding: "0"
+                  padding: "0",
+                  touchAction: "manipulation",
+                  WebkitTapHighlightColor: "transparent"
                 }}
+                aria-label="Close mobile menu"
               >
                 <X style={{ width: "20px", height: "20px", color: "#6b7280" }} />
               </button>
@@ -144,7 +158,10 @@ const SimpleMobileMenu = () => {
                         fontWeight: "500",
                         textDecoration: "none"
                       }}
-                      onClick={closeMenu}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        closeMenu(e);
+                      }}
                       onMouseEnter={(e) => {
                         if (!isActive) {
                           e.currentTarget.style.backgroundColor = "#f3f4f6";
