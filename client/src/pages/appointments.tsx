@@ -551,9 +551,11 @@ const AppointmentsPage = () => {
 
   if (appointmentsLoading || staffLoading || servicesLoading || usersLoading) {
     return (
-      <div className="flex">
-        <SidebarController />
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <div className="hidden lg:block">
+          <SidebarController />
+        </div>
+        <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
           <Header />
           <main className="flex-1 overflow-auto p-4">
             <div className="animate-pulse">
@@ -572,29 +574,33 @@ const AppointmentsPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
-            <div className="bg-white dark:bg-gray-800 border-b px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
+            <div className="bg-white dark:bg-gray-800 border-b px-4 py-4">
+              <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+                <div className="flex items-center justify-between">
+                  <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
+                  
+                  <Button
+                    onClick={handleAddAppointment}
+                    className="bg-pink-600 hover:bg-pink-700 text-white"
+                    size="sm"
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    <span className="hidden sm:inline">New Appointment</span>
+                    <span className="sm:hidden">New</span>
+                  </Button>
+                </div>
                 
-                <Button
-                  onClick={handleAddAppointment}
-                  className="bg-pink-600 hover:bg-pink-700 text-white"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  New Appointment
-                </Button>
-              </div>
-              
-              <div className="flex items-center space-x-4">
+                <div className="flex flex-wrap items-center gap-2 lg:space-x-4">
                 {/* Date Navigation */}
                 <div className="flex items-center space-x-2">
                   <Button
@@ -620,7 +626,7 @@ const AppointmentsPage = () => {
 
                 {/* View Mode Toggle */}
                 <Select value={viewMode} onValueChange={setViewMode}>
-                  <SelectTrigger className="w-32">
+                  <SelectTrigger className="w-20 lg:w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -630,8 +636,8 @@ const AppointmentsPage = () => {
                   </SelectContent>
                 </Select>
 
-                {/* Zoom Controls */}
-                <div className="flex border rounded-lg overflow-hidden">
+                {/* Zoom Controls - Hidden on mobile */}
+                <div className="hidden lg:flex border rounded-lg overflow-hidden">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -653,8 +659,8 @@ const AppointmentsPage = () => {
                 </div>
                 
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select staff..." />
+                  <SelectTrigger className="w-32 lg:w-48">
+                    <SelectValue placeholder="Staff..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All stylists</SelectItem>
@@ -670,8 +676,8 @@ const AppointmentsPage = () => {
                 </Select>
                 
                 <Select value={selectedService} onValueChange={setSelectedService}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select service..." />
+                  <SelectTrigger className="w-32 lg:w-48">
+                    <SelectValue placeholder="Service..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All services</SelectItem>
