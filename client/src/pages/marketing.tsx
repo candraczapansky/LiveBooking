@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import EmailTemplateEditor from "@/components/email/EmailTemplateEditor";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -135,6 +136,8 @@ const MarketingPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewCampaign, setViewCampaign] = useState<any>(null);
   const [isViewCampaignOpen, setIsViewCampaignOpen] = useState(false);
+  const [emailTemplateDesign, setEmailTemplateDesign] = useState<any>(null);
+  const [emailTemplateHtml, setEmailTemplateHtml] = useState<string>("");
 
 
 

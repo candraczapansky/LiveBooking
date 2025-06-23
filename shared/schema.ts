@@ -352,6 +352,8 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
   audience: text("audience").notNull(), // All Clients, Regular Clients, etc.
   subject: text("subject"), // For email campaigns
   content: text("content").notNull(),
+  htmlContent: text("html_content"), // Generated HTML from Unlayer
+  templateDesign: text("template_design"), // Unlayer design JSON as text
   sendDate: timestamp("send_date"),
   status: text("status").notNull().default("draft"), // draft, scheduled, sent, failed
   sentCount: integer("sent_count").default(0),

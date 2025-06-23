@@ -1085,35 +1085,23 @@ export class DatabaseStorage implements IStorage {
 
   // Marketing Campaign operations
   async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
-    const id = this.currentMarketingCampaignId++;
-    const newCampaign: MarketingCampaign = {
-      id,
-      name: campaign.name,
-      type: campaign.type,
-      audience: campaign.audience,
-      subject: campaign.subject || null,
-      content: campaign.content,
-      sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
-      status: campaign.status || "draft",
-      sentCount: campaign.sentCount || 0,
-      deliveredCount: campaign.deliveredCount || 0,
-      failedCount: campaign.failedCount || 0,
-      openedCount: campaign.openedCount || 0,
-      clickedCount: campaign.clickedCount || 0,
-      unsubscribedCount: campaign.unsubscribedCount || 0,
-      createdAt: new Date(),
-      sentAt: null,
-    };
-    this.marketingCampaigns.set(id, newCampaign);
+    const [newCampaign] = await db
+      .insert(marketingCampaigns)
+      .values({
+        ...campaign,
+        sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
+      })
+      .returning();
     return newCampaign;
   }
 
   async getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined> {
-    return this.marketingCampaigns.get(id);
+    const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+    return campaign || undefined;
   }
 
   async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
-    return Array.from(this.marketingCampaigns.values());
+    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
   }
 
   async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
