@@ -139,7 +139,7 @@ export default function EmailTemplateEditor({
             }
           }
         }}
-        style={{ height: '80vh', minHeight: '700px' }}
+        style={{ height: '100%', minHeight: '700px' }}
       />
       <div className="mt-4 flex justify-end">
         <button

@@ -1250,6 +1250,54 @@ const MarketingPage = () => {
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Email Template Editor Modal */}
+      <Dialog open={showEmailEditor} onOpenChange={setShowEmailEditor}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0">
+          <div className="flex flex-col h-full">
+            <div className="flex items-center justify-between p-4 border-b">
+              <DialogTitle>Email Template Editor</DialogTitle>
+              <Button
+                variant="outline"
+                onClick={() => setShowEmailEditor(false)}
+                className="h-8 w-8 p-0"
+              >
+                ×
+              </Button>
+            </div>
+            <div className="flex-1 p-4">
+              <EmailTemplateEditor
+                onDesignChange={setEmailTemplateDesign}
+                onHtmlChange={(html) => {
+                  setEmailTemplateHtml(html);
+                  campaignForm.setValue("content", html);
+                }}
+                initialDesign={emailTemplateDesign}
+                className="h-full"
+              />
+            </div>
+            <div className="flex justify-end gap-2 p-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowEmailEditor(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowEmailEditor(false);
+                  toast({
+                    title: "Template saved",
+                    description: "Email template has been saved to your campaign.",
+                  });
+                }}
+              >
+                Save & Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
