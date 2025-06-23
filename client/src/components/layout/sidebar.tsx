@@ -49,7 +49,7 @@ const Sidebar = () => {
     console.log('Sidebar render state:', { isOpen, isMobile });
   }, [isOpen, isMobile]);
 
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out ${
+  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-red-500 shadow-xl transform transition-transform duration-300 ease-in-out ${
     isOpen ? "translate-x-0" : "-translate-x-full"
   }`;
 

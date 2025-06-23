@@ -49,25 +49,7 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
 
   const toggleSidebar = () => {
     console.log('toggleSidebar called, current isOpen:', isOpen);
-    const newState = !isOpen;
-    setIsOpen(newState);
-    
-    // Prevent overlay from immediately closing on mobile
-    if (isMobile && newState) {
-      setTimeout(() => {
-        document.addEventListener('click', handleOutsideClick, true);
-      }, 100);
-    } else {
-      document.removeEventListener('click', handleOutsideClick, true);
-    }
-  };
-
-  const handleOutsideClick = (event: MouseEvent) => {
-    const sidebar = document.querySelector('.sidebar');
-    if (sidebar && !sidebar.contains(event.target as Node)) {
-      setIsOpen(false);
-      document.removeEventListener('click', handleOutsideClick, true);
-    }
+    setIsOpen(!isOpen);
   };
 
   const closeSidebar = () => {
