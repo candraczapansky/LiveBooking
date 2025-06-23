@@ -49,9 +49,12 @@ const Sidebar = () => {
     console.log('Sidebar render state:', { isOpen, isMobile });
   }, [isOpen, isMobile]);
 
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-red-500 shadow-xl transform transition-transform duration-300 ease-in-out ${
-    isOpen ? "translate-x-0" : "-translate-x-full"
-  }`;
+  // For mobile, show/hide based on isOpen. For desktop, always show.
+  const sidebarClass = isMobile 
+    ? `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-red-500 shadow-xl transition-all duration-300 ${
+        isOpen ? "block translate-x-0" : "hidden -translate-x-full"
+      }`
+    : "sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl";
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
@@ -69,9 +72,11 @@ const Sidebar = () => {
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
+  console.log('Sidebar DOM element about to render:', { sidebarClass, isOpen });
+
   return (
     <div className={sidebarClass} onClick={(e) => e.stopPropagation()}>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full bg-blue-500">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
