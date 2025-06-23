@@ -81,13 +81,14 @@ const MobileSidebar = () => {
               backgroundColor: "white",
               boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
               display: "flex",
-              flexDirection: "column"
+              flexDirection: "column",
+              maxHeight: "100vh"
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col h-full max-h-screen">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center justify-between p-4 border-b flex-shrink-0">
                 <h2 className="text-lg font-semibold">BeautyBook</h2>
                 <Button variant="ghost" size="icon" onClick={closeSidebar}>
                   <X className="h-5 w-5" />
@@ -95,8 +96,8 @@ const MobileSidebar = () => {
               </div>
 
               {/* Navigation */}
-              <nav className="flex-1 p-4 overflow-y-auto">
-                <div className="space-y-2">
+              <nav className="flex-1 p-4 overflow-y-auto min-h-0">
+                <div className="space-y-2 pb-4">
                   {navigationItems.map((item) => (
                     <Link key={item.href} href={item.href}>
                       <div 
@@ -116,7 +117,7 @@ const MobileSidebar = () => {
               </nav>
 
               {/* Footer */}
-              <div className="p-4 border-t">
+              <div className="p-4 border-t flex-shrink-0">
                 <Button 
                   variant="ghost" 
                   className="w-full justify-start text-destructive"
