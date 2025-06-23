@@ -1161,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Amount and payment source are required" });
       }
 
-      const paymentsApi = squareClient.payments;
+      const paymentsApi = squareClient.paymentsApi;
       
       const requestBody = {
         sourceId: sourceId,
@@ -1174,7 +1174,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceId: appointmentId?.toString() || ""
       };
 
-      const { result } = await squareClient.paymentsApi.createPayment(requestBody);
+      const { result } = await paymentsApi.createPayment(requestBody);
 
       res.json({ 
         payment: result.payment,
@@ -1235,8 +1235,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const paymentsApi = squareClient.payments;
-      const { result } = await squareClient.paymentsApi.getPayment(paymentId);
+      const { paymentsApi } = squareClient;
+      const { result } = await paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
@@ -1925,7 +1925,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = user.squareCustomerId;
       
       if (!customerId) {
-        const customersApi = squareClient.customers;
+        const { customersApi } = squareClient;
         
         const requestBody = {
           givenName: user.firstName || '',
@@ -1934,12 +1934,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phoneNumber: user.phone || ''
         };
 
-        const { result } = await customersApi.createCustomer({
-          givenName: requestBody.givenName,
-          familyName: requestBody.familyName,
-          emailAddress: requestBody.emailAddress,
-          phoneNumber: requestBody.phoneNumber
-        });
+        const { result } = await customersApi.createCustomer(requestBody);
         customerId = result.customer?.id;
         
         if (customerId) {
@@ -1971,7 +1966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cardsApi } = squareClient;
       
       const requestBody = {
-        cardNonce: cardNonce,
+        sourceId: cardNonce,
         card: {
           customerId: customerId
         }
