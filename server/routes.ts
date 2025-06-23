@@ -50,9 +50,7 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken || '',
-  },
+  accessToken: squareAccessToken || '',
   environment: squareEnvironment,
 });
 
@@ -1161,7 +1159,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Amount and payment source are required" });
       }
 
-      const { paymentsApi } = squareClient;
+      const paymentsApi = squareClient.payments;
       
       const requestBody = {
         sourceId: sourceId,
@@ -1235,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const { paymentsApi } = squareClient;
+      const paymentsApi = squareClient.payments;
       const { result } = await paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
@@ -1925,7 +1923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = user.squareCustomerId;
       
       if (!customerId) {
-        const { customersApi } = squareClient;
+        const customersApi = squareClient.customers;
         
         const requestBody = {
           givenName: user.firstName || '',
@@ -2025,7 +2023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Disable card in Square
-      const { cardsApi } = squareClient;
+      const cardsApi = squareClient.cards;
       await cardsApi.disableCard(paymentMethod.squareCardId, {});
       
       // Delete from database

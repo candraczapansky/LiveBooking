@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements, useStripe, useElements, CardElement } from "@stripe/react-stripe-js";
+// Square Web SDK will be loaded via script tag
 
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -41,37 +40,18 @@ import { apiRequest } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-// Initialize Stripe
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+// Square payment configuration
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
+const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
 
-// Card element styling
-const CARD_ELEMENT_OPTIONS = {
-  style: {
-    base: {
-      fontSize: '16px',
-      color: '#424770',
-      '::placeholder': {
-        color: '#aab7c4',
-      },
-    },
-    invalid: {
-      color: '#9e2146',
-    },
-  },
-};
-
-// Payment form component
+// Payment form component using Square Web SDK
 const PaymentForm = ({ total, onSuccess, onError }: { 
   total: number; 
   onSuccess: () => void; 
   onError: (error: string) => void; 
 }) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const [isLoading, setIsLoading] = useState(false);
+  const [cardNonce, setCardNonce] = useState<string | null>(null);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
