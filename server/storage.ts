@@ -121,8 +121,8 @@ export interface IStorage {
   deleteSavedPaymentMethod(id: number): Promise<boolean>;
   setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean>;
 
-  // User Stripe operations
-  updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User>;
+  // User Square operations
+  updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User>;
 
   // Gift Card operations
   createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard>;
@@ -515,7 +515,7 @@ export class DatabaseStorage implements IStorage {
       city: insertUser.city || null,
       state: insertUser.state || null,
       zipCode: insertUser.zipCode || null,
-      stripeCustomerId: insertUser.stripeCustomerId || null,
+      squareCustomerId: insertUser.squareCustomerId || null,
       emailAccountManagement: insertUser.emailAccountManagement ?? true,
       emailAppointmentReminders: insertUser.emailAppointmentReminders ?? true,
       emailPromotions: insertUser.emailPromotions ?? false,
@@ -979,8 +979,8 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  async updateUserStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User> {
-    return this.updateUser(userId, { stripeCustomerId });
+  async updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User> {
+    return this.updateUser(userId, { squareCustomerId });
   }
 
   // Gift Card operations

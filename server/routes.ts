@@ -1150,33 +1150,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment routes for appointment checkout and POS
-  app.post("/api/create-payment-intent", async (req, res) => {
+  // Square payment routes for appointment checkout and POS
+  app.post("/api/create-payment", async (req, res) => {
     try {
-      const { amount, appointmentId, description, type = "appointment_payment" } = req.body;
+      const { amount, appointmentId, description, type = "appointment_payment", sourceId } = req.body;
       
-      if (!amount) {
-        return res.status(400).json({ error: "Amount is required" });
+      if (!amount || !sourceId) {
+        return res.status(400).json({ error: "Amount and payment source are required" });
       }
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
-        currency: "usd",
-        metadata: {
-          appointmentId: appointmentId?.toString() || "",
-          type: type
+      const { paymentsApi } = squareClient;
+      
+      const requestBody = {
+        sourceId: sourceId,
+        amountMoney: {
+          amount: BigInt(Math.round(amount * 100)), // Convert to cents
+          currency: 'USD'
         },
-        description: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment")
-      });
+        idempotencyKey: `${Date.now()}-${Math.random()}`,
+        note: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
+        referenceId: appointmentId?.toString() || ""
+      };
+
+      const { result } = await paymentsApi.createPayment(requestBody);
 
       res.json({ 
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id
+        payment: result.payment,
+        paymentId: result.payment?.id
       });
     } catch (error: any) {
-      console.error('Payment intent creation error:', error);
+      console.error('Square payment creation error:', error);
       res.status(500).json({ 
-        error: "Error creating payment intent: " + error.message 
+        error: "Error creating payment: " + error.message 
       });
     }
   });
@@ -1899,8 +1904,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  // Setup SetupIntent for saving cards
-  app.post("/api/create-setup-intent", async (req, res) => {
+  // Create Square customer for saving cards
+  app.post("/api/create-square-customer", async (req, res) => {
     try {
       const { clientId } = req.body;
       
@@ -1908,54 +1913,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Client ID is required" });
       }
 
-      // Get or create Stripe customer
+      // Get or create Square customer
       const user = await storage.getUser(clientId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
 
-      let customerId = user.stripeCustomerId;
+      let customerId = user.squareCustomerId;
       
       if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: user.email,
-          name: `${user.firstName} ${user.lastName}`,
-        });
-        customerId = customer.id;
-        await storage.updateUserStripeCustomerId(clientId, customerId);
+        const { customersApi } = squareClient;
+        
+        const requestBody = {
+          givenName: user.firstName || '',
+          familyName: user.lastName || '',
+          emailAddress: user.email,
+          phoneNumber: user.phone || ''
+        };
+
+        const { result } = await customersApi.createCustomer(requestBody);
+        customerId = result.customer?.id;
+        
+        if (customerId) {
+          await storage.updateUserSquareCustomerId(clientId, customerId);
+        }
       }
 
-      const setupIntent = await stripe.setupIntents.create({
-        customer: customerId,
-        payment_method_types: ['card'],
-      });
-
       res.json({ 
-        clientSecret: setupIntent.client_secret,
-        customerId: customerId
+        customerId: customerId,
+        applicationId: squareApplicationId
       });
     } catch (error: any) {
-      console.error('Setup intent creation error:', error);
+      console.error('Square customer creation error:', error);
       res.status(500).json({ 
-        error: "Error creating setup intent: " + error.message 
+        error: "Error creating Square customer: " + error.message 
       });
     }
   });
 
-  // Save payment method after successful setup
-  app.post("/api/save-payment-method", async (req, res) => {
+  // Save Square card after successful tokenization
+  app.post("/api/save-square-card", async (req, res) => {
     try {
-      const { paymentMethodId, clientId } = req.body;
+      const { cardNonce, customerId, clientId } = req.body;
       
-      if (!paymentMethodId || !clientId) {
-        return res.status(400).json({ error: "Payment method ID and client ID are required" });
+      if (!cardNonce || !customerId || !clientId) {
+        return res.status(400).json({ error: "Card nonce, customer ID, and client ID are required" });
       }
 
-      // Get payment method details from Stripe
-      const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+      const { cardsApi } = squareClient;
       
-      if (!paymentMethod.card) {
-        return res.status(400).json({ error: "Invalid payment method" });
+      const requestBody = {
+        cardNonce: cardNonce,
+        card: {
+          customerId: customerId
+        }
+      };
+
+      const { result } = await cardsApi.createCard(requestBody);
+      
+      if (!result.card) {
+        return res.status(400).json({ error: "Failed to create card" });
       }
 
       // Check if this is the first payment method for this client
@@ -1965,19 +1982,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save to database
       const savedMethod = await storage.createSavedPaymentMethod({
         clientId: clientId,
-        stripePaymentMethodId: paymentMethodId,
-        cardBrand: paymentMethod.card.brand,
-        cardLast4: paymentMethod.card.last4,
-        cardExpMonth: paymentMethod.card.exp_month,
-        cardExpYear: paymentMethod.card.exp_year,
+        squareCardId: result.card.id!,
+        cardBrand: result.card.cardBrand || 'unknown',
+        cardLast4: result.card.last4 || '0000',
+        cardExpMonth: result.card.expMonth || 12,
+        cardExpYear: result.card.expYear || new Date().getFullYear(),
         isDefault: isDefault
       });
 
       res.json(savedMethod);
     } catch (error: any) {
-      console.error('Save payment method error:', error);
+      console.error('Save Square card error:', error);
       res.status(500).json({ 
-        error: "Error saving payment method: " + error.message 
+        error: "Error saving Square card: " + error.message 
       });
     }
   });
