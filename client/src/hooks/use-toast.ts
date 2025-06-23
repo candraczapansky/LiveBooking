@@ -6,7 +6,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 5000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -130,6 +130,14 @@ const listeners: Array<(state: State) => void> = []
 
 let memoryState: State = { toasts: [] }
 
+// Force clear all toasts immediately
+function clearAllToasts() {
+  memoryState = { toasts: [] };
+  listeners.forEach((listener) => {
+    listener(memoryState);
+  });
+}
+
 function dispatch(action: Action) {
   memoryState = reducer(memoryState, action)
   listeners.forEach((listener) => {
@@ -173,11 +181,20 @@ function useToast() {
 
   React.useEffect(() => {
     listeners.push(setState)
+    
+    // Listen for clear all toasts event
+    const handleClearToasts = () => {
+      clearAllToasts();
+    };
+    
+    window.addEventListener('clear-all-toasts', handleClearToasts);
+    
     return () => {
       const index = listeners.indexOf(setState)
       if (index > -1) {
         listeners.splice(index, 1)
       }
+      window.removeEventListener('clear-all-toasts', handleClearToasts);
     }
   }, [state])
 

@@ -142,9 +142,18 @@ function useAuth() {
 function App() {
   const auth = useAuth();
 
-  // Clear any cached achievement data on app start
+  // Clear any cached achievement data and toasts on app start
   React.useEffect(() => {
     localStorage.removeItem("easterEggs");
+    // Force clear all browser storage related to toasts/achievements
+    Object.keys(localStorage).forEach(key => {
+      if (key.includes('toast') || key.includes('achievement') || key.includes('easter')) {
+        localStorage.removeItem(key);
+      }
+    });
+    // Clear any existing toast notifications
+    const event = new CustomEvent('clear-all-toasts');
+    window.dispatchEvent(event);
   }, []);
 
   return (
