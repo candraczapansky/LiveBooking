@@ -45,9 +45,13 @@ const Sidebar = () => {
   const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
 
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-sidebar-background shadow-lg transform transition-transform ${
+  useEffect(() => {
+    console.log('Sidebar render state:', { isOpen, isMobile });
+  }, [isOpen, isMobile]);
+
+  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 ease-in-out ${
     isOpen ? "translate-x-0" : "-translate-x-full"
-  } ${isMobile ? "lg:relative lg:translate-x-0" : ""}`;
+  }`;
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
