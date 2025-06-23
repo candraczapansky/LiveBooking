@@ -20,7 +20,7 @@ import {
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -1179,78 +1179,98 @@ export class DatabaseStorage implements IStorage {
 
   // User filtering for campaigns
   async getUsersByAudience(audience: string): Promise<User[]> {
-    const allUsers = Array.from(this.users.values());
-    
     switch (audience) {
       case "All Clients":
-        return allUsers.filter(user => user.role === "client");
-      case "Regular Clients":
-        // Users with more than 3 appointments
+        return await db.select().from(users).where(eq(users.role, "client"));
+        
+      case "Regular Clients": {
+        // Users with more than 3 appointments - simplified approach
+        const allClients = await db.select().from(users).where(eq(users.role, "client"));
         const regularClients = [];
-        for (const user of allUsers) {
-          if (user.role === "client") {
-            const userAppointments = Array.from(this.appointments.values()).filter(
-              appointment => appointment.clientId === user.id
-            );
-            if (userAppointments.length > 3) {
-              regularClients.push(user);
-            }
+        
+        for (const client of allClients) {
+          const appointmentCount = await db
+            .select({ count: count() })
+            .from(appointments)
+            .where(eq(appointments.clientId, client.id));
+          
+          if (appointmentCount[0]?.count > 3) {
+            regularClients.push(client);
           }
         }
         return regularClients;
-      case "New Clients":
-        // Users with 3 or fewer appointments
+      }
+        
+      case "New Clients": {
+        // Users with 3 or fewer appointments - simplified approach
+        const allClients = await db.select().from(users).where(eq(users.role, "client"));
         const newClients = [];
-        for (const user of allUsers) {
-          if (user.role === "client") {
-            const userAppointments = Array.from(this.appointments.values()).filter(
-              appointment => appointment.clientId === user.id
-            );
-            if (userAppointments.length <= 3) {
-              newClients.push(user);
-            }
+        
+        for (const client of allClients) {
+          const appointmentCount = await db
+            .select({ count: count() })
+            .from(appointments)
+            .where(eq(appointments.clientId, client.id));
+          
+          if ((appointmentCount[0]?.count || 0) <= 3) {
+            newClients.push(client);
           }
         }
         return newClients;
-      case "Inactive Clients":
+      }
+        
+      case "Inactive Clients": {
         // Users with no appointments in the last 60 days
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        
+        const allClients = await db.select().from(users).where(eq(users.role, "client"));
         const inactiveClients = [];
-        for (const user of allUsers) {
-          if (user.role === "client") {
-            const recentAppointments = Array.from(this.appointments.values()).filter(
-              appointment => 
-                appointment.clientId === user.id && 
-                new Date(appointment.startTime) > sixtyDaysAgo
-            );
-            if (recentAppointments.length === 0) {
-              inactiveClients.push(user);
-            }
+        
+        for (const client of allClients) {
+          const recentAppointments = await db
+            .select({ count: count() })
+            .from(appointments)
+            .where(and(
+              eq(appointments.clientId, client.id),
+              gte(appointments.startTime, sixtyDaysAgo)
+            ));
+          
+          if ((recentAppointments[0]?.count || 0) === 0) {
+            inactiveClients.push(client);
           }
         }
         return inactiveClients;
-      case "Upcoming Appointments":
+      }
+        
+      case "Upcoming Appointments": {
         // Users with appointments in the next 7 days
         const nextWeek = new Date();
         nextWeek.setDate(nextWeek.getDate() + 7);
+        const now = new Date();
+        
+        const allClients = await db.select().from(users).where(eq(users.role, "client"));
         const upcomingClients = [];
-        for (const user of allUsers) {
-          if (user.role === "client") {
-            const upcomingAppointments = Array.from(this.appointments.values()).filter(
-              appointment => 
-                appointment.clientId === user.id && 
-                new Date(appointment.startTime) <= nextWeek &&
-                new Date(appointment.startTime) > new Date()
-            );
-            if (upcomingAppointments.length > 0) {
-              upcomingClients.push(user);
-            }
+        
+        for (const client of allClients) {
+          const upcomingAppointments = await db
+            .select({ count: count() })
+            .from(appointments)
+            .where(and(
+              eq(appointments.clientId, client.id),
+              gte(appointments.startTime, now),
+              lte(appointments.startTime, nextWeek)
+            ));
+          
+          if ((upcomingAppointments[0]?.count || 0) > 0) {
+            upcomingClients.push(client);
           }
         }
         return upcomingClients;
+      }
+        
       default:
-        return allUsers.filter(user => user.role === "client");
+        return await db.select().from(users).where(eq(users.role, "client"));
     }
   }
 
