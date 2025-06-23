@@ -26,12 +26,16 @@ const SimpleMobileMenu = () => {
 
   const toggleMenu = () => {
     console.log("Simple mobile menu toggle, current state:", isOpen);
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    setIsOpen(newState);
+    console.log("Menu state changed to:", newState);
   };
 
   const closeMenu = () => {
     setIsOpen(false);
   };
+
+  console.log("SimpleMobileMenu render - isOpen:", isOpen);
 
   return (
     <>
@@ -53,6 +57,22 @@ const SimpleMobileMenu = () => {
       >
         <Menu style={{ width: "24px", height: "24px", color: "#374151" }} />
       </button>
+
+      {/* Debug element */}
+      {isOpen && (
+        <div style={{
+          position: "fixed",
+          top: "50px",
+          left: "10px",
+          backgroundColor: "red",
+          color: "white",
+          padding: "10px",
+          zIndex: 999999,
+          fontSize: "12px"
+        }}>
+          MENU IS OPEN
+        </div>
+      )}
 
       {/* Overlay and Menu */}
       {isOpen && (
