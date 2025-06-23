@@ -47,14 +47,24 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [isToggling, setIsToggling] = useState(false);
+
   const toggleSidebar = () => {
-    console.log('toggleSidebar called, current isOpen:', isOpen);
-    const newState = !isOpen;
+    console.log('toggleSidebar called, current isOpen:', isOpen, 'isToggling:', isToggling);
     
-    // Use setTimeout to ensure state change completes before any other handlers
+    // Prevent rapid toggling
+    if (isToggling) {
+      console.log('Ignoring toggle - already in progress');
+      return;
+    }
+    
+    setIsToggling(true);
+    setIsOpen(!isOpen);
+    
+    // Reset toggle flag after a short delay
     setTimeout(() => {
-      setIsOpen(newState);
-    }, 10);
+      setIsToggling(false);
+    }, 300);
   };
 
   const closeSidebar = () => {
