@@ -709,7 +709,7 @@ const MarketingPage = () => {
       
       {/* Campaign Form Dialog */}
       <Dialog open={isCampaignFormOpen} onOpenChange={setIsCampaignFormOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Campaign</DialogTitle>
             <DialogDescription>
@@ -1133,7 +1133,7 @@ const MarketingPage = () => {
       
       {/* Promo Form Dialog */}
       <Dialog open={isPromoFormOpen} onOpenChange={setIsPromoFormOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Promo Code</DialogTitle>
             <DialogDescription>
