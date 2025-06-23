@@ -151,9 +151,44 @@ function App() {
         localStorage.removeItem(key);
       }
     });
+    
+    // Aggressively remove any persistent overlay elements
+    const removeOverlays = () => {
+      // Remove any elements containing achievement text
+      const selectors = [
+        '[data-state="open"]',
+        '[role="status"]',
+        '[data-sonner-toast]',
+        '.toast',
+        '.notification',
+        '.overlay',
+        '.achievement',
+        '.modal'
+      ];
+      
+      selectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          if (el.textContent?.includes('Achievement') || 
+              el.textContent?.includes('Meet the Team') ||
+              el.textContent?.includes('staff management') ||
+              el.textContent?.includes('points')) {
+            el.remove();
+          }
+        });
+      });
+    };
+    
+    // Run immediately and on interval to catch any delayed overlays
+    removeOverlays();
+    const interval = setInterval(removeOverlays, 100);
+    
     // Clear any existing toast notifications
     const event = new CustomEvent('clear-all-toasts');
     window.dispatchEvent(event);
+    
+    // Cleanup
+    return () => clearInterval(interval);
   }, []);
 
   return (
