@@ -184,7 +184,10 @@ export default function SettingsMobile() {
               borderRadius: "8px",
               border: "1px solid #e5e7eb",
               marginBottom: "24px",
-              padding: "24px"
+              padding: "24px",
+              display: "block",
+              visibility: "visible",
+              minHeight: "200px"
             }}>
               <h2 style={{ 
                 fontSize: "18px", 
@@ -299,7 +302,10 @@ export default function SettingsMobile() {
               borderRadius: "8px",
               border: "1px solid #e5e7eb",
               marginBottom: "24px",
-              padding: "24px"
+              padding: "24px",
+              display: "block",
+              visibility: "visible",
+              minHeight: "200px"
             }}>
               <h2 style={{ 
                 fontSize: "18px", 
