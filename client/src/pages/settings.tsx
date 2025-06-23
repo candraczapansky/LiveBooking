@@ -14,6 +14,7 @@ import { useMutation } from "@tanstack/react-query";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import { useEasterEgg } from "@/contexts/EasterEggContext";
 import { 
   Bell, 
   Moon, 
@@ -534,15 +535,46 @@ export default function Settings() {
           <CardContent className="space-y-6">
             {/* Profile Picture */}
             <div className="flex items-center space-x-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage
+              <div style={{
+                width: "80px",
+                height: "80px",
+                borderRadius: "50%",
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "#f3f4f6",
+                border: "2px solid #e5e7eb"
+              }}>
+                <img
                   src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"}
                   alt="Profile picture"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    objectPosition: "center"
+                  }}
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = "none";
+                    const fallback = target.nextElementSibling as HTMLElement;
+                    if (fallback) fallback.style.display = "flex";
+                  }}
                 />
-                <AvatarFallback className="text-lg">
+                <div style={{
+                  display: "none",
+                  width: "100%",
+                  height: "100%",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "18px",
+                  fontWeight: "600",
+                  color: "#6b7280"
+                }}>
                   {user?.firstName?.[0]}{user?.lastName?.[0]}
-                </AvatarFallback>
-              </Avatar>
+                </div>
+              </div>
               <div>
                 <h3 className="font-medium">{user?.firstName} {user?.lastName}</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
