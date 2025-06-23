@@ -320,30 +320,42 @@ const MarketingPage = () => {
   // Create promo code mutation
   const createPromoCodeMutation = useMutation({
     mutationFn: async (promoData: PromoFormValues) => {
+      console.log('Making API call with data:', promoData);
+      
+      const payload = {
+        code: promoData.code,
+        type: promoData.type,
+        value: promoData.value,
+        service: promoData.service || null,
+        usageLimit: promoData.usageLimit,
+        active: promoData.active,
+        expirationDate: promoData.expirationDate,
+      };
+      
+      console.log('API payload:', payload);
+      
       const response = await fetch('/api/promo-codes', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          code: promoData.code,
-          type: promoData.type,
-          value: promoData.value,
-          service: promoData.service || null,
-          usageLimit: promoData.usageLimit,
-          active: promoData.active,
-          expirationDate: promoData.expirationDate,
-        }),
+        body: JSON.stringify(payload),
       });
+      
+      console.log('API response status:', response.status);
       
       if (!response.ok) {
         const error = await response.json();
+        console.log('API error response:', error);
         throw new Error(error.error || 'Failed to create promo code');
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('API success response:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Mutation success, closing dialog and resetting form');
       queryClient.invalidateQueries({ queryKey: ['/api/promo-codes'] });
       toast({
         title: "Promo code created",
@@ -353,6 +365,7 @@ const MarketingPage = () => {
       promoForm.reset();
     },
     onError: (error: any) => {
+      console.log('Mutation error:', error);
       toast({
         title: "Error creating promo code",
         description: error.message || "Failed to create promo code",
@@ -446,6 +459,15 @@ const MarketingPage = () => {
 
 
   const onPromoSubmit = (data: PromoFormValues) => {
+    console.log('Form submission data:', data);
+    console.log('Form errors:', promoForm.formState.errors);
+    
+    // Prevent multiple submissions
+    if (createPromoCodeMutation.isPending) {
+      console.log('Submission already in progress, skipping...');
+      return;
+    }
+    
     createPromoCodeMutation.mutate(data);
   };
 
