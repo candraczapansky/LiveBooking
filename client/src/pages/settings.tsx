@@ -527,14 +527,15 @@ export default function Settings() {
                 </CardContent>
               </Card>
 
-              {/* Text Color Settings */}
-              <Card>
+              {/* Text Color Settings - TEST MARKER */}
+              <Card className="border-4 border-red-500 bg-yellow-100">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
+                  <CardTitle className="flex items-center text-red-600">
                     <Type className="h-5 w-5 mr-2" />
-                    Text Color
+                    🎨 TEXT COLOR SECTION - YOU SHOULD SEE THIS! 🎨
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-red-800 font-bold">
+                    *** THIS IS THE TEXT COLOR FEATURE YOU REQUESTED ***
                     Customize the main font color for all text throughout the application.
                   </CardDescription>
                 </CardHeader>
