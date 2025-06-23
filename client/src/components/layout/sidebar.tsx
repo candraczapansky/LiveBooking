@@ -18,7 +18,8 @@ import {
   Menu,
   MapPin,
   Monitor,
-  DollarSign
+  DollarSign,
+  Zap
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,7 @@ const Sidebar = () => {
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
+    { icon: <Zap />, label: "Automations", href: "/automations" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
