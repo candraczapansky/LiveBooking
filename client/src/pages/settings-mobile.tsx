@@ -75,13 +75,75 @@ export default function SettingsMobile() {
     setDarkMode(savedDarkMode);
     setCustomColor(savedCustomColor);
     setSecondaryColor(savedSecondaryColor);
+    
   }, []);
+
+  const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
+    const root = document.documentElement;
+    
+    // Convert hex to HSL for CSS custom properties
+    const hexToHsl = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      
+      return {
+        h: Math.round(h * 360),
+        s: Math.round(s * 100),
+        l: Math.round(l * 100)
+      };
+    };
+    
+    const { h, s, l } = hexToHsl(primaryColor);
+    
+    // Apply primary color variations
+    root.style.setProperty('--primary', `${h} ${s}% ${l}%`);
+    root.style.setProperty('--primary-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
+    
+    // Generate complementary colors
+    root.style.setProperty('--accent', `${h} ${Math.max(s - 10, 0)}% ${Math.min(l + 10, 95)}%`);
+    root.style.setProperty('--accent-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
+    
+    // Apply dark/light mode
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      root.style.setProperty('--background', '222 84% 4%');
+      root.style.setProperty('--foreground', '210 40% 98%');
+      root.style.setProperty('--card', '222 84% 4%');
+      root.style.setProperty('--card-foreground', '210 40% 98%');
+    } else {
+      document.documentElement.classList.remove('dark');
+      root.style.setProperty('--background', '0 0% 100%');
+      root.style.setProperty('--foreground', '222 84% 4%');
+      root.style.setProperty('--card', '0 0% 100%');
+      root.style.setProperty('--card-foreground', '222 84% 4%');
+    }
+  };
 
   const handleSaveAppearance = () => {
     localStorage.setItem('theme', selectedTheme);
     localStorage.setItem('customColor', customColor);
     localStorage.setItem('secondaryColor', secondaryColor);
     localStorage.setItem('darkMode', darkMode.toString());
+    
+    // Apply the colors immediately
+    applyThemeColors(customColor, darkMode);
     
     if (customColor !== '#3b82f6' || secondaryColor !== '#6b7280' || selectedTheme !== 'blue') {
       checkEasterEgg("theme_master");
