@@ -124,7 +124,7 @@ type PromoFormValues = z.infer<typeof promoFormSchema>;
 const MarketingPage = () => {
   useDocumentTitle("Marketing | BeautyBook");
   const { toast } = useToast();
-  const { checkEasterEgg } = useEasterEgg();
+
   const [location, setLocation] = useLocation();
   
   const [activeTab, setActiveTab] = useState("campaigns");
@@ -136,10 +136,7 @@ const MarketingPage = () => {
   const [viewCampaign, setViewCampaign] = useState<any>(null);
   const [isViewCampaignOpen, setIsViewCampaignOpen] = useState(false);
 
-  // Track marketing page visit
-  useEffect(() => {
-    checkEasterEgg("marketing_maven");
-  }, [checkEasterEgg]);
+
 
   useEffect(() => {
     const checkSidebarState = () => {

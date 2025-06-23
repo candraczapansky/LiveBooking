@@ -42,7 +42,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function SettingsMobile() {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
-  const { checkEasterEgg } = useEasterEgg();
+
   const [darkMode, setDarkMode] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -115,10 +115,7 @@ export default function SettingsMobile() {
     }
   };
 
-  // Track settings page visit
-  useEffect(() => {
-    checkEasterEgg("settings_guru");
-  }, [checkEasterEgg]);
+
 
   useEffect(() => {
     const savedProfilePicture = localStorage.getItem('profilePicture');
@@ -149,9 +146,7 @@ export default function SettingsMobile() {
     // Apply the colors immediately
     applyThemeColors(customColor, darkMode);
     
-    if (customColor !== '#3b82f6' || secondaryColor !== '#6b7280' || selectedTheme !== 'blue') {
-      checkEasterEgg("theme_master");
-    }
+
     
     toast({
       title: "Appearance saved",
@@ -202,7 +197,7 @@ export default function SettingsMobile() {
         window.location.reload();
       }
       
-      checkEasterEgg("profile_perfectionist");
+
       
       toast({
         title: "Profile updated",

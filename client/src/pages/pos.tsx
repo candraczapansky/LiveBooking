@@ -187,13 +187,10 @@ export default function PointOfSale() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const { toast } = useToast();
-  const { checkEasterEgg } = useEasterEgg();
+
   const queryClient = useQueryClient();
 
-  // Track POS page visit
-  useEffect(() => {
-    checkEasterEgg("pos_pioneer");
-  }, [checkEasterEgg]);
+
 
   // Tax rate (8.5%)
   const TAX_RATE = 0.085;

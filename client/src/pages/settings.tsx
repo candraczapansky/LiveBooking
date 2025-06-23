@@ -47,7 +47,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
-  const { checkEasterEgg } = useEasterEgg();
+
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('blue');
@@ -158,10 +158,7 @@ export default function Settings() {
     }
   }, [user]);
 
-  // Track settings page visit
-  useEffect(() => {
-    checkEasterEgg("settings_guru");
-  }, [checkEasterEgg]);
+
 
   useEffect(() => {
     const checkSidebarState = () => {
