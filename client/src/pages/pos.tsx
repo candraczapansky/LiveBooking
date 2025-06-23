@@ -351,20 +351,20 @@ export default function PointOfSale() {
   ) || [];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className="flex-1 flex flex-col lg:ml-64">
         <Header />
         
-        <main className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
-          <div className="max-w-7xl mx-auto h-full">
-            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
+          <div className="w-full max-w-none sm:max-w-7xl mx-auto">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
               
               {/* Services Selection Panel */}
-              <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex flex-col min-w-0">
                 <div className="mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
@@ -402,7 +402,7 @@ export default function PointOfSale() {
                 </div>
 
                 {/* Services/Products Grid */}
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 min-h-0">
                   {activeTab === 'services' ? (
                     servicesLoading ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">

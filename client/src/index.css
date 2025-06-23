@@ -259,6 +259,23 @@ body {
     margin: 0 !important;
     width: 100% !important;
   }
+
+  /* Point of Sale specific mobile fixes */
+  .flex[class*="h-screen"] {
+    min-height: 100vh !important;
+    height: auto !important;
+  }
+
+  .flex[class*="h-full"] {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* Ensure all pages can scroll properly */
+  main {
+    min-height: calc(100vh - 4rem) !important;
+    overflow-y: auto !important;
+  }
 }
 
 :root {

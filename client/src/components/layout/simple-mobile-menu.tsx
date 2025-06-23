@@ -33,14 +33,11 @@ const SimpleMobileMenu = () => {
     
     if (isAnimating) return;
     
-    console.log("Simple mobile menu toggle, current state:", isOpen);
     setIsAnimating(true);
-    const newState = !isOpen;
-    setIsOpen(newState);
-    console.log("Menu state changed to:", newState);
+    setIsOpen(prev => !prev);
     
     setTimeout(() => setIsAnimating(false), 300);
-  }, [isOpen, isAnimating]);
+  }, [isAnimating]);
 
   const closeMenu = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (e) {
