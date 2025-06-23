@@ -411,32 +411,32 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {filteredServices.map((service: Service) => (
                           <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                            <CardContent className="p-3 sm:p-4">
                               <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-semibold text-lg">{service.name}</h3>
-                                <Badge variant="secondary">{service.category}</Badge>
+                                <h3 className="font-semibold text-base sm:text-lg">{service.name}</h3>
+                                <Badge variant="secondary" className="text-xs">{service.category}</Badge>
                               </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
                                 {service.description}
                               </p>
                               <div className="flex justify-between items-center">
                                 <div>
-                                  <span className="text-lg font-bold text-primary">
+                                  <span className="text-base sm:text-lg font-bold text-primary">
                                     ${service.price.toFixed(2)}
                                   </span>
-                                  <span className="text-sm text-gray-500 ml-2">
+                                  <span className="text-xs sm:text-sm text-gray-500 ml-2">
                                     {service.duration}min
                                   </span>
                                 </div>
                                 <Button
                                   size="sm"
                                   onClick={() => addServiceToCart(service)}
-                                  className="flex items-center gap-1"
+                                  className="flex items-center gap-1 text-xs sm:text-sm"
                                 >
-                                  <Plus className="h-4 w-4" />
+                                  <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                                   Add
                                 </Button>
                               </div>
@@ -447,10 +447,10 @@ export default function PointOfSale() {
                     )
                   ) : (
                     productsLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
-                            <CardContent className="p-4">
+                            <CardContent className="p-3 sm:p-4">
                               <div className="h-4 bg-gray-200 rounded mb-2"></div>
                               <div className="h-3 bg-gray-200 rounded mb-4"></div>
                               <div className="h-6 bg-gray-200 rounded"></div>
@@ -459,19 +459,19 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {filteredProducts.map((product: Product) => (
                           <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
-                            <CardContent className="p-4">
+                            <CardContent className="p-3 sm:p-4">
                               <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-semibold text-lg">{product.name}</h3>
-                                <Badge variant="secondary">{product.category}</Badge>
+                                <h3 className="font-semibold text-base sm:text-lg">{product.name}</h3>
+                                <Badge variant="secondary" className="text-xs">{product.category}</Badge>
                               </div>
-                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
                                 {product.description}
                               </p>
                               <div className="flex justify-between items-center mb-2">
-                                <span className="text-lg font-bold text-primary">
+                                <span className="text-base sm:text-lg font-bold text-primary">
                                   ${product.price.toFixed(2)}
                                 </span>
                                 <div className="text-right">
@@ -484,10 +484,10 @@ export default function PointOfSale() {
                               <Button
                                 size="sm"
                                 onClick={() => addProductToCart(product)}
-                                className="flex items-center gap-1 w-full"
+                                className="flex items-center gap-1 w-full text-xs sm:text-sm"
                                 disabled={product.stockQuantity <= 0}
                               >
-                                <Plus className="h-4 w-4" />
+                                <Plus className="h-3 w-3 sm:h-4 sm:w-4" />
                                 {product.stockQuantity <= 0 ? 'Out of Stock' : 'Add to Cart'}
                               </Button>
                             </CardContent>
