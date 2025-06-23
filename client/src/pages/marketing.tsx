@@ -327,13 +327,12 @@ const MarketingPage = () => {
         },
         body: JSON.stringify({
           code: promoData.code,
-          description: `${promoData.type === 'percentage' ? promoData.value + '%' : '$' + promoData.value} off${promoData.service ? ' ' + promoData.service : ' all services'}`,
-          discountType: promoData.type,
-          discountValue: promoData.value,
-          minimumAmount: null,
+          type: promoData.type,
+          value: promoData.value,
+          service: promoData.service || null,
           usageLimit: promoData.usageLimit,
           active: promoData.active,
-          expirationDate: new Date(promoData.expirationDate),
+          expirationDate: promoData.expirationDate,
         }),
       });
       
@@ -699,9 +698,10 @@ const MarketingPage = () => {
                             </div>
                           </div>
                           <CardDescription>
-                            {promo.description || (promo.discountType === "percentage" 
-                              ? `${promo.discountValue}% off` 
-                              : `$${promo.discountValue?.toFixed(2)} off`)}
+                            {promo.type === "percentage" 
+                              ? `${promo.value}% off` 
+                              : `$${promo.value?.toFixed(2)} off`}
+                            {promo.service ? ` ${promo.service}` : " all services"}
                           </CardDescription>
                         </CardHeader>
                         
