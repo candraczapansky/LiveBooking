@@ -50,7 +50,9 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
 const squareClient = new SquareClient({
-  accessToken: squareAccessToken,
+  bearerAuthCredentials: {
+    accessToken: squareAccessToken,
+  },
   environment: squareEnvironment,
 });
 
@@ -1234,7 +1236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Retrieve payment to verify it was successful
       const paymentsApi = squareClient.payments;
-      const { result } = await paymentsApi.retrievePayment(paymentId);
+      const { result } = await squareClient.paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
