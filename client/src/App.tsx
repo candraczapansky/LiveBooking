@@ -142,63 +142,14 @@ function useAuth() {
 function App() {
   const auth = useAuth();
 
-  // Clear any cached achievement data and toasts on app start
+  // Simple cleanup on app start
   React.useEffect(() => {
-    // Nuclear option - clear ALL localStorage and sessionStorage
+    // Clear any achievement-related localStorage
     try {
-      localStorage.clear();
-      sessionStorage.clear();
+      localStorage.removeItem("easterEggs");
     } catch (e) {
-      console.log('Storage clear failed:', e);
+      // Ignore errors
     }
-    
-    // Clear any indexedDB
-    if ('indexedDB' in window) {
-      indexedDB.databases().then(databases => {
-        databases.forEach(db => {
-          if (db.name) {
-            indexedDB.deleteDatabase(db.name);
-          }
-        });
-      }).catch(console.error);
-    }
-    
-    // Clear service worker cache
-    if ('caches' in window) {
-      caches.keys().then(names => {
-        names.forEach(name => {
-          caches.delete(name);
-        });
-      });
-    }
-    
-    // Simple cleanup without complex DOM manipulation
-    const cleanup = () => {
-      try {
-        // Just remove any remaining toasts quietly
-        const toasts = document.querySelectorAll('[data-sonner-toast], [data-state="open"]');
-        toasts.forEach(toast => {
-          if (toast.textContent?.includes('Achievement') || toast.textContent?.includes('Meet the Team')) {
-            toast.remove();
-          }
-        });
-      } catch (e) {
-        // Ignore errors
-      }
-    };
-    
-    // Run cleanup once
-    setTimeout(cleanup, 100);
-    
-    // Clear any existing toast notifications
-    const event = new CustomEvent('clear-all-toasts');
-    window.dispatchEvent(event);
-    
-    // Cleanup
-    return () => {
-      clearInterval(interval);
-      observer.disconnect();
-    };
   }, []);
 
   return (
