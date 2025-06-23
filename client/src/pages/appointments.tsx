@@ -663,7 +663,7 @@ const AppointmentsPage = () => {
                   
                   <Button
                     onClick={handleAddAppointment}
-                    className="bg-pink-600 hover:bg-pink-700 text-white"
+                    className="bg-pink-600 hover:bg-pink-700 text-white relative z-10"
                     size="sm"
                   >
                     <PlusCircle className="mr-2 h-4 w-4" />
