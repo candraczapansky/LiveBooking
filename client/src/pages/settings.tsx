@@ -52,7 +52,12 @@ export default function Settings() {
   // Theme states
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true' || document.documentElement.classList.contains('dark');
+      const savedDarkMode = localStorage.getItem('darkMode');
+      if (savedDarkMode !== null) {
+        return savedDarkMode === 'true';
+      }
+      // Check if dark mode is already applied
+      return document.documentElement.classList.contains('dark');
     }
     return false;
   });
@@ -122,8 +127,21 @@ export default function Settings() {
 
   // Effects
   useEffect(() => {
+    // Apply the saved dark mode on component mount
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    if (savedDarkMode !== darkMode) {
+      setDarkMode(savedDarkMode);
+    }
+    document.documentElement.classList.toggle('dark', savedDarkMode);
+  }, []);
+
+  useEffect(() => {
+    // Apply dark mode changes
     document.documentElement.classList.toggle('dark', darkMode);
     localStorage.setItem('darkMode', darkMode.toString());
+    
+    // Force a re-render of the body background
+    document.body.className = document.body.className;
   }, [darkMode]);
 
   useEffect(() => {
