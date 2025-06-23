@@ -667,7 +667,7 @@ const AppointmentsPage = () => {
                     className="bg-pink-600 hover:bg-pink-700 text-white relative z-10"
                     size="sm"
                   >
-                    <PlusCircle className="mr-2 h-4 w-4 !text-gray-900 dark:!text-gray-100" />
+                    <PlusCircle className="mr-2 h-4 w-4" style={{ color: '#111827' }} />
                     <span className="hidden sm:inline">New Appointment</span>
                     <span className="sm:hidden">New</span>
                   </Button>
