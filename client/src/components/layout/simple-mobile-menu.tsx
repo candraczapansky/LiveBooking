@@ -1,4 +1,5 @@
-import { useState, useContext } from "react";
+import { useState, useContext, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Menu, LayoutDashboard, Calendar, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Settings, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
@@ -58,24 +59,8 @@ const SimpleMobileMenu = () => {
         <Menu style={{ width: "24px", height: "24px", color: "#374151" }} />
       </button>
 
-      {/* Debug element */}
-      {isOpen && (
-        <div style={{
-          position: "fixed",
-          top: "50px",
-          left: "10px",
-          backgroundColor: "red",
-          color: "white",
-          padding: "10px",
-          zIndex: 999999,
-          fontSize: "12px"
-        }}>
-          MENU IS OPEN
-        </div>
-      )}
-
-      {/* Overlay and Menu */}
-      {isOpen && (
+      {/* Mobile Menu Overlay */}
+      {isOpen && createPortal(
         <div
           style={{
             position: "fixed",
@@ -86,7 +71,8 @@ const SimpleMobileMenu = () => {
             zIndex: 999999,
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             width: "100vw",
-            height: "100vh"
+            height: "100vh",
+            display: "block"
           }}
           onClick={closeMenu}
         >
@@ -210,7 +196,8 @@ const SimpleMobileMenu = () => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
