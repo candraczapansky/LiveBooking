@@ -32,11 +32,9 @@ type SidebarItemProps = {
 
 const SidebarItem = ({ icon, label, href, isActive }: SidebarItemProps) => {
   return (
-    <Link href={href}>
-      <a className={`sidebar-item ${isActive ? 'active' : ''}`}>
-        <span className="w-5 h-5 mr-3 text-primary">{icon}</span>
-        {label}
-      </a>
+    <Link href={href} className={`sidebar-item ${isActive ? 'active' : ''}`}>
+      <span className="w-5 h-5 mr-3 text-primary">{icon}</span>
+      {label}
     </Link>
   );
 };

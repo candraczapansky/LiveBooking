@@ -350,18 +350,18 @@ export default function PointOfSale() {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
         
-        <main className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-hidden bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto h-full">
-            <div className="flex flex-col lg:flex-row gap-6 h-full">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 h-full">
               
               {/* Services Selection Panel */}
               <div className="flex-1 flex flex-col">
-                <div className="mb-6">
-                  <div className="flex justify-between items-center mb-4">
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
+                <div className="mb-4 sm:mb-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
                     <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
                       <Button
                         size="sm"
@@ -399,10 +399,10 @@ export default function PointOfSale() {
                 <div className="flex-1 overflow-y-auto">
                   {activeTab === 'services' ? (
                     servicesLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
-                            <CardContent className="p-4">
+                            <CardContent className="p-3 sm:p-4">
                               <div className="h-4 bg-gray-200 rounded mb-2"></div>
                               <div className="h-3 bg-gray-200 rounded mb-4"></div>
                               <div className="h-6 bg-gray-200 rounded"></div>
@@ -549,10 +549,10 @@ export default function PointOfSale() {
                         </div>
                       ) : (
                         cart.map((item) => (
-                          <div key={`${item.type}-${item.item.id}`} className="flex items-center gap-3 p-3 border rounded-lg">
+                          <div key={`${item.type}-${item.item.id}`} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg">
                             <div className="flex-1">
-                              <h4 className="font-medium">{item.item.name}</h4>
-                              <p className="text-sm text-gray-600">${item.item.price.toFixed(2)} each</p>
+                              <h4 className="font-medium text-sm sm:text-base">{item.item.name}</h4>
+                              <p className="text-xs sm:text-sm text-gray-600">${item.item.price.toFixed(2)} each</p>
                               {item.type === 'service' && (
                                 <p className="text-xs text-gray-500">{(item.item as Service).duration}min</p>
                               )}
@@ -560,33 +560,37 @@ export default function PointOfSale() {
                                 <p className="text-xs text-gray-500">Stock: {(item.item as Product).stockQuantity}</p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity - 1)}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-8 text-center">{item.quantity}</span>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity + 1)}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => removeFromCart(item.item.id, item.type)}
-                                className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                            <div className="text-right">
-                              <p className="font-semibold">${item.total.toFixed(2)}</p>
+                            <div className="flex items-center justify-between sm:justify-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity - 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="w-8 text-center text-sm">{item.quantity}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity + 1)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => removeFromCart(item.item.id, item.type)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-sm sm:text-base">${item.total.toFixed(2)}</p>
+                              </div>
                             </div>
                           </div>
                         ))
@@ -598,16 +602,16 @@ export default function PointOfSale() {
                       <>
                         <Separator className="mb-4" />
                         <div className="space-y-2 mb-4">
-                          <div className="flex justify-between">
+                          <div className="flex justify-between text-sm sm:text-base">
                             <span>Subtotal:</span>
                             <span>${getSubtotal().toFixed(2)}</span>
                           </div>
-                          <div className="flex justify-between text-sm text-gray-600">
+                          <div className="flex justify-between text-xs sm:text-sm text-gray-600">
                             <span>Tax ({(TAX_RATE * 100).toFixed(1)}%):</span>
                             <span>${getTax().toFixed(2)}</span>
                           </div>
                           <Separator />
-                          <div className="flex justify-between font-bold text-lg">
+                          <div className="flex justify-between font-bold text-base sm:text-lg">
                             <span>Total:</span>
                             <span>${getGrandTotal().toFixed(2)}</span>
                           </div>
@@ -642,7 +646,7 @@ export default function PointOfSale() {
 
       {/* Checkout Dialog */}
       <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Process Payment</DialogTitle>
             <DialogDescription>
