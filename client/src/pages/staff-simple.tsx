@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEasterEgg } from "@/contexts/EasterEggContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,7 +36,13 @@ const StaffPageSimple = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const { toast } = useToast();
+  const { checkEasterEgg } = useEasterEgg();
   const queryClient = useQueryClient();
+
+  // Track staff page visit
+  useEffect(() => {
+    checkEasterEgg("staff_explorer");
+  }, [checkEasterEgg]);
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ['/api/staff'],

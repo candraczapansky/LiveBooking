@@ -47,6 +47,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function Settings() {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
+  const { checkEasterEgg } = useEasterEgg();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [selectedTheme, setSelectedTheme] = useState('blue');
@@ -156,6 +157,11 @@ export default function Settings() {
       root.style.setProperty('--muted-foreground', hslSecondaryColor); // Update muted text color
     }
   }, [user]);
+
+  // Track settings page visit
+  useEffect(() => {
+    checkEasterEgg("settings_guru");
+  }, [checkEasterEgg]);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -406,6 +412,11 @@ export default function Settings() {
     localStorage.setItem('secondaryColor', secondaryColor);
     localStorage.setItem('darkMode', darkMode.toString());
     localStorage.setItem('savedPresets', JSON.stringify(savedPresets));
+    
+    // Track theme customization achievement
+    if (customColor !== '#3b82f6' || secondaryColor !== '#6b7280' || selectedTheme !== 'blue') {
+      checkEasterEgg("theme_master");
+    }
     
     toast({
       title: "Appearance saved",

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import { useEasterEgg } from "@/contexts/EasterEggContext";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -123,6 +124,7 @@ type PromoFormValues = z.infer<typeof promoFormSchema>;
 const MarketingPage = () => {
   useDocumentTitle("Marketing | BeautyBook");
   const { toast } = useToast();
+  const { checkEasterEgg } = useEasterEgg();
   const [location, setLocation] = useLocation();
   
   const [activeTab, setActiveTab] = useState("campaigns");
