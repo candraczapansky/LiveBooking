@@ -142,6 +142,11 @@ function useAuth() {
 function App() {
   const auth = useAuth();
 
+  // Clear any cached achievement data on app start
+  React.useEffect(() => {
+    localStorage.removeItem("easterEggs");
+  }, []);
+
   return (
     <AuthContext.Provider value={auth}>
       <QueryClientProvider client={queryClient}>
