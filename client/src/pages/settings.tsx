@@ -477,16 +477,41 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div style={{
+      display: "flex",
+      height: "100vh",
+      width: "100vw",
+      backgroundColor: "#f9fafb",
+      overflow: "hidden"
+    }}>
       <SidebarController />
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        width: "100%",
+        marginLeft: 0,
+        overflow: "hidden"
+      }}>
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-2xl mx-auto space-y-6">
+        <main style={{
+          flex: 1,
+          height: "calc(100vh - 64px)",
+          width: "100%",
+          overflow: "auto",
+          WebkitOverflowScrolling: "touch",
+          backgroundColor: "#f9fafb",
+          padding: "16px"
+        }}>
+          <div style={{
+            maxWidth: "768px",
+            margin: "0 auto",
+            width: "100%",
+            minHeight: "calc(100vh - 96px)"
+          }}>
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Profile & Settings</h1>
               <p className="text-gray-600 dark:text-gray-400">

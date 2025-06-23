@@ -49,6 +49,11 @@ const Sidebar = () => {
     console.log('Sidebar render state:', { isOpen, isMobile });
   }, [isOpen, isMobile]);
 
+  // Don't render original sidebar on mobile - SimpleMobileMenu handles mobile navigation
+  if (isMobile) {
+    return null;
+  }
+
   // For mobile, show/hide based on isOpen. For desktop, always show.
   const sidebarClass = isMobile 
     ? `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-red-500 shadow-xl transition-all duration-300 ${
