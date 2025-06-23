@@ -183,7 +183,7 @@ const MarketingPage = () => {
       type: "email",
       audience: "",
       subject: "",
-      content: "",
+      content: "Please create an email template using the editor above.",
       sendDate: "",
       sendNow: false,
     },
@@ -802,24 +802,33 @@ const MarketingPage = () => {
               
               {campaignForm.watch("type") === "email" ? (
                 <div className="space-y-4">
-                  <FormLabel>Email Template</FormLabel>
-                  <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      Create professional email templates with our visual editor
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={() => setShowEmailEditor(true)}
-                      className="w-full"
-                    >
-                      Open Email Template Editor
-                    </Button>
-                    {emailTemplateHtml && (
-                      <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                        ✓ Email template created
-                      </p>
+                  <FormField
+                    control={campaignForm.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Template</FormLabel>
+                        <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                            Create professional email templates with our visual editor
+                          </p>
+                          <Button
+                            type="button"
+                            onClick={() => setShowEmailEditor(true)}
+                            className="w-full"
+                          >
+                            Open Email Template Editor
+                          </Button>
+                          {emailTemplateHtml && (
+                            <p className="text-xs text-green-600 dark:text-green-400 mt-2">
+                              ✓ Email template created
+                            </p>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </div>
+                  />
                 </div>
               ) : (
                 <FormField
@@ -894,6 +903,12 @@ const MarketingPage = () => {
                 <Button 
                   type="submit" 
                   disabled={createCampaignMutation.isPending}
+                  onClick={(e) => {
+                    console.log("Create Campaign button clicked");
+                    console.log("Form is valid:", campaignForm.formState.isValid);
+                    console.log("Form errors:", campaignForm.formState.errors);
+                    console.log("Form values:", campaignForm.getValues());
+                  }}
                 >
                   {createCampaignMutation.isPending ? "Creating..." : "Create Campaign"}
                 </Button>
