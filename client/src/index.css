@@ -371,7 +371,7 @@ body {
   --sidebar-border: 220 13% 91%;
   --sidebar-ring: 330 81% 60%;
   
-  /* Dropdown colors */
+  /* Dropdown colors - will be updated by JavaScript */
   --dropdown-selected: 330 81% 60%;
   --dropdown-selected-foreground: 210 40% 98%;
   

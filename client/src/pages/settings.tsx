@@ -133,6 +133,17 @@ export default function Settings() {
       setDarkMode(savedDarkMode);
     }
     document.documentElement.classList.toggle('dark', savedDarkMode);
+    
+    // Apply saved colors on component mount
+    const savedPrimaryColor = localStorage.getItem('primaryColor') || '#8b5cf6';
+    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#f3f4f6';
+    
+    const hsl = hexToHsl(savedPrimaryColor);
+    document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
+    const secondaryHsl = hexToHsl(savedSecondaryColor);
+    document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
   }, []);
 
   useEffect(() => {
@@ -151,6 +162,10 @@ export default function Settings() {
     // Apply custom color to CSS custom properties
     const hsl = hexToHsl(customColor);
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
+    // Also update dropdown colors to match the primary color
+    document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--dropdown-selected-foreground', '210 40% 98%');
     
     const secondaryHsl = hexToHsl(secondaryColor);
     document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
