@@ -122,48 +122,43 @@ export default function Settings() {
 
   // Effects
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', darkMode);
-    localStorage.setItem('darkMode', darkMode.toString());
+    if (typeof window !== 'undefined') {
+      if (darkMode) {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('darkMode', 'true');
+      } else {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('darkMode', 'false');
+      }
+    }
   }, [darkMode]);
 
   useEffect(() => {
-    localStorage.setItem('primaryColor', customColor);
-    localStorage.setItem('secondaryColor', secondaryColor);
-    
-    // Apply custom color to CSS custom properties
+    const root = document.documentElement;
     const hsl = hexToHsl(customColor);
-    document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    
-    const secondaryHsl = hexToHsl(secondaryColor);
-    document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
-  }, [customColor, secondaryColor]);
+    root.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    root.style.setProperty('--primary-foreground', hsl.l > 50 ? '0 0% 0%' : '0 0% 100%');
+    localStorage.setItem('primaryColor', customColor);
+  }, [customColor]);
 
-  // Apply text colors on mount and when they change
   useEffect(() => {
-    document.documentElement.style.setProperty('--text-primary', textColor);
-    document.documentElement.style.setProperty('--text-secondary', textColorSecondary);
-  }, [textColor, textColorSecondary]);
+    const root = document.documentElement;
+    const hsl = hexToHsl(secondaryColor);
+    root.style.setProperty('--foreground', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    localStorage.setItem('secondaryColor', secondaryColor);
+  }, [secondaryColor]);
 
-  // Color conversion utility
+  // Helper functions
   function hexToHsl(hex: string): { h: number; s: number; l: number } {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    if (!result) {
-      return { h: 0, s: 0, l: 0 };
-    }
-
-    let r = parseInt(result[1], 16) / 255;
-    let g = parseInt(result[2], 16) / 255;
-    let b = parseInt(result[3], 16) / 255;
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
 
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
-    let h = 0;
-    let s = 0;
-    const l = (max + min) / 2;
+    let h = 0, s = 0, l = (max + min) / 2;
 
-    if (max === min) {
-      h = s = 0;
-    } else {
+    if (max !== min) {
       const d = max - min;
       s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
       switch (max) {
@@ -233,7 +228,7 @@ export default function Settings() {
   };
 
   const deletePrimaryColorPreset = (presetName: string) => {
-    const updatedPresets = savedPresets.filter((preset: any) => preset.name !== presetName);
+    const updatedPresets = savedPresets.filter(preset => preset.name !== presetName);
     setSavedPresets(updatedPresets);
     localStorage.setItem('colorPresets', JSON.stringify(updatedPresets));
     toast({
@@ -243,7 +238,7 @@ export default function Settings() {
   };
 
   const deleteSecondaryColorPreset = (presetName: string) => {
-    const updatedPresets = savedSecondaryPresets.filter((preset: any) => preset.name !== presetName);
+    const updatedPresets = savedSecondaryPresets.filter(preset => preset.name !== presetName);
     setSavedSecondaryPresets(updatedPresets);
     localStorage.setItem('secondaryColorPresets', JSON.stringify(updatedPresets));
     toast({
@@ -341,6 +336,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-6">
+
               {/* Personal Information */}
               <Card>
                 <CardHeader>
@@ -352,41 +348,44 @@ export default function Settings() {
                     Update your personal details and contact information.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage src="/placeholder-avatar.jpg" />
-                      <AvatarFallback className="text-lg">
-                        {user?.firstName?.[0]}{user?.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Button variant="outline" size="sm">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Change Photo
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        placeholder="Enter your first name"
-                      />
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-4">
+                      <Avatar className="h-20 w-20">
+                        <AvatarImage src="" alt={user?.firstName} />
+                        <AvatarFallback className="text-lg">
+                          {user?.firstName?.[0]?.toUpperCase()}{user?.lastName?.[0]?.toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <Button variant="outline">
+                        <Camera className="h-4 w-4 mr-2" />
+                        Change Photo
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        placeholder="Enter your last name"
-                      />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          placeholder="Enter your first name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          placeholder="Enter your last name"
+                        />
+                      </div>
                     </div>
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
+                      <Label htmlFor="email">Email</Label>
                       <Input
                         id="email"
                         type="email"
@@ -395,8 +394,9 @@ export default function Settings() {
                         placeholder="Enter your email"
                       />
                     </div>
+                    
                     <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="phone">Phone</Label>
                       <Input
                         id="phone"
                         value={phone}
@@ -405,14 +405,10 @@ export default function Settings() {
                       />
                     </div>
                   </div>
-
+                  
                   <Button 
                     onClick={handleSaveProfile} 
-                    className="w-full md:w-auto"
-                    style={{ 
-                      backgroundColor: customColor,
-                      borderColor: customColor
-                    }}
+                    className="w-full mt-4"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     Save Personal Information
@@ -514,18 +510,23 @@ export default function Settings() {
                           {[
                             { name: 'Blue', color: '#3b82f6', value: 'blue' },
                             { name: 'Purple', color: '#8b5cf6', value: 'purple' },
-                            { name: 'Green', color: '#10b981', value: 'emerald' },
-                            { name: 'Orange', color: '#f59e0b', value: 'amber' },
-                            { name: 'Red', color: '#ef4444', value: 'red' },
                             { name: 'Pink', color: '#ec4899', value: 'pink' },
+                            { name: 'Green', color: '#10b981', value: 'green' },
+                            { name: 'Orange', color: '#f97316', value: 'orange' },
+                            { name: 'Red', color: '#ef4444', value: 'red' },
                           ].map((preset) => (
-                            <div key={preset.value} className="text-center">
-                              <div
-                                className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer mx-auto mb-2"
+                            <div
+                              key={preset.value}
+                              className="cursor-pointer group text-center"
+                              onClick={() => handleCustomColorChange(preset.color)}
+                            >
+                              <div 
+                                className="w-8 h-8 mx-auto rounded-full group-hover:scale-110 transition-transform border-2 border-gray-300 dark:border-gray-600"
                                 style={{ backgroundColor: preset.color }}
-                                onClick={() => handleCustomColorChange(preset.color)}
                               />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{preset.name}</span>
+                              <p className="text-xs mt-1 text-gray-600 dark:text-gray-400">
+                                {preset.name}
+                              </p>
                             </div>
                           ))}
                         </div>
@@ -533,32 +534,35 @@ export default function Settings() {
 
                       {/* Saved Primary Color Presets */}
                       {savedPresets.length > 0 && (
-                        <div className="space-y-2">
-                          <Label className="text-base">Saved Primary Color Presets</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {savedPresets.map((preset: any, index: number) => (
-                              <div key={index} className="flex items-center justify-between p-2 border rounded-lg">
-                                <div className="flex items-center space-x-2">
-                                  <div 
-                                    className="w-4 h-4 rounded-full border cursor-pointer"
-                                    style={{ backgroundColor: preset.color }}
-                                    onClick={() => handleCustomColorChange(preset.color)}
-                                  />
-                                  <span className="text-sm font-medium">{preset.name}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
+                        <div className="space-y-4">
+                          <Label className="text-base">Your Saved Colors</Label>
+                          <div className="grid grid-cols-6 gap-3">
+                            {savedPresets.map((preset, index) => (
+                              <div
+                                key={index}
+                                className="group text-center relative"
+                              >
+                                <div 
+                                  className="w-8 h-8 mx-auto rounded-full cursor-pointer group-hover:scale-110 transition-transform border-2 border-gray-300 dark:border-gray-600"
+                                  style={{ backgroundColor: preset.color }}
+                                  onClick={() => handleCustomColorChange(preset.color)}
+                                />
+                                <button
                                   onClick={() => deletePrimaryColorPreset(preset.name)}
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
+                                  className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  title="Delete preset"
                                 >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                                  ×
+                                </button>
+                                <p className="text-xs mt-1 text-gray-600 dark:text-gray-400 truncate">
+                                  {preset.name}
+                                </p>
                               </div>
                             ))}
                           </div>
                         </div>
                       )}
+
 
                     </div>
 
@@ -760,7 +764,7 @@ export default function Settings() {
                 </CardHeader>
                 <CardContent>
                   <Form {...passwordForm}>
-                    <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-6">
+                    <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-4">
                       <FormField
                         control={passwordForm.control}
                         name="currentPassword"
@@ -793,6 +797,7 @@ export default function Settings() {
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={passwordForm.control}
                         name="newPassword"
@@ -825,6 +830,7 @@ export default function Settings() {
                           </FormItem>
                         )}
                       />
+
                       <FormField
                         control={passwordForm.control}
                         name="confirmPassword"
@@ -857,16 +863,14 @@ export default function Settings() {
                           </FormItem>
                         )}
                       />
+
                       <Button 
                         type="submit" 
                         className="w-full"
                         disabled={changePasswordMutation.isPending}
-                        style={{ 
-                          backgroundColor: customColor,
-                          borderColor: customColor
-                        }}
                       >
-                        {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
+                        <Lock className="h-4 w-4 mr-2" />
+                        {changePasswordMutation.isPending ? "Changing Password..." : "Change Password"}
                       </Button>
                     </form>
                   </Form>
@@ -881,143 +885,94 @@ export default function Settings() {
                     Notifications
                   </CardTitle>
                   <CardDescription>
-                    Control how you receive notifications from the platform.
+                    Configure how you want to receive notifications.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base flex items-center">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Email Notifications
-                      </Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive notifications via email
-                      </p>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base flex items-center">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Email Notifications
+                        </Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Receive notifications via email
+                        </p>
+                      </div>
+                      <Switch
+                        checked={emailNotifications}
+                        onCheckedChange={setEmailNotifications}
+                      />
                     </div>
-                    <Switch
-                      checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
-                    />
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base flex items-center">
-                        <Smartphone className="h-4 w-4 mr-2" />
-                        SMS Notifications
-                      </Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive notifications via SMS
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base flex items-center">
+                          <Smartphone className="h-4 w-4 mr-2" />
+                          SMS Notifications
+                        </Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Receive notifications via SMS
+                        </p>
+                      </div>
+                      <Switch
+                        checked={smsNotifications}
+                        onCheckedChange={setSmsNotifications}
+                      />
                     </div>
-                    <Switch
-                      checked={smsNotifications}
-                      onCheckedChange={setSmsNotifications}
-                    />
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Push Notifications</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive push notifications in your browser
-                      </p>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base flex items-center">
+                          <Bell className="h-4 w-4 mr-2" />
+                          Push Notifications
+                        </Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Receive push notifications in your browser
+                        </p>
+                      </div>
+                      <Switch
+                        checked={pushNotifications}
+                        onCheckedChange={setPushNotifications}
+                      />
                     </div>
-                    <Switch
-                      checked={pushNotifications}
-                      onCheckedChange={setPushNotifications}
-                    />
-                  </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Marketing Emails</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive promotional emails and updates
-                      </p>
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label className="text-base flex items-center">
+                          <Mail className="h-4 w-4 mr-2" />
+                          Marketing Emails
+                        </Label>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Receive promotional and marketing emails
+                        </p>
+                      </div>
+                      <Switch
+                        checked={marketingEmails}
+                        onCheckedChange={setMarketingEmails}
+                      />
                     </div>
-                    <Switch
-                      checked={marketingEmails}
-                      onCheckedChange={setMarketingEmails}
-                    />
                   </div>
+                </CardContent>
+              </Card>
 
-                  <Button 
-                    className="w-full"
-                    style={{ 
-                      backgroundColor: customColor,
-                      borderColor: customColor
-                    }}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Preferences
+              {/* Account Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-red-600">Danger Zone</CardTitle>
+                  <CardDescription>
+                    Irreversible and destructive actions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button variant="destructive" className="w-full">
+                    Delete Account
                   </Button>
                 </CardContent>
               </Card>
-
-              {/* Privacy & Security */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Privacy & Security
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your privacy settings and security preferences.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Two-Factor Authentication</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Add an extra layer of security to your account
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Enable
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Profile Visibility</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Control who can see your profile information
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Manage
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Data Export</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Download a copy of your data
-                      </p>
-                    </div>
-                    <Button variant="outline" size="sm">
-                      Export
-                    </Button>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base text-red-600 dark:text-red-400">Delete Account</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Permanently delete your account and all data
-                      </p>
-                    </div>
-                    <Button variant="destructive" size="sm">
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
             </div>
           </div>
         </main>
