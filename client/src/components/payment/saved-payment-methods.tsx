@@ -10,10 +10,7 @@ import { AuthContext } from "@/App";
 import { CreditCard, Plus, Trash2, Star } from "lucide-react";
 import AddPaymentMethod from "./add-payment-method";
 
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
 interface SavedPaymentMethod {
   id: number;

@@ -28,17 +28,13 @@ import {
   StarOff
 } from "lucide-react";
 
-// Make sure to call `loadStripe` outside of a component's render to avoid
-// recreating the `Stripe` object on every render.
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
+// Square payment configuration
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
 interface SavedPaymentMethod {
   id: number;
   clientId: number;
-  stripePaymentMethodId: string;
+  squareCardId: string;
   cardBrand: string;
   cardLast4: string;
   cardExpMonth: number;

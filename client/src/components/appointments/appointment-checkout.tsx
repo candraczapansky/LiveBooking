@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
-import { useStripe, useElements, PaymentElement, Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+// Square payment configuration
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,12 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/utils";
 import { format } from "date-fns";
 
-// Initialize Stripe
-const stripePublicKey = import.meta.env.VITE_STRIPE_PUBLIC_KEY;
-if (!stripePublicKey) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
-const stripePromise = loadStripe(stripePublicKey);
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
 interface AppointmentDetails {
   id: number;
@@ -37,15 +31,14 @@ interface CheckoutFormProps {
 }
 
 const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [cardNonce, setCardNonce] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!stripe || !elements) {
+    if (!cardNonce) {
       return;
     }
 
