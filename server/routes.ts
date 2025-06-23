@@ -1172,7 +1172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceId: appointmentId?.toString() || ""
       };
 
-      const { result } = await paymentsApi.createPayment(requestBody);
+      const { result } = await squareClient.paymentsApi.createPayment(requestBody);
 
       res.json({ 
         payment: result.payment,

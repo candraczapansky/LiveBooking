@@ -56,36 +56,25 @@ const PaymentForm = ({ total, onSuccess, onError }: {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!stripe || !elements) {
+    if (!cardNonce) {
+      onError('Please enter valid card information');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Create payment intent
-      const response = await apiRequest("POST", "/api/create-payment-intent", {
+      const data = await apiRequest("POST", "/api/create-payment", {
         amount: total,
+        sourceId: cardNonce,
         type: "pos_payment",
         description: "Point of Sale Transaction"
       });
-      const { clientSecret } = await response.json();
 
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
-
-      const { error, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: cardElement,
-        },
-      });
-
-      if (error) {
-        onError(error.message || 'Payment failed');
-      } else if (paymentIntent.status === 'succeeded') {
+      if (data.payment) {
         onSuccess();
+      } else {
+        onError('Payment failed');
       }
     } catch (error: any) {
       onError(error.message || 'Payment failed');
@@ -97,11 +86,13 @@ const PaymentForm = ({ total, onSuccess, onError }: {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="p-3 border rounded-md bg-white dark:bg-gray-800">
-        <CardElement options={CARD_ELEMENT_OPTIONS} />
+        <div id="square-card-element" className="min-h-[40px]">
+          {/* Square Card element will be mounted here */}
+        </div>
       </div>
       <Button 
         type="submit" 
-        disabled={!stripe || isLoading}
+        disabled={!cardNonce || isLoading}
         className="w-full"
       >
         {isLoading ? "Processing..." : `Pay $${total.toFixed(2)}`}
@@ -691,30 +682,28 @@ export default function PointOfSale() {
             {paymentMethod === "card" && (
               <div>
                 <label className="text-sm font-medium mb-2 block">Card Information</label>
-                <Elements stripe={stripePromise}>
-                  <PaymentForm
-                    total={getGrandTotal()}
-                    onSuccess={() => {
-                      // Process transaction after successful payment
-                      const transaction = {
-                        clientId: selectedClient?.id,
-                        items: cart,
-                        subtotal: getSubtotal(),
-                        tax: getTax(),
-                        total: getGrandTotal(),
-                        paymentMethod: "card",
-                      };
-                      processTransactionMutation.mutate(transaction);
-                    }}
-                    onError={(error) => {
-                      toast({
-                        title: "Payment Failed",
-                        description: error,
-                        variant: "destructive",
-                      });
-                    }}
-                  />
-                </Elements>
+                <PaymentForm
+                  total={getGrandTotal()}
+                  onSuccess={() => {
+                    // Process transaction after successful payment
+                    const transaction = {
+                      clientId: selectedClient?.id,
+                      items: cart,
+                      subtotal: getSubtotal(),
+                      tax: getTax(),
+                      total: getGrandTotal(),
+                      paymentMethod: "card",
+                    };
+                    processTransactionMutation.mutate(transaction);
+                  }}
+                  onError={(error) => {
+                    toast({
+                      title: "Payment Failed",
+                      description: error,
+                      variant: "destructive",
+                    });
+                  }}
+                />
               </div>
             )}
 
