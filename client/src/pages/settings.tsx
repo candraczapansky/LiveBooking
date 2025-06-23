@@ -483,41 +483,15 @@ export default function Settings() {
   };
 
   return (
-    <div style={{
-      display: "flex",
-      height: "100vh",
-      width: "100vw",
-      backgroundColor: "#f9fafb",
-      overflow: "hidden"
-    }}>
+    <div className="min-h-screen bg-gray-50 mobile-scroll">
       <SidebarController />
       
-      <div style={{
-        flex: 1,
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100%",
-        marginLeft: 0,
-        overflow: "hidden"
-      }}>
+      <div className="lg:ml-64 min-h-screen flex flex-col">
         <Header />
         
-        <main style={{
-          flex: 1,
-          height: "calc(100vh - 64px)",
-          width: "100%",
-          overflow: "auto",
-          WebkitOverflowScrolling: "touch",
-          backgroundColor: "#f9fafb",
-          padding: "16px"
-        }}>
-          <div style={{
-            maxWidth: "768px",
-            margin: "0 auto",
-            width: "100%",
-            minHeight: "calc(100vh - 96px)"
-          }}>
+        <main className="flex-1 bg-gray-50 p-4 pb-safe-area-inset-bottom"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
+          <div className="max-w-3xl mx-auto w-full min-h-screen">
             <div style={{ marginBottom: "24px" }}>
               <h1 style={{ 
                 fontSize: "24px", 
