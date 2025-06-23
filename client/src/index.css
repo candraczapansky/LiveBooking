@@ -20,58 +20,66 @@ body {
   min-height: 100vh;
 }
 
-/* Universal mobile fixes */
-@media (max-width: 1024px) {
-  /* Force all containers to be mobile-friendly */
-  .max-w-7xl, .max-w-6xl, .max-w-5xl, .max-w-4xl, .max-w-3xl, .max-w-2xl {
-    max-width: 100% !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
-  
-  /* Prevent any element from exceeding viewport width */
-  * {
+/* Strict mobile layout enforcement */
+@media (max-width: 768px) {
+  /* Reset everything to mobile-safe defaults */
+  *, *::before, *::after {
     max-width: 100vw !important;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    hyphens: auto;
+    box-sizing: border-box !important;
   }
   
-  /* Force single column layouts on mobile */
-  .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5, .grid-cols-6 {
-    grid-template-columns: 1fr !important;
+  /* Force containers to be mobile-friendly */
+  body, main, section, div, article, aside {
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
   
-  /* Fix flex layouts */
+  /* All grid systems become single column */
+  .grid, [class*="grid-cols"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+  }
+  
+  /* All flex containers wrap */
   .flex {
     flex-wrap: wrap !important;
   }
   
-  /* Text size adjustments */
-  h1 { font-size: 1.5rem !important; }
-  h2 { font-size: 1.25rem !important; }
-  h3 { font-size: 1.125rem !important; }
-  
-  /* Button and input fixes */
-  button, input, select, textarea {
+  /* Force all containers to use mobile padding */
+  .container, [class*="max-w"], .mx-auto {
     max-width: 100% !important;
-    font-size: 16px !important; /* Prevents zoom on iOS */
+    margin-left: 0.75rem !important;
+    margin-right: 0.75rem !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
   
-  /* Card and component spacing */
-  .p-6 { padding: 1rem !important; }
-  .p-8 { padding: 1.5rem !important; }
-  .gap-6 { gap: 1rem !important; }
-  .gap-8 { gap: 1.5rem !important; }
-  
-  /* Table and overflow fixes */
-  table {
-    font-size: 0.875rem !important;
+  /* Text and sizing fixes */
+  h1, h2, h3, h4, h5, h6 {
+    word-break: break-word !important;
+    font-size: clamp(1rem, 4vw, 1.5rem) !important;
   }
   
-  /* Hide elements that cause overflow */
-  .hidden\:lg\:block {
-    display: none !important;
+  /* Form elements */
+  input, select, textarea, button {
+    width: 100% !important;
+    max-width: 100% !important;
+    font-size: 16px !important;
+  }
+  
+  /* Card layouts */
+  [class*="Card"], .card, [class*="rounded"] {
+    width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Sidebar and navigation fixes */
+  [class*="sidebar"], [class*="ml-64"], [class*="pl-64"] {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
   }
 }
 
