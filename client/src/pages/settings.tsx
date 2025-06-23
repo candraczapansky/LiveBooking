@@ -410,10 +410,7 @@ export default function Settings() {
     localStorage.setItem('darkMode', darkMode.toString());
     localStorage.setItem('savedPresets', JSON.stringify(savedPresets));
     
-    // Track theme customization achievement
-    if (customColor !== '#3b82f6' || secondaryColor !== '#6b7280' || selectedTheme !== 'blue') {
-      checkEasterEgg("theme_master");
-    }
+
     
     toast({
       title: "Appearance saved",
