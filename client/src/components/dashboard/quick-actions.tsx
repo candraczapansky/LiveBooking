@@ -49,29 +49,32 @@ const QuickActions = () => {
 
   return (
     <Card>
-      <CardHeader className="px-4 py-5 border-b border-gray-200 dark:border-gray-700">
-        <CardTitle className="text-lg font-medium text-gray-900 dark:text-gray-100">Quick Actions</CardTitle>
+      <CardHeader className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-4 sm:py-5">
+        <CardTitle className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Quick Actions</CardTitle>
       </CardHeader>
-      <CardContent className="p-4 space-y-3">
+      <CardContent className="p-3 sm:p-4 space-y-2 sm:space-y-3">
         <Button 
           onClick={handleNewAppointment}
-          className="w-full flex items-center justify-center"
+          className="w-full flex items-center justify-center h-10 sm:h-auto"
+          size="sm"
         >
           <Plus className="h-4 w-4 mr-2" /> New Appointment
         </Button>
         
         <Button 
           onClick={handleAddClient}
-          className="w-full flex items-center justify-center"
+          className="w-full flex items-center justify-center h-10 sm:h-auto"
           variant="secondary"
+          size="sm"
         >
           <UserPlus className="h-4 w-4 mr-2" /> Add Client
         </Button>
         
         <Button 
           onClick={handleSendPromotion}
-          className="w-full flex items-center justify-center"
+          className="w-full flex items-center justify-center h-10 sm:h-auto"
           variant="outline"
+          size="sm"
         >
           <Megaphone className="h-4 w-4 mr-2" /> Send Promotion
         </Button>

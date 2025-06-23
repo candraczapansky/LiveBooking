@@ -42,16 +42,18 @@ const getNotificationIconBg = (type: string) => {
 
 const NotificationItem = ({ notification }: { notification: Notification }) => {
   return (
-    <li className="py-4">
-      <div className="flex items-start space-x-3">
+    <li className="py-3 sm:py-4">
+      <div className="flex items-start space-x-2 sm:space-x-3">
         <div className="flex-shrink-0">
-          <span className={cn("h-8 w-8 rounded-full flex items-center justify-center", getNotificationIconBg(notification.type))}>
-            {getNotificationIcon(notification.type)}
+          <span className={cn("h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center", getNotificationIconBg(notification.type))}>
+            <div className="h-3 w-3 sm:h-4 sm:w-4">
+              {getNotificationIcon(notification.type)}
+            </div>
           </span>
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm text-gray-900 dark:text-gray-100">{notification.title}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400">{notification.description}</p>
+          <p className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-tight">{notification.title}</p>
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{notification.description}</p>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{notification.timeAgo}</p>
         </div>
       </div>
@@ -94,20 +96,20 @@ const RecentNotifications = () => {
 
   return (
     <Card>
-      <CardHeader className="px-4 py-5 border-b border-gray-200 dark:border-gray-700">
-        <CardTitle className="text-lg font-medium text-gray-900 dark:text-gray-100">Recent Notifications</CardTitle>
+      <CardHeader className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-4 sm:py-5">
+        <CardTitle className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Recent Notifications</CardTitle>
       </CardHeader>
-      <CardContent className="p-4">
+      <CardContent className="p-3 sm:p-4">
         <div className="flow-root">
-          <ul className="-my-4 divide-y divide-gray-200 dark:divide-gray-700">
+          <ul className="-my-3 sm:-my-4 divide-y divide-gray-200 dark:divide-gray-700">
             {notifications.map(notification => (
               <NotificationItem key={notification.id} notification={notification} />
             ))}
           </ul>
         </div>
       </CardContent>
-      <CardFooter className="bg-muted/50 px-4 py-4">
-        <a href="#" className="text-sm font-medium text-primary hover:text-primary/80 transition-colors">
+      <CardFooter className="bg-muted/50 px-3 py-3 sm:px-4 sm:py-4">
+        <a href="#" className="text-xs sm:text-sm font-medium text-primary hover:text-primary/80 transition-colors">
           View all notifications <span aria-hidden="true">→</span>
         </a>
       </CardFooter>

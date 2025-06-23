@@ -79,10 +79,67 @@ const AppointmentsTable = () => {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
-      <div className="px-4 py-5 border-b border-gray-200 dark:border-gray-700 sm:px-6">
-        <h3 className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Today's Schedule</h3>
+      <div className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-6 sm:py-5">
+        <h3 className="text-base sm:text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Today's Schedule</h3>
       </div>
-      <div className="overflow-x-auto">
+      
+      {/* Mobile Card Layout - Hidden on desktop */}
+      <div className="block lg:hidden">
+        {paginatedAppointments?.length === 0 ? (
+          <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+            No appointments scheduled for today
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {paginatedAppointments?.map((appointment: any) => {
+              const service = services?.find((s: any) => s.id === appointment.serviceId);
+              const client = users?.find((u: any) => u.id === appointment.clientId);
+              const staff = users?.find((u: any) => u.id === appointment.staffId);
+              
+              return (
+                <div key={appointment.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-3">
+                        <Avatar className="h-8 w-8 flex-shrink-0">
+                          <AvatarImage src="" alt={client?.firstName || ''} />
+                          <AvatarFallback className="text-xs">
+                            {getInitials(client?.firstName, client?.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {client?.firstName} {client?.lastName}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                            {service?.name || 'Unknown Service'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {formatTime(appointment.startTime)}
+                          </span>
+                          <Badge className={getStatusBadgeStyle(appointment.status)}>
+                            {appointment.status}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {staff?.firstName} {staff?.lastName}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop Table Layout - Hidden on mobile */}
+      <div className="hidden lg:block overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
@@ -156,29 +213,34 @@ const AppointmentsTable = () => {
       </div>
       
       {totalPages > 1 && (
-        <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 sm:px-6">
+        <div className="px-3 py-3 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 sm:px-6">
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-700 dark:text-gray-300">
-              Showing {Math.min((page - 1) * pageSize + 1, totalAppointments)} to {Math.min(page * pageSize, totalAppointments)} of {totalAppointments} appointments
+            <div className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 hidden sm:block">
+              Showing {Math.min((page - 1) * pageSize + 1, totalAppointments)} to {Math.min(page * pageSize, totalAppointments)} of {totalAppointments}
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="text-xs text-gray-700 dark:text-gray-300 sm:hidden">
+              {page} of {totalPages}
+            </div>
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePrevPage}
                 disabled={page === 1}
+                className="h-8 px-2 sm:px-3"
               >
-                <ChevronLeft className="h-4 w-4" />
-                Previous
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline ml-1">Previous</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleNextPage}
                 disabled={page === totalPages}
+                className="h-8 px-2 sm:px-3"
               >
-                Next
-                <ChevronRight className="h-4 w-4" />
+                <span className="hidden sm:inline mr-1">Next</span>
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </div>

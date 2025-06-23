@@ -50,9 +50,9 @@ const StatsOverview = () => {
   const activeMemberships = 0;
 
   return (
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-6 mb-6">
       <StatsCard 
-        icon={<Calendar className="h-5 w-5 text-primary" />}
+        icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />}
         iconBgColor="bg-primary/10"
         title="Today's Appointments"
         value={todayAppointments}
@@ -61,7 +61,7 @@ const StatsOverview = () => {
       />
       
       <StatsCard 
-        icon={<DollarSign className="h-5 w-5 text-secondary" />}
+        icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />}
         iconBgColor="bg-secondary/10"
         title="Revenue Today"
         value={formatPrice(todayRevenue)}
@@ -70,7 +70,7 @@ const StatsOverview = () => {
       />
       
       <StatsCard 
-        icon={<UserPlus className="h-5 w-5 text-accent" />}
+        icon={<UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />}
         iconBgColor="bg-accent/10"
         title="New Clients (Month)"
         value={newClients}
@@ -79,7 +79,7 @@ const StatsOverview = () => {
       />
       
       <StatsCard 
-        icon={<CreditCard className="h-5 w-5 text-pink-600" />}
+        icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-pink-600" />}
         iconBgColor="bg-pink-100"
         title="Active Memberships"
         value={activeMemberships}
