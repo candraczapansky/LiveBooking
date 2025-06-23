@@ -11,7 +11,7 @@ import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
 import Services from "@/pages/services";
 import Clients from "@/pages/clients";
-import Staff from "@/pages/staff";
+import Staff from "@/pages/staff-simple";
 import Rooms from "@/pages/rooms";
 import Devices from "@/pages/devices";
 import Appointments from "@/pages/appointments";

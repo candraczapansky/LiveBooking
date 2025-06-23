@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, PlusCircle, Search } from "lucide-react";
 import Header from "@/components/layout/header";
-import SidebarController from "@/components/layout/sidebar-controller";
-import StaffForm from "@/components/forms/staff-form";
+import Sidebar from "@/components/layout/sidebar";
+import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -90,18 +90,18 @@ const StaffPageSimple = () => {
     }
   };
 
-  const filteredStaff = staff?.filter((staffMember: StaffMember) =>
+  const filteredStaff = Array.isArray(staff) ? staff.filter((staffMember: StaffMember) =>
     getFullName(staffMember.user?.firstName, staffMember.user?.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (staffMember.user?.phone && staffMember.user.phone.includes(searchQuery))
-  );
+  ) : [];
 
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f9fafb", overflow: "hidden" }}>
       {/* Desktop Sidebar */}
       <div style={{ display: "none" }} className="lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
-        <SidebarController />
+        <Sidebar />
       </div>
       
       {/* Main Content */}
