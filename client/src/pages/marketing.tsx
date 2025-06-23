@@ -139,6 +139,7 @@ const MarketingPage = () => {
   const [emailTemplateDesign, setEmailTemplateDesign] = useState<any>(null);
   const [emailTemplateHtml, setEmailTemplateHtml] = useState<string>("");
   const [showEmailEditor, setShowEmailEditor] = useState(false);
+  const emailEditorRef = useRef<EmailTemplateEditorRef>(null);
 
 
 
@@ -1267,6 +1268,7 @@ const MarketingPage = () => {
             </div>
             <div className="flex-1 min-h-0">
               <EmailTemplateEditor
+                ref={emailEditorRef}
                 onDesignChange={setEmailTemplateDesign}
                 onHtmlChange={(html) => {
                   setEmailTemplateHtml(html);
@@ -1285,6 +1287,8 @@ const MarketingPage = () => {
               </Button>
               <Button
                 onClick={() => {
+                  // Export the current design and HTML from the editor before closing
+                  emailEditorRef.current?.exportHtml();
                   setShowEmailEditor(false);
                   toast({
                     title: "Template saved",

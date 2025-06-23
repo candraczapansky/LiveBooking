@@ -499,6 +499,48 @@ body {
   --form-success: var(--success);
 }
 
+/* Email Template Editor Styles */
+.email-template-editor {
+  height: 100% !important;
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.email-template-editor > div {
+  height: 100% !important;
+  flex: 1;
+}
+
+.email-template-editor iframe {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 600px !important;
+}
+
+/* Force Unlayer editor to use full height in dialog */
+[data-radix-dialog-content] .email-template-editor {
+  height: 100% !important;
+}
+
+[data-radix-dialog-content] .email-template-editor > div {
+  height: 100% !important;
+}
+
+[data-radix-dialog-content] .email-template-editor iframe {
+  height: 100% !important;
+}
+
+/* Additional Unlayer editor iframe targeting */
+#unlayer-editor-iframe {
+  height: 100% !important;
+}
+
+/* Ensure the Unlayer wrapper div gets full height */
+.email-template-editor [style*="height"] {
+  height: 100% !important;
+}
+
 /* Enhanced component theming utilities */
 .btn-primary {
   background-color: hsl(var(--button-primary));
