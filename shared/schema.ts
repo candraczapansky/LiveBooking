@@ -16,7 +16,7 @@ export const users = pgTable("users", {
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
-  squareCustomerId: text("square_customer_id"),
+  squareCustomerId: text("stripe_customer_id"),
   // Communication preferences
   emailAccountManagement: boolean("email_account_management").default(true),
   emailAppointmentReminders: boolean("email_appointment_reminders").default(true),
