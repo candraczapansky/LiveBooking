@@ -28,12 +28,16 @@ const MobileSidebar = () => {
 
   const toggleSidebar = () => {
     console.log("Mobile menu toggle clicked, current state:", isOpen);
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    setIsOpen(newState);
+    console.log("Mobile menu new state:", newState);
   };
 
   const closeSidebar = () => {
     setIsOpen(false);
   };
+
+  console.log("MobileSidebar render - isOpen:", isOpen);
 
   return (
     <>
@@ -50,14 +54,14 @@ const MobileSidebar = () => {
       {/* Mobile sidebar overlay */}
       {isOpen && (
         <div 
-          className="fixed inset-0 z-50 lg:hidden"
+          className="mobile-menu-overlay fixed inset-0 lg:hidden"
           style={{ 
             position: "fixed", 
             top: 0, 
             left: 0, 
             right: 0, 
             bottom: 0, 
-            zIndex: 50, 
+            zIndex: 9999, 
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             width: "100vw",
             height: "100vh"
@@ -66,14 +70,14 @@ const MobileSidebar = () => {
         >
           {/* Sidebar */}
           <div 
-            className="fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl"
+            className="mobile-menu-sidebar fixed left-0 top-0 h-full w-64 bg-white dark:bg-gray-800 shadow-xl"
             style={{
               position: "fixed",
               left: 0,
               top: 0,
               width: "256px",
               height: "100vh",
-              zIndex: 51,
+              zIndex: 10000,
               maxWidth: "256px"
             }}
             onClick={(e) => e.stopPropagation()}

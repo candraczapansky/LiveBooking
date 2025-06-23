@@ -51,9 +51,9 @@ body {
   }
   
   /* Exception for mobile overlays and modals */
-  .fixed[class*="z-50"], .fixed[class*="z-40"], [role="dialog"], [data-state="open"] {
+  .mobile-menu-overlay, .mobile-menu-sidebar {
     position: fixed !important;
-    z-index: 50 !important;
+    z-index: 9999 !important;
     width: auto !important;
     max-width: none !important;
     height: auto !important;
