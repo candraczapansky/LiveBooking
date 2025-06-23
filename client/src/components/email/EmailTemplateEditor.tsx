@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, forwardRef, useImperativeHandle } from 'react';
 import EmailEditor, { EditorRef, EmailEditorProps } from 'react-email-editor';
 
 interface EmailTemplateEditorProps {
@@ -8,15 +8,34 @@ interface EmailTemplateEditorProps {
   className?: string;
 }
 
-export default function EmailTemplateEditor({
+export interface EmailTemplateEditorRef {
+  exportHtml: () => void;
+}
+
+const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEditorProps>(({
   onDesignChange,
   onHtmlChange,
   initialDesign,
   className = ""
-}: EmailTemplateEditorProps) {
+}, ref) => {
   const emailEditorRef = useRef<EditorRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorHeight, setEditorHeight] = useState(600);
+
+  const exportHtml = () => {
+    const unlayer = emailEditorRef.current?.editor;
+    if (!unlayer) return;
+
+    unlayer.exportHtml((data) => {
+      const { design, html } = data;
+      onDesignChange?.(design);
+      onHtmlChange?.(html);
+    });
+  };
+
+  useImperativeHandle(ref, () => ({
+    exportHtml
+  }));
 
   useEffect(() => {
     // Calculate container height and set editor height
@@ -48,17 +67,6 @@ export default function EmailTemplateEditor({
       emailEditorRef.current.editor?.loadDesign(initialDesign);
     }
   }, [initialDesign]);
-
-  const exportHtml = () => {
-    const unlayer = emailEditorRef.current?.editor;
-    if (!unlayer) return;
-
-    unlayer.exportHtml((data) => {
-      const { design, html } = data;
-      onDesignChange?.(design);
-      onHtmlChange?.(html);
-    });
-  };
 
   const onReady = () => {
     // Editor is ready
@@ -181,4 +189,8 @@ export default function EmailTemplateEditor({
       />
     </div>
   );
-}
+});
+
+EmailTemplateEditor.displayName = 'EmailTemplateEditor';
+
+export default EmailTemplateEditor;
