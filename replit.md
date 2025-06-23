@@ -12,12 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-### June 23, 2025 - Text Color Customization Feature
+### June 23, 2025 - UI Theming and Data Persistence
 - Added comprehensive text color editing capabilities to the appearance settings
 - Implemented primary and secondary text color controls with live preview
 - Added text color preset saving and management functionality  
 - Created custom CSS properties for text colors (--text-primary, --text-secondary)
 - Enhanced theming system to support both background and text color customization
+- Fixed dark mode functionality with proper page background and white text colors
+- Updated dropdown elements to match custom theme colors from settings
+- Migrated to PostgreSQL database for permanent data storage
+- Client data now persists permanently across sessions
 - Completed Square payment integration migration from Stripe
 
 ## System Architecture
