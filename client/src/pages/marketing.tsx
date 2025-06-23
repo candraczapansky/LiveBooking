@@ -1222,7 +1222,7 @@ const MarketingPage = () => {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">All Services</SelectItem>
+                        <SelectItem value="all">All Services</SelectItem>
                         <SelectItem value="Haircut & Style">Haircut & Style</SelectItem>
                         <SelectItem value="Color Services">Color Services</SelectItem>
                         <SelectItem value="Facial Treatments">Facial Treatments</SelectItem>
