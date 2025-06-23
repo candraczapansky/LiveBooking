@@ -5,7 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/contexts/SidebarContext";
-import { EasterEggProvider } from "@/contexts/EasterEggContext";
+
 import { useState, useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
@@ -147,10 +147,8 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <SidebarProvider>
-            <EasterEggProvider>
-              <Toaster />
-              <Router />
-            </EasterEggProvider>
+            <Toaster />
+            <Router />
           </SidebarProvider>
         </TooltipProvider>
       </QueryClientProvider>

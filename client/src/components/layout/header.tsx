@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
 import SimpleMobileMenu from "./simple-mobile-menu";
-import { AchievementsModal } from "@/components/ui/achievements-modal";
+
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
@@ -56,7 +56,6 @@ const Header = () => {
           </div>
           <div className="flex items-center">
             <div className="ml-4 flex items-center md:ml-6 space-x-2">
-              <AchievementsModal />
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5 text-gray-500 dark:text-gray-400" />
                 <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
