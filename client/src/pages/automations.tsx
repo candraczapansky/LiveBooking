@@ -34,13 +34,14 @@ type AutomationRule = {
   id: number;
   name: string;
   type: 'email' | 'sms';
-  trigger: 'appointment_reminder' | 'follow_up' | 'birthday' | 'no_show' | 'booking_confirmation';
-  timing: string; // e.g., "24 hours before", "1 day after"
+  trigger: 'appointment_reminder' | 'follow_up' | 'birthday' | 'no_show' | 'booking_confirmation' | 'cancellation' | 'custom';
+  timing: string; // e.g., "24 hours before", "1 day after", "immediately"
   template: string;
   subject?: string; // Only for email
   active: boolean;
   lastRun?: string;
   sentCount: number;
+  customTriggerName?: string; // For custom triggers
 };
 
 // Form schemas
@@ -51,6 +52,7 @@ const emailRuleSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   template: z.string().min(1, "Template is required"),
   active: z.boolean().default(true),
+  customTriggerName: z.string().optional(),
 });
 
 const smsRuleSchema = z.object({
@@ -59,6 +61,7 @@ const smsRuleSchema = z.object({
   timing: z.string().min(1, "Timing is required"),
   template: z.string().min(1, "Template is required").max(160, "SMS messages must be 160 characters or less"),
   active: z.boolean().default(true),
+  customTriggerName: z.string().optional(),
 });
 
 type EmailRuleFormValues = z.infer<typeof emailRuleSchema>;
@@ -69,6 +72,8 @@ export default function Automations() {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [isSMSDialogOpen, setIsSMSDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
+  const [selectedEmailTrigger, setSelectedEmailTrigger] = useState("");
+  const [selectedSMSTrigger, setSelectedSMSTrigger] = useState("");
 
   // Mock automation rules data
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([
@@ -94,6 +99,17 @@ export default function Automations() {
       active: true,
       lastRun: "2025-06-23T14:15:00Z",
       sentCount: 89
+    },
+    {
+      id: 5,
+      name: "Cancellation Text",
+      type: "sms",
+      trigger: "cancellation",
+      timing: "Immediately",
+      template: "Hi {client_name}, we've confirmed your cancellation for {appointment_datetime}. Call us at {salon_phone} to reschedule anytime!",
+      active: true,
+      lastRun: "2025-06-23T12:00:00Z",
+      sentCount: 23
     },
     {
       id: 3,
@@ -152,6 +168,8 @@ export default function Automations() {
     { value: "follow_up", label: "Follow-up" },
     { value: "birthday", label: "Birthday" },
     { value: "no_show", label: "No Show" },
+    { value: "cancellation", label: "Appointment Cancellation" },
+    { value: "custom", label: "Custom Trigger" },
   ];
 
   // Available timing options
@@ -290,7 +308,10 @@ export default function Automations() {
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Trigger</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={(value) => {
+                                  field.onChange(value);
+                                  setSelectedEmailTrigger(value);
+                                }} defaultValue={field.value}>
                                   <FormControl>
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select trigger" />
