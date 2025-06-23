@@ -107,6 +107,14 @@ const campaignFormSchema = z.object({
   content: z.string().min(1, "Content is required"),
   sendDate: z.string().optional(),
   sendNow: z.boolean().default(false),
+}).refine((data) => {
+  if (data.type === 'email' && !data.subject) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Subject is required for email campaigns",
+  path: ["subject"],
 });
 
 const promoFormSchema = z.object({
@@ -297,7 +305,11 @@ const MarketingPage = () => {
 
   // Form submission handlers
   const onCampaignSubmit = async (data: CampaignFormValues) => {
+    console.log("Form submission attempted with data:", data);
+    console.log("Form errors:", campaignForm.formState.errors);
+    
     if (createCampaignMutation.isPending) {
+      console.log("Mutation already pending, returning");
       return; // Prevent duplicate submissions
     }
     
@@ -310,6 +322,7 @@ const MarketingPage = () => {
       return;
     }
     
+    console.log("Calling mutation with data:", data);
     createCampaignMutation.mutate(data);
   };
 
