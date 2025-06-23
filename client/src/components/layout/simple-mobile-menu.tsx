@@ -1,11 +1,13 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, Menu, LayoutDashboard, Calendar, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Settings, LogOut } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
+import { useDebounce } from "@/hooks/use-debounce";
 
 const SimpleMobileMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
   const [location] = useLocation();
   const { logout } = useContext(AuthContext);
 
@@ -25,22 +27,42 @@ const SimpleMobileMenu = () => {
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
-  const toggleMenu = (e: React.MouseEvent | React.TouchEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleToggle = useCallback(() => {
+    if (isAnimating) return;
+    
     console.log("Simple mobile menu toggle, current state:", isOpen);
+    setIsAnimating(true);
     const newState = !isOpen;
     setIsOpen(newState);
     console.log("Menu state changed to:", newState);
-  };
+    
+    setTimeout(() => setIsAnimating(false), 300);
+  }, [isOpen, isAnimating]);
 
-  const closeMenu = (e?: React.MouseEvent | React.TouchEvent) => {
+  const debouncedToggle = useDebounce(handleToggle, 100);
+
+  const toggleMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    debouncedToggle();
+  }, [debouncedToggle]);
+
+  const closeMenu = useCallback((e?: React.MouseEvent | React.TouchEvent) => {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
     }
+    if (isAnimating) return;
+    
+    setIsAnimating(true);
     setIsOpen(false);
-  };
+    setTimeout(() => setIsAnimating(false), 300);
+  }, [isAnimating]);
+
+  // Close menu when route changes
+  useEffect(() => {
+    setIsOpen(false);
+  }, [location]);
 
   console.log("SimpleMobileMenu render - isOpen:", isOpen);
 
@@ -49,95 +71,51 @@ const SimpleMobileMenu = () => {
       {/* Menu Button */}
       <button 
         onClick={toggleMenu}
-        onTouchStart={(e) => e.preventDefault()}
+        disabled={isAnimating}
+        className="flex items-center justify-center w-11 h-11 bg-transparent border-none rounded-lg cursor-pointer p-0 touch-manipulation tap-highlight-transparent disabled:opacity-50"
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "44px",
-          height: "44px",
-          backgroundColor: "transparent",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer",
-          padding: "0",
-          touchAction: "manipulation",
-          WebkitTapHighlightColor: "transparent"
+          WebkitTapHighlightColor: "transparent",
+          touchAction: "manipulation"
         }}
         aria-label="Toggle mobile menu"
       >
-        <Menu style={{ width: "24px", height: "24px", color: "#374151" }} />
+        <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
       </button>
 
       {/* Mobile Menu Overlay */}
       {isOpen && createPortal(
         <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999999,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            width: "100vw",
-            height: "100vh",
-            display: "block"
-          }}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
           onClick={closeMenu}
+          style={{ touchAction: "none" }}
         >
           {/* Menu Panel */}
           <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              width: "280px",
-              height: "100vh",
-              backgroundColor: "white",
-              boxShadow: "0 10px 25px rgba(0, 0, 0, 0.15)",
-              display: "flex",
-              flexDirection: "column",
-              zIndex: 1000000
-            }}
+            className="fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col transform transition-transform duration-300 ease-out"
             onClick={(e) => e.stopPropagation()}
+            style={{ touchAction: "auto" }}
           >
             {/* Header */}
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "16px",
-              borderBottom: "1px solid #e5e7eb"
-            }}>
-              <h2 style={{ fontSize: "18px", fontWeight: "600", margin: "0", color: "#111827" }}>
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 BeautyBook
               </h2>
               <button
                 onClick={closeMenu}
-                onTouchStart={(e) => e.preventDefault()}
+                disabled={isAnimating}
+                className="flex items-center justify-center w-10 h-10 bg-transparent border-none rounded-md cursor-pointer p-0 touch-manipulation tap-highlight-transparent disabled:opacity-50 hover:bg-gray-100 dark:hover:bg-gray-700"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: "44px",
-                  height: "44px",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  padding: "0",
-                  touchAction: "manipulation",
-                  WebkitTapHighlightColor: "transparent"
+                  WebkitTapHighlightColor: "transparent",
+                  touchAction: "manipulation"
                 }}
                 aria-label="Close mobile menu"
               >
-                <X style={{ width: "20px", height: "20px", color: "#6b7280" }} />
+                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
 
             {/* Navigation */}
-            <div style={{ flex: "1", padding: "16px", overflowY: "auto" }}>
+            <div className="flex-1 p-4 overflow-y-auto">
               {navigationItems.map((item) => {
                 const IconComponent = item.icon;
                 const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
@@ -145,36 +123,15 @@ const SimpleMobileMenu = () => {
                 return (
                   <Link key={item.href} href={item.href}>
                     <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "12px",
-                        marginBottom: "4px",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        backgroundColor: isActive ? "#3b82f6" : "transparent",
-                        color: isActive ? "white" : "#374151",
-                        fontSize: "14px",
-                        fontWeight: "500",
-                        textDecoration: "none"
-                      }}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        closeMenu(e);
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = "#f3f4f6";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (!isActive) {
-                          e.currentTarget.style.backgroundColor = "transparent";
-                        }
-                      }}
+                      className={`flex items-center px-3 py-2.5 mb-1 rounded-lg cursor-pointer text-sm font-medium transition-colors ${
+                        isActive 
+                          ? "bg-primary text-primary-foreground" 
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                      }`}
+                      onClick={() => closeMenu()}
                     >
-                      <IconComponent style={{ width: "18px", height: "18px", marginRight: "12px" }} />
-                      {item.label}
+                      <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
+                      <span className="truncate">{item.label}</span>
                     </div>
                   </Link>
                 );
@@ -182,33 +139,15 @@ const SimpleMobileMenu = () => {
             </div>
 
             {/* Footer */}
-            <div style={{ padding: "16px", borderTop: "1px solid #e5e7eb" }}>
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
               <button
                 onClick={() => {
                   logout();
                   closeMenu();
                 }}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                  padding: "12px",
-                  backgroundColor: "transparent",
-                  border: "none",
-                  borderRadius: "6px",
-                  cursor: "pointer",
-                  color: "#dc2626",
-                  fontSize: "14px",
-                  fontWeight: "500"
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#fef2f2";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
-                }}
+                className="flex items-center w-full px-3 py-2.5 bg-transparent border-none rounded-lg cursor-pointer text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
-                <LogOut style={{ width: "18px", height: "18px", marginRight: "12px" }} />
+                <LogOut className="w-4 h-4 mr-3" />
                 Sign Out
               </button>
             </div>
