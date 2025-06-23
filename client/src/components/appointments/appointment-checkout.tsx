@@ -111,7 +111,9 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Payment Information</h3>
-        <PaymentElement />
+        <div id="square-card-element" className="min-h-[40px] p-3 border rounded-md">
+          {/* Square Card element will be mounted here */}
+        </div>
       </div>
       
       <div className="flex gap-3">
@@ -126,7 +128,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         </Button>
         <Button 
           type="submit" 
-          disabled={!stripe || isProcessing}
+          disabled={!cardNonce || isProcessing}
           className="flex-1"
         >
           {isProcessing ? (
@@ -675,34 +677,12 @@ export default function AppointmentCheckout({
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
             </div>
-          ) : clientSecret ? (
-            <Elements 
-              stripe={stripePromise} 
-              options={{ 
-                clientSecret,
-                appearance: {
-                  theme: 'stripe'
-                }
-              }}
-            >
-              <CheckoutForm 
-                appointment={appointment}
-                onSuccess={handleSuccess}
-                onCancel={() => setPaymentMethod(null)}
-              />
-            </Elements>
           ) : (
-            <div className="text-center py-4">
-              <p className="text-muted-foreground">Unable to load payment form</p>
-              <div className="flex gap-3 justify-center mt-4">
-                <Button onClick={() => setPaymentMethod(null)} variant="outline">
-                  Back
-                </Button>
-                <Button onClick={onClose} variant="outline">
-                  Close
-                </Button>
-              </div>
-            </div>
+            <CheckoutForm 
+              appointment={appointment}
+              onSuccess={handleSuccess}
+              onCancel={() => setPaymentMethod(null)}
+            />
           )}
         </CardContent>
       </Card>
