@@ -1161,7 +1161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Amount and payment source are required" });
       }
 
-      const paymentsApi = squareClient.paymentsApi;
+      const paymentsApi = squareClient.payments;
       
       const requestBody = {
         sourceId: sourceId,
@@ -1235,7 +1235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const paymentsApi = squareClient.paymentsApi;
+      const paymentsApi = squareClient.payments;
       const { result } = await paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
