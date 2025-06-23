@@ -98,7 +98,7 @@ const StaffPageSimple = () => {
   ) : [];
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "#f9fafb", overflow: "hidden" }}>
+    <div style={{ backgroundColor: "#f9fafb", overflowX: "hidden" }}>
       {/* Desktop Sidebar */}
       <div style={{ display: "none" }} className="lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
         <Sidebar />
@@ -109,7 +109,7 @@ const StaffPageSimple = () => {
         <Header />
         
         {/* Content Area */}
-        <div style={{ padding: "12px", maxWidth: "100%", boxSizing: "border-box" }}>
+        <div style={{ padding: "12px", maxWidth: "100%", boxSizing: "border-box", paddingBottom: "80px" }}>
           {/* Header Section */}
           <Card style={{ marginBottom: "16px", padding: "16px", width: "100%", boxSizing: "border-box" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
