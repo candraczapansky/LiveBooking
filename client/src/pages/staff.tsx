@@ -133,35 +133,41 @@ const StaffPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Manage your salon staff
-                </p>
+            <div className="flex flex-col space-y-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Staff</h1>
+                  <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                    Manage your salon staff
+                  </p>
+                </div>
+                <Button onClick={handleAddStaff} size="sm" className="lg:hidden">
+                  <PlusCircle className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                <div className="relative">
+              
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="relative flex-1 max-w-sm">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
                   <Input
                     type="search"
                     placeholder="Search staff..."
-                    className="pl-8 w-[250px]"
+                    className="pl-8"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <Button onClick={handleAddStaff}>
+                <Button onClick={handleAddStaff} className="hidden lg:flex">
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Staff
                 </Button>
@@ -178,7 +184,7 @@ const StaffPage = () => {
                 No staff members found. {searchQuery ? 'Try a different search term.' : 'Add your first staff member!'}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
                 {filteredStaff?.map((staffMember: StaffMember) => (
                   <Card key={staffMember.id} className="overflow-hidden">
                     <CardHeader className="pb-4">
@@ -216,11 +222,11 @@ const StaffPage = () => {
                         </div>
                       </div>
                       <div className="mt-2">
-                        <CardTitle className="text-xl">
+                        <CardTitle className="text-lg lg:text-xl truncate">
                           {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
                         </CardTitle>
-                        <CardDescription className="flex items-center mt-1">
-                          <Badge variant="outline" className="mr-2">
+                        <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
+                          <Badge variant="outline" className="w-fit">
                             {staffMember.title}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
@@ -231,17 +237,17 @@ const StaffPage = () => {
                     </CardHeader>
                     <CardContent className="pb-4">
                       <div className="space-y-2">
-                        <div className="flex items-center text-sm">
-                          <span className="font-medium w-20">Email:</span>
-                          <span className="text-gray-600 dark:text-gray-400">{staffMember.user?.email || "-"}</span>
+                        <div className="text-sm">
+                          <span className="font-medium block">Email:</span>
+                          <span className="text-gray-600 dark:text-gray-400 break-all text-xs">{staffMember.user?.email || "-"}</span>
                         </div>
-                        <div className="flex items-center text-sm">
-                          <span className="font-medium w-20">Phone:</span>
+                        <div className="text-sm">
+                          <span className="font-medium block">Phone:</span>
                           <span className="text-gray-600 dark:text-gray-400">{staffMember.user?.phone || "-"}</span>
                         </div>
                         {staffMember.bio && (
                           <div className="pt-2">
-                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                            <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
                               {staffMember.bio}
                             </p>
                           </div>
