@@ -283,6 +283,15 @@ export default function Settings() {
             </div>
 
             <div className="space-y-6">
+              {/* DEBUG TEST CARD */}
+              <Card className="border-4 border-green-500 bg-blue-100">
+                <CardHeader>
+                  <CardTitle className="text-green-600">
+                    🔧 DEBUG: Settings page is loading! 🔧
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+
               {/* Personal Information */}
               <Card>
                 <CardHeader>
