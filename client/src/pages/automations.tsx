@@ -285,7 +285,7 @@ export default function Automations() {
                       Email Rule
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Create Email Automation Rule</DialogTitle>
                       <DialogDescription>
@@ -463,7 +463,7 @@ export default function Automations() {
                       SMS Rule
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl">
+                  <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle>Create SMS Automation Rule</DialogTitle>
                       <DialogDescription>
