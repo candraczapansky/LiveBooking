@@ -211,8 +211,11 @@ export default function SettingsMobile() {
                 ></div>
                 <div style={{ textAlign: "center" }}>
                   <h3 style={{ fontSize: "18px", fontWeight: "600", marginBottom: "8px", color: "#111827" }}>
-                    {user?.firstName} {user?.lastName}
+                    {user?.firstName || 'First'} {user?.lastName || 'Last'}
                   </h3>
+                  <p style={{ fontSize: "14px", color: "#6b7280", marginBottom: "8px" }}>
+                    {user?.email || 'email@example.com'}
+                  </p>
                   <input
                     type="file"
                     accept="image/*"
@@ -277,6 +280,18 @@ export default function SettingsMobile() {
                       style={{ height: "48px", fontSize: "16px" }}
                     />
                   </div>
+                  <div>
+                    <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
+                      Phone
+                    </label>
+                    <Input
+                      value={profileData.phone}
+                      onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                      placeholder="Enter phone number"
+                      type="tel"
+                      style={{ height: "48px", fontSize: "16px" }}
+                    />
+                  </div>
                   <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
                     <Button onClick={handleSaveProfile} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
                       <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
@@ -289,6 +304,44 @@ export default function SettingsMobile() {
                 </div>
               ) : (
                 <div>
+                  {/* Display Current Profile Information */}
+                  <div style={{ marginBottom: "24px", padding: "16px", backgroundColor: "#f9fafb", borderRadius: "8px" }}>
+                    <div style={{ display: "grid", gap: "12px" }}>
+                      <div>
+                        <label style={{ fontSize: "14px", fontWeight: "500", color: "#6b7280", display: "block", marginBottom: "4px" }}>
+                          First Name
+                        </label>
+                        <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
+                          {user?.firstName || 'Not set'}
+                        </p>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "14px", fontWeight: "500", color: "#6b7280", display: "block", marginBottom: "4px" }}>
+                          Last Name
+                        </label>
+                        <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
+                          {user?.lastName || 'Not set'}
+                        </p>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "14px", fontWeight: "500", color: "#6b7280", display: "block", marginBottom: "4px" }}>
+                          Email
+                        </label>
+                        <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
+                          {user?.email || 'Not set'}
+                        </p>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: "14px", fontWeight: "500", color: "#6b7280", display: "block", marginBottom: "4px" }}>
+                          Phone
+                        </label>
+                        <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
+                          {user?.phone || 'Not set'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <Button onClick={() => setIsEditingProfile(true)} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
                     Edit Personal Information
                   </Button>
