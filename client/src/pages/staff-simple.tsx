@@ -146,53 +146,60 @@ const StaffPageSimple = () => {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {filteredStaff?.map((staffMember: StaffMember) => (
-                <Card key={staffMember.id} style={{ padding: "16px", width: "100%", boxSizing: "border-box" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                    <Avatar style={{ width: "48px", height: "48px", flexShrink: "0" }}>
-                      {staffMember.photoUrl ? (
-                        <img
-                          src={staffMember.photoUrl}
-                          alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                          style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
-                        />
-                      ) : (
-                        <AvatarFallback>
-                          {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
-                        </AvatarFallback>
-                      )}
-                    </Avatar>
-                    
-                    <div style={{ flex: "1", minWidth: "0" }}>
-                      <h3 style={{ fontSize: "16px", fontWeight: "600", margin: "0 0 4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                      </h3>
-                      <p style={{ fontSize: "14px", color: "#6b7280", margin: "0 0 4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {staffMember.title}
-                      </p>
-                      <p style={{ fontSize: "14px", color: "#6b7280", margin: "0 0 4px 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {staffMember.user?.email}
-                      </p>
-                      <p style={{ fontSize: "14px", color: "#6b7280", margin: "0" }}>
-                        Commission: {staffMember.commissionRate}%
-                      </p>
+                <Card key={staffMember.id} style={{ padding: "20px", width: "100%", boxSizing: "border-box" }}>
+                  {/* Mobile-optimized layout */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    {/* Avatar and basic info section */}
+                    <div className="flex items-center gap-3 flex-1">
+                      <Avatar className="w-16 h-16 sm:w-12 sm:h-12 flex-shrink-0">
+                        {staffMember.photoUrl ? (
+                          <img
+                            src={staffMember.photoUrl}
+                            alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        ) : (
+                          <AvatarFallback className="text-lg sm:text-sm">
+                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-lg sm:text-base font-semibold text-gray-900 truncate mb-1">
+                          {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                        </h3>
+                        <p className="text-sm text-gray-600 truncate mb-1">
+                          {staffMember.title}
+                        </p>
+                        <p className="text-sm text-gray-500 truncate mb-1">
+                          {staffMember.user?.email}
+                        </p>
+                        <p className="text-sm font-medium text-green-600">
+                          Commission: {staffMember.commissionRate}%
+                        </p>
+                      </div>
                     </div>
                     
-                    <div style={{ display: "flex", gap: "8px", flexShrink: "0" }}>
+                    {/* Action buttons - mobile friendly */}
+                    <div className="flex gap-2 justify-end sm:justify-start sm:flex-shrink-0">
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => handleEditStaff(staffMember.id)}
-                        style={{ width: "32px", height: "32px", padding: "0" }}
+                        className="h-10 px-4 text-sm"
                       >
-                        <Edit style={{ width: "16px", height: "16px" }} />
+                        <Edit className="w-4 h-4 mr-2" />
+                        Edit
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="outline"
                         size="sm"
                         onClick={() => openDeleteDialog(staffMember)}
-                        style={{ width: "32px", height: "32px", padding: "0", color: "#ef4444" }}
+                        className="h-10 px-4 text-sm text-red-600 border-red-300 hover:bg-red-50"
                       >
-                        <Trash2 style={{ width: "16px", height: "16px" }} />
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete
                       </Button>
                     </div>
                   </div>
