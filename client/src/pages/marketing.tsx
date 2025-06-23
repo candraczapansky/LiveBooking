@@ -215,7 +215,7 @@ const MarketingPage = () => {
         subject: campaignData.type === 'email' ? campaignData.subject : undefined,
         content: campaignData.content,
         sendDate: campaignData.sendDate ? new Date(campaignData.sendDate) : undefined,
-        status: 'draft'
+        status: campaignData.sendDate && !campaignData.sendNow ? 'scheduled' : 'draft'
       };
       
       const response = await fetch('/api/marketing-campaigns', {
@@ -242,9 +242,12 @@ const MarketingPage = () => {
       if (variables.sendNow) {
         handleSendCampaign(data.id, data.type);
       } else {
+        const isScheduled = variables.sendDate && !variables.sendNow;
         toast({
           title: "Campaign created",
-          description: "Your marketing campaign has been saved as a draft.",
+          description: isScheduled 
+            ? "Your marketing campaign has been scheduled for delivery."
+            : "Your marketing campaign has been saved as a draft.",
         });
       }
     },
