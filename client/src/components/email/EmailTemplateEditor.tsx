@@ -94,7 +94,11 @@ export default function EmailTemplateEditor({
   };
 
   return (
-    <div className={`email-template-editor w-full h-full ${className}`}>
+    <div 
+      ref={containerRef}
+      className={`email-template-editor w-full h-full ${className}`}
+      style={{ height: '100%', minHeight: '600px' }}
+    >
       <EmailEditor
         ref={emailEditorRef}
         onReady={onReady}
@@ -173,7 +177,7 @@ export default function EmailTemplateEditor({
             }
           }
         }}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width: '100%', height: `${editorHeight}px` }}
       />
     </div>
   );
