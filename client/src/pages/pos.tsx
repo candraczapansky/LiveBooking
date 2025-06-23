@@ -359,12 +359,12 @@ export default function PointOfSale() {
       <div className="flex-1 flex flex-col lg:ml-64">
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
-          <div className="w-full max-w-none sm:max-w-7xl mx-auto">
-            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 min-h-0">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 md:p-4 lg:p-6">
+          <div className="w-full max-w-7xl mx-auto">
+            <div className="flex flex-col xl:flex-row gap-3 sm:gap-4 lg:gap-6 min-h-0">
               
               {/* Services Selection Panel */}
-              <div className="flex-1 flex flex-col min-w-0">
+              <div className="flex-1 flex flex-col min-w-0 xl:min-w-[60%]">
                 <div className="mb-4 sm:mb-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-3">
                     <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
@@ -405,7 +405,7 @@ export default function PointOfSale() {
                 <div className="flex-1 min-h-0">
                   {activeTab === 'services' ? (
                     servicesLoading ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
                             <CardContent className="p-3 sm:p-4">
@@ -417,7 +417,7 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                         {filteredServices.map((service: Service) => (
                           <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
                             <CardContent className="p-3 sm:p-4">
@@ -453,7 +453,7 @@ export default function PointOfSale() {
                     )
                   ) : (
                     productsLoading ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
                             <CardContent className="p-3 sm:p-4">
@@ -465,7 +465,7 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                         {filteredProducts.map((product: Product) => (
                           <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
                             <CardContent className="p-3 sm:p-4">
@@ -506,8 +506,8 @@ export default function PointOfSale() {
               </div>
 
               {/* Cart Panel */}
-              <div className="w-full lg:w-96 flex flex-col">
-                <Card className="flex-1 flex flex-col">
+              <div className="w-full xl:w-80 2xl:w-96 flex flex-col xl:min-w-[320px]">
+                <Card className="flex-1 flex flex-col h-full xl:max-h-[calc(100vh-8rem)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <ShoppingCart className="h-5 w-5" />
@@ -555,24 +555,29 @@ export default function PointOfSale() {
                         </div>
                       ) : (
                         cart.map((item) => (
-                          <div key={`${item.type}-${item.item.id}`} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-2 sm:p-3 border rounded-lg">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-sm sm:text-base">{item.item.name}</h4>
-                              <p className="text-xs sm:text-sm text-gray-600">${item.item.price.toFixed(2)} each</p>
-                              {item.type === 'service' && (
-                                <p className="text-xs text-gray-500">{(item.item as Service).duration}min</p>
-                              )}
-                              {item.type === 'product' && (
-                                <p className="text-xs text-gray-500">Stock: {(item.item as Product).stockQuantity}</p>
-                              )}
+                          <div key={`${item.type}-${item.item.id}`} className="flex flex-col gap-2 p-3 border rounded-lg bg-gray-50 dark:bg-gray-800">
+                            <div className="flex justify-between items-start">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-medium text-sm truncate">{item.item.name}</h4>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">${item.item.price.toFixed(2)} each</p>
+                                {item.type === 'service' && (
+                                  <p className="text-xs text-gray-500">{(item.item as Service).duration}min</p>
+                                )}
+                                {item.type === 'product' && (
+                                  <p className="text-xs text-gray-500">Stock: {(item.item as Product).stockQuantity}</p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-sm">${item.total.toFixed(2)}</p>
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between sm:justify-center gap-2">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1">
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity - 1)}
-                                  className="h-8 w-8 p-0"
+                                  className="h-7 w-7 p-0"
                                 >
                                   <Minus className="h-3 w-3" />
                                 </Button>
@@ -581,22 +586,19 @@ export default function PointOfSale() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => updateCartQuantity(item.item.id, item.type, item.quantity + 1)}
-                                  className="h-8 w-8 p-0"
+                                  className="h-7 w-7 p-0"
                                 >
                                   <Plus className="h-3 w-3" />
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => removeFromCart(item.item.id, item.type)}
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
                               </div>
-                              <div className="text-right">
-                                <p className="font-semibold text-sm sm:text-base">${item.total.toFixed(2)}</p>
-                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => removeFromCart(item.item.id, item.type)}
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
                             </div>
                           </div>
                         ))
