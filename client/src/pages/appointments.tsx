@@ -318,25 +318,85 @@ const AppointmentsPage = () => {
 
   const renderDayView = () => {
     const staffCount = staff?.length || 1;
-    // Calculate column width based on available screen space, with mobile considerations
     const isMobileView = window.innerWidth < 768;
-    let availableWidth;
     
+    // For mobile, use a simpler card-based layout
     if (isMobileView) {
-      // On mobile, use full screen width minus padding
-      availableWidth = window.innerWidth - 32; // Account for padding
-    } else {
-      // On desktop, account for sidebar
-      availableWidth = window.innerWidth - 280 - 100; // Sidebar + padding
+      return (
+        <div className="space-y-4 p-4">
+          {staff?.map((staffMember: any) => {
+            const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+            const staffAppointments = appointments?.filter((appointment: any) => {
+              const appointmentDate = new Date(appointment.startTime);
+              const currentDateOnly = new Date(currentDate);
+              
+              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(appointmentDate.getDate()).padStart(2, '0');
+              const currentDateStr = currentDateOnly.getFullYear() + '-' + 
+                String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(currentDateOnly.getDate()).padStart(2, '0');
+              
+              return appointmentDateStr === currentDateStr && 
+                     appointment.staff?.id === staffMember.id;
+            }) || [];
+
+            return (
+              <div key={staffMember.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 className="font-semibold text-lg mb-3 text-gray-900 dark:text-gray-100">{staffName}</h3>
+                <div className="space-y-2">
+                  {staffAppointments.length > 0 ? (
+                    staffAppointments.map((appointment: any) => {
+                      const startTime = new Date(appointment.startTime);
+                      const endTime = new Date(appointment.endTime);
+                      const timeString = `${startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+                      const client = users?.find((u: any) => u.id === appointment.clientId);
+                      const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
+                      const serviceName = appointment.service?.name || 'Unknown Service';
+                      const serviceColor = appointment.service?.color || '#6b7280';
+
+                      return (
+                        <div
+                          key={appointment.id}
+                          className="bg-white dark:bg-gray-800 rounded-lg p-3 border-l-4 shadow-sm"
+                          style={{ borderLeftColor: serviceColor }}
+                          onClick={() => {
+                            setSelectedAppointmentId(appointment.id);
+                            setIsFormOpen(true);
+                          }}
+                        >
+                          <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{serviceName}</div>
+                          <div className="text-sm text-gray-600 dark:text-gray-400">{clientName}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-500">{timeString}</div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-gray-500 dark:text-gray-400 text-sm italic">No appointments scheduled</div>
+                  )}
+                  <button
+                    onClick={handleAddAppointment}
+                    className="w-full text-left p-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-pink-300 hover:text-pink-600 transition-colors"
+                  >
+                    + Add appointment for {staffName}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
     }
-    
-    const columnWidth = Math.max(isMobileView ? 150 : 280, Math.floor(availableWidth / staffCount));
+
+    // Desktop grid view
+    const availableWidth = window.innerWidth - 280 - 100; // Sidebar + padding
+    const columnWidth = Math.max(280, Math.floor(availableWidth / staffCount));
     
     return (
       <div className="relative overflow-x-auto">
         {/* Header with staff names */}
         <div className="flex border-b bg-white dark:bg-gray-800 sticky top-0 z-10 min-w-max">
-          <div className="w-16 lg:w-20 flex-shrink-0 border-r p-2 lg:p-4 text-xs lg:text-sm font-medium text-gray-600 dark:text-gray-300">
+          <div className="w-20 flex-shrink-0 border-r p-4 text-sm font-medium text-gray-600 dark:text-gray-300">
             Time
           </div>
           {staff?.map((staffMember: any) => {
@@ -344,8 +404,8 @@ const AppointmentsPage = () => {
             return (
               <div 
                 key={staffMember.id}
-                className="border-r p-2 lg:p-4 text-xs lg:text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
-                style={{ width: columnWidth, minWidth: isMobileView ? '150px' : '280px' }}
+                className="border-r p-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
+                style={{ width: columnWidth, minWidth: '280px' }}
               >
                 <span className="truncate block">{staffName}</span>
               </div>
@@ -357,11 +417,11 @@ const AppointmentsPage = () => {
         <div className="relative min-w-max">
           {/* Time labels and grid lines */}
           <div className="flex">
-            <div className="w-16 lg:w-20 flex-shrink-0">
+            <div className="w-20 flex-shrink-0">
               {timeSlots.map((time, index) => (
                 <div 
                   key={time} 
-                  className="border-r border-b px-1 lg:px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
+                  className="border-r border-b px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
                   style={{ height: Math.round(30 * zoomLevel) }}
                 >
                   <span className="text-xs">{time}</span>
@@ -371,7 +431,7 @@ const AppointmentsPage = () => {
             
             {/* Staff columns */}
             {staff?.map((staffMember: any) => (
-              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth, minWidth: isMobileView ? '150px' : '280px' }}>
+              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth, minWidth: '280px' }}>
                 {timeSlots.map((time, index) => (
                   <div 
                     key={time} 
@@ -442,8 +502,7 @@ const AppointmentsPage = () => {
               
               if (columnIndex === -1) return null;
 
-              const timeColumnWidth = isMobileView ? 64 : 80; // w-16 on mobile, w-20 on desktop
-              const leftPosition = timeColumnWidth + (columnIndex * columnWidth);
+              const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
 
               // Get service color for appointment
@@ -706,10 +765,12 @@ const AppointmentsPage = () => {
           </div>
 
             {/* Calendar Views */}
-            <div className="p-6">
-              {viewMode === 'day' && renderDayView()}
-              {viewMode === 'week' && renderWeekView()}
-              {viewMode === 'month' && renderMonthView()}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                {viewMode === 'day' && renderDayView()}
+                {viewMode === 'week' && renderWeekView()}
+                {viewMode === 'month' && renderMonthView()}
+              </div>
             </div>
           </div>
         </main>
