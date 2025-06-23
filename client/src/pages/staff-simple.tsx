@@ -98,18 +98,19 @@ const StaffPageSimple = () => {
   ) : [];
 
   return (
-    <div style={{ backgroundColor: "#f9fafb", overflowX: "hidden" }}>
+    <div className="min-h-screen bg-gray-50 mobile-scroll">
       {/* Desktop Sidebar */}
-      <div style={{ display: "none" }} className="lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
+      <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
         <Sidebar />
       </div>
       
       {/* Main Content */}
-      <div style={{ paddingLeft: "0" }} className="lg:pl-64">
+      <div className="lg:pl-64 min-h-screen flex flex-col">
         <Header />
         
         {/* Content Area */}
-        <div className="p-4 sm:p-6 max-w-full box-border pb-24 sm:pb-6">
+        <div className="flex-1 p-4 sm:p-6 overflow-y-auto pb-safe-area-inset-bottom"
+             style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
           {/* Header Section */}
           <Card className="mb-4 p-4 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

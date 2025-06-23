@@ -645,15 +645,16 @@ const AppointmentsPage = () => {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 mobile-scroll">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className="lg:ml-64 min-h-screen flex flex-col">
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 pb-safe-area-inset-bottom"
+              style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
             <div className="bg-white dark:bg-gray-800 border-b px-4 py-4">
