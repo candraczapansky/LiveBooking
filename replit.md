@@ -149,6 +149,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 - **Improved mobile appointment interface:**
   - Centered "Add appointment" button text in mobile view for better alignment
   - Enhanced touch accessibility and visual consistency across mobile interface
+- **Updated Point of Sale payment system:**
+  - Migrated POS checkout from old payment system to Square Web SDK
+  - Fixed payment form initialization and error handling
+  - Added proper styling and autofill support for payment fields
+  - Enhanced accessibility with proper ARIA labels and roles
+  - Both POS and appointment checkout now use consistent Square payment integration
 
 ## System Architecture
 

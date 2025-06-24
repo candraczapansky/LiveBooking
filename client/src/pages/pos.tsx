@@ -83,7 +83,18 @@ const PaymentForm = ({ total, onSuccess, onError }: {
       }
 
       const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
-      const card = await payments.card();
+      const card = await payments.card({
+        style: {
+          input: {
+            fontSize: '16px',
+            fontFamily: '"Helvetica Neue", Arial, sans-serif'
+          },
+          '.input-container': {
+            borderColor: '#E5E7EB',
+            borderRadius: '6px'
+          }
+        }
+      });
       await card.attach('#pos-square-card-element');
       
       setCardElement(card);
@@ -157,7 +168,13 @@ const PaymentForm = ({ total, onSuccess, onError }: {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div id="pos-square-card-element" className="min-h-[60px] border rounded-lg p-3 bg-white">
+      <div 
+        id="pos-square-card-element" 
+        className="min-h-[60px] border rounded-lg p-3 bg-white"
+        data-testid="card-element"
+        role="textbox"
+        aria-label="Credit card number"
+      >
         {/* Square Card element will be mounted here */}
       </div>
       

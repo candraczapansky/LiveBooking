@@ -73,7 +73,18 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
 
       // Initialize Square payments
       const payments = window.Square.payments(SQUARE_APP_ID);
-      const card = await payments.card();
+      const card = await payments.card({
+        style: {
+          input: {
+            fontSize: '16px',
+            fontFamily: '"Helvetica Neue", Arial, sans-serif'
+          },
+          '.input-container': {
+            borderColor: '#E5E7EB',
+            borderRadius: '6px'
+          }
+        }
+      });
       
       // Attach to element
       await card.attach('#square-card-element');
@@ -223,7 +234,13 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Payment Information</h3>
         
-        <div id="square-card-element" className="min-h-[60px] border rounded-lg p-3 bg-white">
+        <div 
+          id="square-card-element" 
+          className="min-h-[60px] border rounded-lg p-3 bg-white"
+          data-testid="card-element"
+          role="textbox"
+          aria-label="Credit card number"
+        >
           {/* Square Card element will be mounted here */}
         </div>
         
