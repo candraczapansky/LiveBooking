@@ -250,7 +250,7 @@ const Login = () => {
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input 
-                            type="email" 
+                            type="text" 
                             placeholder="Enter email address" 
                             autoComplete="off"
                             autoCorrect="off"
