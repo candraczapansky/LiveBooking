@@ -456,7 +456,7 @@ const AppointmentsPage = () => {
                   )}
                   <button
                     onClick={handleAddAppointment}
-                    className="w-full text-left p-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-pink-300 hover:text-pink-600 transition-colors"
+                    className="w-full text-center p-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-pink-300 hover:text-pink-600 transition-colors"
                   >
                     + Add appointment for {staffName}
                   </button>
