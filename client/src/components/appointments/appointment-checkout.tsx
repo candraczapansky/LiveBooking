@@ -57,7 +57,11 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       // Load Square Web SDK if not already loaded
       if (!window.Square) {
         const script = document.createElement('script');
-        script.src = 'https://sandbox.web.squarecdn.com/v1/square.js'; // Use sandbox for testing
+        // Use sandbox SDK for sandbox App IDs
+        const isSandbox = SQUARE_APP_ID?.includes('sandbox');
+        script.src = isSandbox 
+          ? 'https://sandbox.web.squarecdn.com/v1/square.js' 
+          : 'https://web.squarecdn.com/v1/square.js';
         script.async = true;
         await new Promise((resolve, reject) => {
           script.onload = resolve;
@@ -70,7 +74,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         throw new Error('Square Application ID not configured');
       }
       
-      const payments = window.Square.payments(SQUARE_APP_ID, 'main'); // Use 'main' for sandbox location
+      const payments = window.Square.payments(SQUARE_APP_ID);
       const card = await payments.card({
         style: {
           input: {
@@ -91,9 +95,17 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       setCardElement(card);
     } catch (error: any) {
       console.error('Error initializing Square payment form:', error);
+      
+      let errorMessage = "Failed to load payment form. Please refresh the page.";
+      if (error.name === 'ApplicationIdEnvironmentMismatchError') {
+        errorMessage = "Square Application ID environment mismatch. Please check your Square configuration.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Payment Form Error",
-        description: error.message || "Failed to load payment form. Please refresh the page.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -163,12 +175,13 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         <h3 className="text-lg font-semibold">Payment Information</h3>
         <div id="square-card-element" className="min-h-[80px] p-3 border rounded-md bg-white">
           {/* Square Card element will be mounted here */}
-          {!cardElement && (
-            <div className="flex items-center justify-center h-16 text-muted-foreground">
-              Loading payment form...
-            </div>
-          )}
         </div>
+        {!cardElement && (
+          <div className="flex items-center justify-center text-muted-foreground text-sm mt-2">
+            <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
+            Loading payment form...
+          </div>
+        )}
       </div>
       
       <div className="flex gap-3">
