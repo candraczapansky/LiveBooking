@@ -57,7 +57,7 @@ const SimpleMobileMenu = () => {
     setIsOpen(false);
   }, [location]);
 
-  console.log("SimpleMobileMenu render - isOpen:", isOpen);
+
 
   return (
     <>

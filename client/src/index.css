@@ -2,40 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Force hide any achievement overlays */
-[data-state="open"]:has([class*="achievement"]),
-[role="status"]:has([class*="achievement"]),
-.toast:has([class*="achievement"]),
-.notification:has([class*="achievement"]),
-*:has-text("Achievement Unlocked"),
-*:has-text("Meet the Team"),
-*:has-text("staff management page"),
-*:has-text("points") {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  z-index: -9999 !important;
-  position: absolute !important;
-  left: -9999px !important;
-}
 
-/* Alternative approach using content matching */
-[data-sonner-toast],
-[data-state="open"],
-[role="status"] {
-  &:has-text("Achievement") {
-    display: none !important;
-  }
-}
-
-/* Global achievement overlay killer */
-.achievement,
-.easter-egg,
-[id*="achievement"],
-[class*="achievement"],
-[data-achievement] {
-  display: none !important;
-}
 
 /* Perfect circle profile picture */
 .profile-circle {

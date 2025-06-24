@@ -47,7 +47,7 @@ const Sidebar = () => {
   const { user, logout } = useContext(AuthContext);
 
   useEffect(() => {
-    console.log('Sidebar render state:', { isOpen, isMobile });
+
   }, [isOpen, isMobile]);
 
   // Don't render original sidebar on mobile - SimpleMobileMenu handles mobile navigation

@@ -113,7 +113,7 @@ function useAuth() {
         const userData = JSON.parse(storedUser);
         setUser(userData);
         setIsAuthenticated(true);
-        console.log("Auth initialized from localStorage:", userData);
+
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');

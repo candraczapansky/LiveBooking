@@ -25,9 +25,7 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isOpen, setIsOpen] = useState(!isMobile);
 
-  useEffect(() => {
-    console.log('SidebarProvider state:', { isMobile, isOpen });
-  }, [isMobile, isOpen]);
+
 
   useEffect(() => {
     const handleResize = () => {
@@ -50,11 +48,8 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   const [isToggling, setIsToggling] = useState(false);
 
   const toggleSidebar = () => {
-    console.log('toggleSidebar called, current isOpen:', isOpen, 'isToggling:', isToggling);
-    
     // Prevent rapid toggling
     if (isToggling) {
-      console.log('Ignoring toggle - already in progress');
       return;
     }
     
