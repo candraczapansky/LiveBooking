@@ -142,9 +142,11 @@ export default function SettingsMobile() {
     const secondaryHsl = hexToHsl(secondaryText);
     root.style.setProperty('--text-secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
     
-    // Update foreground colors to match
+    // Update global foreground colors to match custom text colors
     root.style.setProperty('--foreground', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
     root.style.setProperty('--muted-foreground', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
+    root.style.setProperty('--card-foreground', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+    root.style.setProperty('--popover-foreground', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
     
     // Save to localStorage
     localStorage.setItem('primaryTextColor', primaryText);

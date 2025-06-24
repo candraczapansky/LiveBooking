@@ -338,6 +338,10 @@ body {
   --primary-foreground: var(--dropdown-selected-foreground);
   --secondary: 210 40% 96%;
   --secondary-foreground: 222.2 84% 4.9%;
+  
+  /* Custom text colors */
+  --text-primary: 222.2 84% 4.9%;
+  --text-secondary: 215.4 16.3% 46.9%;
   --accent: var(--dropdown-selected);
   --accent-foreground: var(--dropdown-selected-foreground);
   --destructive: 0 84.2% 60.2%;
@@ -351,6 +355,10 @@ body {
   --chart-3: 24 94% 53%;
   --chart-4: 315 70% 58%;
   --chart-5: 48 96% 53%;
+  
+  /* Custom text colors for dark mode */
+  --text-primary: 0 0% 98%;
+  --text-secondary: 240 5% 64.9%;
   
   /* Sidebar colors */
   --sidebar-background: 0 0% 100%;
@@ -636,7 +644,7 @@ body {
   color: hsl(var(--secondary-foreground)) !important;
 }
 
-/* Apply secondary color to primary text elements globally */
+/* Apply custom text colors globally */
 h1, h2, h3, h4, h5, h6,
 .text-foreground,
 .sidebar-item,
@@ -647,17 +655,25 @@ h1, h2, h3, h4, h5, h6,
 label,
 .text-lg,
 .text-base,
-.text-xl,
-.text-2xl,
-.text-3xl,
-p:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
-span:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
-div:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground) > *:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
-.text-sm:not(.text-gray-600):not(.text-gray-400):not(.text-muted-foreground),
-nav a,
-.sidebar a,
-.menu-item {
-  color: hsl(var(--secondary-foreground)) !important;
+.text-xl {
+  color: hsl(var(--text-primary)) !important;
+}
+
+/* Apply secondary text colors */
+.text-muted-foreground,
+.text-gray-500,
+.text-gray-600,
+.text-gray-400,
+.text-sm,
+p,
+span:not(.font-semibold):not(.font-medium):not(.font-bold) {
+  color: hsl(var(--text-secondary)) !important;
+}
+/* Additional secondary text elements */
+.text-muted,
+.description,
+small {
+  color: hsl(var(--text-secondary)) !important;
 }
 
 /* Apply primary color to icons with elegant outline style */
