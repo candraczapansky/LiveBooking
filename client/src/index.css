@@ -95,8 +95,11 @@ body {
   color: hsl(var(--text-primary, 0 0% 98%));
 }
 
-/* Buttons with custom backgrounds get white text */
-button[style*="backgroundColor"] {
+/* Buttons with custom backgrounds or primary variant get white text */
+button[style*="backgroundColor"],
+.bg-primary,
+button.bg-primary,
+[class*="bg-primary"] {
   color: white !important;
 }
 
