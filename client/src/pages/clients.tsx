@@ -793,6 +793,9 @@ const ClientsPage = () => {
                           spellCheck="false"
                           data-lpignore="true"
                           data-form-type="other"
+                          pattern=".*"
+                          className="no-validation"
+                          style={{borderColor: 'hsl(var(--border)) !important'}}
                           {...field} 
                         />
                       </FormControl>
@@ -1167,6 +1170,9 @@ const ClientsPage = () => {
                           spellCheck="false"
                           data-lpignore="true"
                           data-form-type="other"
+                          pattern=".*"
+                          className="no-validation"
+                          style={{borderColor: 'hsl(var(--border)) !important'}}
                           {...field} 
                         />
                       </FormControl>
