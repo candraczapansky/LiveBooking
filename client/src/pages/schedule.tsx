@@ -1,33 +1,8 @@
 import { useState, useEffect } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -35,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -58,12 +40,12 @@ const scheduleFormSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().min(1, "Location is required"),
-  serviceCategories: z.array(z.number()).default([]),
+  serviceCategories: z.array(z.number()).optional().default([]),
   dateRange: z.object({
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().optional(),
   }),
-  isBlocked: z.boolean().default(false),
+  isBlocked: z.boolean().optional().default(false),
 });
 
 type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
@@ -95,22 +77,9 @@ const SchedulePage = () => {
   useDocumentTitle("Staff Schedule | BeautyBook");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
   const [viewFilter, setViewFilter] = useState("current");
-
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
 
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
@@ -134,40 +103,25 @@ const SchedulePage = () => {
     queryKey: ['/api/schedules'],
   });
 
-  // Fetch staff members
-  const { data: staff } = useQuery({
+  // Fetch staff
+  const { data: staff = [] } = useQuery({
     queryKey: ['/api/staff'],
-    queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      return response.json();
-    }
   });
 
-  // Fetch rooms for locations
-  const { data: rooms } = useQuery({
+  // Fetch rooms
+  const { data: rooms = [] } = useQuery({
     queryKey: ['/api/rooms'],
-    queryFn: async () => {
-      const response = await fetch('/api/rooms');
-      if (!response.ok) throw new Error('Failed to fetch rooms');
-      return response.json();
-    }
   });
 
   // Fetch service categories
-  const { data: serviceCategories } = useQuery({
+  const { data: serviceCategories = [] } = useQuery({
     queryKey: ['/api/service-categories'],
-    queryFn: async () => {
-      const response = await fetch('/api/service-categories');
-      if (!response.ok) throw new Error('Failed to fetch service categories');
-      return response.json();
-    }
   });
 
+  // Create schedule mutation
   const createScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
       console.log("Creating schedule with data:", data);
-      // Transform the data to match the backend schema
       const scheduleData = {
         staffId: data.staffId,
         dayOfWeek: data.dayOfWeek,
@@ -179,7 +133,11 @@ const SchedulePage = () => {
         endDate: data.dateRange.endDate || null,
         isBlocked: data.isBlocked || false,
       };
-      return await apiRequest("POST", "/api/schedules", scheduleData);
+      console.log("Sending schedule data to API:", scheduleData);
+      return apiRequest('/api/schedules', {
+        method: 'POST',
+        body: JSON.stringify(scheduleData),
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
@@ -199,9 +157,9 @@ const SchedulePage = () => {
     }
   });
 
+  // Update schedule mutation
   const updateScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
-      console.log("Updating schedule:", selectedScheduleId, data);
       const scheduleData = {
         staffId: data.staffId,
         dayOfWeek: data.dayOfWeek,
@@ -234,14 +192,35 @@ const SchedulePage = () => {
     }
   });
 
+  // Delete schedule mutation
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return await apiRequest("DELETE", `/api/schedules/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      toast({
+        title: "Success",
+        description: "Schedule deleted successfully!"
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete schedule: ${error.message}`,
+        variant: "destructive"
+      });
+    }
+  });
+
   const handleAddSchedule = () => {
     setSelectedScheduleId(null);
     form.reset({
-      staffId: 0,
+      staffId: 1,
       dayOfWeek: "Monday",
       startTime: "09:00",
       endTime: "17:00",
-      location: "",
+      location: "All Locations",
       serviceCategories: [],
       dateRange: {
         startDate: new Date().toISOString().split('T')[0],
@@ -270,6 +249,12 @@ const SchedulePage = () => {
     setIsFormOpen(true);
   };
 
+  const handleDeleteSchedule = (id: number) => {
+    if (confirm("Are you sure you want to delete this schedule?")) {
+      deleteScheduleMutation.mutate(id);
+    }
+  };
+
   const onSubmit = (data: ScheduleFormValues) => {
     console.log("Form submitted with data:", data);
     console.log("Form errors:", form.formState.errors);
@@ -293,12 +278,6 @@ const SchedulePage = () => {
     }
   };
 
-  const getStaffName = (staffId: number) => {
-    const staffMember = staff?.find((s: any) => s.id === staffId);
-    if (!staffMember) return "Unknown Staff";
-    return `${staffMember.user?.firstName || ""} ${staffMember.user?.lastName || ""}`.trim();
-  };
-
   const getServiceCategoriesText = (categoryIds: number[]) => {
     if (!categoryIds || categoryIds.length === 0) return "block";
     
@@ -318,151 +297,148 @@ const SchedulePage = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
-        <Header />
-        
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
-            {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff Schedule</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Manage staff availability and appointment scheduling
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                <Select value={viewFilter} onValueChange={setViewFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select view" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="current">Current and future</SelectItem>
-                    <SelectItem value="past">Past schedules</SelectItem>
-                    <SelectItem value="all">All schedules</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddSchedule}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Schedule
-                </Button>
-              </div>
-            </div>
-
-            {/* Schedules Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Appointment Availability
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isSchedulesLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
-                  </div>
-                ) : schedules.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      No schedules found
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-4">
-                      Get started by creating your first staff schedule.
-                    </p>
-                    <Button onClick={handleAddSchedule}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add New Schedule
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Day Of Week</TableHead>
-                          <TableHead>Staff Member</TableHead>
-                          <TableHead>Start Time</TableHead>
-                          <TableHead>End Time</TableHead>
-                          <TableHead>Service Categories</TableHead>
-                          <TableHead>Date Range</TableHead>
-                          <TableHead>Location</TableHead>
-                          <TableHead>Privacy</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {schedules.map((schedule: any) => (
-                          <TableRow key={schedule.id}>
-                            <TableCell className="font-medium">
-                              {schedule.dayOfWeek}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <User className="h-4 w-4 mr-2 text-gray-400" />
-                                {getStaffName(schedule.staffId)}
-                              </div>
-                            </TableCell>
-                            <TableCell>{schedule.startTime}</TableCell>
-                            <TableCell>{schedule.endTime}</TableCell>
-                            <TableCell>
-                              <Badge variant={schedule.isBlocked ? "secondary" : "default"}>
-                                {getServiceCategoriesText(schedule.serviceCategories)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              {formatDateRange(schedule.startDate, schedule.endDate)}
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-                                {schedule.location}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center">
-                                {schedule.isBlocked ? (
-                                  <Badge variant="secondary">🔒 Blocked</Badge>
-                                ) : (
-                                  <Badge variant="outline">👥 Public</Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditSchedule(schedule)}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </main>
+    <>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff Schedule</h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            Manage staff availability and appointment scheduling
+          </p>
+        </div>
+        <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+          <Select value={viewFilter} onValueChange={setViewFilter}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="Select view" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current">Current and future</SelectItem>
+              <SelectItem value="past">Past schedules</SelectItem>
+              <SelectItem value="all">All schedules</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={handleAddSchedule}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Schedule
+          </Button>
+        </div>
       </div>
+
+      {/* Schedules Table */}
+      {isSchedulesLoading ? (
+        <div className="flex justify-center items-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : schedules && schedules.length > 0 ? (
+        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Day Of Week
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <User className="h-4 w-4 mr-2" />
+                      Staff Member
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-2" />
+                      Start Time
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <Clock className="h-4 w-4 mr-2" />
+                      End Time
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <Users className="h-4 w-4 mr-2" />
+                      Service Categories
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Date Range
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Location
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {schedules.map((schedule: any) => (
+                  <tr key={schedule.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {schedule.dayOfWeek}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {schedule.staff?.user?.firstName} {schedule.staff?.user?.lastName}
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{schedule.staff?.title}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {schedule.startTime}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {schedule.endTime}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <Badge variant={schedule.isBlocked ? "destructive" : "default"}>
+                        {getServiceCategoriesText(schedule.serviceCategories)}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatDateRange(schedule.startDate, schedule.endDate)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {schedule.location}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditSchedule(schedule)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteSchedule(schedule.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400">No schedules found.</p>
+        </div>
+      )}
 
       {/* Schedule Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -606,7 +582,7 @@ const SchedulePage = () => {
                     </FormItem>
                   )}
                 />
-                
+
                 <FormField
                   control={form.control}
                   name="dateRange.endDate"
@@ -622,26 +598,27 @@ const SchedulePage = () => {
                 />
               </div>
 
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>
+              {/* Submit Button */}
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsFormOpen(false)}
+                >
                   Cancel
                 </Button>
                 <Button 
-                  type="submit" 
+                  type="submit"
                   disabled={createScheduleMutation.isPending || updateScheduleMutation.isPending}
                 >
-                  {createScheduleMutation.isPending || updateScheduleMutation.isPending
-                    ? "Saving..."
-                    : selectedScheduleId
-                    ? "Update Schedule"
-                    : "Create Schedule"}
+                  {createScheduleMutation.isPending || updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
                 </Button>
-              </DialogFooter>
+              </div>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 
