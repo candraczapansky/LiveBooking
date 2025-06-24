@@ -149,21 +149,6 @@ export default function SettingsMobile() {
     // Save to localStorage
     localStorage.setItem('primaryTextColor', primaryText);
     localStorage.setItem('secondaryTextColor', secondaryText);
-    
-    // Apply dark/light mode
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      root.style.setProperty('--background', '222 84% 4%');
-      root.style.setProperty('--foreground', '210 40% 98%');
-      root.style.setProperty('--card', '222 84% 4%');
-      root.style.setProperty('--card-foreground', '210 40% 98%');
-    } else {
-      document.documentElement.classList.remove('dark');
-      root.style.setProperty('--background', '0 0% 100%');
-      root.style.setProperty('--foreground', '222 84% 4%');
-      root.style.setProperty('--card', '0 0% 100%');
-      root.style.setProperty('--card-foreground', '222 84% 4%');
-    }
   };
 
 
