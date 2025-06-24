@@ -9,6 +9,7 @@ The system uses a modern tech stack with React for the UI, Express for the API, 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Preferred color scheme: Pink primary color with black text for better readability and modern aesthetic.
 
 ## Recent Changes
 
@@ -89,6 +90,11 @@ Preferred communication style: Simple, everyday language.
   - Implemented floating action button for quick product creation on mobile devices
   - Added form validation and error handling for required fields
   - Connected to existing product API endpoints for seamless integration
+- **Updated default color scheme:**
+  - Changed primary color to pink (HSL: 330 81% 60%) for a modern, beauty-focused aesthetic
+  - Set default text color to black for improved readability and contrast
+  - Updated both light and dark mode variants to maintain consistency
+  - Enhanced visual appeal while maintaining accessibility standards
 
 ## System Architecture
 

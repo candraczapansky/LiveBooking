@@ -357,28 +357,28 @@ body {
 
 :root {
   --background: 0 0% 100%;
-  --foreground: 20 14.3% 4.1%;
+  --foreground: 0 0% 0%;
   --muted: 60 4.8% 95.9%;
   --muted-foreground: 25 5.3% 44.7%;
   --popover: 0 0% 100%;
-  --popover-foreground: 20 14.3% 4.1%;
+  --popover-foreground: 0 0% 0%;
   --card: 0 0% 100%;
-  --card-foreground: 20 14.3% 4.1%;
+  --card-foreground: 0 0% 0%;
   --border: 20 5.9% 90%;
   --input: 20 5.9% 90%;
-  --primary: var(--dropdown-selected);
-  --primary-foreground: var(--dropdown-selected-foreground);
+  --primary: 330 81% 60%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 210 40% 96%;
-  --secondary-foreground: 222.2 84% 4.9%;
+  --secondary-foreground: 0 0% 0%;
   
   /* Custom text colors */
-  --text-primary: 222.2 84% 4.9%;
+  --text-primary: 0 0% 0%;
   --text-secondary: 215.4 16.3% 46.9%;
-  --accent: var(--dropdown-selected);
-  --accent-foreground: var(--dropdown-selected-foreground);
+  --accent: 330 81% 60%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 60 9.1% 97.8%;
-  --ring: 20 14.3% 4.1%;
+  --ring: 330 81% 60%;
   --radius: 0.5rem;
   
   /* Chart colors */
@@ -394,9 +394,9 @@ body {
   
   /* Sidebar colors */
   --sidebar-background: 0 0% 100%;
-  --sidebar-foreground: 20 14.3% 4.1%;
+  --sidebar-foreground: 0 0% 0%;
   --sidebar-primary: 330 81% 60%;
-  --sidebar-primary-foreground: 210 40% 98%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 330 81% 95%;
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-border: 220 13% 91%;
@@ -404,7 +404,7 @@ body {
   
   /* Dropdown colors - will be updated by JavaScript */
   --dropdown-selected: 330 81% 60%;
-  --dropdown-selected-foreground: 210 40% 98%;
+  --dropdown-selected-foreground: 0 0% 100%;
   
   /* Enhanced theme colors for better UI consistency */
   --success: 142 76% 36%;
@@ -473,12 +473,12 @@ body {
   --card-foreground: 0 0% 98%;
   --border: 240 3.7% 15.9%;
   --input: 240 3.7% 15.9%;
-  --primary: var(--dropdown-selected);
-  --primary-foreground: var(--dropdown-selected-foreground);
+  --primary: 330 81% 60%;
+  --primary-foreground: 0 0% 100%;
   --secondary: 240 3.7% 15.9%;
   --secondary-foreground: 0 0% 98%;
-  --accent: var(--dropdown-selected);
-  --accent-foreground: var(--dropdown-selected-foreground);
+  --accent: 330 81% 60%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
   --ring: 240 4.9% 83.9%;
@@ -494,7 +494,7 @@ body {
   --sidebar-background: 240 10% 3.9%;
   --sidebar-foreground: 0 0% 98%;
   --sidebar-primary: 330 81% 60%;
-  --sidebar-primary-foreground: 210 40% 98%;
+  --sidebar-primary-foreground: 0 0% 100%;
   --sidebar-accent: 330 30% 20%;
   --sidebar-accent-foreground: 330 81% 60%;
   --sidebar-border: 240 3.7% 15.9%;
@@ -502,7 +502,7 @@ body {
   
   /* Dropdown colors for dark mode */
   --dropdown-selected: 330 81% 60%;
-  --dropdown-selected-foreground: 210 40% 98%;
+  --dropdown-selected-foreground: 0 0% 100%;
   
   /* Enhanced theme colors for dark mode */
   --success: 142 70% 45%;
