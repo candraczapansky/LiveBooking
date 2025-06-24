@@ -630,6 +630,58 @@ export default function SettingsMobile() {
                   </div>
                 </div>
 
+                {/* Brand Color Presets */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Brand Colors
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                    {[
+                      { color: "#d946ef", name: "Fuchsia", subtitle: "Modern & Bold" },
+                      { color: "#8b5cf6", name: "Violet", subtitle: "Elegant & Luxe" },
+                      { color: "#ec4899", name: "Rose Pink", subtitle: "Feminine & Soft" },
+                      { color: "#f59e0b", name: "Gold", subtitle: "Premium & Warm" },
+                      { color: "#06b6d4", name: "Cyan", subtitle: "Fresh & Clean" },
+                      { color: "#84cc16", name: "Lime", subtitle: "Natural & Vibrant" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.color}
+                        onClick={() => {
+                          setCustomColor(preset.color);
+                          applyThemeColors(preset.color, darkMode);
+                        }}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          backgroundColor: "white",
+                          border: customColor === preset.color ? "2px solid #374151" : "1px solid #e5e7eb",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px"
+                        }}
+                        title={`${preset.name} - ${preset.subtitle}`}
+                      >
+                        <div 
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
+                            backgroundColor: preset.color,
+                            flexShrink: 0
+                          }}
+                        />
+                        <div style={{ fontSize: "12px", lineHeight: "1.2" }}>
+                          <div style={{ fontWeight: "600", color: "#111827" }}>{preset.name}</div>
+                          <div style={{ color: "#6b7280", fontSize: "10px" }}>{preset.subtitle}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Custom Color Input */}
                 <div style={{ position: "relative" }}>
                   <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
@@ -788,14 +840,12 @@ export default function SettingsMobile() {
                   <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
                     Text Color Presets
                   </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "12px" }}>
                     {[
-                      { primary: "#111827", secondary: "#6b7280", name: "Dark Gray" },
-                      { primary: "#1f2937", secondary: "#9ca3af", name: "Charcoal" },
-                      { primary: "#374151", secondary: "#9ca3af", name: "Medium Gray" },
-                      { primary: "#000000", secondary: "#666666", name: "Black" },
-                      { primary: "#1e40af", secondary: "#3b82f6", name: "Blue" },
-                      { primary: "#7c3aed", secondary: "#8b5cf6", name: "Purple" },
+                      { primary: "#111827", secondary: "#6b7280", name: "Classic Dark", subtitle: "Traditional" },
+                      { primary: "#1f2937", secondary: "#9ca3af", name: "Charcoal", subtitle: "Modern" },
+                      { primary: "#374151", secondary: "#9ca3af", name: "Medium Gray", subtitle: "Balanced" },
+                      { primary: "#000000", secondary: "#666666", name: "Pure Black", subtitle: "Bold" },
                     ].map((preset) => (
                       <button
                         key={preset.name}
@@ -805,21 +855,58 @@ export default function SettingsMobile() {
                           applyTextColors(preset.primary, preset.secondary);
                         }}
                         style={{
-                          padding: "8px",
+                          padding: "10px",
                           borderRadius: "8px",
-                          border: "2px solid #e5e7eb",
+                          border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
                           backgroundColor: "white",
                           cursor: "pointer",
                           textAlign: "left",
                           transition: "all 0.2s"
                         }}
-                        title={preset.name}
+                        title={`${preset.name} - ${preset.subtitle}`}
                       >
-                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600" }}>
-                          Primary
+                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
+                          {preset.name}
                         </div>
-                        <div style={{ color: preset.secondary, fontSize: "11px" }}>
-                          Secondary
+                        <div style={{ color: preset.secondary, fontSize: "10px" }}>
+                          {preset.subtitle}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {/* Brand Text Colors */}
+                  <label style={{ fontSize: "12px", fontWeight: "500", marginBottom: "6px", display: "block", color: "#6b7280" }}>
+                    Brand Text Colors
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                    {[
+                      { primary: "#1e40af", secondary: "#3b82f6", name: "Blue Tone", subtitle: "Professional" },
+                      { primary: "#7c3aed", secondary: "#8b5cf6", name: "Purple Tone", subtitle: "Creative" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => {
+                          setPrimaryTextColor(preset.primary);
+                          setSecondaryTextColor(preset.secondary);
+                          applyTextColors(preset.primary, preset.secondary);
+                        }}
+                        style={{
+                          padding: "10px",
+                          borderRadius: "8px",
+                          border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
+                          backgroundColor: "white",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.2s"
+                        }}
+                        title={`${preset.name} - ${preset.subtitle}`}
+                      >
+                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
+                          {preset.name}
+                        </div>
+                        <div style={{ color: preset.secondary, fontSize: "10px" }}>
+                          {preset.subtitle}
                         </div>
                       </button>
                     ))}
