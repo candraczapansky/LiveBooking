@@ -116,15 +116,21 @@ function replaceTemplateVariables(template: string, variables: Record<string, st
 
 // Check if email should be sent based on client preferences
 function shouldSendEmail(rule: AutomationRule, client: any): boolean {
+  console.log(`Checking email preferences for trigger: ${rule.trigger}`, {
+    emailAccountManagement: client.emailAccountManagement,
+    emailAppointmentReminders: client.emailAppointmentReminders,
+    emailPromotions: client.emailPromotions
+  });
+  
   switch (rule.trigger) {
     case 'booking_confirmation':
-      return client.emailAccountManagement !== false;
+      return client.emailAccountManagement === true;
     case 'appointment_reminder':
-      return client.emailAppointmentReminders !== false;
+      return client.emailAppointmentReminders === true;
     case 'cancellation':
-      return client.emailAccountManagement !== false;
+      return client.emailAccountManagement === true;
     case 'follow_up':
-      return client.emailPromotions !== false;
+      return client.emailPromotions === true;
     default:
       return true;
   }
@@ -132,15 +138,21 @@ function shouldSendEmail(rule: AutomationRule, client: any): boolean {
 
 // Check if SMS should be sent based on client preferences
 function shouldSendSMS(rule: AutomationRule, client: any): boolean {
+  console.log(`Checking SMS preferences for trigger: ${rule.trigger}`, {
+    smsAccountManagement: client.smsAccountManagement,
+    smsAppointmentReminders: client.smsAppointmentReminders,
+    smsPromotions: client.smsPromotions
+  });
+  
   switch (rule.trigger) {
     case 'booking_confirmation':
-      return client.smsAccountManagement !== false;
+      return client.smsAccountManagement === true;
     case 'appointment_reminder':
-      return client.smsAppointmentReminders !== false;
+      return client.smsAppointmentReminders === true;
     case 'cancellation':
-      return client.smsAccountManagement !== false;
+      return client.smsAccountManagement === true;
     case 'follow_up':
-      return client.smsPromotions !== false;
+      return client.smsPromotions === true;
     default:
       return true;
   }
