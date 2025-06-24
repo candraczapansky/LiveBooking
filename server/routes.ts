@@ -63,10 +63,12 @@ const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? Squa
 
 const squareClient = new SquareClient({
   bearerAuthCredentials: {
-    accessToken: squareAccessToken,
+    accessToken: squareAccessToken || '',
   },
   environment: squareEnvironment,
 });
+
+// Square API clients will be accessed directly from squareClient
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
@@ -1279,7 +1281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceId: appointmentId?.toString() || ""
       };
 
-      const { result } = await paymentsApi.createPayment(requestBody);
+      const response = await squareClient.paymentsApi.createPayment(requestBody);
+      const { result } = response;
 
       res.json({ 
         payment: result.payment,
@@ -1360,8 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const paymentsApi = squareClient.payments;
-      const { result } = await paymentsApi.getPayment(paymentId);
+      const { result } = await squareClient.paymentsApi.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
