@@ -55,7 +55,6 @@ const appointmentFormSchema = z.object({
   }),
   time: z.string().min(1, "Time is required"),
   notes: z.string().optional(),
-  sendReminder: z.boolean().default(true),
 });
 
 type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
@@ -181,7 +180,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         date: appointmentDate,
         time: appointmentTime,
         notes: appointment.notes || "",
-        sendReminder: true,
       });
     }
   }, [appointment, appointmentId, form]);
@@ -196,7 +194,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         date: selectedDate || new Date(),
         time: "10:00",
         notes: "",
-        sendReminder: true,
       });
     }
   }, [open, selectedDate, form]);
@@ -583,29 +580,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                 )}
               />
               
-              {/* Send Reminder Option */}
-              <FormField
-                control={form.control}
-                name="sendReminder"
-                render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        disabled={isLoading}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Send Reminder</FormLabel>
-                      <FormDescription>
-                        Send an email reminder to the client 24 hours before the appointment
-                      </FormDescription>
-                    </div>
-                  </FormItem>
-                )}
-              />
-              
+
               {/* Payment Section - Only show for existing appointments */}
               {appointmentId && appointmentId > 0 && appointment && (
                 <div className="border-t pt-4">
