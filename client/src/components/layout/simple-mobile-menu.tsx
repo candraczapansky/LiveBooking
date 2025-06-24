@@ -94,7 +94,7 @@ const SimpleMobileMenu = () => {
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100" style={{ color: 'hsl(0 0% 0%)' }}>
                 BeautyBook
               </h2>
               <button
@@ -132,10 +132,21 @@ const SimpleMobileMenu = () => {
                           ? "bg-primary text-primary-foreground" 
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                       }`}
+                      style={{
+                        color: isActive ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)'
+                      }}
                       onClick={() => closeMenu()}
                     >
-                      <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      <IconComponent 
+                        className="w-4 h-4 mr-3 flex-shrink-0" 
+                        style={{ color: isActive ? 'hsl(0 0% 100%)' : 'hsl(330 81% 60%)' }}
+                      />
+                      <span 
+                        className="truncate" 
+                        style={{ color: isActive ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)' }}
+                      >
+                        {item.label}
+                      </span>
                     </div>
                   </Link>
                 );
@@ -152,9 +163,10 @@ const SimpleMobileMenu = () => {
                   closeMenu();
                 }}
                 className="flex items-center w-full px-3 py-2.5 bg-transparent border-none rounded-lg cursor-pointer text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                style={{ color: 'hsl(0 84% 60%)' }}
               >
-                <LogOut className="w-4 h-4 mr-3" />
-                Sign Out
+                <LogOut className="w-4 h-4 mr-3" style={{ color: 'hsl(0 84% 60%)' }} />
+                <span style={{ color: 'hsl(0 84% 60%)' }}>Sign Out</span>
               </button>
             </div>
           </div>

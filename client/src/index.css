@@ -223,7 +223,17 @@ html:not(.dark) {
   color: hsl(0 0% 0%) !important;
 }
 
-html:not(.dark) * {
+html:not(.dark) *:not(.text-primary):not([class*="text-primary"]):not([class*="text-red"]):not([class*="text-destructive"]) {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Specific mobile menu override */
+html:not(.dark) .mobile-menu,
+html:not(.dark) .mobile-menu *,
+html:not(.dark) [data-mobile-menu],
+html:not(.dark) [data-mobile-menu] *,
+html:not(.dark) .mobile-nav,
+html:not(.dark) .mobile-nav * {
   color: hsl(0 0% 0%) !important;
 }
 
