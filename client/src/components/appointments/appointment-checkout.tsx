@@ -150,9 +150,15 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         });
 
         if (paymentData.payment) {
+          // Confirm the payment in the database
+          await apiRequest("POST", "/api/confirm-payment", {
+            paymentId: paymentData.paymentId,
+            appointmentId: appointment.id
+          });
+
           toast({
             title: "Payment Successful",
-            description: "Your appointment payment has been processed!",
+            description: `Credit card payment of $${appointment.amount} processed successfully`,
           });
           onSuccess();
         } else {
@@ -268,21 +274,28 @@ export default function AppointmentCheckout({
   const handleCashPayment = async () => {
     setIsCashProcessing(true);
     try {
-      await apiRequest("POST", "/api/record-cash-payment", {
-        appointmentId: appointment.id,
+      const paymentData = await apiRequest("POST", "/api/create-payment", {
         amount: appointment.amount,
-        type: "appointment_payment"
+        sourceId: "cash",
+        type: "appointment_payment",
+        appointmentId: appointment.id,
+        description: `Cash payment for ${appointment.serviceName} appointment`
+      });
+
+      await apiRequest("POST", "/api/confirm-payment", {
+        paymentId: paymentData.paymentId,
+        appointmentId: appointment.id
       });
       
       toast({
         title: "Cash Payment Recorded",
-        description: "Cash payment has been recorded successfully.",
+        description: `Cash payment of $${appointment.amount} recorded successfully`,
       });
       onSuccess();
     } catch (error: any) {
       toast({
-        title: "Error",
-        description: error.message || "Failed to record cash payment.",
+        title: "Cash Payment Error",
+        description: error.response?.data?.error || "Failed to record cash payment",
         variant: "destructive",
       });
     } finally {
