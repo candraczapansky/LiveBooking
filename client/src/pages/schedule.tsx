@@ -249,20 +249,28 @@ const SchedulePage = () => {
         ...data,
         dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
       };
+      delete (singleDayData as any).daysOfWeek; // Remove the array field
       updateScheduleMutation.mutate(singleDayData);
     } else {
       // For creating, submit multiple schedules for each selected day
       try {
-        for (const dayOfWeek of data.daysOfWeek) {
+        const promises = data.daysOfWeek.map(async (dayOfWeek) => {
           const singleDayData = {
             ...data,
             dayOfWeek,
           };
-          await apiRequest('/api/schedules', {
+          delete (singleDayData as any).daysOfWeek; // Remove the array field
+          return await fetch('/api/schedules', {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
             body: JSON.stringify(singleDayData),
           });
-        }
+        });
+        
+        await Promise.all(promises);
+        
         toast({
           title: "Success",
           description: `Schedules created for ${data.daysOfWeek.length} day(s)`,
@@ -524,7 +532,6 @@ const SchedulePage = () => {
                                 >
                                   <Checkbox
                                     checked={isSelected}
-                                    readOnly
                                     className="pointer-events-none"
                                   />
                                   <span className="text-sm font-medium">{day}</span>
