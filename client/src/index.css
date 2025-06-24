@@ -218,13 +218,13 @@ main,
   color: hsl(0 0% 0%) !important;
 }
 
-/* Force all text to be black in light mode - comprehensive override */
+/* Use custom text colors in light mode */
 html:not(.dark) {
-  color: hsl(0 0% 0%) !important;
+  color: hsl(var(--text-primary)) !important;
 }
 
 html:not(.dark) *:not(.text-primary):not([class*="text-primary"]):not([class*="text-red"]):not([class*="text-destructive"]) {
-  color: hsl(0 0% 0%) !important;
+  color: hsl(var(--text-primary)) !important;
 }
 
 /* Specific mobile menu override */
@@ -514,7 +514,7 @@ body {
   --secondary: 210 40% 96%;
   --secondary-foreground: 0 0% 0%;
   
-  /* Custom text colors */
+  /* Custom text colors - will be updated by JavaScript */
   --text-primary: 0 0% 0%;
   --text-secondary: 215.4 16.3% 46.9%;
   --accent: 330 81% 60%;
@@ -531,9 +531,7 @@ body {
   --chart-4: 315 70% 58%;
   --chart-5: 48 96% 53%;
   
-  /* Custom text colors for dark mode */
-  --text-primary: 0 0% 98%;
-  --text-secondary: 240 5% 64.9%;
+  /* Dark mode will use same custom text colors */
   
   /* Sidebar colors */
   --sidebar-background: 0 0% 100%;
