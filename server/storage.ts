@@ -263,22 +263,25 @@ export class DatabaseStorage implements IStorage {
     this.currentMarketingCampaignRecipientId = 1;
     this.currentEmailUnsubscribeId = 1;
 
-    // Initialize with admin user
-    this.createUser({
-      username: 'admin',
-      password: 'password', // In a real app, this would be hashed
-      email: 'admin@beautybook.com',
-      role: 'admin',
-      firstName: 'Sarah',
-      lastName: 'Johnson',
-      phone: '555-123-4567'
-    });
-
     // Initialize with sample data for demo purposes
     this.initializeSampleData();
   }
 
-  private initializeSampleData() {
+  private async initializeSampleData() {
+    // Create admin user if not exists
+    const existingAdmin = await this.getUserByUsername('admin');
+    if (!existingAdmin) {
+      await this.createUser({
+        username: 'admin',
+        password: 'password',
+        email: 'admin@beautybook.com',
+        role: 'admin',
+        firstName: 'Sarah',
+        lastName: 'Johnson',
+        phone: '555-123-4567'
+      });
+    }
+
     // Create sample service categories
     this.createServiceCategory({
       name: 'Hair Services',
@@ -364,15 +367,19 @@ export class DatabaseStorage implements IStorage {
       isActive: true
     });
 
-    // Create sample staff user
-    this.createUser({
-      username: 'stylist1',
-      password: 'password',
-      email: 'emma.martinez@beautybook.com',
-      role: 'staff',
-      firstName: 'Emma',
-      lastName: 'Martinez',
-      phone: '555-234-5678'
+    // Create sample staff user (if not exists)
+    this.getUserByUsername('stylist1').then(existingUser => {
+      if (!existingUser) {
+        this.createUser({
+          username: 'stylist1',
+          password: 'password',
+          email: 'emma.martinez@beautybook.com',
+          role: 'staff',
+          firstName: 'Emma',
+          lastName: 'Martinez',
+          phone: '555-234-5678'
+        });
+      }
     });
 
     // Create staff member profile
