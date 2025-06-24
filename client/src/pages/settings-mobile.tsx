@@ -430,7 +430,7 @@ export default function SettingsMobile() {
                         margin: "0 auto"
                       }}
                     >
-                      <Camera style={{ width: "16px", height: "16px" }} />
+                      <Camera style={{ width: "16px", height: "16px", color: primaryTextColor }} />
                       Change Photo
                     </Button>
                   </label>
@@ -498,7 +498,7 @@ export default function SettingsMobile() {
                         borderColor: customColor
                       }}
                     >
-                      <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
+                      <Save style={{ width: "18px", height: "18px", marginRight: "8px", color: "white" }} />
                       {updateProfileMutation.isPending ? "Saving..." : "Save"}
                     </Button>
                     <Button variant="outline" onClick={() => setIsEditingProfile(false)} style={{ flex: 1, height: "48px", fontSize: "16px" }}>
@@ -581,7 +581,7 @@ export default function SettingsMobile() {
                 display: "flex",
                 alignItems: "center"
               }}>
-                <Palette style={{ width: "20px", height: "20px", marginRight: "8px" }} />
+                <Palette style={{ width: "20px", height: "20px", marginRight: "8px", color: primaryTextColor }} />
                 Appearance
               </h2>
               
@@ -598,11 +598,11 @@ export default function SettingsMobile() {
               }}>
                 <div style={{ display: "flex", alignItems: "center" }}>
                   {darkMode ? (
-                    <Moon style={{ width: "20px", height: "20px", marginRight: "12px", color: "#6366f1" }} />
+                    <Moon style={{ width: "20px", height: "20px", marginRight: "12px", color: primaryTextColor }} />
                   ) : (
-                    <Sun style={{ width: "20px", height: "20px", marginRight: "12px", color: "#f59e0b" }} />
+                    <Sun style={{ width: "20px", height: "20px", marginRight: "12px", color: primaryTextColor }} />
                   )}
-                  <span style={{ fontSize: "16px", fontWeight: "500", color: "#111827" }}>Dark Mode</span>
+                  <span style={{ fontSize: "16px", fontWeight: "500", color: primaryTextColor }}>Dark Mode</span>
                 </div>
                 <Switch
                   checked={darkMode}
@@ -617,13 +617,13 @@ export default function SettingsMobile() {
 
               {/* Theme Colors */}
               <div style={{ marginBottom: "24px" }}>
-                <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
+                <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: primaryTextColor }}>
                   Primary Color
                 </label>
                 
                 {/* Color Preset Options */}
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: secondaryTextColor }}>
                     Quick Colors
                   </label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
@@ -1152,7 +1152,7 @@ export default function SettingsMobile() {
                   borderColor: customColor
                 }}
               >
-                <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
+                <Save style={{ width: "18px", height: "18px", marginRight: "8px", color: "white" }} />
                 Save Appearance Settings
               </Button>
             </div>
