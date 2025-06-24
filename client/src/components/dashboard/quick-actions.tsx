@@ -12,9 +12,12 @@ const QuickActions = () => {
   const { user } = useContext(AuthContext);
 
   const handleNewAppointment = () => {
+    console.log('New Appointment clicked, user:', user);
     if (user?.role === 'admin' || user?.role === 'staff') {
+      console.log('Navigating to appointments with new=true');
       navigate('/appointments?new=true');
     } else {
+      console.log('Permission denied for user role:', user?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to create appointments.",
@@ -24,9 +27,12 @@ const QuickActions = () => {
   };
 
   const handleAddClient = () => {
+    console.log('Add Client clicked, user:', user);
     if (user?.role === 'admin' || user?.role === 'staff') {
+      console.log('Navigating to clients with new=true');
       navigate('/clients?new=true');
     } else {
+      console.log('Permission denied for user role:', user?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to add clients.",
@@ -36,9 +42,12 @@ const QuickActions = () => {
   };
 
   const handleSendPromotion = () => {
+    console.log('Send Promotion clicked, user:', user);
     if (user?.role === 'admin') {
+      console.log('Navigating to marketing with new=true');
       navigate('/marketing?new=true');
     } else {
+      console.log('Permission denied for user role:', user?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to send promotions.",
