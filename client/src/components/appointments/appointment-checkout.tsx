@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CreditCard, Calendar, User, Clock, DollarSign } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -40,74 +39,51 @@ interface CheckoutFormProps {
 const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentForm, setPaymentForm] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [cardElement, setCardElement] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     initializeSquarePaymentForm();
-    return () => {
-      if (paymentForm) {
-        paymentForm.destroy();
-      }
-    };
   }, []);
 
   const initializeSquarePaymentForm = async () => {
     try {
-      // Load Square Web SDK if not already loaded
-      if (!window.Square) {
-        const script = document.createElement('script');
-        // Use sandbox SDK for sandbox App IDs
-        const isSandbox = SQUARE_APP_ID?.includes('sandbox');
-        script.src = isSandbox 
-          ? 'https://sandbox.web.squarecdn.com/v1/square.js' 
-          : 'https://web.squarecdn.com/v1/square.js';
-        script.async = true;
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
+      setIsLoading(true);
+      setError(null);
 
       if (!SQUARE_APP_ID) {
         throw new Error('Square Application ID not configured');
       }
-      
+
+      // Load Square Web SDK
+      if (!window.Square) {
+        const script = document.createElement('script');
+        const isSandbox = SQUARE_APP_ID.includes('sandbox');
+        script.src = isSandbox 
+          ? 'https://sandbox.web.squarecdn.com/v1/square.js' 
+          : 'https://web.squarecdn.com/v1/square.js';
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load Square SDK'));
+          document.head.appendChild(script);
+        });
+      }
+
+      // Initialize Square payments
       const payments = window.Square.payments(SQUARE_APP_ID);
-      const card = await payments.card({
-        style: {
-          input: {
-            fontSize: '16px',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-            color: '#000',
-            backgroundColor: '#fff'
-          },
-          '.input-container': {
-            borderColor: '#e5e7eb',
-            borderRadius: '0.375rem'
-          }
-        }
-      });
+      const card = await payments.card();
+      
+      // Attach to element
       await card.attach('#square-card-element');
       
-      setPaymentForm(payments);
       setCardElement(card);
+      setIsLoading(false);
     } catch (error: any) {
       console.error('Error initializing Square payment form:', error);
-      
-      let errorMessage = "Failed to load payment form. Please refresh the page.";
-      if (error.name === 'ApplicationIdEnvironmentMismatchError') {
-        errorMessage = "Square Application ID environment mismatch. Please check your Square configuration.";
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      toast({
-        title: "Payment Form Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      setError(error.message || 'Failed to load payment form');
+      setIsLoading(false);
     }
   };
 
@@ -116,8 +92,8 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
 
     if (!cardElement) {
       toast({
-        title: "Payment Form Not Ready",
-        description: "Please wait for the payment form to load.",
+        title: "Payment Error",
+        description: "Payment form not ready. Please try again.",
         variant: "destructive",
       });
       return;
@@ -169,17 +145,40 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     }
   };
 
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+            Payment Form Error
+          </h3>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={onCancel} className="flex-1">
+            Back
+          </Button>
+          <Button onClick={initializeSquarePaymentForm} className="flex-1">
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Payment Information</h3>
-        <div id="square-card-element" className="min-h-[80px] p-3 border rounded-md bg-white">
+        
+        <div id="square-card-element" className="min-h-[60px] border rounded-lg p-3 bg-white">
           {/* Square Card element will be mounted here */}
         </div>
-        {!cardElement && (
-          <div className="flex items-center justify-center text-muted-foreground text-sm mt-2">
+        
+        {isLoading && (
+          <div className="flex items-center justify-center text-sm text-muted-foreground">
             <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
-            Loading payment form...
+            Loading secure payment form...
           </div>
         )}
       </div>
@@ -196,7 +195,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         </Button>
         <Button 
           type="submit" 
-          disabled={!cardElement || isProcessing}
+          disabled={!cardElement || isProcessing || isLoading}
           className="flex-1"
         >
           {isProcessing ? (
@@ -275,9 +274,8 @@ export default function AppointmentCheckout({
               <p className="font-mono mt-1">
                 <strong>Card Number:</strong> 4242 4242 4242 4242<br />
                 <strong>Expiry:</strong> 12/25 (any future date)<br />
-                <strong>CVC:</strong> 123 (any valid ZIP)<br />
-                <strong>Name:</strong> Test User<br />
-                <strong>ZIP Code:</strong> 12345 (any valid ZIP)
+                <strong>CVC:</strong> 123<br />
+                <strong>ZIP Code:</strong> 12345
               </p>
             </div>
           </div>
