@@ -49,6 +49,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download } from "lucide-react";
@@ -876,17 +877,18 @@ const ClientsPage = () => {
                       control={addForm.control}
                       name="emailAccountManagement"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
                           <FormControl>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={field.value}
-                              onChange={field.onChange}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="text-sm">Account Management</FormLabel>
+                          <div className="space-y-1 leading-none flex-1">
+                            <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                              Account Management
+                            </FormLabel>
                             <FormDescription className="text-xs">Login alerts, password changes, account updates</FormDescription>
                           </div>
                         </FormItem>
@@ -897,17 +899,18 @@ const ClientsPage = () => {
                       control={addForm.control}
                       name="emailAppointmentReminders"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
                           <FormControl>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={field.value}
-                              onChange={field.onChange}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                          <div className="space-y-1 leading-none flex-1">
+                            <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                              Appointment Reminders
+                            </FormLabel>
                             <FormDescription className="text-xs">Booking confirmations and upcoming appointment alerts</FormDescription>
                           </div>
                         </FormItem>
@@ -918,17 +921,18 @@ const ClientsPage = () => {
                       control={addForm.control}
                       name="emailPromotions"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
                           <FormControl>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={field.value}
-                              onChange={field.onChange}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="text-sm">Promotions & Marketing</FormLabel>
+                          <div className="space-y-1 leading-none flex-1">
+                            <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                              Promotions & Marketing
+                            </FormLabel>
                             <FormDescription className="text-xs">Special offers, new services, and promotional content</FormDescription>
                           </div>
                         </FormItem>
@@ -942,17 +946,18 @@ const ClientsPage = () => {
                       control={addForm.control}
                       name="smsAccountManagement"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
                           <FormControl>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={field.value}
-                              onChange={field.onChange}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="text-sm">Account Management</FormLabel>
+                          <div className="space-y-1 leading-none flex-1">
+                            <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                              Account Management
+                            </FormLabel>
                             <FormDescription className="text-xs">Critical account security alerts via text</FormDescription>
                           </div>
                         </FormItem>
@@ -963,17 +968,18 @@ const ClientsPage = () => {
                       control={addForm.control}
                       name="smsAppointmentReminders"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 py-2">
                           <FormControl>
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={field.value}
-                              onChange={field.onChange}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onCheckedChange={field.onChange}
+                              className="mt-0.5"
                             />
                           </FormControl>
-                          <div className="space-y-1 leading-none">
-                            <FormLabel className="text-sm">Appointment Reminders</FormLabel>
+                          <div className="space-y-1 leading-none flex-1">
+                            <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
+                              Appointment Reminders
+                            </FormLabel>
                             <FormDescription className="text-xs">Text reminders for upcoming appointments</FormDescription>
                           </div>
                         </FormItem>
