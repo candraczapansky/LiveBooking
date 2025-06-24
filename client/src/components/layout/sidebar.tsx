@@ -57,7 +57,7 @@ const Sidebar = () => {
 
   // For mobile, show/hide based on isOpen. For desktop, always show.
   const sidebarClass = isMobile 
-    ? `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-red-500 shadow-xl transition-all duration-300 ${
+    ? `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
         isOpen ? "block translate-x-0" : "hidden -translate-x-full"
       }`
     : "sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl";

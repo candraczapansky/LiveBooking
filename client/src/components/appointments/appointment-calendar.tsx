@@ -58,10 +58,10 @@ type AppointmentCalendarProps = {
 };
 
 const statusColors = {
-  confirmed: "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100",
-  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100",
-  cancelled: "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100",
-  completed: "bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100",
+  confirmed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+  pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
+  cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
+  completed: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground",
 };
 
 const AppointmentCalendar = ({
@@ -142,15 +142,15 @@ const AppointmentCalendar = ({
           />
           <div className="mt-4 space-y-2">
             <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+              <div className="w-3 h-3 rounded-full bg-green-100 border-2 border-green-500 mr-2"></div>
               <span className="text-sm">Available</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+              <div className="w-3 h-3 rounded-full bg-red-100 border-2 border-red-500 mr-2"></div>
               <span className="text-sm">Fully Booked</span>
             </div>
             <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+              <div className="w-3 h-3 rounded-full bg-yellow-100 border-2 border-yellow-500 mr-2"></div>
               <span className="text-sm">Limited Availability</span>
             </div>
           </div>
