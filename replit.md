@@ -68,6 +68,9 @@ Preferred communication style: Simple, everyday language.
   - Enhanced error messaging for SMS campaigns with invalid phone numbers
   - Fixed SMS delivery issues by properly validating phone number formats
   - Updated client feedback to clearly indicate SMS marketing requirements
+- **Fixed membership dialog mobile scrolling:**
+  - Added proper overflow and height constraints to membership form popup
+  - Ensured add/edit membership dialog scrolls properly on mobile devices
 
 ## System Architecture
 
