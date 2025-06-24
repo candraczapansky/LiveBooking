@@ -626,7 +626,7 @@ export default function SettingsMobile() {
                   <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
                     Quick Colors
                   </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: "8px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
                     {[
                       { color: "#3b82f6", name: "Blue" },
                       { color: "#8b5cf6", name: "Purple" },
@@ -642,16 +642,24 @@ export default function SettingsMobile() {
                           applyThemeColors(preset.color, darkMode);
                         }}
                         style={{
-                          width: "40px",
-                          height: "40px",
+                          height: "56px",
                           borderRadius: "8px",
                           backgroundColor: preset.color,
                           border: customColor === preset.color ? "3px solid #374151" : "2px solid #e5e7eb",
                           cursor: "pointer",
-                          transition: "all 0.2s"
+                          transition: "all 0.2s",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "white",
+                          fontWeight: "500",
+                          fontSize: "14px",
+                          textShadow: "0 1px 2px rgba(0,0,0,0.3)"
                         }}
                         title={preset.name}
-                      />
+                      >
+                        {preset.name}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -687,70 +695,82 @@ export default function SettingsMobile() {
                   </div>
                   
                   {savedBrandColors.length > 0 ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
                       {savedBrandColors.map((preset, index) => (
-                        <button
+                        <div
                           key={index}
-                          onClick={() => {
-                            setCustomColor(preset.color);
-                            applyThemeColors(preset.color, darkMode);
-                          }}
                           style={{
-                            padding: "10px",
+                            padding: "12px",
                             borderRadius: "8px",
                             backgroundColor: "white",
                             border: customColor === preset.color ? "2px solid #374151" : "1px solid #e5e7eb",
-                            cursor: "pointer",
                             transition: "all 0.2s",
                             textAlign: "left",
                             display: "flex",
                             alignItems: "center",
-                            gap: "8px",
-                            position: "relative"
+                            gap: "10px",
+                            position: "relative",
+                            minHeight: "56px"
                           }}
-                          title={preset.name}
                         >
-                          <div 
-                            style={{
-                              width: "24px",
-                              height: "24px",
-                              borderRadius: "6px",
-                              backgroundColor: preset.color,
-                              flexShrink: 0
-                            }}
-                          />
-                          <div style={{ fontSize: "12px", lineHeight: "1.2", flex: 1 }}>
-                            <div style={{ fontWeight: "600", color: "#111827" }}>{preset.name}</div>
-                            <div style={{ color: "#6b7280", fontSize: "10px" }}>{preset.color}</div>
-                          </div>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
+                              setCustomColor(preset.color);
+                              applyThemeColors(preset.color, darkMode);
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "10px",
+                              flex: 1,
+                              backgroundColor: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              padding: "0"
+                            }}
+                            title={`Select ${preset.name}`}
+                          >
+                            <div 
+                              style={{
+                                width: "28px",
+                                height: "28px",
+                                borderRadius: "6px",
+                                backgroundColor: preset.color,
+                                flexShrink: 0,
+                                border: "1px solid #e5e7eb"
+                              }}
+                            />
+                            <div style={{ fontSize: "13px", lineHeight: "1.3", flex: 1 }}>
+                              <div style={{ fontWeight: "600", color: "#111827", marginBottom: "2px" }}>{preset.name}</div>
+                              <div style={{ color: "#6b7280", fontSize: "11px" }}>{preset.color}</div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
                               const updated = savedBrandColors.filter((_, i) => i !== index);
                               setSavedBrandColors(updated);
                               localStorage.setItem('savedBrandColors', JSON.stringify(updated));
                             }}
                             style={{
-                              position: "absolute",
-                              top: "2px",
-                              right: "2px",
-                              width: "16px",
-                              height: "16px",
+                              width: "24px",
+                              height: "24px",
                               backgroundColor: "#ef4444",
                               color: "white",
                               border: "none",
-                              borderRadius: "2px",
-                              fontSize: "10px",
+                              borderRadius: "4px",
+                              fontSize: "12px",
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center"
+                              justifyContent: "center",
+                              flexShrink: 0
                             }}
                             title="Delete"
                           >
                             ×
                           </button>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
@@ -772,22 +792,39 @@ export default function SettingsMobile() {
                   <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
                     Custom Color
                   </label>
-                  <input
-                    type="color"
-                    id="color-picker"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    style={{ 
-                      width: "100%", 
-                      height: "48px", 
-                      border: "2px solid #e5e7eb", 
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      backgroundColor: "white",
-                      WebkitAppearance: "none",
-                      padding: "4px"
-                    }}
-                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <input
+                      type="color"
+                      id="color-picker"
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      style={{ 
+                        width: "80px", 
+                        height: "56px", 
+                        border: "2px solid #e5e7eb", 
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        backgroundColor: "white",
+                        WebkitAppearance: "none",
+                        padding: "4px"
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={customColor}
+                      onChange={(e) => setCustomColor(e.target.value)}
+                      style={{
+                        flex: 1,
+                        height: "56px",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "8px",
+                        padding: "0 16px",
+                        fontSize: "16px",
+                        fontFamily: "monospace"
+                      }}
+                      placeholder="#f4a4c0"
+                    />
+                  </div>
                   <div 
                     style={{
                       position: "absolute",
@@ -925,7 +962,7 @@ export default function SettingsMobile() {
                   <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
                     Text Color Presets
                   </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px", marginBottom: "12px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "16px" }}>
                     {[
                       { primary: "#111827", secondary: "#6b7280", name: "Classic Dark", subtitle: "Traditional" },
                       { primary: "#1f2937", secondary: "#9ca3af", name: "Charcoal", subtitle: "Modern" },
@@ -940,20 +977,24 @@ export default function SettingsMobile() {
                           applyTextColors(preset.primary, preset.secondary);
                         }}
                         style={{
-                          padding: "10px",
+                          padding: "12px",
                           borderRadius: "8px",
                           border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
                           backgroundColor: "white",
                           cursor: "pointer",
                           textAlign: "left",
-                          transition: "all 0.2s"
+                          transition: "all 0.2s",
+                          minHeight: "64px",
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "center"
                         }}
                         title={`${preset.name} - ${preset.subtitle}`}
                       >
-                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
+                        <div style={{ color: preset.primary, fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>
                           {preset.name}
                         </div>
-                        <div style={{ color: preset.secondary, fontSize: "10px" }}>
+                        <div style={{ color: preset.secondary, fontSize: "12px" }}>
                           {preset.subtitle}
                         </div>
                       </button>
@@ -994,61 +1035,96 @@ export default function SettingsMobile() {
                   </div>
                   
                   {savedTextColors.length > 0 ? (
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(1, 1fr)", gap: "12px" }}>
                       {savedTextColors.map((preset, index) => (
-                        <button
+                        <div
                           key={index}
-                          onClick={() => {
-                            setPrimaryTextColor(preset.primary);
-                            setSecondaryTextColor(preset.secondary);
-                            applyTextColors(preset.primary, preset.secondary);
-                          }}
                           style={{
-                            padding: "10px",
+                            padding: "12px",
                             borderRadius: "8px",
                             border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
                             backgroundColor: "white",
-                            cursor: "pointer",
-                            textAlign: "left",
                             transition: "all 0.2s",
-                            position: "relative"
+                            textAlign: "left",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "12px",
+                            minHeight: "60px"
                           }}
-                          title={preset.name}
                         >
-                          <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
-                            {preset.name}
-                          </div>
-                          <div style={{ color: preset.secondary, fontSize: "10px" }}>
-                            Primary: {preset.primary} | Secondary: {preset.secondary}
-                          </div>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
+                              setPrimaryTextColor(preset.primary);
+                              setSecondaryTextColor(preset.secondary);
+                              applyTextColors(preset.primary, preset.secondary);
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: "12px",
+                              flex: 1,
+                              backgroundColor: "transparent",
+                              border: "none",
+                              cursor: "pointer",
+                              textAlign: "left",
+                              padding: "0"
+                            }}
+                            title={`Select ${preset.name}`}
+                          >
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                              <div 
+                                style={{
+                                  width: "20px",
+                                  height: "20px",
+                                  borderRadius: "4px",
+                                  backgroundColor: preset.primary,
+                                  border: "1px solid #e5e7eb"
+                                }}
+                              />
+                              <div 
+                                style={{
+                                  width: "20px",
+                                  height: "20px",
+                                  borderRadius: "4px",
+                                  backgroundColor: preset.secondary,
+                                  border: "1px solid #e5e7eb"
+                                }}
+                              />
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ color: preset.primary, fontSize: "14px", fontWeight: "600", marginBottom: "2px" }}>
+                                {preset.name}
+                              </div>
+                              <div style={{ color: preset.secondary, fontSize: "12px" }}>
+                                Primary: {preset.primary} | Secondary: {preset.secondary}
+                              </div>
+                            </div>
+                          </button>
+                          <button
+                            onClick={() => {
                               const updated = savedTextColors.filter((_, i) => i !== index);
                               setSavedTextColors(updated);
                               localStorage.setItem('savedTextColors', JSON.stringify(updated));
                             }}
                             style={{
-                              position: "absolute",
-                              top: "2px",
-                              right: "2px",
-                              width: "16px",
-                              height: "16px",
+                              width: "28px",
+                              height: "28px",
                               backgroundColor: "#ef4444",
                               color: "white",
                               border: "none",
-                              borderRadius: "2px",
-                              fontSize: "10px",
+                              borderRadius: "4px",
+                              fontSize: "14px",
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
-                              justifyContent: "center"
+                              justifyContent: "center",
+                              flexShrink: 0
                             }}
                             title="Delete"
                           >
                             ×
                           </button>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   ) : (
