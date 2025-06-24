@@ -8,12 +8,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/utils";
 import { format } from "date-fns";
-import SquareSetup from "../square-setup";
 
 // Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID || 
-                     localStorage.getItem('VITE_SQUARE_APPLICATION_ID') || 
-                     'sandbox-sq0idb-your-app-id';
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
 // Declare Square global types
 declare global {
@@ -69,6 +66,10 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         });
       }
 
+      if (!SQUARE_APP_ID) {
+        throw new Error('Square Application ID not configured');
+      }
+      
       const payments = window.Square.payments(SQUARE_APP_ID, 'main'); // Use 'main' for sandbox location
       const card = await payments.card({
         style: {
@@ -88,11 +89,11 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       
       setPaymentForm(payments);
       setCardElement(card);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing Square payment form:', error);
       toast({
         title: "Payment Form Error",
-        description: "Failed to load payment form. Please refresh the page.",
+        description: error.message || "Failed to load payment form. Please refresh the page.",
         variant: "destructive",
       });
     }
@@ -217,15 +218,7 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
   const [isCashProcessing, setIsCashProcessing] = useState(false);
-  const [showSquareSetup, setShowSquareSetup] = useState(false);
   const { toast } = useToast();
-
-  // Check if Square is configured
-  const isSquareConfigured = () => {
-    const appId = import.meta.env.VITE_SQUARE_APPLICATION_ID || localStorage.getItem('VITE_SQUARE_APPLICATION_ID');
-    const locationId = localStorage.getItem('SQUARE_LOCATION_ID');
-    return appId && locationId && appId !== 'sandbox-sq0idb-your-app-id';
-  };
 
   const handleCashPayment = async () => {
     setIsCashProcessing(true);
@@ -281,11 +274,6 @@ export default function AppointmentCheckout({
   };
 
   if (!isOpen) return null;
-
-  // Show Square setup if not configured
-  if (showSquareSetup || !isSquareConfigured()) {
-    return <SquareSetup onComplete={() => setShowSquareSetup(false)} />;
-  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -351,13 +339,7 @@ export default function AppointmentCheckout({
                 <Button
                   variant="outline"
                   className="h-20 flex flex-col gap-2"
-                  onClick={() => {
-                    if (!isSquareConfigured()) {
-                      setShowSquareSetup(true);
-                    } else {
-                      setPaymentMethod('card');
-                    }
-                  }}
+                  onClick={() => setPaymentMethod('card')}
                 >
                   <CreditCard className="w-6 h-6" />
                   <span>Credit Card</span>
