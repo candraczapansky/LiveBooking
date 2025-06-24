@@ -503,7 +503,8 @@ const MarketingPage = () => {
                 </div>
                 <Button 
                   onClick={() => activeTab === "campaigns" ? setIsCampaignFormOpen(true) : setIsPromoFormOpen(true)}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto min-h-[44px]"
+                  size="default"
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">{activeTab === "campaigns" ? "New Campaign" : "New Promo"}</span>
@@ -537,7 +538,11 @@ const MarketingPage = () => {
                           ? "No campaigns match your search criteria. Try a different search term."
                           : "Create your first marketing campaign to reach out to your clients."}
                       </p>
-                      <Button onClick={() => setIsCampaignFormOpen(true)}>
+                      <Button 
+                        onClick={() => setIsCampaignFormOpen(true)}
+                        className="min-h-[44px]"
+                        size="default"
+                      >
                         <PlusCircle className="h-4 w-4 mr-2" />
                         Create Campaign
                       </Button>
@@ -703,16 +708,16 @@ const MarketingPage = () => {
                             <div className="flex space-x-2">
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
+                                size="default"
+                                className="min-h-[44px] min-w-[44px] p-3"
                                 onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code editing will be available soon!" })}
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                               <Button
                                 variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive"
+                                size="default"
+                                className="min-h-[44px] min-w-[44px] p-3 text-destructive"
                                 onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code deletion will be available soon!" })}
                               >
                                 <Trash2 className="h-4 w-4" />

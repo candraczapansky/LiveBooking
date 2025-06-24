@@ -298,6 +298,12 @@ body {
     -webkit-tap-highlight-color: transparent !important;
     -webkit-user-select: none !important;
     user-select: none !important;
+    padding: 0.75rem !important;
+  }
+  
+  /* Exception for buttons that already have adequate padding */
+  button[class*="px-"], button[class*="py-"] {
+    padding: revert !important;
   }
   
   /* Tables responsive handling */
