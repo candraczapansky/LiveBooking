@@ -56,8 +56,12 @@ export default function SettingsMobile() {
   const [selectedTheme, setSelectedTheme] = useState('blue');
   const [customColor, setCustomColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#6b7280');
-  const [primaryTextColor, setPrimaryTextColor] = useState('#111827');
-  const [secondaryTextColor, setSecondaryTextColor] = useState('#6b7280');
+  const [primaryTextColor, setPrimaryTextColor] = useState(() => {
+    return localStorage.getItem('primaryTextColor') || '#111827';
+  });
+  const [secondaryTextColor, setSecondaryTextColor] = useState(() => {
+    return localStorage.getItem('secondaryTextColor') || '#6b7280';
+  });
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;

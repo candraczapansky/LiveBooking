@@ -666,10 +666,7 @@ label,
 .text-gray-400,
 .text-sm,
 p,
-span:not(.font-semibold):not(.font-medium):not(.font-bold) {
-  color: hsl(var(--text-secondary)) !important;
-}
-/* Additional secondary text elements */
+span:not(.font-semibold):not(.font-medium):not(.font-bold),
 .text-muted,
 .description,
 small {
