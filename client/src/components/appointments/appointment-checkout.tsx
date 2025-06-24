@@ -160,7 +160,9 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
             title: "Payment Successful",
             description: `Credit card payment of $${appointment.amount} processed successfully`,
           });
-          onSuccess();
+          
+          // Show success screen
+          setIsPaymentComplete(true);
         } else {
           throw new Error('Payment processing failed');
         }
@@ -269,6 +271,7 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
   const [isCashProcessing, setIsCashProcessing] = useState(false);
+  const [isPaymentComplete, setIsPaymentComplete] = useState(false);
   const { toast } = useToast();
 
   const handleCashPayment = async () => {
@@ -291,8 +294,7 @@ export default function AppointmentCheckout({
         title: "Cash Payment Recorded",
         description: `Cash payment of $${appointment.amount} recorded successfully`,
       });
-      setPaymentMethod(null);
-      onSuccess();
+      setIsPaymentComplete(true);
     } catch (error: any) {
       toast({
         title: "Cash Payment Error",
@@ -332,6 +334,41 @@ export default function AppointmentCheckout({
   };
 
   if (!isOpen) return null;
+
+  // Show payment success screen
+  if (isPaymentComplete) {
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <CardTitle className="text-green-800 dark:text-green-200">Payment Complete!</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-muted-foreground">
+              Your payment of {formatPrice(appointment.amount)} has been processed successfully.
+            </p>
+            <Button 
+              onClick={() => {
+                setIsPaymentComplete(false);
+                setPaymentMethod(null);
+                setIsCashProcessing(false);
+                onSuccess();
+                onClose();
+              }}
+              className="w-full"
+            >
+              Close
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -420,10 +457,7 @@ export default function AppointmentCheckout({
               {showTestModeNotice()}
               <CheckoutForm
                 appointment={appointment}
-                onSuccess={() => {
-                  onSuccess();
-                  onClose();
-                }}
+                onSuccess={() => setIsPaymentComplete(true)}
                 onCancel={() => setPaymentMethod(null)}
               />
             </div>
@@ -459,7 +493,12 @@ export default function AppointmentCheckout({
           {/* Cancel Button */}
           {!paymentMethod && (
             <div className="flex justify-end">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={() => {
+                setPaymentMethod(null);
+                setIsCashProcessing(false);
+                setIsPaymentComplete(false);
+                onClose();
+              }}>
                 Cancel
               </Button>
             </div>
