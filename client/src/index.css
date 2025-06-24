@@ -188,6 +188,24 @@ main,
   [role="button"] {
     min-height: 44px;
     min-width: 44px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+  }
+  
+  /* Icon buttons need adequate touch area */
+  button:has(svg:only-child), 
+  [role="button"]:has(svg:only-child) {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.75rem;
+  }
+  
+  /* Small buttons should still meet minimum touch targets */
+  .btn-sm, 
+  button[class*="size-sm"] {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 0.5rem 0.75rem;
   }
 }
 

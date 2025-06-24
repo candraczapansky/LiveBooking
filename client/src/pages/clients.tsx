@@ -438,12 +438,17 @@ const ClientsPage = () => {
                     <Button
                       variant="outline"
                       onClick={handleExportClients}
-                      className="mr-2"
+                      className="mr-2 min-h-[44px]"
+                      size="default"
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export CSV
                     </Button>
-                    <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Button 
+                      onClick={() => setIsAddDialogOpen(true)}
+                      className="min-h-[44px]"
+                      size="default"
+                    >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       Add Client
                     </Button>
@@ -537,7 +542,11 @@ const ClientsPage = () => {
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
+                                <Button 
+                                  variant="ghost" 
+                                  size="default"
+                                  className="min-h-[44px] min-w-[44px] p-2"
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>

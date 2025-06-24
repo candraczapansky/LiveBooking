@@ -682,8 +682,8 @@ const AppointmentsPage = () => {
                     
                     <Button
                       onClick={handleAddAppointment}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10"
-                      size="sm"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px]"
+                      size="default"
                     >
                       <PlusCircle className="mr-2 h-4 w-4 text-primary-foreground" />
                       <span className="hidden sm:inline">New Appointment</span>
@@ -697,8 +697,9 @@ const AppointmentsPage = () => {
                 <div className="flex items-center space-x-2">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={() => navigateDate('prev')}
+                    className="min-h-[44px] min-w-[44px] p-3"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -709,8 +710,9 @@ const AppointmentsPage = () => {
                   
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={() => navigateDate('next')}
+                    className="min-h-[44px] min-w-[44px] p-3"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
