@@ -424,34 +424,36 @@ const ClientsPage = () => {
                       Manage your salon clients
                     </p>
                   </div>
-                  <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                    <div className="relative">
+                  <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center gap-4">
+                    <div className="relative flex-1 sm:flex-none">
                       <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
                       <Input
                         type="search"
                         placeholder="Search clients..."
-                        className="pl-8 w-[250px]"
+                        className="pl-8 w-full sm:w-[250px]"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={handleExportClients}
-                      className="mr-2 min-h-[44px]"
-                      size="default"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export CSV
-                    </Button>
-                    <Button 
-                      onClick={() => setIsAddDialogOpen(true)}
-                      className="min-h-[44px]"
-                      size="default"
-                    >
-                      <PlusCircle className="h-4 w-4 mr-2" />
-                      Add Client
-                    </Button>
+                    <div className="flex gap-2 sm:gap-4">
+                      <Button
+                        variant="outline"
+                        onClick={handleExportClients}
+                        className="flex-1 sm:flex-none min-h-[44px]"
+                        size="default"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export CSV
+                      </Button>
+                      <Button 
+                        onClick={() => setIsAddDialogOpen(true)}
+                        className="flex-1 sm:flex-none min-h-[44px]"
+                        size="default"
+                      >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Add Client
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </>
