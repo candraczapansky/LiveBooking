@@ -1274,19 +1274,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sourceId: sourceId,
         amountMoney: {
           amount: BigInt(Math.round(amount * 100)), // Convert to cents
-          currency: 'USD'
+          currency: 'USD' as any
         },
         idempotencyKey: `${Date.now()}-${Math.random()}`,
         note: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
         referenceId: appointmentId?.toString() || ""
       };
 
-      const response = await squareClient.payments.createPayment(requestBody);
-      const { result } = response;
+      const response = await squareClient.payments.create(requestBody);
 
       res.json({ 
-        payment: result.payment,
-        paymentId: result.payment?.id
+        payment: response.payment,
+        paymentId: response.payment?.id
       });
     } catch (error: any) {
       console.error('Square payment creation error:', error);
@@ -1363,9 +1362,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const { result } = await squareClient.payments.getPayment(paymentId);
+      const response = await squareClient.payments.get(paymentId);
       
-      if (result.payment?.status === 'COMPLETED') {
+      if (response.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
         const appointment = await storage.getAppointment(appointmentId);
         if (appointment) {
@@ -2071,8 +2070,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phoneNumber: user.phone || ''
         };
 
-        const { result } = await squareClient.customers.createCustomer({ requestBody });
-        customerId = result.customer?.id;
+        const response = await squareClient.customers.create(requestBody);
+        customerId = response.customer?.id;
         
         if (customerId) {
           await storage.updateUserSquareCustomerId(clientId, customerId);
@@ -2104,14 +2103,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const requestBody = {
         sourceId: cardNonce,
+        idempotencyKey: `${Date.now()}-${Math.random()}`,
         card: {
           customerId: customerId
         }
       };
 
-      const { result } = await squareClient.cards.createCard(requestBody);
+      const response = await squareClient.cards.create(requestBody);
       
-      if (!result.card) {
+      if (!response.card) {
         return res.status(400).json({ error: "Failed to create card" });
       }
 
@@ -2162,7 +2162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Disable card in Square
-      await squareClient.cards.disableCard(paymentMethod.squareCardId, {});
+      await squareClient.cards.disable({ cardId: paymentMethod.squareCardId });
       
       // Delete from database
       await storage.deleteSavedPaymentMethod(id);

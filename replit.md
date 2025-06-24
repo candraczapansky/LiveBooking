@@ -131,6 +131,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Successfully configured Square Web SDK with proper environment detection
   - Fixed ApplicationIdEnvironmentMismatchError by using correct sandbox/production URLs
   - Credit card payment form now displays properly in appointment checkout
+  - Resolved Square API method naming issues (using create/get instead of createPayment/getPayment)
   - Square payment tokenization and processing fully functional
   - Added proper error handling for Square configuration issues
   - Cash payment option available as alternative payment method
