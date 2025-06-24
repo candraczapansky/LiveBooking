@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -88,14 +88,21 @@ const SchedulePage = () => {
   useEffect(() => {
     const checkSidebarState = () => {
       const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
+      if (globalSidebarState !== undefined && globalSidebarState !== sidebarOpen) {
         setSidebarOpen(globalSidebarState);
       }
     };
 
-    const interval = setInterval(checkSidebarState, 100);
+    // Check immediately
+    checkSidebarState();
+    
+    // Then check periodically, but less frequently
+    const interval = setInterval(checkSidebarState, 500);
     return () => clearInterval(interval);
-  }, []);
+  }, [sidebarOpen]);
+
+  // Memoize the default date to prevent re-creation on every render
+  const defaultStartDate = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
@@ -107,7 +114,7 @@ const SchedulePage = () => {
       location: "All Locations",
       serviceCategories: [],
       dateRange: {
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: defaultStartDate,
         endDate: "",
       },
       isBlocked: false,
@@ -181,7 +188,7 @@ const SchedulePage = () => {
       location: "All Locations",
       serviceCategories: [],
       dateRange: {
-        startDate: new Date().toISOString().split('T')[0],
+        startDate: defaultStartDate,
         endDate: "",
       },
       isBlocked: false,
@@ -518,16 +525,6 @@ const SchedulePage = () => {
                               const currentValue = field.value || [];
                               const isSelected = currentValue.includes(day as any);
                               
-                              const handleToggle = () => {
-                                if (isSelected) {
-                                  const newValue = currentValue.filter((d: string) => d !== day);
-                                  field.onChange(newValue);
-                                } else {
-                                  const newValue = [...currentValue, day];
-                                  field.onChange(newValue);
-                                }
-                              };
-                              
                               return (
                                 <div
                                   key={day}
@@ -536,11 +533,18 @@ const SchedulePage = () => {
                                       ? 'bg-primary/10 border-primary text-primary'
                                       : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                                   }`}
-                                  onClick={handleToggle}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (isSelected) {
+                                      field.onChange(currentValue.filter((d: string) => d !== day));
+                                    } else {
+                                      field.onChange([...currentValue, day]);
+                                    }
+                                  }}
                                 >
                                   <Checkbox
                                     checked={isSelected}
-                                    onChange={handleToggle}
+                                    readOnly
                                     className="pointer-events-none"
                                   />
                                   <span className="text-sm font-medium">{day}</span>
