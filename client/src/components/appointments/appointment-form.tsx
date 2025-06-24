@@ -541,7 +541,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           <SelectValue placeholder="Select a time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {getAvailableTimeSlots().map((slot) => (
+                          {allTimeSlots.map((slot) => (
                             <SelectItem key={slot.value} value={slot.value}>
                               {slot.label}
                             </SelectItem>
