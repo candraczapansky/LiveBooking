@@ -56,8 +56,8 @@ export default function Settings() {
       if (savedDarkMode !== null) {
         return savedDarkMode === 'true';
       }
-      // Check if dark mode is already applied
-      return document.documentElement.classList.contains('dark');
+      // Default to false instead of checking current state
+      return false;
     }
     return false;
   });

@@ -95,6 +95,10 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Set default text color to black for improved readability and contrast
   - Updated both light and dark mode variants to maintain consistency
   - Enhanced visual appeal while maintaining accessibility standards
+- **Fixed settings page dark mode auto-activation:**
+  - Resolved issue where visiting settings page automatically switched to dark mode
+  - Updated dark mode initialization logic to prevent unwanted theme changes
+  - Settings page now properly respects current theme state without forcing changes
 
 ## System Architecture
 
