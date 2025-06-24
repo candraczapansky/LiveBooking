@@ -59,10 +59,12 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 // Initialize Square
 const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
 const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
-const squareEnvironment = SquareEnvironment.Sandbox; // Force sandbox for testing
+const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareEnvironment.Sandbox : SquareEnvironment.Production;
 
 const squareClient = new SquareClient({
-  accessToken: squareAccessToken || '',
+  bearerAuthCredentials: {
+    accessToken: squareAccessToken || '',
+  },
   environment: squareEnvironment,
 });
 
