@@ -75,45 +75,29 @@ body {
   box-sizing: border-box;
 }
 
-/* Apply theme colors to all elements by default */
-* {
-  color: hsl(0 0% 0%) !important;
+/* Apply theme colors with proper specificity */
+:not(.dark) {
+  color: hsl(var(--text-primary, 0 0% 0%));
 }
 
-/* Specific element targeting for better coverage */
-h1, h2, h3, h4, h5, h6, p, span, div, label, a, td, th, li, input, textarea, select {
-  color: hsl(0 0% 0%) !important;
+:not(.dark) h1, :not(.dark) h2, :not(.dark) h3, :not(.dark) h4, :not(.dark) h5, :not(.dark) h6,
+:not(.dark) label, :not(.dark) .text-lg, :not(.dark) .text-base, :not(.dark) .text-xl {
+  color: hsl(var(--text-primary, 0 0% 0%));
 }
 
-/* Buttons with custom background colors should have white text */
+/* Dark mode colors */
+.dark {
+  color: hsl(var(--text-primary, 0 0% 98%));
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+.dark label, .dark .text-lg, .dark .text-base, .dark .text-xl {
+  color: hsl(var(--text-primary, 0 0% 98%));
+}
+
+/* Buttons with custom backgrounds get white text */
 button[style*="backgroundColor"] {
   color: white !important;
-}
-
-/* Default buttons use text color */
-button:not([style*="backgroundColor"]) {
-  color: hsl(0 0% 0%) !important;
-}
-
-.dark * {
-  border-color: hsl(var(--border));
-  color: hsl(0 0% 98%) !important;
-}
-
-.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6, 
-.dark p, .dark span, .dark div, .dark label, 
-.dark a, .dark td, .dark th, .dark li {
-  color: hsl(0 0% 98%) !important;
-}
-
-/* Dark mode buttons with custom backgrounds keep white text */
-.dark button[style*="backgroundColor"] {
-  color: white !important;
-}
-
-/* Dark mode default buttons use light text */
-.dark button:not([style*="backgroundColor"]) {
-  color: hsl(0 0% 98%) !important;
 }
 
 /* Ensure proper inheritance of background and text colors */
