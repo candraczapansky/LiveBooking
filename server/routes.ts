@@ -62,9 +62,7 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken || '',
-  },
+  accessToken: squareAccessToken || '',
   environment: squareEnvironment,
 });
 
@@ -1281,8 +1279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceId: appointmentId?.toString() || ""
       };
 
-      const { paymentsApi } = squareClient;
-      const response = await paymentsApi.createPayment(requestBody);
+      const response = await squareClient.payments.createPayment(requestBody);
       const { result } = response;
 
       res.json({ 
@@ -1364,8 +1361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const { paymentsApi } = squareClient;
-      const { result } = await paymentsApi.getPayment(paymentId);
+      const { result } = await squareClient.payments.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
@@ -2073,8 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           phoneNumber: user.phone || ''
         };
 
-        const { customersApi } = squareClient;
-        const { result } = await customersApi.createCustomer({ requestBody });
+        const { result } = await squareClient.customers.createCustomer({ requestBody });
         customerId = result.customer?.id;
         
         if (customerId) {
@@ -2112,8 +2107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      const { cardsApi } = squareClient;
-      const { result } = await cardsApi.createCard(requestBody);
+      const { result } = await squareClient.cards.createCard(requestBody);
       
       if (!result.card) {
         return res.status(400).json({ error: "Failed to create card" });
@@ -2166,8 +2160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Disable card in Square
-      const { cardsApi } = squareClient;
-      await cardsApi.disableCard(paymentMethod.squareCardId, {});
+      await squareClient.cards.disableCard(paymentMethod.squareCardId, {});
       
       // Delete from database
       await storage.deleteSavedPaymentMethod(id);
