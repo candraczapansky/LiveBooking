@@ -62,7 +62,9 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
 const squareClient = new SquareClient({
-  accessToken: squareAccessToken,
+  bearerAuthCredentials: {
+    accessToken: squareAccessToken,
+  },
   environment: squareEnvironment,
 });
 
@@ -1294,7 +1296,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test Square connection
   app.get("/api/test-square-connection", async (req, res) => {
     try {
-      const paymentsApi = squareClient.paymentsApi;
+      const { paymentsApi } = squareClient;
       
       res.json({
         status: "connected",
@@ -2058,7 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = user.squareCustomerId;
       
       if (!customerId) {
-        const customersApi = squareClient.customersApi;
+        const { customersApi } = squareClient;
         
         const requestBody = {
           givenName: user.firstName || '',
@@ -2096,7 +2098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Card nonce, customer ID, and client ID are required" });
       }
 
-      const cardsApi = squareClient.cardsApi;
+      const { cardsApi } = squareClient;
       
       const requestBody = {
         sourceId: cardNonce,
@@ -2158,7 +2160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Disable card in Square
-      const cardsApi = squareClient.cardsApi;
+      const { cardsApi } = squareClient;
       await cardsApi.disableCard(paymentMethod.squareCardId, {});
       
       // Delete from database

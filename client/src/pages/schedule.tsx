@@ -523,7 +523,7 @@ const SchedulePage = () => {
                           <div className="grid grid-cols-2 gap-3 mt-2">
                             {DAYS_OF_WEEK.map((day) => {
                               const currentValue = field.value || [];
-                              const isChecked = currentValue.includes(day);
+                              const isChecked = currentValue.includes(day as any);
                               
                               return (
                                 <div key={day} className="flex items-center space-x-2">
