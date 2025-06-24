@@ -161,8 +161,8 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
             description: `Credit card payment of $${appointment.amount} processed successfully`,
           });
           
-          // Show success screen
-          setIsPaymentComplete(true);
+          // Trigger the success callback which will handle the UI change
+          onSuccess();
         } else {
           throw new Error('Payment processing failed');
         }
@@ -333,10 +333,13 @@ export default function AppointmentCheckout({
     );
   };
 
+  console.log('AppointmentCheckout render - isOpen:', isOpen, 'isPaymentComplete:', isPaymentComplete);
+  
   if (!isOpen) return null;
 
   // Show payment success screen
   if (isPaymentComplete) {
+    console.log('Rendering payment complete screen');
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-md">
@@ -457,7 +460,10 @@ export default function AppointmentCheckout({
               {showTestModeNotice()}
               <CheckoutForm
                 appointment={appointment}
-                onSuccess={() => setIsPaymentComplete(true)}
+                onSuccess={() => {
+                  console.log('CheckoutForm onSuccess called, setting isPaymentComplete to true');
+                  setIsPaymentComplete(true);
+                }}
                 onCancel={() => setPaymentMethod(null)}
               />
             </div>
