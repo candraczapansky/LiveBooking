@@ -523,7 +523,7 @@ const AppointmentsPage = () => {
                           ? `hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
                               dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
                             }`
-                          : 'bg-gray-800 dark:bg-gray-800 cursor-not-allowed'
+                          : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-50'
                       }`}
                       style={{ height: Math.round(30 * zoomLevel) }}
                       onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
