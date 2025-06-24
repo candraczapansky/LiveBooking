@@ -62,9 +62,7 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
 
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken || '',
-  },
+  accessToken: squareAccessToken || '',
   environment: squareEnvironment,
 });
 
@@ -1281,7 +1279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         referenceId: appointmentId?.toString() || ""
       };
 
-      const response = await squareClient.paymentsApi.createPayment(requestBody);
+      const response = await squareClient.payments.createPayment(requestBody);
       const { result } = response;
 
       res.json({ 
@@ -1299,7 +1297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test Square connection
   app.get("/api/test-square-connection", async (req, res) => {
     try {
-      const { paymentsApi } = squareClient;
+      // Test Square payments API connection
       
       res.json({
         status: "connected",
@@ -1363,7 +1361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Retrieve payment to verify it was successful
-      const { result } = await squareClient.paymentsApi.getPayment(paymentId);
+      const { result } = await squareClient.payments.getPayment(paymentId);
       
       if (result.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
@@ -2062,7 +2060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let customerId = user.squareCustomerId;
       
       if (!customerId) {
-        const { customersApi } = squareClient;
+        // Create Square customer
         
         const requestBody = {
           givenName: user.firstName || '',
@@ -2109,7 +2107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       };
 
-      const { result } = await cardsApi.createCard(requestBody);
+      const { result } = await squareClient.cards.createCard(requestBody);
       
       if (!result.card) {
         return res.status(400).json({ error: "Failed to create card" });
