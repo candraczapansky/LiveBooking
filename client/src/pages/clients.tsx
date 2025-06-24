@@ -534,9 +534,6 @@ const ClientsPage = () => {
                                 <div className="font-medium">
                                   {getFullName(client.firstName, client.lastName)}
                                 </div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">
-                                  {client.username}
-                                </div>
                               </div>
                             </div>
                           </TableCell>
