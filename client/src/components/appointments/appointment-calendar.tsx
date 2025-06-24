@@ -27,6 +27,7 @@ type Appointment = {
   startTime: string;
   endTime: string;
   status: 'confirmed' | 'pending' | 'cancelled' | 'completed';
+  paymentStatus?: 'unpaid' | 'paid' | 'refunded';
   client: {
     id: number;
     email: string;
@@ -58,10 +59,28 @@ type AppointmentCalendarProps = {
 };
 
 const statusColors = {
-  confirmed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100",
+  confirmed: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100",
   pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100",
   cancelled: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100",
   completed: "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground",
+};
+
+const getAppointmentBadgeColor = (appointment: Appointment) => {
+  // If payment is complete, always show green
+  if (appointment.paymentStatus === 'paid') {
+    return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
+  }
+  // Otherwise use status color
+  return statusColors[appointment.status];
+};
+
+const getAppointmentBadgeText = (appointment: Appointment) => {
+  // If payment is complete, show "Paid"
+  if (appointment.paymentStatus === 'paid') {
+    return "Paid";
+  }
+  // Otherwise show status
+  return appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
 };
 
 const AppointmentCalendar = ({
@@ -265,10 +284,10 @@ const AppointmentCalendar = ({
                       <TableCell>{appointment.service.name}</TableCell>
                       <TableCell>
                         <Badge 
-                          className={statusColors[appointment.status]}
+                          className={getAppointmentBadgeColor(appointment)}
                           variant="outline"
                         >
-                          {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+                          {getAppointmentBadgeText(appointment)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

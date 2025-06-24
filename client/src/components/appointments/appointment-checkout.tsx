@@ -151,7 +151,17 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
 
         console.log('Payment response:', paymentData);
         
-        if (paymentData.payment || paymentData.id) {
+        if (paymentData.payment || paymentData.paymentId) {
+          // Confirm the payment and update appointment status
+          const paymentId = paymentData.paymentId || paymentData.payment?.id;
+          
+          if (paymentId) {
+            await apiRequest("POST", "/api/confirm-payment", {
+              paymentId: paymentId,
+              appointmentId: appointment.id
+            });
+          }
+          
           toast({
             title: "Payment Successful",
             description: `Credit card payment of $${appointment.amount} processed successfully`,
@@ -290,6 +300,16 @@ export default function AppointmentCheckout({
         appointmentId: appointment.id,
         description: `Cash payment for ${appointment.serviceName} appointment`
       });
+
+      // Confirm the cash payment and update appointment status
+      const paymentId = paymentData.paymentId || paymentData.payment?.id;
+      
+      if (paymentId) {
+        await apiRequest("POST", "/api/confirm-payment", {
+          paymentId: paymentId,
+          appointmentId: appointment.id
+        });
+      }
 
       toast({
         title: "Cash Payment Recorded",
