@@ -432,8 +432,13 @@ export default function PointOfSale() {
                       {activeTab === 'products' && (
                         <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
                           <DialogTrigger asChild>
-                            <Button size="sm" variant="outline" className="lg:hidden flex-shrink-0">
-                              <Plus className="h-4 w-4" />
+                            <Button 
+                              size="default" 
+                              variant="default" 
+                              className="lg:hidden flex-shrink-0 min-w-[44px] min-h-[44px] px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+                            >
+                              <Plus className="h-5 w-5 mr-1" />
+                              <span className="hidden min-[380px]:inline text-sm font-medium">Add</span>
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4">
@@ -453,6 +458,7 @@ export default function PointOfSale() {
                                     value={newProduct.name}
                                     onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
                                     placeholder="Enter product name"
+                                    className="min-h-[44px]"
                                     required
                                   />
                                 </div>
@@ -465,6 +471,7 @@ export default function PointOfSale() {
                                     onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
                                     placeholder="Product description"
                                     rows={2}
+                                    className="min-h-[44px]"
                                   />
                                 </div>
                                 
@@ -581,14 +588,14 @@ export default function PointOfSale() {
                                   type="button"
                                   variant="outline"
                                   onClick={() => setIsAddProductOpen(false)}
-                                  className="w-full sm:w-auto"
+                                  className="w-full sm:w-auto min-h-[44px]"
                                 >
                                   Cancel
                                 </Button>
                                 <Button
                                   type="submit"
                                   disabled={createProductMutation.isPending}
-                                  className="w-full sm:w-auto"
+                                  className="w-full sm:w-auto min-h-[44px]"
                                 >
                                   {createProductMutation.isPending ? "Creating..." : "Create Product"}
                                 </Button>
@@ -605,11 +612,193 @@ export default function PointOfSale() {
                       <Input
                         type="search"
                         placeholder={`Search ${activeTab}...`}
-                        className="pl-8 text-sm"
+                        className="pl-8 text-sm min-h-[44px]"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
+                    
+                    {/* Alternative Add Product Button for smaller screens */}
+                    {activeTab === 'products' && (
+                      <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+                        <DialogTrigger asChild>
+                          <Button 
+                            size="default" 
+                            className="min-[380px]:hidden min-w-[44px] min-h-[44px] px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg rounded-full"
+                          >
+                            <Plus className="h-6 w-6" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4">
+                          <DialogHeader>
+                            <DialogTitle>Add New Product</DialogTitle>
+                            <DialogDescription>
+                              Create a new product for your inventory
+                            </DialogDescription>
+                          </DialogHeader>
+                          
+                          <form onSubmit={handleCreateProduct} className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4">
+                              <div>
+                                <Label htmlFor="name-alt">Product Name *</Label>
+                                <Input
+                                  id="name-alt"
+                                  value={newProduct.name}
+                                  onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                                  placeholder="Enter product name"
+                                  className="min-h-[44px]"
+                                  required
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="description-alt">Description</Label>
+                                <Textarea
+                                  id="description-alt"
+                                  value={newProduct.description}
+                                  onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                                  placeholder="Product description"
+                                  rows={2}
+                                  className="min-h-[44px]"
+                                />
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label htmlFor="price-alt">Price *</Label>
+                                  <Input
+                                    id="price-alt"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={newProduct.price}
+                                    onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
+                                    placeholder="0.00"
+                                    className="min-h-[44px]"
+                                    required
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="costPrice-alt">Cost Price</Label>
+                                  <Input
+                                    id="costPrice-alt"
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={newProduct.costPrice}
+                                    onChange={(e) => setNewProduct({...newProduct, costPrice: parseFloat(e.target.value) || 0})}
+                                    placeholder="0.00"
+                                    className="min-h-[44px]"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label htmlFor="category-alt">Category</Label>
+                                  <Input
+                                    id="category-alt"
+                                    value={newProduct.category}
+                                    onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                                    placeholder="Hair Care, Skincare, etc."
+                                    className="min-h-[44px]"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="brand-alt">Brand</Label>
+                                  <Input
+                                    id="brand-alt"
+                                    value={newProduct.brand}
+                                    onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                                    placeholder="Brand name"
+                                    className="min-h-[44px]"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label htmlFor="stockQuantity-alt">Stock Quantity</Label>
+                                  <Input
+                                    id="stockQuantity-alt"
+                                    type="number"
+                                    min="0"
+                                    value={newProduct.stockQuantity}
+                                    onChange={(e) => setNewProduct({...newProduct, stockQuantity: parseInt(e.target.value) || 0})}
+                                    placeholder="0"
+                                    className="min-h-[44px]"
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="minStockLevel-alt">Min Stock Level</Label>
+                                  <Input
+                                    id="minStockLevel-alt"
+                                    type="number"
+                                    min="0"
+                                    value={newProduct.minStockLevel}
+                                    onChange={(e) => setNewProduct({...newProduct, minStockLevel: parseInt(e.target.value) || 0})}
+                                    placeholder="5"
+                                    className="min-h-[44px]"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <Label htmlFor="sku-alt">SKU</Label>
+                                <Input
+                                  id="sku-alt"
+                                  value={newProduct.sku}
+                                  onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
+                                  placeholder="Product SKU"
+                                  className="min-h-[44px]"
+                                />
+                              </div>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center space-x-2">
+                                  <Switch
+                                    id="isActive-alt"
+                                    checked={newProduct.isActive}
+                                    onCheckedChange={(checked) => setNewProduct({...newProduct, isActive: checked})}
+                                  />
+                                  <Label htmlFor="isActive-alt">Active Product</Label>
+                                </div>
+                                
+                                <div className="flex items-center space-x-2">
+                                  <Switch
+                                    id="isTaxable-alt"
+                                    checked={newProduct.isTaxable}
+                                    onCheckedChange={(checked) => setNewProduct({...newProduct, isTaxable: checked})}
+                                  />
+                                  <Label htmlFor="isTaxable-alt">Taxable</Label>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setIsAddProductOpen(false)}
+                                className="w-full sm:w-auto min-h-[44px]"
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                type="submit"
+                                disabled={createProductMutation.isPending}
+                                className="w-full sm:w-auto min-h-[44px]"
+                              >
+                                {createProductMutation.isPending ? "Creating..." : "Create Product"}
+                              </Button>
+                            </DialogFooter>
+                          </form>
+                        </DialogContent>
+                      </Dialog>
+                    )}
                   </div>
                 </div>
 
