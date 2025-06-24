@@ -114,6 +114,38 @@ function replaceTemplateVariables(template: string, variables: Record<string, st
   return result;
 }
 
+// Check if email should be sent based on client preferences
+function shouldSendEmail(rule: AutomationRule, client: any): boolean {
+  switch (rule.trigger) {
+    case 'booking_confirmation':
+      return client.emailAccountManagement !== false;
+    case 'appointment_reminder':
+      return client.emailAppointmentReminders !== false;
+    case 'cancellation':
+      return client.emailAccountManagement !== false;
+    case 'follow_up':
+      return client.emailPromotions !== false;
+    default:
+      return true;
+  }
+}
+
+// Check if SMS should be sent based on client preferences
+function shouldSendSMS(rule: AutomationRule, client: any): boolean {
+  switch (rule.trigger) {
+    case 'booking_confirmation':
+      return client.smsAccountManagement !== false;
+    case 'appointment_reminder':
+      return client.smsAppointmentReminders !== false;
+    case 'cancellation':
+      return client.smsAccountManagement !== false;
+    case 'follow_up':
+      return client.smsPromotions !== false;
+    default:
+      return true;
+  }
+}
+
 // Main trigger function
 export async function triggerAutomations(
   trigger: AutomationRule['trigger'],
@@ -173,7 +205,14 @@ export async function triggerAutomations(
     try {
       const processedTemplate = replaceTemplateVariables(rule.template, variables);
       
-      if (rule.type === 'email' && client.email) {
+      // Check client preferences before sending
+      if (rule.type === 'email' && client.email && shouldSendEmail(rule, client)) {
+        console.log(`Email automation check for ${rule.name}: client.email=${!!client.email}, canSendEmail=${shouldSendEmail(rule, client)}, preferences:`, {
+          emailAccountManagement: client.emailAccountManagement,
+          emailAppointmentReminders: client.emailAppointmentReminders,
+          emailPromotions: client.emailPromotions
+        });
+        
         const subject = rule.subject ? replaceTemplateVariables(rule.subject, variables) : 'Notification from BeautyBook Salon';
         
         const emailSent = await sendEmail({
@@ -189,7 +228,13 @@ export async function triggerAutomations(
           rule.lastRun = new Date().toISOString();
           console.log(`Email automation sent successfully for rule: ${rule.name}`);
         }
-      } else if (rule.type === 'sms' && client.phone) {
+      } else if (rule.type === 'sms' && client.phone && shouldSendSMS(rule, client)) {
+        console.log(`SMS automation check for ${rule.name}: client.phone=${!!client.phone}, canSendSMS=${shouldSendSMS(rule, client)}, preferences:`, {
+          smsAccountManagement: client.smsAccountManagement,
+          smsAppointmentReminders: client.smsAppointmentReminders,
+          smsPromotions: client.smsPromotions
+        });
+        
         const smsResult = await sendSMS(client.phone, processedTemplate);
         
         if (smsResult.success) {
@@ -197,6 +242,8 @@ export async function triggerAutomations(
           rule.lastRun = new Date().toISOString();
           console.log(`SMS automation sent successfully for rule: ${rule.name}`);
         }
+      } else {
+        console.log(`Automation skipped for ${rule.name} (${rule.type}): client.email=${!!client.email}, client.phone=${!!client.phone}, canSendEmail=${rule.type === 'email' ? shouldSendEmail(rule, client) : 'N/A'}, canSendSMS=${rule.type === 'sms' ? shouldSendSMS(rule, client) : 'N/A'}`);
       }
     } catch (error) {
       console.error(`Failed to execute automation rule ${rule.name}:`, error);

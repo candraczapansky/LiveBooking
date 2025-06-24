@@ -217,13 +217,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update user profile route
-  app.put("/api/users/:id", async (req, res) => {
+  app.put("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
     const userId = parseInt(req.params.id);
-    const { firstName, lastName, email, phone } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });
     }
+    
+    console.log("Updating user with data:", JSON.stringify(req.body, null, 2));
     
     try {
       const user = await storage.getUser(userId);
@@ -232,13 +233,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Update user profile
-      const updatedUser = await storage.updateUser(userId, { 
-        firstName, 
-        lastName, 
-        email, 
-        phone 
-      });
+      // Update user profile with all provided fields including communication preferences
+      const updatedUser = await storage.updateUser(userId, req.body);
+      
+      console.log("User updated successfully:", JSON.stringify(updatedUser, null, 2));
       
       // Remove password from response
       const { password, ...userWithoutPassword } = updatedUser;
