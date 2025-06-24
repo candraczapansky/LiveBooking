@@ -62,6 +62,17 @@ export default function SettingsMobile() {
   const [secondaryTextColor, setSecondaryTextColor] = useState(() => {
     return localStorage.getItem('secondaryTextColor') || '#6b7280';
   });
+  
+  // Saved brand colors state
+  const [savedBrandColors, setSavedBrandColors] = useState(() => {
+    const saved = localStorage.getItem('savedBrandColors');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [savedTextColors, setSavedTextColors] = useState(() => {
+    const saved = localStorage.getItem('savedTextColors');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
@@ -630,56 +641,115 @@ export default function SettingsMobile() {
                   </div>
                 </div>
 
-                {/* Brand Color Presets */}
+                {/* Saved Brand Colors */}
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
-                    Brand Colors
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                    {[
-                      { color: "#d946ef", name: "Fuchsia", subtitle: "Modern & Bold" },
-                      { color: "#8b5cf6", name: "Violet", subtitle: "Elegant & Luxe" },
-                      { color: "#ec4899", name: "Rose Pink", subtitle: "Feminine & Soft" },
-                      { color: "#f59e0b", name: "Gold", subtitle: "Premium & Warm" },
-                      { color: "#06b6d4", name: "Cyan", subtitle: "Fresh & Clean" },
-                      { color: "#84cc16", name: "Lime", subtitle: "Natural & Vibrant" },
-                    ].map((preset) => (
-                      <button
-                        key={preset.color}
-                        onClick={() => {
-                          setCustomColor(preset.color);
-                          applyThemeColors(preset.color, darkMode);
-                        }}
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          backgroundColor: "white",
-                          border: customColor === preset.color ? "2px solid #374151" : "1px solid #e5e7eb",
-                          cursor: "pointer",
-                          transition: "all 0.2s",
-                          textAlign: "left",
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px"
-                        }}
-                        title={`${preset.name} - ${preset.subtitle}`}
-                      >
-                        <div 
-                          style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "6px",
-                            backgroundColor: preset.color,
-                            flexShrink: 0
-                          }}
-                        />
-                        <div style={{ fontSize: "12px", lineHeight: "1.2" }}>
-                          <div style={{ fontWeight: "600", color: "#111827" }}>{preset.name}</div>
-                          <div style={{ color: "#6b7280", fontSize: "10px" }}>{preset.subtitle}</div>
-                        </div>
-                      </button>
-                    ))}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <label style={{ fontSize: "14px", fontWeight: "500", color: "#6b7280" }}>
+                      Saved Brand Colors
+                    </label>
+                    <button
+                      onClick={() => {
+                        const name = prompt("Enter a name for this color:");
+                        if (name && customColor) {
+                          const newBrandColor = { name, color: customColor };
+                          const updated = [...savedBrandColors, newBrandColor];
+                          setSavedBrandColors(updated);
+                          localStorage.setItem('savedBrandColors', JSON.stringify(updated));
+                        }
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: "12px",
+                        backgroundColor: customColor,
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Save Current
+                    </button>
                   </div>
+                  
+                  {savedBrandColors.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                      {savedBrandColors.map((preset, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setCustomColor(preset.color);
+                            applyThemeColors(preset.color, darkMode);
+                          }}
+                          style={{
+                            padding: "10px",
+                            borderRadius: "8px",
+                            backgroundColor: "white",
+                            border: customColor === preset.color ? "2px solid #374151" : "1px solid #e5e7eb",
+                            cursor: "pointer",
+                            transition: "all 0.2s",
+                            textAlign: "left",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            position: "relative"
+                          }}
+                          title={preset.name}
+                        >
+                          <div 
+                            style={{
+                              width: "24px",
+                              height: "24px",
+                              borderRadius: "6px",
+                              backgroundColor: preset.color,
+                              flexShrink: 0
+                            }}
+                          />
+                          <div style={{ fontSize: "12px", lineHeight: "1.2", flex: 1 }}>
+                            <div style={{ fontWeight: "600", color: "#111827" }}>{preset.name}</div>
+                            <div style={{ color: "#6b7280", fontSize: "10px" }}>{preset.color}</div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updated = savedBrandColors.filter((_, i) => i !== index);
+                              setSavedBrandColors(updated);
+                              localStorage.setItem('savedBrandColors', JSON.stringify(updated));
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "2px",
+                              right: "2px",
+                              width: "16px",
+                              height: "16px",
+                              backgroundColor: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "2px",
+                              fontSize: "10px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: "20px",
+                      textAlign: "center",
+                      border: "2px dashed #d1d5db",
+                      borderRadius: "8px",
+                      color: "#6b7280",
+                      fontSize: "14px"
+                    }}>
+                      No saved brand colors yet. Choose a primary color above and click "Save Current" to create your brand palette.
+                    </div>
+                  )}
                 </div>
 
                 {/* Custom Color Input */}
@@ -875,42 +945,109 @@ export default function SettingsMobile() {
                     ))}
                   </div>
                   
-                  {/* Brand Text Colors */}
-                  <label style={{ fontSize: "12px", fontWeight: "500", marginBottom: "6px", display: "block", color: "#6b7280" }}>
-                    Brand Text Colors
-                  </label>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
-                    {[
-                      { primary: "#1e40af", secondary: "#3b82f6", name: "Blue Tone", subtitle: "Professional" },
-                      { primary: "#7c3aed", secondary: "#8b5cf6", name: "Purple Tone", subtitle: "Creative" },
-                    ].map((preset) => (
-                      <button
-                        key={preset.name}
-                        onClick={() => {
-                          setPrimaryTextColor(preset.primary);
-                          setSecondaryTextColor(preset.secondary);
-                          applyTextColors(preset.primary, preset.secondary);
-                        }}
-                        style={{
-                          padding: "10px",
-                          borderRadius: "8px",
-                          border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
-                          backgroundColor: "white",
-                          cursor: "pointer",
-                          textAlign: "left",
-                          transition: "all 0.2s"
-                        }}
-                        title={`${preset.name} - ${preset.subtitle}`}
-                      >
-                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
-                          {preset.name}
-                        </div>
-                        <div style={{ color: preset.secondary, fontSize: "10px" }}>
-                          {preset.subtitle}
-                        </div>
-                      </button>
-                    ))}
+                  {/* Saved Brand Text Colors */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <label style={{ fontSize: "12px", fontWeight: "500", color: "#6b7280" }}>
+                      Saved Text Colors
+                    </label>
+                    <button
+                      onClick={() => {
+                        const name = prompt("Enter a name for this text color combination:");
+                        if (name) {
+                          const newTextColor = { 
+                            name, 
+                            primary: primaryTextColor, 
+                            secondary: secondaryTextColor 
+                          };
+                          const updated = [...savedTextColors, newTextColor];
+                          setSavedTextColors(updated);
+                          localStorage.setItem('savedTextColors', JSON.stringify(updated));
+                        }
+                      }}
+                      style={{
+                        padding: "4px 8px",
+                        fontSize: "10px",
+                        backgroundColor: primaryTextColor,
+                        color: "white",
+                        border: "none",
+                        borderRadius: "4px",
+                        cursor: "pointer"
+                      }}
+                    >
+                      Save Current
+                    </button>
                   </div>
+                  
+                  {savedTextColors.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "8px" }}>
+                      {savedTextColors.map((preset, index) => (
+                        <button
+                          key={index}
+                          onClick={() => {
+                            setPrimaryTextColor(preset.primary);
+                            setSecondaryTextColor(preset.secondary);
+                            applyTextColors(preset.primary, preset.secondary);
+                          }}
+                          style={{
+                            padding: "10px",
+                            borderRadius: "8px",
+                            border: (primaryTextColor === preset.primary && secondaryTextColor === preset.secondary) ? "2px solid #374151" : "1px solid #e5e7eb",
+                            backgroundColor: "white",
+                            cursor: "pointer",
+                            textAlign: "left",
+                            transition: "all 0.2s",
+                            position: "relative"
+                          }}
+                          title={preset.name}
+                        >
+                          <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600", marginBottom: "2px" }}>
+                            {preset.name}
+                          </div>
+                          <div style={{ color: preset.secondary, fontSize: "10px" }}>
+                            Primary: {preset.primary} | Secondary: {preset.secondary}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const updated = savedTextColors.filter((_, i) => i !== index);
+                              setSavedTextColors(updated);
+                              localStorage.setItem('savedTextColors', JSON.stringify(updated));
+                            }}
+                            style={{
+                              position: "absolute",
+                              top: "2px",
+                              right: "2px",
+                              width: "16px",
+                              height: "16px",
+                              backgroundColor: "#ef4444",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "2px",
+                              fontSize: "10px",
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center"
+                            }}
+                            title="Delete"
+                          >
+                            ×
+                          </button>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: "16px",
+                      textAlign: "center",
+                      border: "2px dashed #d1d5db",
+                      borderRadius: "8px",
+                      color: "#6b7280",
+                      fontSize: "12px"
+                    }}>
+                      No saved text colors yet. Adjust your text colors above and click "Save Current" to create your text palette.
+                    </div>
+                  )}
                 </div>
               </div>
 
