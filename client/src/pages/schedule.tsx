@@ -58,7 +58,7 @@ const scheduleFormSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().min(1, "Location is required"),
-  serviceCategories: z.array(z.number()).min(1, "At least one service category is required"),
+  serviceCategories: z.array(z.number()).default([]),
   dateRange: z.object({
     startDate: z.string().min(1, "Start date is required"),
     endDate: z.string().optional(),
@@ -115,11 +115,11 @@ const SchedulePage = () => {
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
-      staffId: 0,
+      staffId: 1, // Set to a valid staff ID
       dayOfWeek: "Monday",
       startTime: "09:00",
       endTime: "17:00",
-      location: "",
+      location: "All Locations",
       serviceCategories: [],
       dateRange: {
         startDate: new Date().toISOString().split('T')[0],
@@ -130,7 +130,7 @@ const SchedulePage = () => {
   });
 
   // Fetch schedules
-  const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery({
+  const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<any[]>({
     queryKey: ['/api/schedules'],
   });
 
@@ -272,6 +272,20 @@ const SchedulePage = () => {
 
   const onSubmit = (data: ScheduleFormValues) => {
     console.log("Form submitted with data:", data);
+    console.log("Form errors:", form.formState.errors);
+    
+    // Validate the form manually
+    const validationResult = scheduleFormSchema.safeParse(data);
+    if (!validationResult.success) {
+      console.error("Validation failed:", validationResult.error);
+      toast({
+        title: "Validation Error",
+        description: "Please check all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (selectedScheduleId) {
       updateScheduleMutation.mutate(data);
     } else {
