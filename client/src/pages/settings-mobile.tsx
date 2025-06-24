@@ -982,7 +982,7 @@ export default function SettingsMobile() {
                       style={{
                         padding: "4px 8px",
                         fontSize: "10px",
-                        backgroundColor: primaryTextColor,
+                        backgroundColor: customColor,
                         color: "white",
                         border: "none",
                         borderRadius: "4px",
@@ -1066,7 +1066,16 @@ export default function SettingsMobile() {
                 </div>
               </div>
 
-              <Button onClick={handleSaveAppearance} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
+              <Button 
+                onClick={handleSaveAppearance} 
+                style={{ 
+                  width: "100%", 
+                  height: "48px", 
+                  fontSize: "16px",
+                  backgroundColor: customColor,
+                  borderColor: customColor
+                }}
+              >
                 <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
                 Save Appearance Settings
               </Button>
