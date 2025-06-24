@@ -124,7 +124,7 @@ function shouldSendEmail(rule: AutomationRule, client: any): boolean {
   
   switch (rule.trigger) {
     case 'booking_confirmation':
-      return client.emailAccountManagement === true;
+      return client.emailAppointmentReminders === true;
     case 'appointment_reminder':
       return client.emailAppointmentReminders === true;
     case 'cancellation':
@@ -146,7 +146,7 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
   
   switch (rule.trigger) {
     case 'booking_confirmation':
-      return client.smsAccountManagement === true;
+      return client.smsAppointmentReminders === true;
     case 'appointment_reminder':
       return client.smsAppointmentReminders === true;
     case 'cancellation':
