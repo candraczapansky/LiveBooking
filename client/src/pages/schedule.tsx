@@ -150,20 +150,11 @@ const SchedulePage = () => {
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Schedule updated successfully",
-      });
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       setIsFormOpen(false);
     },
     onError: (error: any) => {
       console.error("Failed to update schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update schedule",
-        variant: "destructive",
-      });
     }
   });
 
@@ -222,24 +213,44 @@ const SchedulePage = () => {
     }
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const onSubmit = async (data: ScheduleFormValues) => {
-    if (selectedScheduleId) {
-      // For editing, convert back to single day format
-      const singleDayData = {
-        staffId: data.staffId,
-        dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
-        startTime: data.startTime,
-        endTime: data.endTime,
-        location: data.location,
-        serviceCategories: data.serviceCategories || [],
-        startDate: data.dateRange.startDate,
-        endDate: data.dateRange.endDate || null,
-        isBlocked: data.isBlocked || false,
-      };
-      updateScheduleMutation.mutate(singleDayData);
-    } else {
-      // For creating, submit multiple schedules for each selected day
-      try {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+
+    try {
+      if (selectedScheduleId) {
+        // For editing, convert back to single day format
+        const singleDayData = {
+          staffId: data.staffId,
+          dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
+          startTime: data.startTime,
+          endTime: data.endTime,
+          location: data.location,
+          serviceCategories: data.serviceCategories || [],
+          startDate: data.dateRange.startDate,
+          endDate: data.dateRange.endDate || null,
+          isBlocked: data.isBlocked || false,
+        };
+        
+        const response = await fetch(`/api/schedules/${selectedScheduleId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(singleDayData),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update schedule');
+        }
+        
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        setIsFormOpen(false);
+        setSelectedScheduleId(null);
+      } else {
+        // For creating, submit multiple schedules for each selected day
         const promises = data.daysOfWeek.map(async (dayOfWeek) => {
           const singleDayData = {
             staffId: data.staffId,
@@ -269,21 +280,13 @@ const SchedulePage = () => {
         });
         
         await Promise.all(promises);
-        
-        toast({
-          title: "Success",
-          description: `Schedules created for ${data.daysOfWeek.length} day(s)`,
-        });
         queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
         setIsFormOpen(false);
-      } catch (error: any) {
-        console.error("Failed to create schedules:", error);
-        toast({
-          title: "Error",
-          description: error.message || "Failed to create schedules",
-          variant: "destructive",
-        });
       }
+    } catch (error: any) {
+      console.error("Failed to save schedules:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -644,9 +647,9 @@ const SchedulePage = () => {
                       </Button>
                       <Button 
                         type="submit"
-                        disabled={updateScheduleMutation.isPending}
+                        disabled={isSubmitting}
                       >
-                        {updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
+                        {isSubmitting ? "Saving..." : "Save Schedule"}
                       </Button>
                     </div>
                   </form>
