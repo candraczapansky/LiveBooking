@@ -644,9 +644,9 @@ const SchedulePage = () => {
                       </Button>
                       <Button 
                         type="submit"
-                        disabled={createScheduleMutation.isPending || updateScheduleMutation.isPending}
+                        disabled={updateScheduleMutation.isPending}
                       >
-                        {createScheduleMutation.isPending || updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
+                        {updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
                       </Button>
                     </div>
                   </form>
