@@ -58,8 +58,8 @@ body {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
-  transition: background-color 0.3s ease, color 0.3s ease;
+  color: hsl(0 0% 0%) !important;
+  transition: background-color 0.3s ease;
 }
 
 /* Fix mobile scrolling issues */
@@ -67,7 +67,7 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  color: hsl(0 0% 0%) !important;
 }
 
 /* Ensure all main containers inherit theme colors */
@@ -76,8 +76,24 @@ body {
 }
 
 /* Apply theme colors to all elements by default */
+* {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Specific element targeting for better coverage */
+h1, h2, h3, h4, h5, h6, p, span, div, label, button, a, td, th, li, input, textarea, select {
+  color: hsl(0 0% 0%) !important;
+}
+
 .dark * {
   border-color: hsl(var(--border));
+  color: hsl(0 0% 98%) !important;
+}
+
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6, 
+.dark p, .dark span, .dark div, .dark label, .dark button, 
+.dark a, .dark td, .dark th, .dark li {
+  color: hsl(0 0% 98%) !important;
 }
 
 /* Ensure proper inheritance of background and text colors */
@@ -91,7 +107,20 @@ main,
 [class*="flex-1"],
 [class*="bg-background"] {
   background-color: hsl(var(--background)) !important;
-  color: hsl(var(--foreground)) !important;
+  color: hsl(0 0% 0%) !important;
+}
+
+.dark main, 
+.dark .main-content,
+.dark [data-radix-portal],
+.dark .page-container,
+.dark .flex.flex-1,
+.dark .overflow-auto,
+.dark .h-full,
+.dark [class*="flex-1"],
+.dark [class*="bg-background"] {
+  background-color: hsl(var(--background)) !important;
+  color: hsl(0 0% 98%) !important;
 }
 
 /* Force dark mode background on all major layout containers */
@@ -114,6 +143,41 @@ main,
 .dark [data-radix-portal] {
   background-color: hsl(240 10% 3.9%) !important;
   color: hsl(0 0% 98%) !important;
+}
+
+/* Force light mode text color on all elements */
+:not(.dark) * {
+  color: hsl(0 0% 0%) !important;
+}
+
+:not(.dark) h1,
+:not(.dark) h2,
+:not(.dark) h3,
+:not(.dark) h4,
+:not(.dark) h5,
+:not(.dark) h6,
+:not(.dark) p,
+:not(.dark) span,
+:not(.dark) div,
+:not(.dark) label,
+:not(.dark) button,
+:not(.dark) a,
+:not(.dark) td,
+:not(.dark) th,
+:not(.dark) li,
+:not(.dark) [class*="text-"],
+:not(.dark) .prose {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Override any Tailwind text color classes */
+:not(.dark) .text-gray-500,
+:not(.dark) .text-gray-600,
+:not(.dark) .text-gray-700,
+:not(.dark) .text-gray-800,
+:not(.dark) .text-gray-900,
+:not(.dark) [class*="text-gray"] {
+  color: hsl(0 0% 0%) !important;
 }
 
 /* Mobile-specific dark mode enforcement */
