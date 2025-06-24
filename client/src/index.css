@@ -81,7 +81,17 @@ body {
 }
 
 /* Specific element targeting for better coverage */
-h1, h2, h3, h4, h5, h6, p, span, div, label, button, a, td, th, li, input, textarea, select {
+h1, h2, h3, h4, h5, h6, p, span, div, label, a, td, th, li, input, textarea, select {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Buttons with custom background colors should have white text */
+button[style*="backgroundColor"] {
+  color: white !important;
+}
+
+/* Default buttons use text color */
+button:not([style*="backgroundColor"]) {
   color: hsl(0 0% 0%) !important;
 }
 
@@ -91,8 +101,18 @@ h1, h2, h3, h4, h5, h6, p, span, div, label, button, a, td, th, li, input, texta
 }
 
 .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6, 
-.dark p, .dark span, .dark div, .dark label, .dark button, 
+.dark p, .dark span, .dark div, .dark label, 
 .dark a, .dark td, .dark th, .dark li {
+  color: hsl(0 0% 98%) !important;
+}
+
+/* Dark mode buttons with custom backgrounds keep white text */
+.dark button[style*="backgroundColor"] {
+  color: white !important;
+}
+
+/* Dark mode default buttons use light text */
+.dark button:not([style*="backgroundColor"]) {
   color: hsl(0 0% 98%) !important;
 }
 
