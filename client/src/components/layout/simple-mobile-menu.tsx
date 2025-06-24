@@ -86,7 +86,11 @@ const SimpleMobileMenu = () => {
           <div
             className="fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col transform transition-transform duration-300 ease-out"
             onClick={(e) => e.stopPropagation()}
-            style={{ touchAction: "auto" }}
+            style={{ 
+              touchAction: "auto",
+              maxHeight: "100vh",
+              minHeight: "100vh"
+            }}
           >
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
@@ -108,7 +112,14 @@ const SimpleMobileMenu = () => {
             </div>
 
             {/* Navigation */}
-            <div className="flex-1 p-4 overflow-y-auto">
+            <div 
+              className="flex-1 p-4 overflow-y-auto overscroll-contain"
+              style={{
+                minHeight: 0,
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "thin"
+              }}
+            >
               {navigationItems.map((item) => {
                 const IconComponent = item.icon;
                 const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
@@ -129,6 +140,8 @@ const SimpleMobileMenu = () => {
                   </Link>
                 );
               })}
+              {/* Add some bottom padding to ensure last item is accessible */}
+              <div className="h-4"></div>
             </div>
 
             {/* Footer */}
