@@ -185,7 +185,7 @@ const SchedulePage = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       toast({
         title: "Success",
-        description: "Schedule created successfully!",
+        description: "Schedule created successfully!"
       });
       setIsFormOpen(false);
       form.reset();
@@ -194,7 +194,7 @@ const SchedulePage = () => {
       toast({
         title: "Error",
         description: `Failed to create schedule: ${error.message}`,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   });
@@ -219,7 +219,7 @@ const SchedulePage = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       toast({
         title: "Success",
-        description: "Schedule updated successfully!",
+        description: "Schedule updated successfully!"
       });
       setIsFormOpen(false);
       setSelectedScheduleId(null);
@@ -229,7 +229,7 @@ const SchedulePage = () => {
       toast({
         title: "Error",
         description: `Failed to update schedule: ${error.message}`,
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   });
@@ -279,9 +279,9 @@ const SchedulePage = () => {
     if (!validationResult.success) {
       console.error("Validation failed:", validationResult.error);
       toast({
-        title: "Validation Error",
+        title: "Validation Error", 
         description: "Please check all required fields",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
