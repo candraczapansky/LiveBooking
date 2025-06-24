@@ -51,6 +51,24 @@ Preferred communication style: Simple, everyday language.
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 24, 2025 - Mobile UI Improvements and SMS Marketing Fixes
+- **Enhanced mobile button accessibility:**
+  - Increased all button touch targets to meet 44px minimum standard
+  - Fixed overlapping buttons in client page header with responsive layout
+  - Improved date navigation buttons in appointments page
+  - Enhanced icon buttons across marketing and client pages for better mobile interaction
+- **Fixed mobile form issues:**
+  - Resolved checkbox touch interaction problems by replacing HTML inputs with Radix UI components
+  - Made checkboxes 24px on mobile for better accessibility
+  - Added clickable labels for easier interaction
+  - Fixed popup scrolling in Add/Edit Client dialogs
+  - Removed unwanted autocomplete text from email input fields
+- **Improved SMS marketing functionality:**
+  - Added phone number validation to filter out placeholder/test numbers
+  - Enhanced error messaging for SMS campaigns with invalid phone numbers
+  - Fixed SMS delivery issues by properly validating phone number formats
+  - Updated client feedback to clearly indicate SMS marketing requirements
+
 ## System Architecture
 
 ### Frontend Architecture

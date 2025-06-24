@@ -1468,9 +1468,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter recipients based on campaign type
       let validRecipients: any[] = [];
       if (campaign.type === 'sms') {
-        validRecipients = recipients.filter(user => user.phone);
+        // Filter for users with valid phone numbers
+        validRecipients = recipients.filter(user => {
+          if (!user.phone) return false;
+          // Check if phone number is valid (not a placeholder like "555XXXX")
+          const cleanPhone = user.phone.replace(/\D/g, '');
+          return cleanPhone.length >= 10 && !user.phone.includes('X') && !user.phone.includes('x');
+        });
         if (validRecipients.length === 0) {
-          return res.status(400).json({ error: "No recipients have phone numbers" });
+          return res.status(400).json({ 
+            error: "No recipients have valid phone numbers. Phone numbers must be real numbers, not placeholders." 
+          });
         }
       } else if (campaign.type === 'email') {
         validRecipients = recipients.filter(user => user.email);
