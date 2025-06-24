@@ -161,7 +161,7 @@ const ClientsPage = () => {
       emailAccountManagement: true,
       emailAppointmentReminders: true,
       emailPromotions: false,
-      smsAccountManagement: true,
+      smsAccountManagement: false,
       smsAppointmentReminders: true,
       smsPromotions: false,
     },
@@ -977,7 +977,7 @@ const ClientsPage = () => {
                             <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
                               Appointment Reminders
                             </FormLabel>
-                            <FormDescription className="text-xs">Text reminders for upcoming appointments</FormDescription>
+                            <FormDescription className="text-xs">Booking confirmations and reminder notifications for appointments</FormDescription>
                           </div>
                         </FormItem>
                       )}
@@ -1336,7 +1336,7 @@ const ClientsPage = () => {
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel className="text-sm">Appointment Reminders</FormLabel>
-                            <FormDescription className="text-xs">Text reminders for upcoming appointments</FormDescription>
+                            <FormDescription className="text-xs">Booking confirmations and reminder notifications for appointments</FormDescription>
                           </div>
                         </FormItem>
                       )}
