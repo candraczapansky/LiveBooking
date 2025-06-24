@@ -19,7 +19,8 @@ import {
   insertPaymentSchema,
   insertSavedPaymentMethodSchema,
   insertMarketingCampaignSchema,
-  insertPromoCodeSchema
+  insertPromoCodeSchema,
+  insertStaffScheduleSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 

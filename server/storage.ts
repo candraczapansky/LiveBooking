@@ -173,6 +173,14 @@ export interface IStorage {
   updatePromoCode(id: number, promoCodeData: Partial<InsertPromoCode>): Promise<PromoCode>;
   deletePromoCode(id: number): Promise<boolean>;
 
+  // Staff Schedule operations
+  createStaffSchedule(schedule: InsertStaffSchedule): Promise<StaffSchedule>;
+  getStaffSchedule(id: number): Promise<StaffSchedule | undefined>;
+  getAllStaffSchedules(): Promise<StaffSchedule[]>;
+  getStaffSchedulesByStaffId(staffId: number): Promise<StaffSchedule[]>;
+  updateStaffSchedule(id: number, scheduleData: Partial<InsertStaffSchedule>): Promise<StaffSchedule>;
+  deleteStaffSchedule(id: number): Promise<boolean>;
+
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
 }
@@ -1394,6 +1402,38 @@ export class DatabaseStorage implements IStorage {
 
   async deletePromoCode(id: number): Promise<boolean> {
     const result = await db.delete(promoCodes).where(eq(promoCodes.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Staff Schedule operations
+  async createStaffSchedule(schedule: InsertStaffSchedule): Promise<StaffSchedule> {
+    const [newSchedule] = await db.insert(staffSchedules).values(schedule).returning();
+    return newSchedule;
+  }
+
+  async getStaffSchedule(id: number): Promise<StaffSchedule | undefined> {
+    const [schedule] = await db.select().from(staffSchedules).where(eq(staffSchedules.id, id));
+    return schedule;
+  }
+
+  async getAllStaffSchedules(): Promise<StaffSchedule[]> {
+    return await db.select().from(staffSchedules).orderBy(staffSchedules.dayOfWeek, staffSchedules.startTime);
+  }
+
+  async getStaffSchedulesByStaffId(staffId: number): Promise<StaffSchedule[]> {
+    return await db.select().from(staffSchedules).where(eq(staffSchedules.staffId, staffId)).orderBy(staffSchedules.dayOfWeek, staffSchedules.startTime);
+  }
+
+  async updateStaffSchedule(id: number, scheduleData: Partial<InsertStaffSchedule>): Promise<StaffSchedule> {
+    const [updatedSchedule] = await db.update(staffSchedules).set(scheduleData).where(eq(staffSchedules.id, id)).returning();
+    if (!updatedSchedule) {
+      throw new Error('Staff schedule not found');
+    }
+    return updatedSchedule;
+  }
+
+  async deleteStaffSchedule(id: number): Promise<boolean> {
+    const result = await db.delete(staffSchedules).where(eq(staffSchedules.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 }
