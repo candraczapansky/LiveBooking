@@ -34,9 +34,9 @@ type SidebarItemProps = {
 
 const SidebarItem = ({ icon, label, href, isActive }: SidebarItemProps) => {
   return (
-    <Link href={href} className={`sidebar-item ${isActive ? 'active' : ''}`}>
-      <span className="w-5 h-5 mr-3 text-primary">{icon}</span>
-      {label}
+    <Link href={href} className={`sidebar-item ${isActive ? 'active' : ''}`} style={{ color: 'hsl(0 0% 0%)' }}>
+      <span className="w-5 h-5 mr-3 text-primary" style={{ color: 'hsl(330 81% 60%)' }}>{icon}</span>
+      <span style={{ color: 'hsl(0 0% 0%)' }}>{label}</span>
     </Link>
   );
 };

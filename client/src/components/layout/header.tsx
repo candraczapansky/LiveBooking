@@ -60,7 +60,7 @@ const Header = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-0">
-                  <span className="hidden sm:inline-block text-sm font-medium truncate max-w-24 lg:max-w-none">
+                  <span className="hidden sm:inline-block text-sm font-medium truncate max-w-24 lg:max-w-none" style={{ color: 'hsl(0 0% 0%)' }}>
                     {getFullName(user?.firstName, user?.lastName)}
                   </span>
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0">
@@ -78,25 +78,25 @@ const Header = () => {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
+                    <p className="text-sm font-medium leading-none" style={{ color: 'hsl(0 0% 0%)' }}>
                       {getFullName(user?.firstName, user?.lastName)}
                     </p>
-                    <p className="text-xs leading-none text-muted-foreground">
+                    <p className="text-xs leading-none text-muted-foreground" style={{ color: 'hsl(0 0% 30%)' }}>
                       {user?.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/settings" className="flex items-center w-full cursor-pointer">
+                  <Link href="/settings" className="flex items-center w-full cursor-pointer" style={{ color: 'hsl(0 0% 0%)' }}>
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Profile & Settings</span>
+                    <span style={{ color: 'hsl(0 0% 0%)' }}>Profile & Settings</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span style={{ color: 'hsl(0 84% 60%)' }}>Sign out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

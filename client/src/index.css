@@ -176,7 +176,76 @@ main,
 :not(.dark) .text-gray-700,
 :not(.dark) .text-gray-800,
 :not(.dark) .text-gray-900,
-:not(.dark) [class*="text-gray"] {
+:not(.dark) [class*="text-gray"],
+:not(.dark) .text-muted-foreground,
+:not(.dark) [class*="text-muted"] {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Specific navigation and sidebar text overrides */
+:not(.dark) nav,
+:not(.dark) nav *,
+:not(.dark) .sidebar,
+:not(.dark) .sidebar *,
+:not(.dark) [data-sidebar],
+:not(.dark) [data-sidebar] *,
+:not(.dark) header,
+:not(.dark) header *,
+:not(.dark) .navigation,
+:not(.dark) .navigation *,
+:not(.dark) [role="navigation"],
+:not(.dark) [role="navigation"] * {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Menu items and links */
+:not(.dark) .menu-item,
+:not(.dark) .nav-link,
+:not(.dark) [class*="menu"],
+:not(.dark) [class*="nav"],
+:not(.dark) .sidebar-item,
+:not(.dark) [data-sidebar="menu-button"],
+:not(.dark) [data-sidebar="menu-sub-button"],
+:not(.dark) .text-sidebar-foreground,
+:not(.dark) .text-sidebar-accent-foreground {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Sidebar specific overrides */
+:not(.dark) .sidebar-item,
+:not(.dark) .sidebar-item span,
+:not(.dark) .sidebar-item * {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Force all text to be black in light mode - comprehensive override */
+html:not(.dark) {
+  color: hsl(0 0% 0%) !important;
+}
+
+html:not(.dark) * {
+  color: hsl(0 0% 0%) !important;
+}
+
+/* Override any CSS variables that might be causing gray text */
+:root {
+  --sidebar-foreground: 0 0% 0% !important;
+  --card-foreground: 0 0% 0% !important;
+  --popover-foreground: 0 0% 0% !important;
+}
+
+/* Comprehensive text color enforcement for all UI components */
+:not(.dark) .text-muted-foreground,
+:not(.dark) [class*="text-muted"],
+:not(.dark) .text-gray-500,
+:not(.dark) .text-gray-600,
+:not(.dark) .text-slate-500,
+:not(.dark) .text-slate-600,
+:not(.dark) [class*="text-slate"],
+:not(.dark) [class*="text-zinc"],
+:not(.dark) [data-radix-collection-item],
+:not(.dark) [data-radix-menu-content] *,
+:not(.dark) [data-radix-dropdown-menu-content] * {
   color: hsl(0 0% 0%) !important;
 }
 
