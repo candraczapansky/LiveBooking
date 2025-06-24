@@ -115,7 +115,7 @@ const SchedulePage = () => {
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
-      staffId: 1, // Set to a valid staff ID
+      staffId: 1, // Default to first staff member
       dayOfWeek: "Monday",
       startTime: "09:00",
       endTime: "17:00",
