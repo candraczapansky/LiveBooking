@@ -104,17 +104,17 @@ const SchedulePage = () => {
   });
 
   // Fetch staff
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [] } = useQuery<any[]>({
     queryKey: ['/api/staff'],
   });
 
   // Fetch rooms
-  const { data: rooms = [] } = useQuery({
+  const { data: rooms = [] } = useQuery<any[]>({
     queryKey: ['/api/rooms'],
   });
 
   // Fetch service categories
-  const { data: serviceCategories = [] } = useQuery({
+  const { data: serviceCategories = [] } = useQuery<any[]>({
     queryKey: ['/api/service-categories'],
   });
 
@@ -134,10 +134,7 @@ const SchedulePage = () => {
         isBlocked: data.isBlocked || false,
       };
       console.log("Sending schedule data to API:", scheduleData);
-      return apiRequest('/api/schedules', {
-        method: 'POST',
-        body: JSON.stringify(scheduleData),
-      });
+      return await apiRequest('POST', '/api/schedules', scheduleData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
@@ -195,7 +192,7 @@ const SchedulePage = () => {
   // Delete schedule mutation
   const deleteScheduleMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/schedules/${id}`);
+      return await apiRequest("DELETE", `/api/schedules/${id}`, {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
