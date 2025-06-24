@@ -61,10 +61,19 @@ const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
 const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareEnvironment.Sandbox : SquareEnvironment.Production;
 
-const squareClient = new SquareClient({
-  accessToken: squareAccessToken || '',
-  environment: squareEnvironment,
-});
+// Initialize Square client with proper configuration
+let squareClient;
+try {
+  squareClient = new SquareClient({
+    accessToken: squareAccessToken,
+    environment: squareEnvironment,
+    customUrl: squareEnvironment === SquareEnvironment.Production ? 'https://connect.squareup.com' : undefined
+  });
+  console.log('Square client initialized for environment:', squareEnvironment === SquareEnvironment.Production ? 'Production' : 'Sandbox');
+} catch (error) {
+  console.error('Square client initialization failed:', error);
+  squareClient = null;
+}
 
 // Square API clients will be accessed directly from squareClient
 
@@ -1266,6 +1275,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Amount and payment source are required" });
       }
 
+      // Handle cash payments first
+      if (sourceId === "cash") {
+        const payment = {
+          id: `cash_${Date.now()}`,
+          status: 'COMPLETED',
+          amountMoney: {
+            amount: Math.round(amount * 100),
+            currency: 'USD'
+          }
+        };
+        
+        return res.json({ 
+          payment: payment,
+          paymentId: payment.id
+        });
+      }
+
+      // Check if Square client is available
+      if (!squareClient) {
+        throw new Error('Square client not initialized. Please check your credentials.');
+      }
+
       const paymentsApi = squareClient.payments;
       
       const requestBody = {
@@ -1276,10 +1307,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         idempotencyKey: `${Date.now()}-${Math.random()}`,
         note: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
-        referenceId: appointmentId?.toString() || ""
+        referenceId: appointmentId?.toString() || "",
+        locationId: process.env.SQUARE_LOCATION_ID
       };
 
-      const response = await squareClient.payments.create(requestBody);
+      console.log('Attempting Square payment with request:', JSON.stringify(requestBody, null, 2));
+      const response = await paymentsApi.create(requestBody);
 
       res.json({ 
         payment: response.payment,
