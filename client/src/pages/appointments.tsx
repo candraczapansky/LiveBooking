@@ -135,14 +135,12 @@ const AppointmentsPage = () => {
     const currentDate = formatDateForComparison(date);
     
     // Find schedules for this staff member on this day
-    const staffSchedules = schedules.filter((schedule: any) => {
-      const matchesStaff = schedule.staffId === staffId;
-      const matchesDay = schedule.dayOfWeek === dayName;
-      const startDateValid = schedule.startDate <= currentDate;
-      const endDateValid = !schedule.endDate || schedule.endDate >= currentDate;
-      
-      return matchesStaff && matchesDay && startDateValid && endDateValid;
-    });
+    const staffSchedules = schedules.filter((schedule: any) => 
+      schedule.staffId === staffId && 
+      schedule.dayOfWeek === dayName &&
+      schedule.startDate <= currentDate &&
+      (!schedule.endDate || schedule.endDate >= currentDate)
+    );
 
     if (staffSchedules.length === 0) {
       return false; // No schedule = not available
