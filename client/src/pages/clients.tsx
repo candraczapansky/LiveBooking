@@ -716,7 +716,7 @@ const ClientsPage = () => {
       
       {/* Add Client Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Client</DialogTitle>
             <DialogDescription>
@@ -763,7 +763,15 @@ const ClientsPage = () => {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john.doe@example.com" {...field} />
+                        <Input 
+                          type="email" 
+                          placeholder="john.doe@example.com" 
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck="false"
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1072,7 +1080,7 @@ const ClientsPage = () => {
       
       {/* Edit Client Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Client</DialogTitle>
             <DialogDescription>
