@@ -138,7 +138,7 @@ const MarketingPage = () => {
   const [location, setLocation] = useLocation();
   
   const [activeTab, setActiveTab] = useState("campaigns");
-  const [isCampaignFormOpen, setIsCampaignFormOpen] = useState(location.includes("new=true"));
+  const [isCampaignFormOpen, setIsCampaignFormOpen] = useState(false);
   const [campaignToEdit, setCampaignToEdit] = useState<any>(null);
   const [isPromoFormOpen, setIsPromoFormOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -164,17 +164,15 @@ const MarketingPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Get URL params
-  const searchParams = new URLSearchParams(location.split("?")[1]);
-  
-  // Check if we should open the form for creating a new campaign
-  useState(() => {
-    if (searchParams.get("new") === "true") {
+  // Handle quick action navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    if (searchParams.get('new') === 'true') {
       setIsCampaignFormOpen(true);
-      // Clean up the URL
-      setLocation("/marketing", { replace: true });
+      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/marketing');
     }
-  });
+  }, [location]);
 
   // Campaign form
   const campaignForm = useForm<CampaignFormValues>({

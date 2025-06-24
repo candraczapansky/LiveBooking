@@ -61,6 +61,17 @@ const AppointmentsPage = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Handle quick action navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    if (searchParams.get('new') === 'true') {
+      setSelectedAppointmentId(null);
+      setIsFormOpen(true);
+      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/appointments');
+    }
+  }, [location]);
+
   // Fetch appointments from API
   const { data: appointments, isLoading: appointmentsLoading } = useQuery({
     queryKey: ['/api/appointments'],

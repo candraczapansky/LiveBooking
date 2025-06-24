@@ -122,6 +122,7 @@ const ClientsPage = () => {
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
+  const [location] = useLocation();
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -134,6 +135,16 @@ const ClientsPage = () => {
     const interval = setInterval(checkSidebarState, 100);
     return () => clearInterval(interval);
   }, []);
+
+  // Handle quick action navigation
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    if (searchParams.get('new') === 'true') {
+      setIsAddDialogOpen(true);
+      // Clean up URL without triggering navigation
+      window.history.replaceState({}, '', '/clients');
+    }
+  }, [location]);
 
   const { data: clients, isLoading } = useQuery({
     queryKey: ['/api/users'],
