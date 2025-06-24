@@ -663,23 +663,6 @@ const AppointmentsPage = () => {
                   <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
                   
                   <div className="flex items-center space-x-2">
-                    {/* Text Color Controls */}
-                    <div className="flex items-center space-x-2 mr-4">
-                      <input
-                        type="color"
-                        defaultValue="#374151"
-                        onChange={(e) => {
-                          const root = document.documentElement;
-                          const color = e.target.value;
-                          root.style.setProperty('--foreground', color);
-                          localStorage.setItem('textColor', color);
-                        }}
-                        className="w-8 h-8 rounded cursor-pointer border-2"
-                        title="Change text color"
-                      />
-                      <span className="text-xs text-gray-500">Text</span>
-                    </div>
-                    
                     <Button
                       onClick={handleAddAppointment}
                       className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px]"
