@@ -490,7 +490,13 @@ export default function SettingsMobile() {
                     <Button 
                       onClick={handleSaveProfile} 
                       disabled={updateProfileMutation.isPending}
-                      style={{ flex: 1, height: "48px", fontSize: "16px" }}
+                      style={{ 
+                        flex: 1, 
+                        height: "48px", 
+                        fontSize: "16px",
+                        backgroundColor: customColor,
+                        borderColor: customColor
+                      }}
                     >
                       <Save style={{ width: "18px", height: "18px", marginRight: "8px" }} />
                       {updateProfileMutation.isPending ? "Saving..." : "Save"}
@@ -540,7 +546,16 @@ export default function SettingsMobile() {
                     </div>
                   </div>
                   
-                  <Button onClick={() => setIsEditingProfile(true)} style={{ width: "100%", height: "48px", fontSize: "16px" }}>
+                  <Button 
+                    onClick={() => setIsEditingProfile(true)} 
+                    style={{ 
+                      width: "100%", 
+                      height: "48px", 
+                      fontSize: "16px",
+                      backgroundColor: customColor,
+                      borderColor: customColor
+                    }}
+                  >
                     Edit Personal Information
                   </Button>
                 </div>
