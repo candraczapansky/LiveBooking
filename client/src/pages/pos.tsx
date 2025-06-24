@@ -19,7 +19,8 @@ import {
   Trash2,
   Receipt,
   User,
-  DollarSign
+  DollarSign,
+  Package
 } from "lucide-react";
 import {
   Dialog,
@@ -28,6 +29,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -36,9 +38,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { apiRequest } from "@/lib/queryClient";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -157,9 +160,75 @@ export default function PointOfSale() {
   const [cashReceived, setCashReceived] = useState<string>("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    description: "",
+    sku: "",
+    price: 0,
+    costPrice: 0,
+    category: "",
+    brand: "",
+    stockQuantity: 0,
+    minStockLevel: 5,
+    isActive: true,
+    isTaxable: true
+  });
   const { toast } = useToast();
 
   const queryClient = useQueryClient();
+
+  // Create product mutation
+  const createProductMutation = useMutation({
+    mutationFn: async (productData: any) => {
+      return await apiRequest("POST", "/api/products", productData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Product created",
+        description: "Product has been added successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setIsAddProductOpen(false);
+      resetProductForm();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create product",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetProductForm = () => {
+    setNewProduct({
+      name: "",
+      description: "",
+      sku: "",
+      price: 0,
+      costPrice: 0,
+      category: "",
+      brand: "",
+      stockQuantity: 0,
+      minStockLevel: 5,
+      isActive: true,
+      isTaxable: true
+    });
+  };
+
+  const handleCreateProduct = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProduct.name || newProduct.price <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createProductMutation.mutate(newProduct);
+  };
 
 
 
@@ -339,23 +408,195 @@ export default function PointOfSale() {
                 <div className="mb-3 sm:mb-4 lg:mb-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2 sm:gap-3">
                     <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 w-full sm:w-auto">
-                      <Button
-                        size="sm"
-                        variant={activeTab === 'services' ? 'default' : 'ghost'}
-                        onClick={() => setActiveTab('services')}
-                        className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
-                      >
-                        Services
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={activeTab === 'products' ? 'default' : 'ghost'}
-                        onClick={() => setActiveTab('products')}
-                        className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
-                      >
-                        Products
-                      </Button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 flex-1 sm:flex-none">
+                        <Button
+                          size="sm"
+                          variant={activeTab === 'services' ? 'default' : 'ghost'}
+                          onClick={() => setActiveTab('services')}
+                          className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
+                        >
+                          Services
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={activeTab === 'products' ? 'default' : 'ghost'}
+                          onClick={() => setActiveTab('products')}
+                          className="flex-1 sm:flex-none px-3 sm:px-4 text-xs sm:text-sm"
+                        >
+                          Products
+                        </Button>
+                      </div>
+                      
+                      {/* Add Product Button - Mobile Only */}
+                      {activeTab === 'products' && (
+                        <Dialog open={isAddProductOpen} onOpenChange={setIsAddProductOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="lg:hidden flex-shrink-0">
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4">
+                            <DialogHeader>
+                              <DialogTitle>Add New Product</DialogTitle>
+                              <DialogDescription>
+                                Create a new product for your inventory
+                              </DialogDescription>
+                            </DialogHeader>
+                            
+                            <form onSubmit={handleCreateProduct} className="space-y-4">
+                              <div className="grid grid-cols-1 gap-4">
+                                <div>
+                                  <Label htmlFor="name">Product Name *</Label>
+                                  <Input
+                                    id="name"
+                                    value={newProduct.name}
+                                    onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                                    placeholder="Enter product name"
+                                    required
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="description">Description</Label>
+                                  <Textarea
+                                    id="description"
+                                    value={newProduct.description}
+                                    onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                                    placeholder="Product description"
+                                    rows={2}
+                                  />
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label htmlFor="price">Price *</Label>
+                                    <Input
+                                      id="price"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={newProduct.price}
+                                      onChange={(e) => setNewProduct({...newProduct, price: parseFloat(e.target.value) || 0})}
+                                      placeholder="0.00"
+                                      required
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label htmlFor="costPrice">Cost Price</Label>
+                                    <Input
+                                      id="costPrice"
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={newProduct.costPrice}
+                                      onChange={(e) => setNewProduct({...newProduct, costPrice: parseFloat(e.target.value) || 0})}
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label htmlFor="category">Category</Label>
+                                    <Input
+                                      id="category"
+                                      value={newProduct.category}
+                                      onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                                      placeholder="Hair Care, Skincare, etc."
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label htmlFor="brand">Brand</Label>
+                                    <Input
+                                      id="brand"
+                                      value={newProduct.brand}
+                                      onChange={(e) => setNewProduct({...newProduct, brand: e.target.value})}
+                                      placeholder="Brand name"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label htmlFor="stockQuantity">Stock Quantity</Label>
+                                    <Input
+                                      id="stockQuantity"
+                                      type="number"
+                                      min="0"
+                                      value={newProduct.stockQuantity}
+                                      onChange={(e) => setNewProduct({...newProduct, stockQuantity: parseInt(e.target.value) || 0})}
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  
+                                  <div>
+                                    <Label htmlFor="minStockLevel">Min Stock Level</Label>
+                                    <Input
+                                      id="minStockLevel"
+                                      type="number"
+                                      min="0"
+                                      value={newProduct.minStockLevel}
+                                      onChange={(e) => setNewProduct({...newProduct, minStockLevel: parseInt(e.target.value) || 0})}
+                                      placeholder="5"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="sku">SKU</Label>
+                                  <Input
+                                    id="sku"
+                                    value={newProduct.sku}
+                                    onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
+                                    placeholder="Product SKU"
+                                  />
+                                </div>
+                                
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      id="isActive"
+                                      checked={newProduct.isActive}
+                                      onCheckedChange={(checked) => setNewProduct({...newProduct, isActive: checked})}
+                                    />
+                                    <Label htmlFor="isActive">Active Product</Label>
+                                  </div>
+                                  
+                                  <div className="flex items-center space-x-2">
+                                    <Switch
+                                      id="isTaxable"
+                                      checked={newProduct.isTaxable}
+                                      onCheckedChange={(checked) => setNewProduct({...newProduct, isTaxable: checked})}
+                                    />
+                                    <Label htmlFor="isTaxable">Taxable</Label>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <DialogFooter className="flex flex-col gap-2 sm:flex-row">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setIsAddProductOpen(false)}
+                                  className="w-full sm:w-auto"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="submit"
+                                  disabled={createProductMutation.isPending}
+                                  className="w-full sm:w-auto"
+                                >
+                                  {createProductMutation.isPending ? "Creating..." : "Create Product"}
+                                </Button>
+                              </DialogFooter>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                      )}
                     </div>
                   </div>
                   <div className="flex gap-2 sm:gap-4">
