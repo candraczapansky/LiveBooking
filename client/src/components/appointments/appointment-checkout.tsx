@@ -274,16 +274,7 @@ export default function AppointmentCheckout({
   const [isCashProcessing, setIsCashProcessing] = useState(false);
   const { toast } = useToast();
 
-  const handlePaymentSuccess = async () => {
-    try {
-      // Update appointment to paid status
-      await apiRequest("PATCH", `/api/appointments/${appointment.id}`, {
-        paymentStatus: "paid"
-      });
-    } catch (error) {
-      console.warn('Failed to update payment status:', error);
-    }
-    
+  const handlePaymentSuccess = () => {
     // Close dialog and refresh appointments
     onSuccess();
     onClose();
