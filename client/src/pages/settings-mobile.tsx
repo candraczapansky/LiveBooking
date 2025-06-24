@@ -1024,7 +1024,7 @@ export default function SettingsMobile() {
                         padding: "4px 8px",
                         fontSize: "10px",
                         backgroundColor: customColor,
-                        color: "white",
+                        color: "white !important",
                         border: "none",
                         borderRadius: "4px",
                         cursor: "pointer"
