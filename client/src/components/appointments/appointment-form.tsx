@@ -228,11 +228,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       });
     },
     onError: (error: any) => {
+      const isConflict = error.response?.status === 409;
       const errorMessage = error.response?.data?.message || error.message || "Failed to create appointment.";
+      
       toast({
-        title: "Error",
+        title: isConflict ? "⚠️ Scheduling Conflict" : "Error",
         description: errorMessage,
         variant: "destructive",
+        duration: isConflict ? 8000 : 5000, // Show conflict messages longer
       });
     },
   });
@@ -272,11 +275,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       });
     },
     onError: (error: any) => {
+      const isConflict = error.response?.status === 409;
       const errorMessage = error.response?.data?.message || error.message || "Failed to update appointment.";
+      
       toast({
-        title: "Error",
+        title: isConflict ? "⚠️ Scheduling Conflict" : "Error", 
         description: errorMessage,
         variant: "destructive",
+        duration: isConflict ? 8000 : 5000, // Show conflict messages longer
       });
     },
   });
