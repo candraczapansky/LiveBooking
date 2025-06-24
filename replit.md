@@ -71,12 +71,6 @@ Preferred communication style: Simple, everyday language.
 - **Fixed membership dialog mobile scrolling:**
   - Added proper overflow and height constraints to membership form popup
   - Ensured add/edit membership dialog scrolls properly on mobile devices
-- **Implemented notification system:**
-  - Created functional notification dropdown with bell icon in header
-  - Added notification types (appointments, payments, clients, system)
-  - Implemented read/unread status with visual indicators
-  - Added mark as read, mark all read, and dismiss functionality
-  - Notifications show relevant timestamps and action links
 
 ## System Architecture
 
