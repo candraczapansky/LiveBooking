@@ -38,6 +38,27 @@ const automationRules: AutomationRule[] = [
     template: "Hi {client_name}! Your appointment at {salon_name} for {service_name} on {appointment_date} at {appointment_time} has been confirmed. See you soon!",
     active: true,
     sentCount: 0
+  },
+  {
+    id: 3,
+    name: "Appointment Cancellation Email",
+    type: "email",
+    trigger: "cancellation",
+    timing: "immediately",
+    subject: "Appointment Cancelled - {salon_name}",
+    template: "Hi {client_name},\n\nWe've received your cancellation for your appointment scheduled on {appointment_datetime} for {service_name} with {staff_name}.\n\nYour appointment has been successfully cancelled. If you'd like to reschedule, please call us at {salon_phone} or book online.\n\nWe look forward to seeing you again soon!\n\nBest regards,\n{salon_name}",
+    active: true,
+    sentCount: 0
+  },
+  {
+    id: 4,
+    name: "Appointment Cancellation SMS",
+    type: "sms",
+    trigger: "cancellation",
+    timing: "immediately",
+    template: "Hi {client_name}, your appointment at {salon_name} for {appointment_datetime} has been cancelled. Call {salon_phone} to reschedule anytime!",
+    active: true,
+    sentCount: 0
   }
 ];
 

@@ -798,10 +798,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.delete("/api/appointments/:id", async (req, res) => {
     const id = parseInt(req.params.id);
+    
+    // Get appointment data before deletion for automation trigger
+    const appointment = await storage.getAppointment(id);
+    if (!appointment) {
+      return res.status(404).json({ error: "Appointment not found" });
+    }
+    
     const deleted = await storage.deleteAppointment(id);
     
     if (!deleted) {
       return res.status(404).json({ error: "Appointment not found" });
+    }
+    
+    // Trigger cancellation automation
+    try {
+      await triggerCancellation(appointment, storage);
+    } catch (error) {
+      console.error('Failed to trigger cancellation automation:', error);
     }
     
     return res.status(204).end();

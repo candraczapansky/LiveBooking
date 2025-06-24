@@ -102,14 +102,26 @@ export default function Automations() {
     },
     {
       id: 5,
+      name: "Appointment Cancellation Email",
+      type: "email",
+      trigger: "cancellation",
+      timing: "Immediately",
+      subject: "Appointment Cancelled - {salon_name}",
+      template: "Hi {client_name},\n\nWe've received your cancellation for your appointment scheduled on {appointment_datetime} for {service_name} with {staff_name}.\n\nYour appointment has been successfully cancelled. If you'd like to reschedule, please call us at {salon_phone} or book online.\n\nWe look forward to seeing you again soon!\n\nBest regards,\n{salon_name}",
+      active: true,
+      lastRun: "2025-06-24T16:04:00Z",
+      sentCount: 1
+    },
+    {
+      id: 6,
       name: "Cancellation Text",
       type: "sms",
       trigger: "cancellation",
       timing: "Immediately",
-      template: "Hi {client_name}, we've confirmed your cancellation for {appointment_datetime}. Call us at {salon_phone} to reschedule anytime!",
+      template: "Hi {client_name}, your appointment at {salon_name} for {appointment_datetime} has been cancelled. Call {salon_phone} to reschedule anytime!",
       active: true,
-      lastRun: "2025-06-23T12:00:00Z",
-      sentCount: 23
+      lastRun: "2025-06-24T16:04:00Z",
+      sentCount: 1
     },
     {
       id: 3,
