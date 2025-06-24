@@ -573,7 +573,17 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormItem>
                         <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <Input type="email" placeholder="Enter email address" {...field} />
+                          <Input 
+                            type="email" 
+                            placeholder="Enter email address" 
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck="false"
+                            data-lpignore="true"
+                            data-form-type="other"
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
