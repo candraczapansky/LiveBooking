@@ -56,6 +56,8 @@ export default function SettingsMobile() {
   const [selectedTheme, setSelectedTheme] = useState('blue');
   const [customColor, setCustomColor] = useState('#3b82f6');
   const [secondaryColor, setSecondaryColor] = useState('#6b7280');
+  const [primaryTextColor, setPrimaryTextColor] = useState('#111827');
+  const [secondaryTextColor, setSecondaryTextColor] = useState('#6b7280');
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
@@ -98,6 +100,55 @@ export default function SettingsMobile() {
     // Generate complementary colors
     root.style.setProperty('--accent', `${h} ${Math.max(s - 10, 0)}% ${Math.min(l + 10, 95)}%`);
     root.style.setProperty('--accent-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
+  };
+
+  const applyTextColors = (primaryText: string, secondaryText: string) => {
+    const root = document.documentElement;
+    
+    // Convert hex to HSL for text colors
+    const hexToHsl = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      
+      return {
+        h: Math.round(h * 360),
+        s: Math.round(s * 100),
+        l: Math.round(l * 100)
+      };
+    };
+    
+    // Apply primary text color
+    const primaryHsl = hexToHsl(primaryText);
+    root.style.setProperty('--text-primary', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+    
+    // Apply secondary text color
+    const secondaryHsl = hexToHsl(secondaryText);
+    root.style.setProperty('--text-secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
+    
+    // Update foreground colors to match
+    root.style.setProperty('--foreground', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+    root.style.setProperty('--muted-foreground', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
+    
+    // Save to localStorage
+    localStorage.setItem('primaryTextColor', primaryText);
+    localStorage.setItem('secondaryTextColor', secondaryText);
     
     // Apply dark/light mode
     if (isDark) {
@@ -125,15 +176,20 @@ export default function SettingsMobile() {
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
     const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
     const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
+    const savedPrimaryTextColor = localStorage.getItem('primaryTextColor') || '#111827';
+    const savedSecondaryTextColor = localStorage.getItem('secondaryTextColor') || '#6b7280';
     
     setSelectedTheme(savedTheme);
     setDarkMode(savedDarkMode);
     setCustomColor(savedCustomColor);
     setSecondaryColor(savedSecondaryColor);
+    setPrimaryTextColor(savedPrimaryTextColor);
+    setSecondaryTextColor(savedSecondaryTextColor);
     
     // Apply saved theme after state update
     setTimeout(() => {
       applyThemeColors(savedCustomColor, savedDarkMode);
+      applyTextColors(savedPrimaryTextColor, savedSecondaryTextColor);
     }, 100);
   }, []);
 
@@ -142,15 +198,16 @@ export default function SettingsMobile() {
     localStorage.setItem('customColor', customColor);
     localStorage.setItem('secondaryColor', secondaryColor);
     localStorage.setItem('darkMode', darkMode.toString());
+    localStorage.setItem('primaryTextColor', primaryTextColor);
+    localStorage.setItem('secondaryTextColor', secondaryTextColor);
     
     // Apply the colors immediately
     applyThemeColors(customColor, darkMode);
-    
-
+    applyTextColors(primaryTextColor, secondaryTextColor);
     
     toast({
       title: "Appearance saved",
-      description: "Your appearance preferences have been updated.",
+      description: "Your appearance preferences including text colors have been updated.",
     });
   };
 
@@ -577,6 +634,163 @@ export default function SettingsMobile() {
                     }}
                   >
                     {customColor}
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Color Settings */}
+              <div style={{ marginBottom: "24px" }}>
+                <label style={{ fontSize: "16px", fontWeight: "500", marginBottom: "12px", display: "block", color: "#374151" }}>
+                  Text Colors
+                </label>
+                
+                {/* Primary Text Color */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Primary Text Color (Headings & Main Text)
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <input
+                      type="color"
+                      value={primaryTextColor}
+                      onChange={(e) => {
+                        setPrimaryTextColor(e.target.value);
+                        applyTextColors(e.target.value, secondaryTextColor);
+                      }}
+                      style={{
+                        width: "60px",
+                        height: "40px",
+                        borderRadius: "8px",
+                        border: "2px solid #e5e7eb",
+                        cursor: "pointer",
+                        WebkitAppearance: "none",
+                        padding: "4px"
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={primaryTextColor}
+                      onChange={(e) => {
+                        setPrimaryTextColor(e.target.value);
+                        applyTextColors(e.target.value, secondaryTextColor);
+                      }}
+                      style={{
+                        flex: 1,
+                        height: "40px",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "8px",
+                        padding: "0 12px",
+                        fontSize: "14px"
+                      }}
+                      placeholder="#111827"
+                    />
+                  </div>
+                  <div style={{ 
+                    marginTop: "8px", 
+                    padding: "12px", 
+                    backgroundColor: "#f9fafb", 
+                    borderRadius: "6px",
+                    color: primaryTextColor,
+                    fontSize: "14px",
+                    fontWeight: "600"
+                  }}>
+                    Preview: This is how primary text will look
+                  </div>
+                </div>
+
+                {/* Secondary Text Color */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Secondary Text Color (Descriptions & Muted Text)
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <input
+                      type="color"
+                      value={secondaryTextColor}
+                      onChange={(e) => {
+                        setSecondaryTextColor(e.target.value);
+                        applyTextColors(primaryTextColor, e.target.value);
+                      }}
+                      style={{
+                        width: "60px",
+                        height: "40px",
+                        borderRadius: "8px",
+                        border: "2px solid #e5e7eb",
+                        cursor: "pointer",
+                        WebkitAppearance: "none",
+                        padding: "4px"
+                      }}
+                    />
+                    <input
+                      type="text"
+                      value={secondaryTextColor}
+                      onChange={(e) => {
+                        setSecondaryTextColor(e.target.value);
+                        applyTextColors(primaryTextColor, e.target.value);
+                      }}
+                      style={{
+                        flex: 1,
+                        height: "40px",
+                        border: "2px solid #e5e7eb",
+                        borderRadius: "8px",
+                        padding: "0 12px",
+                        fontSize: "14px"
+                      }}
+                      placeholder="#6b7280"
+                    />
+                  </div>
+                  <div style={{ 
+                    marginTop: "8px", 
+                    padding: "12px", 
+                    backgroundColor: "#f9fafb", 
+                    borderRadius: "6px",
+                    color: secondaryTextColor,
+                    fontSize: "14px"
+                  }}>
+                    Preview: This is how secondary text will look
+                  </div>
+                </div>
+
+                {/* Text Color Presets */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Text Color Presets
+                  </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                    {[
+                      { primary: "#111827", secondary: "#6b7280", name: "Dark Gray" },
+                      { primary: "#1f2937", secondary: "#9ca3af", name: "Charcoal" },
+                      { primary: "#374151", secondary: "#9ca3af", name: "Medium Gray" },
+                      { primary: "#000000", secondary: "#666666", name: "Black" },
+                      { primary: "#1e40af", secondary: "#3b82f6", name: "Blue" },
+                      { primary: "#7c3aed", secondary: "#8b5cf6", name: "Purple" },
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => {
+                          setPrimaryTextColor(preset.primary);
+                          setSecondaryTextColor(preset.secondary);
+                          applyTextColors(preset.primary, preset.secondary);
+                        }}
+                        style={{
+                          padding: "8px",
+                          borderRadius: "8px",
+                          border: "2px solid #e5e7eb",
+                          backgroundColor: "white",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          transition: "all 0.2s"
+                        }}
+                        title={preset.name}
+                      >
+                        <div style={{ color: preset.primary, fontSize: "12px", fontWeight: "600" }}>
+                          Primary
+                        </div>
+                        <div style={{ color: preset.secondary, fontSize: "11px" }}>
+                          Secondary
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>

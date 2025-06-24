@@ -71,6 +71,12 @@ Preferred communication style: Simple, everyday language.
 - **Fixed membership dialog mobile scrolling:**
   - Added proper overflow and height constraints to membership form popup
   - Ensured add/edit membership dialog scrolls properly on mobile devices
+- **Added text color customization to mobile settings:**
+  - Implemented primary and secondary text color controls
+  - Added color picker and text input for custom colors
+  - Created text color presets for quick selection
+  - Added live preview functionality for text colors
+  - Integrated with existing theme system for persistent color changes
 
 ## System Architecture
 
