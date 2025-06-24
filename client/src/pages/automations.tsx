@@ -125,12 +125,23 @@ export default function Automations() {
     },
     {
       id: 3,
-      name: "Booking Confirmation",
+      name: "Booking Confirmation SMS",
+      type: "sms",
+      trigger: "booking_confirmation",
+      timing: "Immediately",
+      template: "Hi {client_name}! Your appointment at {salon_name} for {service_name} on {appointment_date} at {appointment_time} has been confirmed. See you soon!",
+      active: true,
+      lastRun: "2025-06-24T16:09:00Z",
+      sentCount: 1
+    },
+    {
+      id: 7,
+      name: "Booking Confirmation Email",
       type: "email",
       trigger: "booking_confirmation",
       timing: "Immediately",
       subject: "Appointment Confirmed - {salon_name}",
-      template: "Dear {client_name},\n\nYour appointment has been confirmed!\n\nDetails:\n- Service: {service_name}\n- Date & Time: {appointment_datetime}\n- Stylist: {staff_name}\n- Duration: {service_duration}\n- Price: {service_price}\n\nLocation:\n{salon_address}\n\nIf you have any questions, please don't hesitate to contact us.\n\nThank you for choosing {salon_name}!",
+      template: "Dear {client_name},\n\nYour appointment has been confirmed!\n\nDetails:\n- Service: {service_name}\n- Date & Time: {appointment_datetime}\n- Stylist: {staff_name}\n- Duration: {service_duration}\n- Price: {total_amount}\n\nLocation:\n{salon_address}\n\nIf you have any questions, please don't hesitate to contact us.\n\nThank you for choosing {salon_name}!",
       active: true,
       lastRun: "2025-06-23T16:45:00Z",
       sentCount: 67
