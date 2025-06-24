@@ -218,7 +218,7 @@ const SchedulePage = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       toast({
-        title: "Success",
+        title: "Success", 
         description: "Schedule updated successfully!"
       });
       setIsFormOpen(false);
@@ -279,7 +279,7 @@ const SchedulePage = () => {
     if (!validationResult.success) {
       console.error("Validation failed:", validationResult.error);
       toast({
-        title: "Validation Error", 
+        title: "Validation Error",
         description: "Please check all required fields",
         variant: "destructive"
       });
