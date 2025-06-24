@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar, Clock, MapPin, Users, Plus, Edit, Trash2, User } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,7 +39,7 @@ import { z } from "zod";
 // Schedule form schema
 const scheduleFormSchema = z.object({
   staffId: z.number().min(1, "Staff member is required"),
-  dayOfWeek: z.enum(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]),
+  daysOfWeek: z.array(z.enum(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])).min(1, "At least one day must be selected"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().min(1, "Location is required"),
@@ -100,7 +101,7 @@ const SchedulePage = () => {
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
       staffId: 1,
-      dayOfWeek: "Monday",
+      daysOfWeek: ["Monday"],
       startTime: "09:00",
       endTime: "17:00",
       location: "All Locations",
@@ -203,7 +204,7 @@ const SchedulePage = () => {
     setSelectedScheduleId(null);
     form.reset({
       staffId: 1,
-      dayOfWeek: "Monday",
+      daysOfWeek: ["Monday"],
       startTime: "09:00",
       endTime: "17:00",
       location: "All Locations",
@@ -221,7 +222,7 @@ const SchedulePage = () => {
     setSelectedScheduleId(schedule.id);
     form.reset({
       staffId: schedule.staffId,
-      dayOfWeek: schedule.dayOfWeek as any,
+      daysOfWeek: [schedule.dayOfWeek as any],
       startTime: schedule.startTime,
       endTime: schedule.endTime,
       location: schedule.location,
@@ -241,11 +242,40 @@ const SchedulePage = () => {
     }
   };
 
-  const onSubmit = (data: ScheduleFormValues) => {
+  const onSubmit = async (data: ScheduleFormValues) => {
     if (selectedScheduleId) {
-      updateScheduleMutation.mutate(data);
+      // For editing, convert back to single day format
+      const singleDayData = {
+        ...data,
+        dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
+      };
+      updateScheduleMutation.mutate(singleDayData);
     } else {
-      createScheduleMutation.mutate(data);
+      // For creating, submit multiple schedules for each selected day
+      try {
+        for (const dayOfWeek of data.daysOfWeek) {
+          const singleDayData = {
+            ...data,
+            dayOfWeek,
+          };
+          await apiRequest('/api/schedules', {
+            method: 'POST',
+            body: JSON.stringify(singleDayData),
+          });
+        }
+        toast({
+          title: "Success",
+          description: `Schedules created for ${data.daysOfWeek.length} day(s)`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        setIsFormOpen(false);
+      } catch (error: any) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to create schedules",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -465,27 +495,43 @@ const SchedulePage = () => {
                       )}
                     />
 
-                    {/* Day of Week */}
+                    {/* Days of Week - Multiple Selection */}
                     <FormField
                       control={form.control}
-                      name="dayOfWeek"
+                      name="daysOfWeek"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Day of Week</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select day" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {DAYS_OF_WEEK.map((day) => (
-                                <SelectItem key={day} value={day}>
-                                  {day}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <FormLabel>Days of Week</FormLabel>
+                          <div className="grid grid-cols-2 gap-3 mt-2">
+                            {DAYS_OF_WEEK.map((day) => {
+                              const isSelected = field.value?.includes(day as any);
+                              return (
+                                <div
+                                  key={day}
+                                  className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                    isSelected
+                                      ? 'bg-primary/10 border-primary text-primary'
+                                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                  }`}
+                                  onClick={() => {
+                                    const currentValue = field.value || [];
+                                    if (isSelected) {
+                                      field.onChange(currentValue.filter((d: string) => d !== day));
+                                    } else {
+                                      field.onChange([...currentValue, day]);
+                                    }
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    readOnly
+                                    className="pointer-events-none"
+                                  />
+                                  <span className="text-sm font-medium">{day}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
