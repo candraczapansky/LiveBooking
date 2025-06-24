@@ -523,7 +523,7 @@ const AppointmentsPage = () => {
                           ? `hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
                               dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
                             }`
-                          : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed opacity-60'
+                          : 'bg-gray-800 dark:bg-gray-800 cursor-not-allowed'
                       }`}
                       style={{ height: Math.round(30 * zoomLevel) }}
                       onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
@@ -542,13 +542,7 @@ const AppointmentsPage = () => {
                         
                         handleAddAppointment();
                       } : undefined}
-                    >
-                      {!isAvailable && (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-gray-400 dark:text-gray-500 text-xs">Unavailable</span>
-                        </div>
-                      )}
-                    </div>
+                    />
                   );
                 })}
               </div>
