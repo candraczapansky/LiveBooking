@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { SidebarController } from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import {
   Select,
   SelectContent,
@@ -80,6 +82,19 @@ const SchedulePage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
   const [viewFilter, setViewFilter] = useState("current");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
@@ -294,40 +309,51 @@ const SchedulePage = () => {
   };
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff Schedule</h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Manage staff availability and appointment scheduling
-          </p>
-        </div>
-        <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-          <Select value={viewFilter} onValueChange={setViewFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Select view" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current">Current and future</SelectItem>
-              <SelectItem value="past">Past schedules</SelectItem>
-              <SelectItem value="all">All schedules</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button onClick={handleAddSchedule}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add New Schedule
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block">
+        <SidebarController />
       </div>
+      
+      <div className={`transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
+      } min-h-screen flex flex-col`}>
+        <Header />
+        
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">
+          <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
+            {/* Page Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff Schedule</h1>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                  Manage staff availability and appointment scheduling
+                </p>
+              </div>
+              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
+                <Select value={viewFilter} onValueChange={setViewFilter}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Select view" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="current">Current and future</SelectItem>
+                    <SelectItem value="past">Past schedules</SelectItem>
+                    <SelectItem value="all">All schedules</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={handleAddSchedule}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Schedule
+                </Button>
+              </div>
+            </div>
 
-      {/* Schedules Table */}
-      {isSchedulesLoading ? (
-        <div className="flex justify-center items-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : schedules && schedules.length > 0 ? (
-        <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
+            {/* Schedules Table */}
+            {isSchedulesLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+              </div>
+            ) : schedules && schedules.length > 0 ? (
+              <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
@@ -430,15 +456,15 @@ const SchedulePage = () => {
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">No schedules found.</p>
-        </div>
-      )}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 dark:text-gray-400">No schedules found.</p>
+              </div>
+            )}
 
-      {/* Schedule Form Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+            {/* Schedule Form Dialog */}
+            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -613,9 +639,12 @@ const SchedulePage = () => {
               </div>
             </form>
           </Form>
-        </DialogContent>
-      </Dialog>
-    </>
+            </DialogContent>
+            </Dialog>
+          </div>
+        </main>
+      </div>
+    </div>
   );
 };
 
