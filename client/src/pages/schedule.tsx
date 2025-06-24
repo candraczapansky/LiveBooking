@@ -205,10 +205,9 @@ const SchedulePage = () => {
 
   const createScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
-      // For now, simulate creating a schedule
-      // In real implementation, this would call the backend API
-      console.log("Creating schedule:", data);
-      return { id: Date.now(), ...data };
+      console.log("Creating schedule with data:", data);
+      // Call the actual API endpoint
+      return await apiRequest("POST", "/api/schedules", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
@@ -230,9 +229,8 @@ const SchedulePage = () => {
 
   const updateScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
-      // For now, simulate updating a schedule
       console.log("Updating schedule:", selectedScheduleId, data);
-      return { id: selectedScheduleId, ...data };
+      return await apiRequest("PUT", `/api/schedules/${selectedScheduleId}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });

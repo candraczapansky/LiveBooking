@@ -421,6 +421,29 @@ export const insertPromoCodeSchema = createInsertSchema(promoCodes).omit({
 export type PromoCode = typeof promoCodes.$inferSelect;
 export type InsertPromoCode = z.infer<typeof insertPromoCodeSchema>;
 
+// Staff schedules schema
+export const staffSchedules = pgTable("staff_schedules", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").notNull(),
+  dayOfWeek: text("day_of_week").notNull(), // Monday, Tuesday, etc.
+  startTime: text("start_time").notNull(), // HH:MM format
+  endTime: text("end_time").notNull(), // HH:MM format
+  location: text("location").notNull(),
+  serviceCategories: text("service_categories").array().default([]), // Array of category IDs
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"), // Optional end date
+  isBlocked: boolean("is_blocked").default(false), // If true, staff is unavailable
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStaffScheduleSchema = createInsertSchema(staffSchedules).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type StaffSchedule = typeof staffSchedules.$inferSelect;
+export type InsertStaffSchedule = z.infer<typeof insertStaffScheduleSchema>;
+
 // Email unsubscribes schema (global unsubscribe tracking)
 export const emailUnsubscribes = pgTable("email_unsubscribes", {
   id: serial("id").primaryKey(),

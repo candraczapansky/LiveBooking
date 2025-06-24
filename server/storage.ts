@@ -18,7 +18,8 @@ import {
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
-  promoCodes, PromoCode, InsertPromoCode
+  promoCodes, PromoCode, InsertPromoCode,
+  staffSchedules, StaffSchedule, InsertStaffSchedule
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
