@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from "react";
-import { Bell, Settings, User, LogOut, ChevronDown } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/App";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -57,10 +57,6 @@ const Header = () => {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
-            <Button variant="ghost" size="icon" className="relative h-9 w-9 sm:h-10 sm:w-10">
-              <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-gray-500 dark:text-gray-400" />
-              <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-red-500"></span>
-            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-0">
