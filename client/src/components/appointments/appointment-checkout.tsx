@@ -291,6 +291,7 @@ export default function AppointmentCheckout({
         title: "Cash Payment Recorded",
         description: `Cash payment of $${appointment.amount} recorded successfully`,
       });
+      setPaymentMethod(null);
       onSuccess();
     } catch (error: any) {
       toast({
