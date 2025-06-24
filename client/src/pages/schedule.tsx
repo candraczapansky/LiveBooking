@@ -97,9 +97,9 @@ const SchedulePage = () => {
     checkSidebarState();
     
     // Then check periodically, but less frequently
-    const interval = setInterval(checkSidebarState, 500);
+    const interval = setInterval(checkSidebarState, 1000);
     return () => clearInterval(interval);
-  }, [sidebarOpen]);
+  }, []); // Remove sidebarOpen from dependencies to prevent infinite loop
 
   // Memoize the default date to prevent re-creation on every render
   const defaultStartDate = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -523,31 +523,27 @@ const SchedulePage = () => {
                           <div className="grid grid-cols-2 gap-3 mt-2">
                             {DAYS_OF_WEEK.map((day) => {
                               const currentValue = field.value || [];
-                              const isSelected = currentValue.includes(day as any);
+                              const isChecked = currentValue.includes(day);
                               
                               return (
-                                <div
-                                  key={day}
-                                  className={`flex items-center space-x-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                                    isSelected
-                                      ? 'bg-primary/10 border-primary text-primary'
-                                      : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                  }`}
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (isSelected) {
-                                      field.onChange(currentValue.filter((d: string) => d !== day));
-                                    } else {
-                                      field.onChange([...currentValue, day]);
-                                    }
-                                  }}
-                                >
+                                <div key={day} className="flex items-center space-x-2">
                                   <Checkbox
-                                    checked={isSelected}
-                                    readOnly
-                                    className="pointer-events-none"
+                                    id={`day-${day}`}
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        field.onChange([...currentValue, day]);
+                                      } else {
+                                        field.onChange(currentValue.filter((d: string) => d !== day));
+                                      }
+                                    }}
                                   />
-                                  <span className="text-sm font-medium">{day}</span>
+                                  <label
+                                    htmlFor={`day-${day}`}
+                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                  >
+                                    {day}
+                                  </label>
                                 </div>
                               );
                             })}
