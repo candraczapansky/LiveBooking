@@ -88,7 +88,7 @@ function validateBody<T>(schema: z.ZodType<T>) {
   };
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
   // Add middleware to log all requests
   app.use((req, res, next) => {
     if (req.method === 'PUT' && req.url.includes('/services/')) {
