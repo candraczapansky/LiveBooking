@@ -46,7 +46,7 @@ const staffFormSchema = z.object({
   hourlyRate: z.number().min(0).optional(),
   fixedSalary: z.number().min(0).optional(),
   username: z.string().min(1, "Username is required"),
-  email: z.string().email("Invalid email address"),
+  email: z.string(),
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),

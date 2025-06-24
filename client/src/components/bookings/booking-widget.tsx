@@ -79,7 +79,7 @@ const bookingSchema = z.object({
   notes: z.string().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
+  email: z.string(),
   phone: z.string().min(1, "Phone number is required"),
 });
 
