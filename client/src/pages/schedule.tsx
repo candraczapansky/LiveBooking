@@ -99,7 +99,7 @@ const SchedulePage = () => {
   const form = useForm<ScheduleFormValues>({
     resolver: zodResolver(scheduleFormSchema),
     defaultValues: {
-      staffId: 1, // Default to first staff member
+      staffId: 1,
       dayOfWeek: "Monday",
       startTime: "09:00",
       endTime: "17:00",
@@ -136,7 +136,6 @@ const SchedulePage = () => {
   // Create schedule mutation
   const createScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
-      console.log("Creating schedule with data:", data);
       const scheduleData = {
         staffId: data.staffId,
         dayOfWeek: data.dayOfWeek,
@@ -148,24 +147,15 @@ const SchedulePage = () => {
         endDate: data.dateRange.endDate || null,
         isBlocked: data.isBlocked || false,
       };
-      console.log("Sending schedule data to API:", scheduleData);
       return await apiRequest('POST', '/api/schedules', scheduleData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule created successfully!"
-      });
       setIsFormOpen(false);
       form.reset();
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: `Failed to create schedule: ${error.message}`,
-        variant: "destructive"
-      });
+      console.error("Failed to create schedule:", error);
     }
   });
 
@@ -187,20 +177,12 @@ const SchedulePage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success", 
-        description: "Schedule updated successfully!"
-      });
       setIsFormOpen(false);
       setSelectedScheduleId(null);
       form.reset();
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: `Failed to update schedule: ${error.message}`,
-        variant: "destructive"
-      });
+      console.error("Failed to update schedule:", error);
     }
   });
 
@@ -211,17 +193,9 @@ const SchedulePage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule deleted successfully!"
-      });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: `Failed to delete schedule: ${error.message}`,
-        variant: "destructive"
-      });
+      console.error("Failed to delete schedule:", error);
     }
   });
 
@@ -268,21 +242,6 @@ const SchedulePage = () => {
   };
 
   const onSubmit = (data: ScheduleFormValues) => {
-    console.log("Form submitted with data:", data);
-    console.log("Form errors:", form.formState.errors);
-    
-    // Validate the form manually
-    const validationResult = scheduleFormSchema.safeParse(data);
-    if (!validationResult.success) {
-      console.error("Validation failed:", validationResult.error);
-      toast({
-        title: "Validation Error",
-        description: "Please check all required fields",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     if (selectedScheduleId) {
       updateScheduleMutation.mutate(data);
     } else {
@@ -291,10 +250,10 @@ const SchedulePage = () => {
   };
 
   const getServiceCategoriesText = (categoryIds: number[]) => {
-    if (!categoryIds || categoryIds.length === 0) return "block";
+    if (!categoryIds || categoryIds.length === 0) return "Available";
     
     const categories = serviceCategories?.filter((cat: any) => categoryIds.includes(cat.id));
-    if (!categories || categories.length === 0) return "block";
+    if (!categories || categories.length === 0) return "Available";
     
     return `${categories.length} service${categories.length > 1 ? 's' : ''}`;
   };
@@ -354,108 +313,108 @@ const SchedulePage = () => {
               </div>
             ) : schedules && schedules.length > 0 ? (
               <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Day Of Week
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      Staff Member
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2" />
-                      Start Time
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2" />
-                      End Time
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      Service Categories
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      Date Range
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Location
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {schedules.map((schedule: any) => (
-                  <tr key={schedule.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {schedule.dayOfWeek}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {schedule.staff?.user?.firstName} {schedule.staff?.user?.lastName}
-                      <div className="text-xs text-gray-500 dark:text-gray-400">{schedule.staff?.title}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {schedule.startTime}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {schedule.endTime}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      <Badge variant={schedule.isBlocked ? "destructive" : "default"}>
-                        {getServiceCategoriesText(schedule.serviceCategories)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {formatDateRange(schedule.startDate, schedule.endDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {schedule.location}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditSchedule(schedule)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteSchedule(schedule.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Day Of Week
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <User className="h-4 w-4 mr-2" />
+                            Staff Member
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2" />
+                            Start Time
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <Clock className="h-4 w-4 mr-2" />
+                            End Time
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <Users className="h-4 w-4 mr-2" />
+                            Service Categories
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2" />
+                            Date Range
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          <div className="flex items-center">
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Location
+                          </div>
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {schedules.map((schedule: any) => (
+                        <tr key={schedule.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {schedule.dayOfWeek}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {schedule.staff?.user?.firstName} {schedule.staff?.user?.lastName}
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{schedule.staff?.title}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {schedule.startTime}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {schedule.endTime}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            <Badge variant={schedule.isBlocked ? "destructive" : "default"}>
+                              {getServiceCategoriesText(schedule.serviceCategories)}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {formatDateRange(schedule.startDate, schedule.endDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                            {schedule.location}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <div className="flex justify-end space-x-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditSchedule(schedule)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteSchedule(schedule.id)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
@@ -465,181 +424,181 @@ const SchedulePage = () => {
 
             {/* Schedule Form Dialog */}
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedScheduleId ? "Edit Schedule" : "Add New Schedule"}
-            </DialogTitle>
-            <DialogDescription>
-              Set up staff availability for appointments and services.
-            </DialogDescription>
-          </DialogHeader>
+              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedScheduleId ? "Edit Schedule" : "Add New Schedule"}
+                  </DialogTitle>
+                  <DialogDescription>
+                    Set up staff availability for appointments and services.
+                  </DialogDescription>
+                </DialogHeader>
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              {/* Staff Selection */}
-              <FormField
-                control={form.control}
-                name="staffId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Staff Member</FormLabel>
-                    <Select 
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      value={field.value?.toString() || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select staff member" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {staff?.map((staffMember: any) => (
-                          <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
-                            {staffMember.user?.firstName} {staffMember.user?.lastName} - {staffMember.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Staff Selection */}
+                    <FormField
+                      control={form.control}
+                      name="staffId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Staff Member</FormLabel>
+                          <Select 
+                            onValueChange={(value) => field.onChange(parseInt(value))}
+                            value={field.value?.toString() || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select staff member" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {staff?.map((staffMember: any) => (
+                                <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
+                                  {staffMember.user?.firstName} {staffMember.user?.lastName} - {staffMember.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-              {/* Day of Week */}
-              <FormField
-                control={form.control}
-                name="dayOfWeek"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Day of Week</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select day" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {DAYS_OF_WEEK.map((day) => (
-                          <SelectItem key={day} value={day}>
-                            {day}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    {/* Day of Week */}
+                    <FormField
+                      control={form.control}
+                      name="dayOfWeek"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Day of Week</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select day" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {DAYS_OF_WEEK.map((day) => (
+                                <SelectItem key={day} value={day}>
+                                  {day}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-              {/* Time Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="startTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="endTime"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                    {/* Time Range */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="startTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Time</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="endTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Time</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-              {/* Location */}
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="All Locations">All Locations</SelectItem>
-                        {rooms?.map((room: any) => (
-                          <SelectItem key={room.id} value={room.name}>
-                            {room.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    {/* Location */}
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="All Locations">All Locations</SelectItem>
+                              {rooms?.map((room: any) => (
+                                <SelectItem key={room.id} value={room.name}>
+                                  {room.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="dateRange.startDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Start Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    {/* Date Range */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="dateRange.startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-                <FormField
-                  control={form.control}
-                  name="dateRange.endDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>End Date (Optional)</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                      <FormField
+                        control={form.control}
+                        name="dateRange.endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Date (Optional)</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsFormOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={createScheduleMutation.isPending || updateScheduleMutation.isPending}
-                >
-                  {createScheduleMutation.isPending || updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-            </DialogContent>
+                    {/* Submit Button */}
+                    <div className="flex justify-end space-x-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsFormOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        type="submit"
+                        disabled={createScheduleMutation.isPending || updateScheduleMutation.isPending}
+                      >
+                        {createScheduleMutation.isPending || updateScheduleMutation.isPending ? "Saving..." : "Save Schedule"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
             </Dialog>
           </div>
         </main>
