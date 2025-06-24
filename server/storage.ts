@@ -505,54 +505,29 @@ export class DatabaseStorage implements IStorage {
 
   // User operations
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
   }
 
   async getAllUsers(): Promise<User[]> {
-    return Array.from(this.users.values());
+    return await db.select().from(users);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const user: User = { 
-      id,
-      username: insertUser.username,
-      password: insertUser.password,
-      email: insertUser.email,
-      role: insertUser.role || "client",
-      firstName: insertUser.firstName || null,
-      lastName: insertUser.lastName || null,
-      phone: insertUser.phone || null,
-      address: insertUser.address || null,
-      city: insertUser.city || null,
-      state: insertUser.state || null,
-      zipCode: insertUser.zipCode || null,
-      squareCustomerId: insertUser.squareCustomerId || null,
-      emailAccountManagement: insertUser.emailAccountManagement ?? true,
-      emailAppointmentReminders: insertUser.emailAppointmentReminders ?? true,
-      emailPromotions: insertUser.emailPromotions ?? false,
-      smsAccountManagement: insertUser.smsAccountManagement ?? false,
-      smsAppointmentReminders: insertUser.smsAppointmentReminders ?? true,
-      smsPromotions: insertUser.smsPromotions ?? false,
-      createdAt: new Date()
-    };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
-    const user = await this.getUser(id);
-    if (!user) {
+    const [updatedUser] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
+    if (!updatedUser) {
       throw new Error('User not found');
     }
-    const updatedUser = { ...user, ...userData };
-    this.users.set(id, updatedUser);
     return updatedUser;
   }
 
