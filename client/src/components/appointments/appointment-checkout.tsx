@@ -87,6 +87,39 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     }
   };
 
+  const handleCashPayment = async () => {
+    setIsProcessing(true);
+    try {
+      const paymentData = await apiRequest("POST", "/api/create-payment", {
+        amount: appointment.amount,
+        sourceId: "cash",
+        type: "appointment_payment",
+        appointmentId: appointment.id,
+        description: `Cash payment for ${appointment.serviceName} appointment`
+      });
+
+      toast({
+        title: "Payment Successful",
+        description: "Cash payment recorded successfully",
+      });
+
+      await apiRequest("POST", "/api/confirm-payment", {
+        paymentId: "cash",
+        appointmentId: appointment.id
+      });
+
+      onSuccess();
+    } catch (error: any) {
+      toast({
+        title: "Payment Error",
+        description: error.response?.data?.error || "Failed to process cash payment",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

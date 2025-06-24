@@ -1361,6 +1361,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Payment ID and appointment ID are required" });
       }
 
+      // Handle cash payments
+      if (paymentId.startsWith('cash_')) {
+        const appointment = await storage.getAppointment(appointmentId);
+        if (appointment) {
+          await storage.updateAppointment(appointmentId, { paymentStatus: 'paid' });
+          
+          await storage.createPayment({
+            clientId: appointment.clientId,
+            amount: Number(appointment.amount || 0),
+            method: 'cash',
+            status: 'completed',
+            appointmentId: appointmentId,
+            squarePaymentId: paymentId
+          });
+
+          return res.json({ success: true, appointment });
+        }
+      }
+
       // Retrieve payment to verify it was successful
       const response = await squareClient.payments.get(paymentId);
       
