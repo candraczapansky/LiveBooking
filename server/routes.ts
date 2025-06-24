@@ -59,12 +59,10 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 // Initialize Square
 const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
 const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
-const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' ? SquareEnvironment.Production : SquareEnvironment.Sandbox;
+const squareEnvironment = SquareEnvironment.Sandbox; // Force sandbox for testing
 
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken || '',
-  },
+  accessToken: squareAccessToken || '',
   environment: squareEnvironment,
 });
 
@@ -1376,7 +1374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create payment record
           await storage.createPayment({
             clientId: appointment.clientId,
-            amount: Number(result.payment.amountMoney?.amount || 0) / 100, // Convert back from cents
+            amount: Number(response.payment?.amountMoney?.amount || 0) / 100, // Convert back from cents
             method: 'card',
             status: 'completed',
             appointmentId: appointmentId,
@@ -2071,7 +2069,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         const response = await squareClient.customers.create(requestBody);
-        customerId = response.customer?.id;
+        customerId = response.customer?.id || null;
         
         if (customerId) {
           await storage.updateUserSquareCustomerId(clientId, customerId);
@@ -2122,11 +2120,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Save to database
       const savedMethod = await storage.createSavedPaymentMethod({
         clientId: clientId,
-        squareCardId: result.card.id!,
-        cardBrand: result.card.cardBrand || 'unknown',
-        cardLast4: result.card.last4 || '0000',
-        cardExpMonth: result.card.expMonth || 12,
-        cardExpYear: result.card.expYear || new Date().getFullYear(),
+        squareCardId: response.card?.id || '',
+        cardBrand: response.card?.cardBrand || 'unknown',
+        cardLast4: response.card?.last4 || '0000',
+        cardExpMonth: Number(response.card?.expMonth) || 12,
+        cardExpYear: Number(response.card?.expYear) || new Date().getFullYear(),
         isDefault: isDefault
       });
 
