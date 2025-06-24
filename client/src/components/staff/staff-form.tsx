@@ -478,7 +478,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
             {/* Staff Profile Header */}
             {!staffId && (
               <div className="flex items-center space-x-2">

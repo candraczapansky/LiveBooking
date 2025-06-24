@@ -306,7 +306,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         </div>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate>
             {/* Step 1: Service Selection */}
             {currentStep === 0 && (
               <div className="space-y-4">

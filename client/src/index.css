@@ -2,13 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Completely disable browser validation styling */
+/* Completely disable ALL browser validation styling */
 input:invalid,
 input:-webkit-invalid,
 input:-moz-invalid,
 input[type="text"]:invalid,
-input[type="email"]:invalid {
+input[type="email"]:invalid,
+input[data-invalid]:invalid,
+input[aria-invalid="true"] {
   border: 1px solid hsl(var(--border)) !important;
+  border-color: hsl(var(--border)) !important;
   box-shadow: none !important;
   outline: none !important;
   background-color: hsl(var(--background)) !important;
@@ -18,24 +21,39 @@ input:focus:invalid,
 input:focus:-webkit-invalid,
 input:focus:-moz-invalid,
 input[type="text"]:focus:invalid,
-input[type="email"]:focus:invalid {
+input[type="email"]:focus:invalid,
+input[data-invalid]:focus:invalid,
+input[aria-invalid="true"]:focus {
   border: 1px solid hsl(var(--ring)) !important;
+  border-color: hsl(var(--ring)) !important;
   box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
   outline: none !important;
   background-color: hsl(var(--background)) !important;
 }
 
-/* Remove any red coloring from form validation */
+/* Force override any validation styling */
 input[aria-invalid="true"],
 input[aria-invalid="false"],
+input[data-state="invalid"],
 .form-field input,
-.form-control input {
+.form-control input,
+[data-radix-collection-item] input {
   border-color: hsl(var(--border)) !important;
   box-shadow: none !important;
 }
 
-/* Override any validation states */
-input:not(:focus):invalid {
+/* Remove red borders globally */
+input:not(:focus):invalid,
+input:not(:focus)[aria-invalid="true"] {
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* Override any red styling */
+*[style*="border-color: red"],
+*[style*="border: red"],
+*[class*="border-red"],
+*[class*="ring-red"] {
   border-color: hsl(var(--border)) !important;
   box-shadow: none !important;
 }
