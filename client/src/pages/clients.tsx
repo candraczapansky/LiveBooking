@@ -312,7 +312,7 @@ const ClientsPage = () => {
       emailAccountManagement: client.emailAccountManagement ?? true,
       emailAppointmentReminders: client.emailAppointmentReminders ?? true,
       emailPromotions: client.emailPromotions ?? false,
-      smsAccountManagement: client.smsAccountManagement ?? false,
+      smsAccountManagement: client.smsAccountManagement ?? true,
       smsAppointmentReminders: client.smsAppointmentReminders ?? true,
       smsPromotions: client.smsPromotions ?? false,
     });
@@ -886,7 +886,7 @@ const ClientsPage = () => {
                             <FormLabel className="text-sm cursor-pointer" onClick={() => field.onChange(!field.value)}>
                               Account Management
                             </FormLabel>
-                            <FormDescription className="text-xs">Login alerts, password changes, account updates</FormDescription>
+                            <FormDescription className="text-xs">Receipts, billing updates, booking confirmations, account changes</FormDescription>
                           </div>
                         </FormItem>
                       )}
