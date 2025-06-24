@@ -150,24 +150,12 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         });
 
         if (paymentData.payment) {
-          try {
-            // Confirm the payment in the database
-            await apiRequest("POST", "/api/confirm-payment", {
-              paymentId: paymentData.paymentId || paymentData.payment.id,
-              appointmentId: appointment.id
-            });
-          } catch (confirmError) {
-            console.warn('Payment confirmation failed:', confirmError);
-            // Continue anyway since payment was successful
-          }
-
           toast({
             title: "Payment Successful",
             description: `Credit card payment of $${appointment.amount} processed successfully`,
           });
           
-          // Trigger the success callback which will handle the UI change
-          console.log('About to call onSuccess callback');
+          // Close the payment dialog immediately
           onSuccess();
         } else {
           throw new Error('Payment processing failed');
@@ -277,8 +265,22 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | null>(null);
   const [isCashProcessing, setIsCashProcessing] = useState(false);
-  const [isPaymentComplete, setIsPaymentComplete] = useState(false);
   const { toast } = useToast();
+
+  const handlePaymentSuccess = async () => {
+    try {
+      // Update appointment to paid status
+      await apiRequest("PATCH", `/api/appointments/${appointment.id}`, {
+        paymentStatus: "paid"
+      });
+    } catch (error) {
+      console.warn('Failed to update payment status:', error);
+    }
+    
+    // Close dialog and refresh appointments
+    onSuccess();
+    onClose();
+  };
 
   const handleCashPayment = async () => {
     setIsCashProcessing(true);
@@ -291,21 +293,13 @@ export default function AppointmentCheckout({
         description: `Cash payment for ${appointment.serviceName} appointment`
       });
 
-      try {
-        await apiRequest("POST", "/api/confirm-payment", {
-          paymentId: paymentData.paymentId || paymentData.payment?.id || "cash",
-          appointmentId: appointment.id
-        });
-      } catch (confirmError) {
-        console.warn('Payment confirmation failed:', confirmError);
-        // Continue anyway since payment was successful
-      }
-      
       toast({
         title: "Cash Payment Recorded",
         description: `Cash payment of $${appointment.amount} recorded successfully`,
       });
-      setIsPaymentComplete(true);
+      
+      // Close the payment dialog immediately
+      onSuccess();
     } catch (error: any) {
       toast({
         title: "Cash Payment Error",
@@ -344,45 +338,7 @@ export default function AppointmentCheckout({
     );
   };
 
-  console.log('AppointmentCheckout render - isOpen:', isOpen, 'isPaymentComplete:', isPaymentComplete);
-  
   if (!isOpen) return null;
-
-  // Show payment success screen
-  if (isPaymentComplete) {
-    console.log('Rendering payment complete screen');
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <CardTitle className="text-green-800 dark:text-green-200">Payment Complete!</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              Your payment of {formatPrice(appointment.amount)} has been processed successfully.
-            </p>
-            <Button 
-              onClick={() => {
-                setIsPaymentComplete(false);
-                setPaymentMethod(null);
-                setIsCashProcessing(false);
-                onSuccess();
-                onClose();
-              }}
-              className="w-full"
-            >
-              Close
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -472,8 +428,8 @@ export default function AppointmentCheckout({
               <CheckoutForm
                 appointment={appointment}
                 onSuccess={() => {
-                  console.log('CheckoutForm onSuccess called, setting isPaymentComplete to true');
-                  setIsPaymentComplete(true);
+                  onSuccess();
+                  onClose();
                 }}
                 onCancel={() => setPaymentMethod(null)}
               />
@@ -513,7 +469,6 @@ export default function AppointmentCheckout({
               <Button variant="outline" onClick={() => {
                 setPaymentMethod(null);
                 setIsCashProcessing(false);
-                setIsPaymentComplete(false);
                 onClose();
               }}>
                 Cancel
