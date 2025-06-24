@@ -86,7 +86,7 @@ const generateTimeSlots = () => {
   return slots;
 };
 
-const timeSlots = generateTimeSlots();
+const allTimeSlots = generateTimeSlots();
 
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
@@ -541,7 +541,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           <SelectValue placeholder="Select a time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {timeSlots.map((slot) => (
+                          {getAvailableTimeSlots().map((slot) => (
                             <SelectItem key={slot.value} value={slot.value}>
                               {slot.label}
                             </SelectItem>

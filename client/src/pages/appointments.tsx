@@ -92,12 +92,68 @@ const AppointmentsPage = () => {
     queryKey: ['/api/users'],
   });
 
+  // Fetch staff schedules
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['/api/schedules'],
+  });
+
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
+    });
+  };
+
+  // Helper function to get day name from date
+  const getDayName = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  // Helper function to format date as YYYY-MM-DD
+  const formatDateForComparison = (date: Date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Convert 12-hour time format to 24-hour
+  const convertTo24Hour = (time12h: string) => {
+    const [time, modifier] = time12h.split(' ');
+    let [hours, minutes] = time.split(':');
+    if (hours === '12') {
+      hours = '00';
+    }
+    if (modifier === 'PM') {
+      hours = (parseInt(hours, 10) + 12).toString();
+    }
+    return `${hours.padStart(2, '0')}:${minutes}`;
+  };
+
+  // Check if a staff member is available at a specific time
+  const isStaffAvailable = (staffId: number, timeSlot: string, date: Date) => {
+    const dayName = getDayName(date);
+    const currentDate = formatDateForComparison(date);
+    
+    // Find schedules for this staff member on this day
+    const staffSchedules = schedules.filter((schedule: any) => 
+      schedule.staffId === staffId && 
+      schedule.dayOfWeek === dayName &&
+      schedule.startDate <= currentDate &&
+      (!schedule.endDate || schedule.endDate >= currentDate)
+    );
+
+    if (staffSchedules.length === 0) {
+      return false; // No schedule = not available
+    }
+
+    // Convert time slot to 24-hour format for comparison
+    const timeSlot24 = convertTo24Hour(timeSlot);
+    
+    // Check if the time slot falls within any of the scheduled periods
+    return staffSchedules.some((schedule: any) => {
+      const startTime = schedule.startTime.substring(0, 5); // Remove seconds
+      const endTime = schedule.endTime.substring(0, 5);
+      return timeSlot24 >= startTime && timeSlot24 < endTime && !schedule.isBlocked;
     });
   };
 
@@ -260,6 +316,19 @@ const AppointmentsPage = () => {
     e.preventDefault();
     
     if (!draggedAppointment) return;
+
+    // Check if the staff member is available at this time slot
+    const staffMember = staff?.find((s: any) => s.id === draggedAppointment.staffId);
+    if (!staffMember || !isStaffAvailable(staffMember.id, timeSlot, currentDate)) {
+      toast({
+        title: "Cannot Move Appointment",
+        description: "This staff member is not available at the selected time.",
+        variant: "destructive",
+      });
+      setDraggedAppointment(null);
+      setDragOverTimeSlot(null);
+      return;
+    }
 
     // Parse the time slot (e.g., "10:00 AM")
     const [time, period] = timeSlot.split(' ');
@@ -443,31 +512,45 @@ const AppointmentsPage = () => {
             {/* Staff columns */}
             {staff?.map((staffMember: any) => (
               <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth, minWidth: '280px' }}>
-                {timeSlots.map((time, index) => (
-                  <div 
-                    key={time} 
-                    className={`border-b hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
-                      dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
-                    }`}
-                    style={{ height: Math.round(30 * zoomLevel) }}
-                    onDragOver={(e) => handleDragOver(e, time)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, time)}
-                    onClick={() => {
-                      // Set time for new appointment
-                      const [timeStr, period] = time.split(' ');
-                      const [hours, minutes] = timeStr.split(':');
-                      let hour = parseInt(hours);
-                      if (period === 'PM' && hour !== 12) hour += 12;
-                      if (period === 'AM' && hour === 12) hour = 0;
-                      
-                      const appointmentDate = new Date(currentDate);
-                      appointmentDate.setHours(hour, parseInt(minutes), 0, 0);
-                      
-                      handleAddAppointment();
-                    }}
-                  />
-                ))}
+                {timeSlots.map((time, index) => {
+                  const isAvailable = isStaffAvailable(staffMember.id, time, currentDate);
+                  
+                  return (
+                    <div 
+                      key={time} 
+                      className={`border-b transition-colors ${
+                        isAvailable
+                          ? `hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
+                              dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
+                            }`
+                          : 'bg-gray-200 dark:bg-gray-600 cursor-not-allowed opacity-60'
+                      }`}
+                      style={{ height: Math.round(30 * zoomLevel) }}
+                      onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
+                      onDragLeave={isAvailable ? handleDragLeave : undefined}
+                      onDrop={isAvailable ? (e) => handleDrop(e, time) : undefined}
+                      onClick={isAvailable ? () => {
+                        // Set time for new appointment
+                        const [timeStr, period] = time.split(' ');
+                        const [hours, minutes] = timeStr.split(':');
+                        let hour = parseInt(hours);
+                        if (period === 'PM' && hour !== 12) hour += 12;
+                        if (period === 'AM' && hour === 12) hour = 0;
+                        
+                        const appointmentDate = new Date(currentDate);
+                        appointmentDate.setHours(hour, parseInt(minutes), 0, 0);
+                        
+                        handleAddAppointment();
+                      } : undefined}
+                    >
+                      {!isAvailable && (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-gray-400 dark:text-gray-500 text-xs">Unavailable</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>
