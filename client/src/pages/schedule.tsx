@@ -515,7 +515,19 @@ const SchedulePage = () => {
                           <FormLabel>Days of Week</FormLabel>
                           <div className="grid grid-cols-2 gap-3 mt-2">
                             {DAYS_OF_WEEK.map((day) => {
-                              const isSelected = field.value?.includes(day as any);
+                              const currentValue = field.value || [];
+                              const isSelected = currentValue.includes(day as any);
+                              
+                              const handleToggle = () => {
+                                if (isSelected) {
+                                  const newValue = currentValue.filter((d: string) => d !== day);
+                                  field.onChange(newValue);
+                                } else {
+                                  const newValue = [...currentValue, day];
+                                  field.onChange(newValue);
+                                }
+                              };
+                              
                               return (
                                 <div
                                   key={day}
@@ -524,17 +536,11 @@ const SchedulePage = () => {
                                       ? 'bg-primary/10 border-primary text-primary'
                                       : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700'
                                   }`}
-                                  onClick={() => {
-                                    const currentValue = field.value || [];
-                                    if (isSelected) {
-                                      field.onChange(currentValue.filter((d: string) => d !== day));
-                                    } else {
-                                      field.onChange([...currentValue, day]);
-                                    }
-                                  }}
+                                  onClick={handleToggle}
                                 >
                                   <Checkbox
                                     checked={isSelected}
+                                    onChange={handleToggle}
                                     className="pointer-events-none"
                                   />
                                   <span className="text-sm font-medium">{day}</span>
