@@ -14,6 +14,7 @@ const SimpleMobileMenu = () => {
   const navigationItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: Calendar, label: "Appointments", href: "/appointments" },
+    { icon: CalendarDays, label: "Schedules", href: "/schedule" },
     { icon: Users, label: "Clients", href: "/clients" },
     { icon: UserCircle, label: "Staff", href: "/staff" },
     { icon: Scissors, label: "Services", href: "/services" },

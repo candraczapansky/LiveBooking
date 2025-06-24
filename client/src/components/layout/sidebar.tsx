@@ -19,7 +19,8 @@ import {
   MapPin,
   Monitor,
   DollarSign,
-  Zap
+  Zap,
+  CalendarDays
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ const Sidebar = () => {
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
     { icon: <Calendar />, label: "Appointments", href: "/appointments" },
+    { icon: <CalendarDays />, label: "Schedules", href: "/schedule" },
     { icon: <Users />, label: "Clients", href: "/clients" },
     { icon: <UserCircle />, label: "Staff", href: "/staff" },
     { icon: <Scissors />, label: "Services", href: "/services" },
