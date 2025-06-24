@@ -745,7 +745,7 @@ const ClientsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <Form {...addForm}>
-            <form onSubmit={addForm.handleSubmit(handleAddClient)} className="space-y-4">
+            <form onSubmit={addForm.handleSubmit(handleAddClient)} className="space-y-4" noValidate>
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={addForm.control}
@@ -1117,7 +1117,7 @@ const ClientsPage = () => {
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleEditClient)} className="space-y-4">
+            <form onSubmit={editForm.handleSubmit(handleEditClient)} className="space-y-4" noValidate>
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}

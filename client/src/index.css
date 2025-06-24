@@ -2,6 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Completely disable browser validation styling */
+input:invalid,
+input:-webkit-invalid,
+input:-moz-invalid,
+input[type="text"]:invalid,
+input[type="email"]:invalid {
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background-color: hsl(var(--background)) !important;
+}
+
+input:focus:invalid,
+input:focus:-webkit-invalid,
+input:focus:-moz-invalid,
+input[type="text"]:focus:invalid,
+input[type="email"]:focus:invalid {
+  border: 1px solid hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+  outline: none !important;
+  background-color: hsl(var(--background)) !important;
+}
+
+/* Remove any red coloring from form validation */
+input[aria-invalid="true"],
+input[aria-invalid="false"],
+.form-field input,
+.form-control input {
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* Override any validation states */
+input:not(:focus):invalid {
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
 
 
 /* Perfect circle profile picture */

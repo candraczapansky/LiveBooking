@@ -159,7 +159,7 @@ const Login = () => {
             
             <TabsContent value="login">
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4" noValidate>
                   <FormField
                     control={loginForm.control}
                     name="username"
@@ -197,7 +197,7 @@ const Login = () => {
             
             <TabsContent value="register">
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={registerForm.control}
