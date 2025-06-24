@@ -971,12 +971,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/payments", async (req, res) => {
     const { clientId } = req.query;
     
-    if (!clientId) {
-      return res.status(400).json({ error: "Client ID is required" });
+    // If clientId is provided, get payments for specific client
+    if (clientId) {
+      const payments = await storage.getPaymentsByClient(parseInt(clientId as string));
+      return res.status(200).json(payments);
     }
     
-    const payments = await storage.getPaymentsByClient(parseInt(clientId as string));
-    return res.status(200).json(payments);
+    // Otherwise, get all payments for reporting purposes
+    try {
+      console.log('Fetching all payments for reports...');
+      const payments = await storage.getAllPayments();
+      console.log(`Found ${payments.length} payments`);
+      
+      // Get detailed information for each payment
+      const detailedPayments = await Promise.all(
+        payments.map(async (payment) => {
+          const client = await storage.getUser(payment.clientId);
+          const appointment = payment.appointmentId ? await storage.getAppointment(payment.appointmentId) : null;
+          let service = null;
+          
+          if (appointment) {
+            service = await storage.getService(appointment.serviceId);
+          }
+          
+          return {
+            ...payment,
+            client: client ? {
+              id: client.id,
+              firstName: client.firstName,
+              lastName: client.lastName,
+              email: client.email
+            } : null,
+            appointment,
+            service
+          };
+        })
+      );
+      
+      res.json(detailedPayments);
+    } catch (error: any) {
+      console.error('Error fetching payments:', error);
+      res.status(500).json({ error: "Error fetching payments: " + error.message });
+    }
   });
   
   app.put("/api/payments/:id", validateBody(insertPaymentSchema.partial()), async (req, res) => {
@@ -1384,42 +1420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all payments for verification
-  app.get("/api/payments", async (req, res) => {
-    try {
-      const payments = await storage.getAllPayments();
-      
-      // Get detailed information for each payment
-      const detailedPayments = await Promise.all(
-        payments.map(async (payment) => {
-          const client = await storage.getUser(payment.clientId);
-          const appointment = payment.appointmentId ? await storage.getAppointment(payment.appointmentId) : null;
-          let service = null;
-          
-          if (appointment) {
-            service = await storage.getService(appointment.serviceId);
-          }
-          
-          return {
-            ...payment,
-            client: client ? {
-              id: client.id,
-              firstName: client.firstName,
-              lastName: client.lastName,
-              email: client.email
-            } : null,
-            appointment,
-            service
-          };
-        })
-      );
-      
-      res.json(detailedPayments);
-    } catch (error: any) {
-      console.error('Error fetching payments:', error);
-      res.status(500).json({ error: "Error fetching payments: " + error.message });
-    }
-  });
+
 
   // Confirm payment and update appointment status
   app.post("/api/confirm-payment", async (req, res) => {
@@ -2381,8 +2382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate transaction ID
       const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Create transaction record (for now, just return success)
-      // In a real implementation, you would save this to a transactions table
+      // Create transaction record
       const transaction = {
         id: transactionId,
         clientId: clientId || null,
@@ -2395,11 +2395,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'completed'
       };
 
-      console.log('Transaction processed:', transaction);
+      // Also create a payment record for reporting purposes
+      let paymentRecord = null;
+      try {
+        paymentRecord = await storage.createPayment({
+          clientId: clientId || 1, // Default client for POS sales if none selected
+          amount: total,
+          method: paymentMethod === 'card' ? 'card' : 'cash',
+          status: 'completed',
+          type: 'pos_payment',
+          description: `POS Transaction - ${items.length} item(s)`,
+          paymentDate: new Date()
+        });
+
+        console.log('Transaction processed:', transaction);
+        console.log('Payment record created for reporting:', paymentRecord);
+      } catch (paymentError) {
+        console.error('Failed to create payment record:', paymentError);
+        // Continue with transaction even if payment record fails
+      }
       
       res.json({ 
         success: true, 
         transactionId: transactionId,
+        paymentRecord,
         message: "Transaction processed successfully" 
       });
     } catch (error: any) {
