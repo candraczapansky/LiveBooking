@@ -59,6 +59,17 @@ const automationRules: AutomationRule[] = [
     template: "Hi {client_name}, your appointment at {salon_name} for {appointment_datetime} has been cancelled. Call {salon_phone} to reschedule anytime!",
     active: true,
     sentCount: 0
+  },
+  {
+    id: 5,
+    name: "Booking Confirmation Email",
+    type: "email",
+    trigger: "booking_confirmation",
+    timing: "immediately",
+    subject: "Appointment Confirmed - {salon_name}",
+    template: "Dear {client_name},\n\nYour appointment has been confirmed!\n\nDetails:\n- Service: {service_name}\n- Date & Time: {appointment_datetime}\n- Stylist: {staff_name}\n- Duration: {service_duration} minutes\n- Price: ${total_amount}\n\nLocation:\n{salon_address}\n\nIf you have any questions, please don't hesitate to contact us at {salon_phone}.\n\nThank you for choosing {salon_name}!",
+    active: true,
+    sentCount: 0
   }
 ];
 
@@ -167,7 +178,7 @@ export async function triggerAutomations(
         
         const emailSent = await sendEmail({
           to: client.email,
-          from: 'noreply@beautybook.com',
+          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@beautybook.com',
           subject,
           text: processedTemplate,
           html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`
