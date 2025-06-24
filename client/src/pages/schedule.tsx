@@ -134,56 +134,36 @@ const SchedulePage = () => {
     queryKey: ['/api/service-categories'],
   });
 
-  // Create schedule mutation
-  const createScheduleMutation = useMutation({
-    mutationFn: async (data: ScheduleFormValues) => {
-      const scheduleData = {
-        staffId: data.staffId,
-        dayOfWeek: data.dayOfWeek,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        location: data.location,
-        serviceCategories: data.serviceCategories || [],
-        startDate: data.dateRange.startDate,
-        endDate: data.dateRange.endDate || null,
-        isBlocked: data.isBlocked || false,
-      };
-      return await apiRequest('POST', '/api/schedules', scheduleData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      setIsFormOpen(false);
-      form.reset();
-    },
-    onError: (error: any) => {
-      console.error("Failed to create schedule:", error);
-    }
-  });
-
-  // Update schedule mutation
+  // Update schedule mutation (for editing existing schedules)
   const updateScheduleMutation = useMutation({
-    mutationFn: async (data: ScheduleFormValues) => {
-      const scheduleData = {
-        staffId: data.staffId,
-        dayOfWeek: data.dayOfWeek,
-        startTime: data.startTime,
-        endTime: data.endTime,
-        location: data.location,
-        serviceCategories: data.serviceCategories || [],
-        startDate: data.dateRange.startDate,
-        endDate: data.dateRange.endDate || null,
-        isBlocked: data.isBlocked || false,
-      };
-      return await apiRequest("PUT", `/api/schedules/${selectedScheduleId}`, scheduleData);
+    mutationFn: async (data: any) => {
+      const response = await fetch(`/api/schedules/${selectedScheduleId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update schedule');
+      }
+      return response.json();
     },
     onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Schedule updated successfully",
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       setIsFormOpen(false);
-      setSelectedScheduleId(null);
-      form.reset();
     },
     onError: (error: any) => {
       console.error("Failed to update schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update schedule",
+        variant: "destructive",
+      });
     }
   });
 
@@ -246,27 +226,46 @@ const SchedulePage = () => {
     if (selectedScheduleId) {
       // For editing, convert back to single day format
       const singleDayData = {
-        ...data,
+        staffId: data.staffId,
         dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        serviceCategories: data.serviceCategories || [],
+        startDate: data.dateRange.startDate,
+        endDate: data.dateRange.endDate || null,
+        isBlocked: data.isBlocked || false,
       };
-      delete (singleDayData as any).daysOfWeek; // Remove the array field
       updateScheduleMutation.mutate(singleDayData);
     } else {
       // For creating, submit multiple schedules for each selected day
       try {
         const promises = data.daysOfWeek.map(async (dayOfWeek) => {
           const singleDayData = {
-            ...data,
+            staffId: data.staffId,
             dayOfWeek,
+            startTime: data.startTime,
+            endTime: data.endTime,
+            location: data.location,
+            serviceCategories: data.serviceCategories || [],
+            startDate: data.dateRange.startDate,
+            endDate: data.dateRange.endDate || null,
+            isBlocked: data.isBlocked || false,
           };
-          delete (singleDayData as any).daysOfWeek; // Remove the array field
-          return await fetch('/api/schedules', {
+          
+          const response = await fetch('/api/schedules', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(singleDayData),
           });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to create schedule for ${dayOfWeek}`);
+          }
+          
+          return response.json();
         });
         
         await Promise.all(promises);
@@ -278,6 +277,7 @@ const SchedulePage = () => {
         queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
         setIsFormOpen(false);
       } catch (error: any) {
+        console.error("Failed to create schedules:", error);
         toast({
           title: "Error",
           description: error.message || "Failed to create schedules",
