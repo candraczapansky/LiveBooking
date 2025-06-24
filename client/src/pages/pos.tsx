@@ -47,58 +47,140 @@ import { apiRequest } from "@/lib/queryClient";
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
 
-// Payment form component using Square Web SDK
+// Square payment form component
 const PaymentForm = ({ total, onSuccess, onError }: { 
   total: number; 
   onSuccess: () => void; 
   onError: (error: string) => void; 
 }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [cardNonce, setCardNonce] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [cardElement, setCardElement] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!cardNonce) {
-      onError('Please enter valid card information');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const data = await apiRequest("POST", "/api/create-payment", {
-        amount: total,
-        sourceId: cardNonce,
-        type: "pos_payment",
-        description: "Point of Sale Transaction"
-      });
-
-      if (data.payment) {
-        onSuccess();
-      } else {
-        onError('Payment failed');
+  useEffect(() => {
+    initializeSquarePaymentForm();
+    
+    return () => {
+      // Cleanup Square elements when component unmounts
+      if (cardElement) {
+        cardElement.destroy();
       }
-    } catch (error: any) {
-      onError(error.message || 'Payment failed');
-    } finally {
+    };
+  }, []);
+
+  const initializeSquarePaymentForm = async () => {
+    try {
+      // Dynamically load Square Web SDK if not already loaded
+      if (!(window as any).Square) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://web.squarecdn.com/v1/square.js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
+      }
+
+      const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+      const card = await payments.card();
+      await card.attach('#pos-square-card-element');
+      
+      setCardElement(card);
+      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Square payment form initialization error:', err);
+      setError('Failed to load payment form. Please try again.');
       setIsLoading(false);
     }
   };
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!cardElement) {
+      onError('Payment form not ready. Please try again.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const result = await cardElement.tokenize();
+      
+      if (result.status === 'OK') {
+        const nonce = result.token;
+        
+        // Process payment with Square
+        const paymentData = await apiRequest("POST", "/api/create-payment", {
+          amount: total,
+          sourceId: nonce,
+          type: "pos_payment",
+          description: "Point of Sale Transaction"
+        });
+
+        console.log('POS Payment response:', paymentData);
+        
+        if (paymentData.payment || paymentData.paymentId) {
+          onSuccess();
+        } else {
+          console.error('Unexpected payment response:', paymentData);
+          throw new Error('Payment processing failed');
+        }
+      } else {
+        const errorMessages = result.errors?.map((error: any) => error.message).join(', ') || 'Payment failed';
+        onError(errorMessages);
+      }
+    } catch (error: any) {
+      console.error('POS Payment processing error:', error);
+      onError(error.message || 'Payment failed');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+          <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
+            Payment Form Error
+          </h3>
+          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+        </div>
+        <Button onClick={initializeSquarePaymentForm} className="w-full">
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="p-3 border rounded-md bg-white dark:bg-gray-800">
-        <div id="square-card-element" className="min-h-[40px]">
-          {/* Square Card element will be mounted here */}
-        </div>
+      <div id="pos-square-card-element" className="min-h-[60px] border rounded-lg p-3 bg-white">
+        {/* Square Card element will be mounted here */}
       </div>
+      
+      {isLoading && (
+        <div className="flex items-center justify-center text-sm text-muted-foreground">
+          <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
+          Loading secure payment form...
+        </div>
+      )}
+      
       <Button 
         type="submit" 
-        disabled={!cardNonce || isLoading}
+        disabled={!cardElement || isProcessing || isLoading}
         className="w-full"
       >
-        {isLoading ? "Processing..." : `Pay $${total.toFixed(2)}`}
+        {isProcessing ? (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+            Processing...
+          </div>
+        ) : (
+          `Pay $${total.toFixed(2)}`
+        )}
       </Button>
     </form>
   );
