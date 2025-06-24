@@ -464,7 +464,7 @@ const ReportsPage = () => {
             
             {/* Report Tabs */}
             <Tabs defaultValue="sales">
-              <TabsList className="mb-6">
+              <TabsList className="mb-6 w-full overflow-x-auto flex-nowrap">
                 <TabsTrigger value="sales" className="flex items-center">
                   <BarChart2 className="h-4 w-4 mr-2" />
                   Sales
