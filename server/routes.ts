@@ -62,9 +62,7 @@ const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
 const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareEnvironment.Sandbox : SquareEnvironment.Production;
 
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken || '',
-  },
+  accessToken: squareAccessToken || '',
   environment: squareEnvironment,
 });
 
@@ -1369,7 +1367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           await storage.createPayment({
             clientId: appointment.clientId,
-            amount: Number(appointment.amount || 0),
+            amount: Number(appointment.totalAmount || 0),
             method: 'cash',
             status: 'completed',
             appointmentId: appointmentId,
