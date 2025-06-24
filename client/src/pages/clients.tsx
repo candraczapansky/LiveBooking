@@ -786,7 +786,7 @@ const ClientsPage = () => {
                       <FormControl>
                         <Input 
                           type="email" 
-                          placeholder="john.doe@example.com" 
+                          placeholder="Enter email address" 
                           autoComplete="off"
                           autoCorrect="off"
                           autoCapitalize="off"
@@ -1156,7 +1156,7 @@ const ClientsPage = () => {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john.doe@example.com" {...field} />
+                        <Input type="email" placeholder="Enter email address" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
