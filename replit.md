@@ -52,7 +52,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
-### June 24, 2025 - Mobile UI Improvements, SMS Marketing Fixes, and Staff Schedule Completion
+### June 24, 2025 - Mobile UI Improvements, SMS Marketing Fixes, Staff Schedule Completion, and POS Sales Reporting Integration
 - **Enhanced mobile button accessibility:**
   - Increased all button touch targets to meet 44px minimum standard
   - Fixed overlapping buttons in client page header with responsive layout
@@ -155,6 +155,13 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Added proper styling and autofill support for payment fields
   - Enhanced accessibility with proper ARIA labels and roles
   - Both POS and appointment checkout now use consistent Square payment integration
+- **Fixed POS sales reporting integration:**
+  - Added payment type and description fields to payments database schema
+  - Updated payment creation endpoint to save POS transaction records to database
+  - Modified reports page to include all completed payments (appointments + POS sales)
+  - Fixed revenue calculations to combine appointment and POS payment data
+  - Changed "Total Appointments" metric to "Total Transactions" showing both payment types
+  - POS sales now properly appear in monthly sales charts and revenue totals
 
 ## System Architecture
 

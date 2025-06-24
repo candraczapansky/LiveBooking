@@ -51,6 +51,7 @@ const ReportsPage = () => {
   const { data: services = [] } = useQuery({ queryKey: ['/api/services'] });
   const { data: users = [] } = useQuery({ queryKey: ['/api/users'] });
   const { data: staff = [] } = useQuery({ queryKey: ['/api/staff'] });
+  const { data: payments = [] } = useQuery({ queryKey: ['/api/payments'] });
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -66,18 +67,21 @@ const ReportsPage = () => {
 
   // Calculate real metrics from appointment and payment data
   const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
+  const completedPayments = payments.filter((payment: any) => payment.status === 'completed');
   
-  const totalRevenue = paidAppointments.reduce((sum: number, apt: any) => {
-    const service = services.find((s: any) => s.id === apt.serviceId);
-    return sum + (service?.price || 0);
+  // Calculate total revenue from all completed payments (appointments + POS)
+  const totalRevenue = completedPayments.reduce((sum: number, payment: any) => {
+    return sum + (payment.amount || 0);
   }, 0);
   
   // For demo purposes, we'll estimate expenses as 40% of revenue
   const totalExpenses = Math.round(totalRevenue * 0.4);
   const totalProfit = totalRevenue - totalExpenses;
   
-  // Use only paid appointments for accurate metrics
-  const uniqueClients = new Set(paidAppointments.map((apt: any) => apt.clientId)).size;
+  // Use completed payments for accurate client metrics
+  const appointmentPayments = completedPayments.filter((p: any) => p.type === 'appointment' || p.appointmentId);
+  const posPayments = completedPayments.filter((p: any) => p.type === 'pos_payment');
+  const uniqueClients = new Set(completedPayments.map((payment: any) => payment.clientId)).size;
   const totalClients = uniqueClients;
   
   // Calculate new clients this month from paid appointments only
@@ -95,7 +99,7 @@ const ReportsPage = () => {
   const completedAppointments = paidAppointments.length; // All paid appointments are completed
   const appointmentCompletionRate = 100; // 100% since we only count paid appointments
 
-  // Generate sales data from real appointments
+  // Generate sales data from all completed payments (appointments + POS)
   const generateSalesData = () => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
@@ -106,13 +110,12 @@ const ReportsPage = () => {
       salesByMonth.set(index, { name: month, revenue: 0, expenses: 0 });
     });
 
-    // Calculate revenue from paid appointments
-    paidAppointments.forEach((apt: any) => {
-      const aptDate = new Date(apt.startTime);
-      if (aptDate.getFullYear() === currentYear) {
-        const month = aptDate.getMonth();
-        const service = services.find((s: any) => s.id === apt.serviceId);
-        const revenue = service?.price || 0;
+    // Calculate revenue from all completed payments (appointments + POS)
+    completedPayments.forEach((payment: any) => {
+      const paymentDate = new Date(payment.paymentDate || payment.createdAt);
+      if (paymentDate.getFullYear() === currentYear) {
+        const month = paymentDate.getMonth();
+        const revenue = payment.amount || 0;
         
         const monthData = salesByMonth.get(month);
         if (monthData) {
@@ -450,10 +453,10 @@ const ReportsPage = () => {
                     <div className="ml-5 w-0 flex-1">
                       <dl>
                         <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                          Total Appointments
+                          Total Transactions
                         </dt>
                         <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                          {totalAppointments}
+                          {completedPayments.length}
                         </dd>
                       </dl>
                     </div>

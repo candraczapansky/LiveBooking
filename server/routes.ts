@@ -1282,6 +1282,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         };
         
+        // Save cash payment record to database
+        const paymentRecord = await storage.createPayment({
+          clientId: 1, // Default client for POS sales
+          amount: amount,
+          method: 'cash',
+          status: 'completed',
+          type: type,
+          description: description || (type === "pos_payment" ? "POS Cash Transaction" : "Cash Payment"),
+          paymentDate: new Date(),
+          appointmentId: appointmentId || null
+        });
+        
+        console.log('Cash payment record saved to database:', paymentRecord);
+        
         return res.json({ 
           payment: payment,
           paymentId: payment.id
@@ -1320,6 +1334,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const response = { payment: responseData.payment };
+
+      // Save payment record to database if Square payment was successful
+      if (response.payment && response.payment.status === 'COMPLETED') {
+        const paymentRecord = await storage.createPayment({
+          clientId: 1, // Default client for POS sales, could be made dynamic
+          amount: amount,
+          method: 'card',
+          status: 'completed',
+          type: type,
+          description: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
+          squarePaymentId: response.payment.id,
+          paymentDate: new Date(),
+          appointmentId: appointmentId || null
+        });
+        
+        console.log('Payment record saved to database:', paymentRecord);
+      }
 
       res.json({ 
         payment: response.payment,

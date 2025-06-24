@@ -220,6 +220,8 @@ export const payments = pgTable("payments", {
   amount: doublePrecision("amount").notNull(),
   method: text("method").notNull().default("card"), // card, cash, check, etc.
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
+  type: text("type").notNull().default("appointment"), // appointment, pos_payment, membership
+  description: text("description"),
   squarePaymentId: text("square_payment_id"),
   paymentDate: timestamp("payment_date"),
   createdAt: timestamp("created_at").defaultNow(),
