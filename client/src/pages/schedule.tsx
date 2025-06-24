@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -93,7 +93,6 @@ const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 
 const SchedulePage = () => {
   useDocumentTitle("Staff Schedule | BeautyBook");
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -130,7 +129,7 @@ const SchedulePage = () => {
   });
 
   // Fetch schedules
-  const { data: schedules, isLoading: isSchedulesLoading } = useQuery({
+  const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery({
     queryKey: ['/api/schedules'],
   });
 
@@ -183,19 +182,12 @@ const SchedulePage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule created successfully!",
-      });
+      toast.success("Schedule created successfully!");
       setIsFormOpen(false);
       form.reset();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to create schedule: ${error.message}`,
-        variant: "destructive",
-      });
+      toast.error(`Failed to create schedule: ${error.message}`);
     }
   });
 
@@ -217,20 +209,13 @@ const SchedulePage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule updated successfully!",
-      });
+      toast.success("Schedule updated successfully!");
       setIsFormOpen(false);
       setSelectedScheduleId(null);
       form.reset();
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update schedule: ${error.message}`,
-        variant: "destructive",
-      });
+    onError: (error: any) => {
+      toast.error(`Failed to update schedule: ${error.message}`);
     }
   });
 
@@ -353,7 +338,7 @@ const SchedulePage = () => {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>
-                ) : schedules && schedules.length === 0 ? (
+                ) : schedules.length === 0 ? (
                   <div className="text-center py-8">
                     <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -384,7 +369,7 @@ const SchedulePage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {schedules && schedules.map((schedule: any) => (
+                        {schedules.map((schedule: any) => (
                           <TableRow key={schedule.id}>
                             <TableCell className="font-medium">
                               {schedule.dayOfWeek}
