@@ -717,6 +717,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
+    const { staffId, startTime, endTime } = req.body;
+    
+    // Check for overlapping appointments for the same staff member
+    const existingAppointments = await storage.getAppointmentsByStaff(staffId);
+    const newStart = new Date(startTime);
+    const newEnd = new Date(endTime);
+    
+    const hasOverlap = existingAppointments.some(appointment => {
+      const existingStart = new Date(appointment.startTime);
+      const existingEnd = new Date(appointment.endTime);
+      
+      // Check for any overlap: new appointment starts before existing ends AND new appointment ends after existing starts
+      return newStart < existingEnd && newEnd > existingStart;
+    });
+    
+    if (hasOverlap) {
+      return res.status(409).json({ 
+        error: "Appointment conflicts with existing booking", 
+        message: "The selected time slot overlaps with an existing appointment for this staff member. Please choose a different time."
+      });
+    }
+    
     const newAppointment = await storage.createAppointment(req.body);
     
     // Trigger booking confirmation automation
@@ -770,6 +792,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const id = parseInt(req.params.id);
     try {
       const existingAppointment = await storage.getAppointment(id);
+      if (!existingAppointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+      
+      // Check for overlapping appointments if time or staff is being changed
+      if (req.body.staffId || req.body.startTime || req.body.endTime) {
+        const staffId = req.body.staffId || existingAppointment.staffId;
+        const startTime = req.body.startTime || existingAppointment.startTime;
+        const endTime = req.body.endTime || existingAppointment.endTime;
+        
+        const staffAppointments = await storage.getAppointmentsByStaff(staffId);
+        const newStart = new Date(startTime);
+        const newEnd = new Date(endTime);
+        
+        const hasOverlap = staffAppointments.some(appointment => {
+          // Skip checking against the current appointment being updated
+          if (appointment.id === id) return false;
+          
+          const existingStart = new Date(appointment.startTime);
+          const existingEnd = new Date(appointment.endTime);
+          
+          // Check for any overlap
+          return newStart < existingEnd && newEnd > existingStart;
+        });
+        
+        if (hasOverlap) {
+          return res.status(409).json({ 
+            error: "Appointment conflicts with existing booking", 
+            message: "The updated time slot overlaps with an existing appointment for this staff member. Please choose a different time."
+          });
+        }
+      }
+      
       const updatedAppointment = await storage.updateAppointment(id, req.body);
       
       // Trigger automations based on status changes

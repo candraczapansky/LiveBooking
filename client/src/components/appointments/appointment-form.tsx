@@ -228,9 +228,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       });
     },
     onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || error.message || "Failed to create appointment.";
       toast({
         title: "Error",
-        description: error.message || "Failed to create appointment.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -271,9 +272,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       });
     },
     onError: (error: any) => {
+      const errorMessage = error.response?.data?.message || error.message || "Failed to update appointment.";
       toast({
         title: "Error",
-        description: error.message || "Failed to update appointment.",
+        description: errorMessage,
         variant: "destructive",
       });
     },
