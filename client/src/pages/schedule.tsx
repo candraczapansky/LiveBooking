@@ -132,45 +132,6 @@ const SchedulePage = () => {
   // Fetch schedules
   const { data: schedules, isLoading: isSchedulesLoading } = useQuery({
     queryKey: ['/api/schedules'],
-    queryFn: async () => {
-      // For now, return sample data since we don't have the backend endpoint yet
-      return [
-        {
-          id: 1,
-          staffId: 1,
-          dayOfWeek: "Sunday",
-          startTime: "08:00",
-          endTime: "11:00",
-          location: "All Locations",
-          serviceCategories: [],
-          startDate: "2025-05-25",
-          endDate: "",
-          isBlocked: true,
-          staff: {
-            id: 1,
-            title: "Hair Stylist",
-            user: { firstName: "Sarah", lastName: "Johnson" }
-          }
-        },
-        {
-          id: 2,
-          staffId: 1,
-          dayOfWeek: "Sunday",
-          startTime: "08:00",
-          endTime: "12:00",
-          location: "GloUp - Brooklyn",
-          serviceCategories: [1],
-          startDate: "2025-05-25",
-          endDate: "",
-          isBlocked: false,
-          staff: {
-            id: 1,
-            title: "Hair Stylist",
-            user: { firstName: "Sarah", lastName: "Johnson" }
-          }
-        }
-      ] as Schedule[];
-    }
   });
 
   // Fetch staff members
@@ -206,8 +167,19 @@ const SchedulePage = () => {
   const createScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
       console.log("Creating schedule with data:", data);
-      // Call the actual API endpoint
-      return await apiRequest("POST", "/api/schedules", data);
+      // Transform the data to match the backend schema
+      const scheduleData = {
+        staffId: data.staffId,
+        dayOfWeek: data.dayOfWeek,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        serviceCategories: data.serviceCategories || [],
+        startDate: data.dateRange.startDate,
+        endDate: data.dateRange.endDate || null,
+        isBlocked: data.isBlocked || false,
+      };
+      return await apiRequest("POST", "/api/schedules", scheduleData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
@@ -230,7 +202,18 @@ const SchedulePage = () => {
   const updateScheduleMutation = useMutation({
     mutationFn: async (data: ScheduleFormValues) => {
       console.log("Updating schedule:", selectedScheduleId, data);
-      return await apiRequest("PUT", `/api/schedules/${selectedScheduleId}`, data);
+      const scheduleData = {
+        staffId: data.staffId,
+        dayOfWeek: data.dayOfWeek,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        location: data.location,
+        serviceCategories: data.serviceCategories || [],
+        startDate: data.dateRange.startDate,
+        endDate: data.dateRange.endDate || null,
+        isBlocked: data.isBlocked || false,
+      };
+      return await apiRequest("PUT", `/api/schedules/${selectedScheduleId}`, scheduleData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
@@ -288,6 +271,7 @@ const SchedulePage = () => {
   };
 
   const onSubmit = (data: ScheduleFormValues) => {
+    console.log("Form submitted with data:", data);
     if (selectedScheduleId) {
       updateScheduleMutation.mutate(data);
     } else {
@@ -369,7 +353,7 @@ const SchedulePage = () => {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>
-                ) : schedules?.length === 0 ? (
+                ) : schedules && schedules.length === 0 ? (
                   <div className="text-center py-8">
                     <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
@@ -400,7 +384,7 @@ const SchedulePage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {schedules?.map((schedule) => (
+                        {schedules && schedules.map((schedule: any) => (
                           <TableRow key={schedule.id}>
                             <TableCell className="font-medium">
                               {schedule.dayOfWeek}

@@ -2521,6 +2521,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Staff Schedule routes
+  app.get("/api/schedules", async (req: Request, res: Response) => {
+    try {
+      const schedules = await storage.getAllStaffSchedules();
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching staff schedules:", error);
+      res.status(500).json({ error: "Failed to fetch staff schedules" });
+    }
+  });
+
+  app.get("/api/schedules/staff/:staffId", async (req: Request, res: Response) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const schedules = await storage.getStaffSchedulesByStaffId(staffId);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching staff schedules by staff ID:", error);
+      res.status(500).json({ error: "Failed to fetch staff schedules" });
+    }
+  });
+
+  app.post("/api/schedules", async (req: Request, res: Response) => {
+    try {
+      console.log("Creating staff schedule with data:", req.body);
+      const validatedData = insertStaffScheduleSchema.parse(req.body);
+      const schedule = await storage.createStaffSchedule(validatedData);
+      console.log("Staff schedule created successfully:", schedule);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error creating staff schedule:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid schedule data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to create staff schedule" });
+      }
+    }
+  });
+
+  app.put("/api/schedules/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const validatedData = insertStaffScheduleSchema.partial().parse(req.body);
+      const schedule = await storage.updateStaffSchedule(id, validatedData);
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error updating staff schedule:", error);
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid schedule data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Failed to update staff schedule" });
+      }
+    }
+  });
+
+  app.delete("/api/schedules/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteStaffSchedule(id);
+      if (deleted) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: "Staff schedule not found" });
+      }
+    } catch (error) {
+      console.error("Error deleting staff schedule:", error);
+      res.status(500).json({ error: "Failed to delete staff schedule" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
