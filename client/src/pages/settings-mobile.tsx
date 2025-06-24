@@ -104,6 +104,45 @@ export default function SettingsMobile() {
     // Generate complementary colors
     root.style.setProperty('--accent', `${h} ${Math.max(s - 10, 0)}% ${Math.min(l + 10, 95)}%`);
     root.style.setProperty('--accent-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
+    
+    // Apply dark/light mode styling
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+      // Force dark mode background and text colors
+      document.body.style.backgroundColor = 'hsl(240 10% 3.9%)';
+      document.body.style.color = 'hsl(0 0% 98%)';
+      // Apply to all main containers and override any white backgrounds
+      const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"], [style*="white"]');
+      containers.forEach(container => {
+        if (container instanceof HTMLElement) {
+          container.style.backgroundColor = 'hsl(240 10% 3.9%)';
+          container.style.color = 'hsl(0 0% 98%)';
+        }
+      });
+      // Force the root div to have dark background
+      const rootDiv = document.querySelector('#root > div');
+      if (rootDiv instanceof HTMLElement) {
+        rootDiv.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+      }
+    } else {
+      document.documentElement.classList.remove('dark');
+      // Force light mode background and text colors
+      document.body.style.backgroundColor = 'hsl(0 0% 100%)';
+      document.body.style.color = 'hsl(222.2 84% 4.9%)';
+      // Apply to all main containers
+      const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"]');
+      containers.forEach(container => {
+        if (container instanceof HTMLElement) {
+          container.style.backgroundColor = 'hsl(0 0% 100%)';
+          container.style.color = 'hsl(222.2 84% 4.9%)';
+        }
+      });
+      // Force the root div to have light background
+      const rootDiv = document.querySelector('#root > div');
+      if (rootDiv instanceof HTMLElement) {
+        rootDiv.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+      }
+    }
   };
 
   const applyTextColors = (primaryText: string, secondaryText: string) => {
@@ -544,6 +583,8 @@ export default function SettingsMobile() {
                   onCheckedChange={(checked) => {
                     setDarkMode(checked);
                     applyThemeColors(customColor, checked);
+                    // Save dark mode preference
+                    localStorage.setItem('darkMode', checked.toString());
                   }}
                 />
               </div>

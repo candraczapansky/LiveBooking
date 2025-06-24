@@ -95,6 +95,9 @@ main,
 }
 
 /* Force dark mode background on all major layout containers */
+.dark,
+.dark body,
+.dark #root,
 .dark main,
 .dark .main-content,
 .dark .flex.flex-1,
@@ -107,9 +110,38 @@ main,
 .dark .w-full,
 .dark .p-6,
 .dark .space-y-6,
-.dark div:not([class*="sidebar"]):not([class*="border"]):not([class*="card"]) {
-  background-color: hsl(var(--background)) !important;
-  color: hsl(var(--foreground)) !important;
+.dark .page-container,
+.dark [data-radix-portal] {
+  background-color: hsl(240 10% 3.9%) !important;
+  color: hsl(0 0% 98%) !important;
+}
+
+/* Mobile-specific dark mode enforcement */
+@media (max-width: 768px) {
+  .dark,
+  .dark body,
+  .dark #root,
+  .dark main,
+  .dark .main-content,
+  .dark > div,
+  .dark .flex[style*="height"],
+  .dark .flex.min-h-screen,
+  .dark .flex.h-full {
+    background-color: hsl(240 10% 3.9%) !important;
+    color: hsl(0 0% 98%) !important;
+  }
+  
+  .dark div[style*="backgroundColor"],
+  .dark div[style*="background-color"],
+  .dark div[style*="white"] {
+    background-color: hsl(240 10% 3.9%) !important;
+    color: hsl(0 0% 98%) !important;
+  }
+  
+  /* Override any inline styles that might be setting white backgrounds */
+  .dark * {
+    border-color: hsl(240 3.7% 15.9%) !important;
+  }
 }
 
 /* Specifically target the main layout wrapper */
