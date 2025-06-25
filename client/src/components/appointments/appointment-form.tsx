@@ -275,6 +275,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         date: selectedDate || new Date(),
         time: "10:00",
         notes: "",
+        sendReminder: true,
       });
       setAvailableStaff([]);
       setAvailableTimes([]);
