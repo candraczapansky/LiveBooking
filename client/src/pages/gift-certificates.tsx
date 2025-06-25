@@ -2,7 +2,7 @@ import { useState } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -24,7 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Gift, CreditCard, DollarSign, Mail, User } from "lucide-react";
+import { Gift, CreditCard, DollarSign, Mail, User, Search, CheckCircle, XCircle, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -49,6 +49,8 @@ export default function GiftCertificatesPage() {
   const queryClient = useQueryClient();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [balanceCheckCode, setBalanceCheckCode] = useState("");
+  const [showBalanceCheck, setShowBalanceCheck] = useState(false);
 
   const form = useForm<GiftCertificateForm>({
     resolver: zodResolver(giftCertificateSchema),
@@ -87,6 +89,13 @@ export default function GiftCertificatesPage() {
     },
   });
 
+  const balanceQuery = useQuery({
+    queryKey: ['/api/gift-card-balance', balanceCheckCode],
+    queryFn: () => apiRequest(`/api/gift-card-balance/${balanceCheckCode}`),
+    enabled: !!balanceCheckCode && balanceCheckCode.length >= 8,
+    retry: false,
+  });
+
   const handleAmountSelect = (amount: number) => {
     setSelectedAmount(amount);
     form.setValue("amount", amount);
@@ -106,6 +115,39 @@ export default function GiftCertificatesPage() {
       await purchaseGiftCertificateMutation.mutateAsync(data);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleBalanceCheck = (code: string) => {
+    setBalanceCheckCode(code.toUpperCase());
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'expired':
+        return <Clock className="h-4 w-4 text-orange-500" />;
+      case 'inactive':
+      case 'used':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <CheckCircle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'expired':
+        return 'Expired';
+      case 'inactive':
+        return 'Inactive';
+      case 'used':
+        return 'Fully Used';
+      default:
+        return status;
     }
   };
 
@@ -132,6 +174,90 @@ export default function GiftCertificatesPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Balance Check Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    Check Gift Certificate Balance
+                  </CardTitle>
+                  <CardDescription>
+                    Enter your gift certificate code to check the current balance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <FormLabel>Gift Certificate Code</FormLabel>
+                    <div className="relative">
+                      <Input
+                        placeholder="Enter your gift certificate code"
+                        value={balanceCheckCode}
+                        onChange={(e) => handleBalanceCheck(e.target.value)}
+                        className="uppercase"
+                      />
+                      <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                    </div>
+                  </div>
+
+                  {balanceQuery.isLoading && balanceCheckCode && (
+                    <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Checking balance...</p>
+                    </div>
+                  )}
+
+                  {balanceQuery.data && (
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Current Balance:</span>
+                          <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                            ${balanceQuery.data.currentBalance.toFixed(2)}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Original Amount:</span>
+                            <p className="font-medium">${balanceQuery.data.initialAmount.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <span className="text-gray-600 dark:text-gray-400">Status:</span>
+                            <div className="flex items-center gap-1">
+                              {getStatusIcon(balanceQuery.data.status)}
+                              <span className="font-medium">{getStatusText(balanceQuery.data.status)}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {balanceQuery.data.expiryDate && (
+                          <div className="text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Expires:</span>
+                            <p className="font-medium">
+                              {new Date(balanceQuery.data.expiryDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        )}
+
+                        {balanceQuery.data.issuedToName && (
+                          <div className="text-sm">
+                            <span className="text-gray-600 dark:text-gray-400">Issued To:</span>
+                            <p className="font-medium">{balanceQuery.data.issuedToName}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {balanceQuery.isError && balanceCheckCode && (
+                    <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        Gift certificate not found. Please check the code and try again.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Purchase Form */}
               <Card>
                 <CardHeader>
@@ -311,47 +437,67 @@ export default function GiftCertificatesPage() {
               {/* Information Card */}
               <Card>
                 <CardHeader>
-                  <CardTitle>How It Works</CardTitle>
+                  <CardTitle>Gift Certificate Information</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">1</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-1">Choose Amount</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Select from preset amounts or enter a custom amount between $10-$1000
-                      </p>
+                <CardContent className="space-y-6">
+                  <div>
+                    <h4 className="font-medium mb-3">How to Purchase</h4>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-primary">1</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Choose amount and enter recipient details
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-primary">2</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Gift certificate is emailed instantly with unique code
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <span className="text-xs font-medium text-primary">3</span>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Recipient can use code for any salon service
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">2</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-1">Enter Details</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Provide recipient information and add a personal message
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">3</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-1">Instant Delivery</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        The gift certificate is emailed instantly with a unique code
-                      </p>
+                  <div>
+                    <h4 className="font-medium mb-3">How to Check Balance</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-3">
+                        <Search className="h-4 w-4 text-primary mt-0.5" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Enter your gift certificate code in the balance checker above
+                        </p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="h-4 w-4 text-green-500 mt-0.5" />
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          View current balance, status, and expiry date
+                        </p>
+                      </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t">
-                    <h4 className="font-medium mb-2">Terms & Conditions</h4>
+                    <h4 className="font-medium mb-3">Terms & Conditions</h4>
                     <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                       <li>• Valid for 1 year from purchase date</li>
                       <li>• Can be used for any salon service</li>
