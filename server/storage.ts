@@ -1053,21 +1053,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllGiftCards(): Promise<GiftCard[]> {
-    return Array.from(this.giftCards.values());
+    return await db.select().from(giftCards).orderBy(desc(giftCards.createdAt));
   }
 
   async updateGiftCard(id: number, giftCardData: Partial<InsertGiftCard>): Promise<GiftCard> {
-    const giftCard = await this.getGiftCard(id);
-    if (!giftCard) {
+    const [updatedGiftCard] = await db
+      .update(giftCards)
+      .set(giftCardData)
+      .where(eq(giftCards.id, id))
+      .returning();
+    if (!updatedGiftCard) {
       throw new Error('Gift card not found');
     }
-    const updatedGiftCard = { ...giftCard, ...giftCardData };
-    this.giftCards.set(id, updatedGiftCard);
     return updatedGiftCard;
   }
 
   async deleteGiftCard(id: number): Promise<boolean> {
-    return this.giftCards.delete(id);
+    const result = await db.delete(giftCards).where(eq(giftCards.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Gift Card Transaction operations
@@ -1077,41 +1080,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined> {
-    return this.giftCardTransactions.get(id);
+    const [transaction] = await db.select().from(giftCardTransactions).where(eq(giftCardTransactions.id, id));
+    return transaction;
   }
 
   async getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]> {
-    return Array.from(this.giftCardTransactions.values()).filter(
-      transaction => transaction.giftCardId === giftCardId
-    );
+    return await db.select().from(giftCardTransactions)
+      .where(eq(giftCardTransactions.giftCardId, giftCardId))
+      .orderBy(desc(giftCardTransactions.createdAt));
   }
 
   // Saved Gift Card operations
   async createSavedGiftCard(savedGiftCard: InsertSavedGiftCard): Promise<SavedGiftCard> {
-    const id = this.currentSavedGiftCardId++;
-    const newSavedGiftCard: SavedGiftCard = {
-      id,
-      addedAt: new Date(),
-      clientId: savedGiftCard.clientId,
-      giftCardId: savedGiftCard.giftCardId,
-      nickname: savedGiftCard.nickname || null,
-    };
-    this.savedGiftCards.set(id, newSavedGiftCard);
+    const [newSavedGiftCard] = await db.insert(savedGiftCards).values(savedGiftCard).returning();
     return newSavedGiftCard;
   }
 
   async getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined> {
-    return this.savedGiftCards.get(id);
+    const [savedCard] = await db.select().from(savedGiftCards).where(eq(savedGiftCards.id, id));
+    return savedCard;
   }
 
   async getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]> {
-    return Array.from(this.savedGiftCards.values()).filter(
-      savedCard => savedCard.clientId === clientId
-    );
+    return await db.select().from(savedGiftCards)
+      .where(eq(savedGiftCards.clientId, clientId))
+      .orderBy(desc(savedGiftCards.addedAt));
   }
 
   async deleteSavedGiftCard(id: number): Promise<boolean> {
-    return this.savedGiftCards.delete(id);
+    const result = await db.delete(savedGiftCards).where(eq(savedGiftCards.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Marketing Campaign operations
