@@ -139,9 +139,10 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 py-8">
-      <Card className="w-full max-w-md mx-auto shadow-lg overflow-visible">
-        <CardHeader className="text-center pb-4 px-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6 py-8">
+      <div className="w-full max-w-md mx-auto p-2">
+        <Card className="w-full shadow-lg overflow-visible border-0">
+        <CardHeader className="text-center pb-4 px-8">
           <div className="flex justify-center mb-4">
             <div className="bg-primary/10 p-3 rounded-full">
               <Scissors className="h-10 w-10 text-primary" />
@@ -152,7 +153,7 @@ const Login = () => {
             Salon & Spa Management Platform
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-2 overflow-visible">
+        <CardContent className="px-8 pb-2 overflow-visible">
             <div className="flex w-full mb-4 h-9 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 gap-0.5">
               <button
                 type="button"
@@ -190,7 +191,7 @@ const Login = () => {
                         <FormControl>
                           <Input 
                             placeholder="Enter your username" 
-                            className="h-10 text-sm px-3 rounded-md focus:ring-1 focus:ring-primary/20 focus:outline-none" 
+                            className="h-10 text-sm px-3 rounded-md focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 focus:outline-none" 
                             {...field} 
                           />
                         </FormControl>
@@ -277,7 +278,7 @@ const Login = () => {
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
-                            className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none"
+                            className="h-9 text-sm px-2 rounded focus:ring-2 focus:ring-primary/30 focus:ring-offset-1 focus:outline-none"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -327,7 +328,7 @@ const Login = () => {
               </Form>
             )}
         </CardContent>
-        <CardFooter className="px-6 pb-4 pt-2">
+        <CardFooter className="px-8 pb-4 pt-2">
           <Button 
             variant="outline" 
             className="w-full h-10 text-sm font-medium rounded-md" 
@@ -336,7 +337,8 @@ const Login = () => {
             Continue as Guest to Book Appointment
           </Button>
         </CardFooter>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };
