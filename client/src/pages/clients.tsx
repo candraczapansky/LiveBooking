@@ -65,6 +65,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getInitials, getFullName } from "@/lib/utils";
 import ClientPaymentMethods from "@/components/payment/client-payment-methods";
+import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
@@ -566,7 +567,7 @@ const ClientsPage = () => {
                                 <DropdownMenuItem onClick={() => handleViewClient(client)}>
                                   <CreditCard className="h-4 w-4 mr-2" /> View Details & Cards
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => toast({ title: "Feature Coming Soon", description: "Appointments view will be available soon!" })}>
+                                <DropdownMenuItem onClick={() => handleViewClient(client)}>
                                   <Calendar className="h-4 w-4 mr-2" /> Appointments
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => openEditDialog(client)}>
@@ -729,6 +730,9 @@ const ClientsPage = () => {
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
                   />
                 )}
+
+                {/* Appointment History */}
+                {clientDetail && <ClientAppointmentHistory clientId={clientDetail.id} />}
               </div>
             )}
           </div>
