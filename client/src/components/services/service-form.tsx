@@ -158,8 +158,23 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
           setIsLoading(false);
           onOpenChange(false);
         });
+    } else if (open && !serviceId) {
+      // Reset form for new service
+      form.reset({
+        name: "",
+        description: "",
+        duration: 30,
+        price: 0,
+        categoryId: undefined,
+        roomId: undefined,
+        bufferTimeBefore: 0,
+        bufferTimeAfter: 0,
+        color: "#3B82F6",
+        assignedStaff: [],
+        requiredDevices: [],
+      });
     }
-  }, [serviceId, open, form, toast, onOpenChange]);
+  }, [serviceId, open]);
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
