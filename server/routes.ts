@@ -580,6 +580,33 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  app.patch("/api/staff-services/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { customRate, customCommissionRate } = req.body;
+    
+    try {
+      // Find the staff service and update it
+      const existingStaffService = await storage.getStaffServiceById(id);
+      if (!existingStaffService) {
+        return res.status(404).json({ error: "Staff service not found" });
+      }
+      
+      console.log("PATCH: Updating staff service with data:", { customRate, customCommissionRate });
+      
+      const updatedStaffService = await storage.updateStaffService(id, {
+        customRate: customRate !== undefined ? customRate : existingStaffService.customRate,
+        customCommissionRate: customCommissionRate !== undefined ? customCommissionRate : existingStaffService.customCommissionRate,
+      });
+      
+      console.log("PATCH: Updated staff service result:", updatedStaffService);
+      
+      return res.status(200).json(updatedStaffService);
+    } catch (error) {
+      console.error("PATCH: Error updating staff service:", error);
+      return res.status(500).json({ error: "Failed to update staff service" });
+    }
+  });
+
   app.get("/api/staff-services/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     

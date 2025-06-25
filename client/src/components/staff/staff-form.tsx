@@ -340,13 +340,27 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           // Update existing assignment
           const existingAssignment = existingServices.find((s: any) => s.id === serviceId);
           if (existingAssignment) {
-            console.log(`Updating existing assignment ${existingAssignment.staffServiceId}`);
-            await apiRequest("PATCH", `/api/staff-services/${existingAssignment.staffServiceId}`, serviceAssignment);
+            console.log(`Updating existing assignment ${existingAssignment.staffServiceId} with rates:`, {
+              customRate: serviceAssignment.customRate,
+              customCommissionRate: serviceAssignment.customCommissionRate
+            });
+            const updateResponse = await apiRequest("PATCH", `/api/staff-services/${existingAssignment.staffServiceId}`, {
+              customRate: serviceAssignment.customRate,
+              customCommissionRate: serviceAssignment.customCommissionRate
+            });
+            if (!updateResponse.ok) {
+              const errorData = await updateResponse.json();
+              throw new Error(`Failed to update service assignment: ${errorData.error}`);
+            }
           }
         } else {
           // Create new assignment
           console.log(`Creating new service assignment`);
-          await apiRequest("POST", "/api/staff-services", serviceAssignment);
+          const createResponse = await apiRequest("POST", "/api/staff-services", serviceAssignment);
+          if (!createResponse.ok) {
+            const errorData = await createResponse.json();
+            throw new Error(`Failed to create service assignment: ${errorData.error}`);
+          }
         }
       }
 
