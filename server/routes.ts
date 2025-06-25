@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     const serviceId = parseInt(req.params.serviceId);
     const staffServices = await storage.getStaffServicesByService(serviceId);
     
-    // Get detailed staff information
+    // Get detailed staff information with custom rates
     const staffDetails = await Promise.all(
       staffServices.map(async (staffService) => {
         const staff = await storage.getStaff(staffService.staffId);
@@ -664,6 +664,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
         return {
           staffServiceId: staffService.id,
           id: staff?.id,
+          customRate: staffService.customRate,
+          customCommissionRate: staffService.customCommissionRate,
           ...staff,
           user: user ? {
             id: user.id,
