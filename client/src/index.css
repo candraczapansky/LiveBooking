@@ -1442,6 +1442,21 @@ div[data-radix-select-content] div[data-radix-select-item]:focus,
   --accent-foreground: var(--dropdown-selected-foreground);
 }
 
+/* Override all select item colors with higher specificity */
+div[data-radix-select-content] div[data-radix-select-item]:hover,
+div[data-radix-select-content] div[data-radix-select-item][data-highlighted],
+div[data-radix-select-content] div[data-radix-select-item][data-state="checked"],
+div[data-radix-select-content] div[data-radix-select-item]:focus {
+  background-color: hsl(var(--dropdown-selected)) !important;
+  color: hsl(var(--dropdown-selected-foreground)) !important;
+}
+
+/* Target shadcn select components with maximum specificity */
+[data-radix-select-content] [data-radix-select-item]:is(:hover, [data-highlighted], [data-state="checked"], :focus) {
+  background-color: hsl(var(--dropdown-selected)) !important;
+  color: hsl(var(--dropdown-selected-foreground)) !important;
+}
+
 /* Stats card hover effect */
 .stats-card {
   @apply transition-all duration-200;

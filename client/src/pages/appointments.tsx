@@ -10,6 +10,19 @@ import AppointmentCheckout from "@/components/appointments/appointment-checkout"
 import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+// Force re-render when theme changes
+const forceDropdownRerender = () => {
+  const selectElements = document.querySelectorAll('[data-radix-select-content]');
+  selectElements.forEach(el => {
+    if (el instanceof HTMLElement) {
+      el.style.display = 'none';
+      requestAnimationFrame(() => {
+        el.style.display = '';
+      });
+    }
+  });
+};
 import { useLocation } from "wouter";
 
 const timeSlots = [
