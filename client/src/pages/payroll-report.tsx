@@ -63,11 +63,11 @@ export default function PayrollReport() {
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfMonth(selectedMonth);
 
-    // Filter appointments for the selected month and completed status
+    // Filter appointments for the selected month and completed/paid status
     const monthlyAppointments = (appointments as any[]).filter((apt: any) => {
       const aptDate = new Date(apt.startTime);
       return isWithinInterval(aptDate, { start: monthStart, end: monthEnd }) && 
-             apt.status === 'completed';
+             (apt.status === 'completed' || apt.paymentStatus === 'paid');
     });
 
     return (staff as any[]).map((staffMember: any) => {
@@ -100,8 +100,15 @@ export default function PayrollReport() {
 
           if (staffMember.commissionType === 'commission') {
             // Use custom commission rate if available, otherwise use default
-            const commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
-            appointmentEarnings = serviceRevenue * (commissionRate / 100);
+            let commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
+            
+            // Custom commission rates are stored as percentages (e.g., 4 = 4%), 
+            // but default staff rates are stored as decimals (e.g., 0.45 = 45%)
+            if (staffService?.customCommissionRate !== undefined && staffService?.customCommissionRate !== null) {
+              commissionRate = commissionRate / 100; // Convert percentage to decimal
+            }
+            
+            appointmentEarnings = serviceRevenue * commissionRate;
           } else if (staffMember.commissionType === 'hourly') {
             // Use custom hourly rate if available, otherwise use default
             const hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
