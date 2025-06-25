@@ -50,15 +50,6 @@ const Header = () => {
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10 sticky top-0">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 sm:h-16">
-          {/* Hamburger Menu Button for Desktop */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:flex hidden h-8 w-8 mr-4"
-            onClick={toggleSidebar}
-          >
-            <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-          </Button>
           <div className="flex items-center min-w-0">
             <div className="lg:hidden">
               <SimpleMobileMenu />
