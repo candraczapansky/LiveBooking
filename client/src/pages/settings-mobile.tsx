@@ -721,6 +721,8 @@ export default function SettingsMobile() {
                             onClick={() => {
                               setCustomColor(preset.color);
                               applyThemeColors(preset.color, darkMode);
+                              // Auto-save to database
+                              saveColorPreferencesMutation.mutate({ primaryColor: preset.color });
                             }}
                             style={{
                               display: "flex",
@@ -803,7 +805,10 @@ export default function SettingsMobile() {
                       type="color"
                       id="color-picker"
                       value={customColor}
-                      onChange={(e) => setCustomColor(e.target.value)}
+                      onChange={(e) => {
+                        setCustomColor(e.target.value);
+                        applyThemeColors(e.target.value, darkMode);
+                      }}
                       style={{ 
                         width: "80px", 
                         height: "56px", 
@@ -818,7 +823,12 @@ export default function SettingsMobile() {
                     <input
                       type="text"
                       value={customColor}
-                      onChange={(e) => setCustomColor(e.target.value)}
+                      onChange={(e) => {
+                        setCustomColor(e.target.value);
+                        if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                          applyThemeColors(e.target.value, darkMode);
+                        }
+                      }}
                       style={{
                         flex: 1,
                         height: "56px",
