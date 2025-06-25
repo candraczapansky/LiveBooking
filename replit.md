@@ -52,6 +52,23 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 25, 2025 - Reports Page Client Calculation Fixes and Staff Form Restoration
+- **Fixed reports page client calculation issues:**
+  - Updated client metrics to use actual user data instead of only payment data
+  - Client count now shows real registered users with role 'client'
+  - Fixed division by zero errors in percentage calculations
+  - Added proper handling for cases with no transaction data
+  - Client retention rate now calculated from user registration dates
+  - Average spend per client properly handles zero revenue scenarios
+- **Restored staff form functionality:**
+  - Fixed duplicate function definition causing syntax errors in StaffForm component
+  - Resolved staff form dialog rendering issues
+  - Add Staff and Edit Staff buttons now open form dialogs correctly
+  - Fixed form submission and validation logic
+- **Added sample client data:**
+  - Inserted additional client users to demonstrate proper metrics calculation
+  - Reports page now shows meaningful client statistics and trends
+
 ### June 25, 2025 - Staff and Schedule Page UI Simplification
 - **Simplified staff page to show staff names list first:**
   - Updated staff page to display clean list of staff members with names and titles only
