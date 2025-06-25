@@ -139,9 +139,9 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-6 py-8">
-      <div className="w-full max-w-md mx-auto p-2">
-        <Card className="w-full shadow-lg overflow-visible border-0">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-8 py-8">
+      <div className="w-full max-w-md mx-auto">
+        <Card className="w-full shadow-lg border-0 m-4">
         <CardHeader className="text-center pb-4 px-8">
           <div className="flex justify-center mb-4">
             <div className="bg-primary/10 p-3 rounded-full">
@@ -153,7 +153,7 @@ const Login = () => {
             Salon & Spa Management Platform
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-8 pb-2 overflow-visible">
+        <CardContent className="px-8 pb-2 m-2">
             <div className="flex w-full mb-4 h-9 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 gap-0.5">
               <button
                 type="button"
@@ -191,7 +191,7 @@ const Login = () => {
                         <FormControl>
                           <Input 
                             placeholder="Enter your username" 
-                            className="h-10 text-sm px-3 rounded-md focus:ring-2 focus:ring-primary/30 focus:ring-offset-2 focus:outline-none" 
+                            className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
                             {...field} 
                           />
                         </FormControl>
@@ -205,9 +205,14 @@ const Login = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
+                          <Input 
+                            type="password" 
+                            placeholder="••••••" 
+                            className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -278,7 +283,7 @@ const Login = () => {
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
-                            className="h-9 text-sm px-2 rounded focus:ring-2 focus:ring-primary/30 focus:ring-offset-1 focus:outline-none"
+                            className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
