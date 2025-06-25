@@ -237,7 +237,7 @@ const Login = () => {
                         <FormItem>
                           <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
+                            <Input placeholder="John" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -251,7 +251,7 @@ const Login = () => {
                         <FormItem>
                           <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
+                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -266,7 +266,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
+                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -305,7 +305,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
+                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -319,7 +319,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
+                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
