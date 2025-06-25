@@ -7,6 +7,7 @@ import { format, addMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentCheckout from "./appointment-checkout";
+import { getAvailableStaff, generateAppointmentTimes, getAvailableTimeSlots, validateBookingTime } from "@/services/availabilityService";
 
 import {
   Dialog,
@@ -155,6 +156,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
 
   // Computed values
   const selectedServiceId = form.watch("serviceId");
+  const selectedStaffId = form.watch("staffId");
+  const selectedDate = form.watch("date");
   const startTimeString = form.watch("time");
   
   const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
@@ -166,6 +169,64 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     const endDate = addMinutes(startDate, selectedService.duration);
     return format(endDate, 'h:mm a');
   })() : null;
+
+  // Update available staff when service or date changes
+  useEffect(() => {
+    if (selectedServiceId && selectedDate && services && staff && schedules && appointments && staffServices) {
+      const serviceId = parseInt(selectedServiceId);
+      const availableStaffMembers = getAvailableStaff(
+        selectedDate,
+        "09:00", // Default time for initial filtering
+        selectedService ? addMinutes(new Date().setHours(9, 0, 0, 0), selectedService.duration).toTimeString().slice(0, 5) : "10:00",
+        serviceId,
+        staff,
+        schedules,
+        appointments,
+        staffServices
+      );
+      setAvailableStaff(availableStaffMembers);
+      
+      // Reset staff selection if current staff is not available
+      if (selectedStaffId && !availableStaffMembers.find((s: any) => s.id === parseInt(selectedStaffId))) {
+        form.setValue("staffId", "");
+        form.setValue("time", "");
+        setAvailableTimes([]);
+      }
+    } else {
+      setAvailableStaff([]);
+    }
+  }, [selectedServiceId, selectedDate, services, staff, schedules, appointments, staffServices, selectedService, form, selectedStaffId]);
+
+  // Update available times when staff or date changes
+  useEffect(() => {
+    if (selectedStaffId && selectedDate && selectedService && schedules && appointments) {
+      const staffId = parseInt(selectedStaffId);
+      const serviceDuration = selectedService.duration || 60;
+      
+      const timeSlots = getAvailableTimeSlots(
+        staffId,
+        selectedDate,
+        serviceDuration,
+        schedules,
+        appointments
+      );
+
+      const times: string[] = [];
+      timeSlots.forEach(slot => {
+        const slotTimes = generateAppointmentTimes(slot, serviceDuration);
+        times.push(...slotTimes);
+      });
+
+      setAvailableTimes(times);
+      
+      // Reset time selection if current time is not available
+      if (startTimeString && !times.includes(startTimeString)) {
+        form.setValue("time", "");
+      }
+    } else {
+      setAvailableTimes([]);
+    }
+  }, [selectedStaffId, selectedDate, selectedService, schedules, appointments, form, startTimeString]);
   
   // Load appointment data when editing
   useEffect(() => {
@@ -195,6 +256,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         time: "10:00",
         notes: "",
       });
+      setAvailableStaff([]);
+      setAvailableTimes([]);
     }
   }, [open, selectedDate, form]);
 
@@ -636,7 +699,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                 
                 <Button 
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || availableStaff.length === 0 || availableTimes.length === 0}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
