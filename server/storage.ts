@@ -195,7 +195,9 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   constructor() {
     // Initialize with sample data for demo purposes
-    this.initializeSampleData();
+    this.initializeSampleData().catch(err => {
+      console.error("Failed to initialize sample data:", err);
+    });
   }
 
   private async initializeSampleData() {

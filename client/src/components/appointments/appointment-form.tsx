@@ -215,7 +215,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableStaff([]);
     }
-  }, [selectedServiceId, selectedFormDate, services, staff, schedules, appointments, staffServices, selectedService?.duration, selectedStaffId, form]);
+  }, [selectedServiceId, selectedFormDate, services, staff, schedules, appointments, staffServices, selectedService?.duration]);
 
   // Update available times when staff or date changes
   useEffect(() => {
@@ -246,7 +246,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableTimes([]);
     }
-  }, [selectedStaffId, selectedFormDate, selectedService?.duration, schedules, appointments, startTimeString, form]);
+  }, [selectedStaffId, selectedFormDate, selectedService?.duration, schedules, appointments]);
   
   // Load appointment data when editing
   useEffect(() => {
