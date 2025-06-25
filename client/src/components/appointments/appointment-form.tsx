@@ -92,6 +92,8 @@ const allTimeSlots = generateTimeSlots();
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [availableStaff, setAvailableStaff] = useState<any[]>([]);
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -141,6 +143,24 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     },
     enabled: open
   });
+
+  // Fetch schedules for availability checking
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['/api/schedules'],
+    enabled: open
+  });
+
+  // Fetch existing appointments for conflict checking
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['/api/appointments'],
+    enabled: open
+  });
+
+  // Fetch staff services for capability checking
+  const { data: staffServices = [] } = useQuery({
+    queryKey: ['/api/staff-services'],
+    enabled: open
+  });
   
   // Get single appointment if editing
   const { data: appointment, isLoading: isLoadingAppointment } = useQuery({
@@ -154,10 +174,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     enabled: open && !!appointmentId && appointmentId > 0
   });
 
-  // Computed values
+    // Computed values
   const selectedServiceId = form.watch("serviceId");
   const selectedStaffId = form.watch("staffId");
-  const selectedDate = form.watch("date");
+  const selectedFormDate = form.watch("date");
   const startTimeString = form.watch("time");
   
   const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
@@ -172,10 +192,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
 
   // Update available staff when service or date changes
   useEffect(() => {
-    if (selectedServiceId && selectedDate && services && staff && schedules && appointments && staffServices) {
+    if (selectedServiceId && selectedFormDate && services && staff && schedules && appointments && staffServices) {
       const serviceId = parseInt(selectedServiceId);
       const availableStaffMembers = getAvailableStaff(
-        selectedDate,
+        selectedFormDate,
         "09:00", // Default time for initial filtering
         selectedService ? addMinutes(new Date().setHours(9, 0, 0, 0), selectedService.duration).toTimeString().slice(0, 5) : "10:00",
         serviceId,
@@ -195,17 +215,17 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableStaff([]);
     }
-  }, [selectedServiceId, selectedDate, services, staff, schedules, appointments, staffServices, selectedService, form, selectedStaffId]);
+  }, [selectedServiceId, selectedFormDate, services, staff, schedules, appointments, staffServices, selectedService, form, selectedStaffId]);
 
   // Update available times when staff or date changes
   useEffect(() => {
-    if (selectedStaffId && selectedDate && selectedService && schedules && appointments) {
+    if (selectedStaffId && selectedFormDate && selectedService && schedules && appointments) {
       const staffId = parseInt(selectedStaffId);
       const serviceDuration = selectedService.duration || 60;
       
       const timeSlots = getAvailableTimeSlots(
         staffId,
-        selectedDate,
+        selectedFormDate,
         serviceDuration,
         schedules,
         appointments
@@ -226,7 +246,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableTimes([]);
     }
-  }, [selectedStaffId, selectedDate, selectedService, schedules, appointments, form, startTimeString]);
+  }, [selectedStaffId, selectedFormDate, selectedService, schedules, appointments, form, startTimeString]);
   
   // Load appointment data when editing
   useEffect(() => {
@@ -375,6 +395,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   });
 
   const onSubmit = (values: AppointmentFormValues) => {
+    // Additional validation before submission for new appointments
+    if (!appointmentId || appointmentId <= 0) {
+      if (!availableTimes.includes(values.time)) {
+        toast({
+          title: "Error",
+          description: "Selected time is no longer available. Please choose a different time.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     if (appointmentId && appointmentId > 0) {
       updateMutation.mutate(values);
     } else {
@@ -489,7 +521,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <FormLabel>Staff Member</FormLabel>
                     <FormControl>
                       <Select 
-                        disabled={isLoading || isLoadingStaff} 
+                        disabled={isLoading || isLoadingStaff || availableStaff.length === 0} 
                         onValueChange={field.onChange} 
                         value={field.value}
                       >
@@ -497,7 +529,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           <SelectValue placeholder="Select a staff member" />
                         </SelectTrigger>
                         <SelectContent>
-                          {staff?.map((staffMember: any) => {
+                          {availableStaff.length === 0 ? (
+                            <SelectItem value="" disabled>
+                              {selectedServiceId 
+                                ? "No staff available for selected service and date" 
+                                : "Please select a service and date first"
+                              }
+                            </SelectItem>
+                          ) : (
+                            availableStaff.map((staffMember: any) => {
                             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
                             return (
                               <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
@@ -596,7 +636,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <FormLabel>Time</FormLabel>
                     <FormControl>
                       <Select 
-                        disabled={isLoading} 
+                        disabled={isLoading || availableTimes.length === 0} 
                         onValueChange={field.onChange} 
                         value={field.value}
                       >
@@ -604,11 +644,24 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           <SelectValue placeholder="Select a time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {allTimeSlots.map((slot) => (
-                            <SelectItem key={slot.value} value={slot.value}>
-                              {slot.label}
+                          {availableTimes.length === 0 ? (
+                            <SelectItem value="" disabled>
+                              {selectedStaffId 
+                                ? "No available times for selected staff and date" 
+                                : "Please select a staff member first"
+                              }
                             </SelectItem>
-                          ))}
+                          ) : (
+                            availableTimes.map((timeString) => {
+                              const [hours, minutes] = timeString.split(':').map(Number);
+                              const displayTime = format(new Date().setHours(hours, minutes, 0, 0), 'h:mm a');
+                              return (
+                                <SelectItem key={timeString} value={timeString}>
+                                  {displayTime}
+                                </SelectItem>
+                              );
+                            })
+                          )}
                         </SelectContent>
                       </Select>
                     </FormControl>
@@ -699,7 +752,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                 
                 <Button 
                   type="submit"
-                  disabled={isLoading || availableStaff.length === 0 || availableTimes.length === 0}
+                  disabled={isLoading || ((!appointmentId || appointmentId <= 0) && (availableStaff.length === 0 || availableTimes.length === 0))}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
