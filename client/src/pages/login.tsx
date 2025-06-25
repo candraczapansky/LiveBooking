@@ -153,23 +153,32 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 pb-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-8 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl p-2">
-              <TabsTrigger 
-                value="login" 
-                className="text-lg font-bold rounded-lg h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200"
+            <div className="flex w-full mb-8 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl p-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab("login")}
+                className={`flex-1 h-12 rounded-lg text-lg font-bold transition-all duration-200 ${
+                  activeTab === "login" 
+                    ? "bg-white shadow-md text-primary" 
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
               >
                 Login
-              </TabsTrigger>
-              <TabsTrigger 
-                value="register" 
-                className="text-lg font-bold rounded-lg h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200"
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("register")}
+                className={`flex-1 h-12 rounded-lg text-lg font-bold transition-all duration-200 ${
+                  activeTab === "register" 
+                    ? "bg-white shadow-md text-primary" 
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
               >
                 Register
-              </TabsTrigger>
-            </TabsList>
+              </button>
+            </div>
             
-            <TabsContent value="login" className="mt-0">
+            {activeTab === "login" && (
               <Form {...loginForm}>
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6" noValidate>
                   <FormField
@@ -209,9 +218,9 @@ const Login = () => {
                   </Button>
                 </form>
               </Form>
-            </TabsContent>
+            )}
             
-            <TabsContent value="register" className="mt-0">
+            {activeTab === "register" && (
               <Form {...registerForm}>
                 <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-5" noValidate>
                   <div className="grid grid-cols-2 gap-4">
@@ -316,8 +325,7 @@ const Login = () => {
                   </Button>
                 </form>
               </Form>
-            </TabsContent>
-          </Tabs>
+            )}
         </CardContent>
         <CardFooter className="px-6 pb-8 pt-6">
           <Button 
