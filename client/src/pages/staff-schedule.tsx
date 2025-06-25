@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { SidebarController } from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,8 +23,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Calendar, Plus, Search, Filter, MoreHorizontal } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffSchedulePage() {
+  useDocumentTitle("Staff Schedule | BeautyBook");
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");

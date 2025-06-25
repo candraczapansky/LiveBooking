@@ -11,6 +11,8 @@ import { getStaffFullName } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { SidebarController } from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 
 export default function StaffScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -168,6 +170,9 @@ export default function StaffScheduleDetailPage() {
         onSubmit={handleSubmitSchedule}
         isSubmitting={false}
       />
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
