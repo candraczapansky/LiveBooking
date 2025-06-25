@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, Plus, Edit, Trash2, ArrowLeft, User } from "lucide-react";
 import { AddEditScheduleDialog } from "@/components/staff/add-edit-schedule-dialog";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 
@@ -16,6 +16,7 @@ export default function StaffScheduleDetailPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Fetch staff member details
   const { data: staff = [] } = useQuery({

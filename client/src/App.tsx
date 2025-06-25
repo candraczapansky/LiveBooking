@@ -97,6 +97,8 @@ function Router() {
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
+      <Route path="/staff-schedule/:id" component={StaffScheduleDetail} />
+      <Route path="/staff-schedule" component={StaffSchedule} />
       <Route path="/booking" component={ClientBooking} />
       <Route component={NotFound} />
     </Switch>

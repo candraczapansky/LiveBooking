@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = z.object({
@@ -57,6 +57,7 @@ interface AddEditScheduleDialogProps {
 export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId }: AddEditScheduleDialogProps) {
   const queryClient = useQueryClient();
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const { toast } = useToast();
 
   // Fetch staff for dropdown
   const { data: staff = [] } = useQuery({

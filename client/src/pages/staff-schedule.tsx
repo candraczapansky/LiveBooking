@@ -1,12 +1,32 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Plus, User, ChevronRight } from "lucide-react";
-import { Link } from "wouter";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Calendar, Plus, Search, Filter, MoreHorizontal } from "lucide-react";
+import { Link, useLocation } from "wouter";
 
 export default function StaffSchedulePage() {
+  const [, setLocation] = useLocation();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+
   // Fetch staff for display
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['/api/staff'],
@@ -28,79 +48,162 @@ export default function StaffSchedulePage() {
     return 'Unknown Staff';
   };
 
+  const getInitials = (staffMember: any) => {
+    if (staffMember.user) {
+      const firstName = staffMember.user.firstName || '';
+      const lastName = staffMember.user.lastName || '';
+      return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase();
+    }
+    return 'US';
+  };
+
+  // Filter staff based on search and role
+  const filteredStaff = staff.filter((staffMember: any) => {
+    const name = getStaffName(staffMember).toLowerCase();
+    const email = staffMember.user?.email?.toLowerCase() || '';
+    const matchesSearch = name.includes(searchTerm.toLowerCase()) || email.includes(searchTerm.toLowerCase());
+    const matchesRole = roleFilter === 'all' || staffMember.title.toLowerCase().includes(roleFilter.toLowerCase());
+    return matchesSearch && matchesRole;
+  });
+
+  // Get unique roles for filter
+  const uniqueRoles = [...new Set(staff.map((s: any) => s.title))];
+
+  const handleRowClick = (staffId: number) => {
+    setLocation(`/staff-schedule/${staffId}`);
+  };
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Staff Schedule</h1>
-          <p className="text-muted-foreground">Manage staff availability for appointments and services.</p>
+          <p className="text-muted-foreground">Manage staff availability and schedules</p>
         </div>
-        <Link href="/staff-schedule/create">
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add New Schedule
-          </Button>
-        </Link>
+        <Button className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add New Staff
+        </Button>
+      </div>
+
+      {/* Search and Filter Bar */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search by staff name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {uniqueRoles.map((role) => (
+                <SelectItem key={role} value={role}>
+                  {role}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {isLoading ? (
         <div className="text-center py-8">Loading staff...</div>
-      ) : staff.length === 0 ? (
-        <Card>
-          <CardContent className="text-center py-8">
-            <User className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No staff members found</h3>
-            <p className="text-muted-foreground mb-4">
-              Add staff members first to create schedules.
-            </p>
-          </CardContent>
-        </Card>
+      ) : filteredStaff.length === 0 ? (
+        <div className="text-center py-8">
+          <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-medium mb-2">No staff members found</h3>
+          <p className="text-muted-foreground mb-4">
+            {staff.length === 0 
+              ? "Add staff members to manage their schedules." 
+              : "No staff members match your search criteria."
+            }
+          </p>
+        </div>
       ) : (
-        <div className="grid gap-4">
-          {staff.map((staffMember: any) => {
-            const scheduleCount = getScheduleCount(staffMember.id);
-            return (
-              <Link key={staffMember.id} href={`/staff-schedule/${staffMember.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer">
-                  <CardHeader>
-                    <div className="flex justify-between items-center">
+        <div className="bg-white rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>NAME</TableHead>
+                <TableHead>ROLE</TableHead>
+                <TableHead>PHONE NUMBER</TableHead>
+                <TableHead>EMAIL</TableHead>
+                <TableHead>SCHEDULES</TableHead>
+                <TableHead className="w-12"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredStaff.map((staffMember: any) => {
+                const scheduleCount = getScheduleCount(staffMember.id);
+                return (
+                  <TableRow 
+                    key={staffMember.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleRowClick(staffMember.id)}
+                  >
+                    <TableCell className="font-medium">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-                          <User className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">
-                            {getStaffName(staffMember)}
-                          </CardTitle>
-                          <CardDescription>{staffMember.title}</CardDescription>
-                        </div>
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                            {getInitials(staffMember)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>{getStaffName(staffMember)}</span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline">
-                          {scheduleCount} {scheduleCount === 1 ? 'schedule' : 'schedules'}
-                        </Badge>
-                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        {scheduleCount > 0 ? `${scheduleCount} active schedules` : 'No schedules set'}
-                      </div>
-                      {staffMember.user?.email && (
-                        <div className="flex items-center gap-1">
-                          <span>•</span>
-                          <span>{staffMember.user.email}</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="font-normal">
+                        {staffMember.title}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-primary">
+                      {staffMember.user?.phone || '-'}
+                    </TableCell>
+                    <TableCell className="text-primary">
+                      {staffMember.user?.email || '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {scheduleCount} {scheduleCount === 1 ? 'schedule' : 'schedules'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* Pagination placeholder */}
+      {filteredStaff.length > 0 && (
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-sm text-muted-foreground">
+            Rows per page: 10
+          </p>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled>
+              Previous
+            </Button>
+            <span className="text-sm">1</span>
+            <Button variant="outline" size="sm" disabled>
+              Next
+            </Button>
+          </div>
         </div>
       )}
     </div>
