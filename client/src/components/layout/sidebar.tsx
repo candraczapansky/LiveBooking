@@ -57,12 +57,10 @@ const Sidebar = () => {
     return null;
   }
 
-  // For mobile, show/hide based on isOpen. For desktop, always show.
-  const sidebarClass = isMobile 
-    ? `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
-        isOpen ? "block translate-x-0" : "hidden -translate-x-full"
-      }`
-    : "sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl";
+  // For both mobile and desktop, show/hide based on isOpen state
+  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
+    isOpen ? "translate-x-0" : "-translate-x-full"
+  }`;
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
@@ -85,14 +83,9 @@ const Sidebar = () => {
 
   console.log('Sidebar DOM element about to render:', { isOpen, isMobile });
 
-  // For mobile: don't render when closed
-  if (isMobile && !isOpen) {
-    return null;
-  }
-
   return (
     <div 
-      className="sidebar fixed top-0 left-0 w-64 h-screen bg-white dark:bg-gray-800 shadow-xl z-50"
+      className={sidebarClass}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex flex-col h-full">

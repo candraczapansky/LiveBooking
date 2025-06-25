@@ -1,5 +1,5 @@
 import { useContext, useState, useEffect } from "react";
-import { Settings, User, LogOut, ChevronDown } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown, Menu } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/App";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,10 +14,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
 import SimpleMobileMenu from "./simple-mobile-menu";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 
 const Header = () => {
   const { user, logout } = useContext(AuthContext);
+  const { toggleSidebar } = useSidebar();
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,6 +50,15 @@ const Header = () => {
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10 sticky top-0">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 sm:h-16">
+          {/* Hamburger Menu Button for Desktop */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:flex hidden h-8 w-8 mr-4"
+            onClick={toggleSidebar}
+          >
+            <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+          </Button>
           <div className="flex items-center min-w-0">
             <div className="lg:hidden">
               <SimpleMobileMenu />

@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 import {
   Card,
@@ -47,6 +48,7 @@ export default function GiftCertificatesPage() {
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isOpen } = useSidebar();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [balanceCheckCode, setBalanceCheckCode] = useState("");
@@ -155,7 +157,7 @@ export default function GiftCertificatesPage() {
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isOpen ? 'ml-64' : 'ml-0'}`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
