@@ -215,7 +215,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableStaff([]);
     }
-  }, [selectedServiceId, selectedFormDate, services, staff, schedules, appointments, staffServices, selectedService, form, selectedStaffId]);
+  }, [selectedServiceId, selectedFormDate, selectedService?.id]);
 
   // Update available times when staff or date changes
   useEffect(() => {
@@ -246,7 +246,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     } else {
       setAvailableTimes([]);
     }
-  }, [selectedStaffId, selectedFormDate, selectedService, schedules, appointments, form, startTimeString]);
+  }, [selectedStaffId, selectedFormDate, selectedService?.id]);
   
   // Load appointment data when editing
   useEffect(() => {
@@ -530,12 +530,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                         </SelectTrigger>
                         <SelectContent>
                           {availableStaff.length === 0 ? (
-                            <SelectItem value="" disabled>
+                            <div className="p-2 text-sm text-muted-foreground text-center">
                               {selectedServiceId 
                                 ? "No staff available for selected service and date" 
                                 : "Please select a service and date first"
                               }
-                            </SelectItem>
+                            </div>
                           ) : (
                             availableStaff.map((staffMember: any) => {
                             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
