@@ -828,6 +828,18 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
       } : null
     });
   });
+
+  // Get appointments for a specific client
+  app.get("/api/appointments/client/:clientId", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      const appointments = await storage.getAppointmentsByClient(clientId);
+      res.json(appointments);
+    } catch (error) {
+      console.error("Error fetching client appointments:", error);
+      res.status(500).json({ error: "Failed to fetch client appointments" });
+    }
+  });
   
   app.put("/api/appointments/:id", validateBody(insertAppointmentSchema.partial()), async (req, res) => {
     const id = parseInt(req.params.id);

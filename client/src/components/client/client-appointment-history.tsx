@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, DollarSign, User } from "lucide-react";
 import { format } from "date-fns";
 
@@ -122,12 +121,12 @@ export default function ClientAppointmentHistory({ clientId }: ClientAppointment
                       <div className="flex items-center gap-2">
                         <h4 className="font-medium text-lg">{appointment.service.name}</h4>
                         <div className="flex gap-2">
-                          <Badge className={getStatusColor(appointment.status)}>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                             {appointment.status}
-                          </Badge>
-                          <Badge className={getPaymentStatusColor(appointment.paymentStatus)}>
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(appointment.paymentStatus)}`}>
                             {appointment.paymentStatus}
-                          </Badge>
+                          </span>
                         </div>
                       </div>
                       

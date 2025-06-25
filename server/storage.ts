@@ -89,7 +89,7 @@ export interface IStorage {
   // Appointment operations
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   getAppointment(id: number): Promise<Appointment | undefined>;
-  getAppointmentsByClient(clientId: number): Promise<Appointment[]>;
+  getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
   updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment>;
@@ -833,10 +833,24 @@ export class DatabaseStorage implements IStorage {
     return this.appointments.get(id);
   }
 
-  async getAppointmentsByClient(clientId: number): Promise<Appointment[]> {
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.clientId === clientId
-    );
+  async getAppointmentsByClient(clientId: number): Promise<any[]> {
+    const clientAppointments = await db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.clientId, clientId))
+      .leftJoin(services, eq(appointments.serviceId, services.id))
+      .leftJoin(staff, eq(appointments.staffId, staff.id))
+      .leftJoin(users, eq(staff.userId, users.id))
+      .orderBy(desc(appointments.startTime));
+
+    return clientAppointments.map(row => ({
+      ...row.appointments,
+      service: row.services,
+      staff: row.staff ? {
+        ...row.staff,
+        user: row.users
+      } : null
+    }));
   }
 
   async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
