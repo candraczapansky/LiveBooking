@@ -357,15 +357,8 @@ export default function SettingsMobile() {
       return response.json();
     },
     onSuccess: (updatedUser) => {
-      // Update the user context with the new data
-      if (user) {
-        const newUser = { ...user, ...updatedUser };
-        localStorage.setItem('user', JSON.stringify(newUser));
-        // Trigger a page refresh to update the context
-        window.location.reload();
-      }
-      
-
+      // Update the user context with the new data using the context function
+      updateUser(updatedUser);
       
       toast({
         title: "Profile updated",
