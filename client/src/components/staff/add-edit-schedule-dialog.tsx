@@ -1,10 +1,11 @@
+import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,8 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -28,13 +31,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { type StaffSchedule } from "@/services/staffService";
-import { staffService, getStaffFullName } from "@/services/staffService";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
-const scheduleFormSchema = z.object({
+const formSchema = z.object({
   staffId: z.string().min(1, "Staff member is required"),
   dayOfWeek: z.string().min(1, "Day of week is required"),
   startTime: z.string().min(1, "Start time is required"),
@@ -46,30 +47,21 @@ const scheduleFormSchema = z.object({
   isBlocked: z.boolean().optional(),
 });
 
-type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
-
-interface ScheduleManagementDialogProps {
+interface AddEditScheduleDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  schedule?: StaffSchedule | null;
+  schedule?: any;
   defaultStaffId?: number;
-  onSubmit: (data: StaffSchedule) => void;
-  isSubmitting?: boolean;
 }
 
-export function ScheduleManagementDialog({ 
-  open, 
-  onOpenChange, 
-  schedule, 
-  defaultStaffId, 
-  onSubmit, 
-  isSubmitting = false 
-}: ScheduleManagementDialogProps) {
+export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId }: AddEditScheduleDialogProps) {
+  const queryClient = useQueryClient();
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const { toast } = useToast();
 
   // Fetch staff for dropdown
   const { data: staff = [] } = useQuery({
     queryKey: ['/api/staff'],
-    queryFn: staffService.getAllStaff,
   });
 
   // Fetch service categories
@@ -82,8 +74,8 @@ export function ScheduleManagementDialog({
     queryKey: ['/api/rooms'],
   });
 
-  const form = useForm<ScheduleFormValues>({
-    resolver: zodResolver(scheduleFormSchema),
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
     defaultValues: useMemo(() => ({
       staffId: schedule?.staffId?.toString() || defaultStaffId?.toString() || "",
       dayOfWeek: schedule?.dayOfWeek || "",
@@ -97,27 +89,86 @@ export function ScheduleManagementDialog({
     }), [schedule, defaultStaffId]),
   });
 
-  const handleSubmit = (data: ScheduleFormValues) => {
-    const scheduleData: StaffSchedule = {
-      ...(schedule || {}),
+  const createScheduleMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("POST", "/api/schedules", data);
+      if (!response.ok) {
+        throw new Error("Failed to create schedule");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      toast({
+        title: "Success",
+        description: "Schedule created successfully.",
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error) => {
+      console.error("Failed to save schedules:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create schedule. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateScheduleMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await apiRequest("PUT", `/api/schedules/${schedule.id}`, data);
+      if (!response.ok) {
+        throw new Error("Failed to update schedule");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      toast({
+        title: "Success",
+        description: "Schedule updated successfully.",
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error) => {
+      console.error("Failed to update schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update schedule. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    const scheduleData = {
+      ...data,
       staffId: parseInt(data.staffId),
-      dayOfWeek: data.dayOfWeek,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      location: data.location,
       serviceCategories: data.serviceCategories || [],
-      startDate: data.startDate,
-      endDate: data.endDate || undefined,
+      endDate: data.endDate || null,
       isBlocked: data.isBlocked || false,
     };
 
-    onSubmit(scheduleData);
-    form.reset();
+    if (schedule) {
+      updateScheduleMutation.mutate(scheduleData);
+    } else {
+      createScheduleMutation.mutate(scheduleData);
+    }
   };
 
   const daysOfWeek = [
     "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
   ];
+
+  const getStaffName = (staffMember: any) => {
+    if (staffMember.user) {
+      return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
+    }
+    return 'Unknown Staff';
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -132,8 +183,7 @@ export function ScheduleManagementDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {/* Staff Selection */}
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="staffId"
@@ -149,7 +199,7 @@ export function ScheduleManagementDialog({
                     <SelectContent>
                       {staff.map((staffMember: any) => (
                         <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
-                          {getStaffFullName(staffMember)} - {staffMember.title}
+                          {getStaffName(staffMember)} - {staffMember.title}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -159,7 +209,6 @@ export function ScheduleManagementDialog({
               )}
             />
 
-            {/* Day of Week */}
             <FormField
               control={form.control}
               name="dayOfWeek"
@@ -185,7 +234,6 @@ export function ScheduleManagementDialog({
               )}
             />
 
-            {/* Time Range */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -216,7 +264,6 @@ export function ScheduleManagementDialog({
               />
             </div>
 
-            {/* Location */}
             <FormField
               control={form.control}
               name="location"
@@ -243,7 +290,6 @@ export function ScheduleManagementDialog({
               )}
             />
 
-            {/* Date Range */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -274,48 +320,52 @@ export function ScheduleManagementDialog({
               />
             </div>
 
-            {/* Service Categories */}
-            {serviceCategories.length > 0 && (
-              <FormField
-                control={form.control}
-                name="serviceCategories"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service Categories (Optional)</FormLabel>
-                    <div className="grid grid-cols-2 gap-2">
-                      {serviceCategories.map((category: any) => {
-                        const isChecked = field.value?.includes(category.name) || false;
-                        return (
-                          <div key={category.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`category-${category.id}`}
-                              checked={isChecked}
-                              onCheckedChange={(checked) => {
-                                const currentCategories = field.value || [];
-                                if (checked) {
-                                  field.onChange([...currentCategories, category.name]);
-                                } else {
-                                  field.onChange(currentCategories.filter(c => c !== category.name));
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor={`category-${category.id}`}
-                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            <FormField
+              control={form.control}
+              name="serviceCategories"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Service Categories (Optional)</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {serviceCategories.map((category: any) => (
+                      <FormField
+                        key={category.id}
+                        control={form.control}
+                        name="serviceCategories"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={category.id}
+                              className="flex flex-row items-start space-x-3 space-y-0"
                             >
-                              {category.name}
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(category.name)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), category.name])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value: string) => value !== category.name
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal">
+                                {category.name}
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-            {/* Block Time Slot */}
             <FormField
               control={form.control}
               name="isBlocked"
@@ -328,8 +378,10 @@ export function ScheduleManagementDialog({
                     />
                   </FormControl>
                   <div className="space-y-1 leading-none">
-                    <FormLabel>Block this time slot</FormLabel>
-                    <p className="text-xs text-muted-foreground">
+                    <FormLabel>
+                      Block this time slot
+                    </FormLabel>
+                    <p className="text-sm text-muted-foreground">
                       Mark this time as unavailable for appointments
                     </p>
                   </div>
@@ -338,11 +390,23 @@ export function ScheduleManagementDialog({
             />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Saving..." : schedule ? "Update Schedule" : "Create Schedule"}
+              <Button
+                type="submit"
+                disabled={createScheduleMutation.isPending || updateScheduleMutation.isPending}
+              >
+                {createScheduleMutation.isPending || updateScheduleMutation.isPending
+                  ? "Saving..."
+                  : schedule
+                  ? "Update Schedule"
+                  : "Create Schedule"
+                }
               </Button>
             </DialogFooter>
           </form>

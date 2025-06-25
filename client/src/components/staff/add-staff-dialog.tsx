@@ -1,6 +1,10 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 import {
   Dialog,
@@ -28,9 +32,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { type CreateStaffData } from "@/services/staffService";
 
-const staffFormSchema = z.object({
+const addStaffSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
@@ -41,23 +44,19 @@ const staffFormSchema = z.object({
   commissionRate: z.number().min(0).max(100).default(45),
 });
 
-type StaffFormValues = z.infer<typeof staffFormSchema>;
+type AddStaffFormValues = z.infer<typeof addStaffSchema>;
 
-interface StaffManagementDialogProps {
+type AddStaffDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: CreateStaffData) => void;
-  isSubmitting?: boolean;
-}
+};
 
-export function StaffManagementDialog({ 
-  open, 
-  onOpenChange, 
-  onSubmit, 
-  isSubmitting = false 
-}: StaffManagementDialogProps) {
-  const form = useForm<StaffFormValues>({
-    resolver: zodResolver(staffFormSchema),
+export default function AddStaffDialog({ open, onOpenChange }: AddStaffDialogProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const form = useForm<AddStaffFormValues>({
+    resolver: zodResolver(addStaffSchema),
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -70,9 +69,72 @@ export function StaffManagementDialog({
     },
   });
 
-  const handleSubmit = (data: StaffFormValues) => {
-    onSubmit(data);
-    form.reset();
+  const createStaffMutation = useMutation({
+    mutationFn: async (data: AddStaffFormValues) => {
+      // Step 1: Create user account
+      const baseUsername = `${data.firstName.toLowerCase()}${data.lastName.toLowerCase()}`.replace(/[^a-z0-9]/g, '');
+      const timestamp = Date.now().toString().slice(-4);
+      const username = `${baseUsername}${timestamp}`;
+      const defaultPassword = `${data.firstName}123!`;
+      
+      const userData = {
+        username,
+        email: data.email,
+        password: defaultPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone || "",
+        role: "staff",
+      };
+
+      const userResponse = await apiRequest("POST", "/api/register", userData);
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        throw new Error(errorData.error || "Failed to create user account");
+      }
+
+      const user = await userResponse.json();
+
+      // Step 2: Create staff record
+      const staffData = {
+        userId: user.id,
+        title: data.title,
+        bio: data.bio || "",
+        commissionType: data.commissionType,
+        commissionRate: data.commissionRate / 100, // Convert percentage to decimal
+        hourlyRate: data.commissionType === 'hourly' ? data.commissionRate : null,
+        fixedRate: data.commissionType === 'fixed' ? data.commissionRate : null,
+      };
+
+      const staffResponse = await apiRequest("POST", "/api/staff", staffData);
+      if (!staffResponse.ok) {
+        const errorData = await staffResponse.json();
+        throw new Error(errorData.error || "Failed to create staff member");
+      }
+
+      return await staffResponse.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+      toast({
+        title: "Success",
+        description: "Staff member created successfully!",
+      });
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create staff member: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const onSubmit = (data: AddStaffFormValues) => {
+    console.log("Submitting staff form with data:", data);
+    createStaffMutation.mutate(data);
   };
 
   return (
@@ -86,7 +148,7 @@ export function StaffManagementDialog({
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* Personal Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -243,8 +305,11 @@ export function StaffManagementDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Staff Member"}
+              <Button 
+                type="submit" 
+                disabled={createStaffMutation.isPending}
+              >
+                {createStaffMutation.isPending ? "Creating..." : "Create Staff Member"}
               </Button>
             </DialogFooter>
           </form>

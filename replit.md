@@ -10,7 +10,6 @@ The system uses a modern tech stack with React for the UI, Express for the API, 
 
 Preferred communication style: Simple, everyday language.
 Preferred color scheme: Pink primary color with black text for better readability and modern aesthetic.
-Development workflow: User prefers quick solutions over lengthy debugging sessions due to time constraints. Focus on streamlined approaches and consolidation when complexity grows.
 
 ## Recent Changes
 
@@ -52,73 +51,6 @@ Development workflow: User prefers quick solutions over lengthy debugging sessio
   - Enhanced custom trigger name functionality for personalized automation workflows
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
-
-### June 25, 2025 - Complete Database Storage Migration and Data Persistence Fix
-- **Fixed critical data persistence issues:**
-  - Completely migrated DatabaseStorage class from in-memory Map operations to PostgreSQL database calls
-  - All appointment scheduling, payments, staff management, and reports now persist permanently
-  - Replaced all Map.set(), Map.get(), Map.delete() operations with proper database INSERT, SELECT, UPDATE, DELETE
-  - Fixed appointment creation, payment processing, and staff operations to save to database
-  - System now maintains all user input data across server restarts and application updates
-- **Enhanced database initialization:**
-  - Added proper sample data initialization that checks for existing data before creating
-  - Sample data includes admin user, service categories, rooms, devices, services, and staff
-  - Database schema properly supports all salon management operations
-- **Fixed data retrieval for reports:**
-  - Reports page now shows accurate data from database instead of empty in-memory storage
-  - Payment tracking, appointment history, and client metrics display real persistent data
-  - Revenue calculations and analytics reflect actual business transactions
-
-### June 25, 2025 - Reports Page Client Calculation Fixes and Staff Form Restoration
-- **Fixed reports page client calculation issues:**
-  - Updated client metrics to use actual user data instead of only payment data
-  - Client count now shows real registered users with role 'client'
-  - Fixed division by zero errors in percentage calculations
-  - Added proper handling for cases with no transaction data
-  - Client retention rate now calculated from user registration dates
-  - Average spend per client properly handles zero revenue scenarios
-- **Restored staff form functionality:**
-  - Fixed duplicate function definition causing syntax errors in StaffForm component
-  - Resolved staff form dialog rendering issues
-  - Add Staff and Edit Staff buttons now open form dialogs correctly
-  - Fixed form submission and validation logic
-- **Added sample client data:**
-  - Inserted additional client users to demonstrate proper metrics calculation
-  - Reports page now shows meaningful client statistics and trends
-
-### June 25, 2025 - Major Code Reorganization and Architecture Cleanup
-- **Completed comprehensive code reorganization:**
-  - Created centralized service layer (`staffService.ts`) for all staff and schedule operations
-  - Implemented custom hooks (`useStaffManagement`, `useScheduleManagement`) for state management
-  - Consolidated multiple dialog components into unified `StaffManagementDialog` and `ScheduleManagementDialog`
-  - Removed duplicate and conflicting components that were causing editing difficulties
-  - Simplified component prop interfaces and eliminated complex state passing
-- **Enhanced development workflow:**
-  - All staff operations now use consistent API patterns through service layer
-  - Utility functions (`getStaffFullName`, `formatCommissionRate`) centralized for reuse
-  - Error handling and loading states managed through custom hooks
-  - Reduced file count and eliminated redundant code paths
-- **Fixed staff schedule creation functionality:**
-  - Schedule creation now working properly with proper database persistence
-  - Form validation and error handling working correctly through new architecture
-
-### June 25, 2025 - Intelligent Staff Availability Filtering for Appointment Booking
-- **Implemented comprehensive availability service:**
-  - Created `availabilityService.ts` with schedule-based staff filtering
-  - Added intelligent time slot generation based on staff schedules
-  - Implemented conflict detection to prevent double-booking
-  - Added validation for service capability checking
-- **Enhanced appointment booking system:**
-  - Staff dropdown now only shows available staff for selected service and date
-  - Time selection filtered to show only available slots based on staff schedules
-  - Added helpful guidance messages when no staff or times are available
-  - Prevents booking appointments outside staff working hours
-  - Real-time validation against existing appointments to avoid conflicts
-- **Improved user experience:**
-  - Clear feedback when staff unavailable for selected date/service
-  - Dynamic time slot filtering based on staff availability
-  - Form validation prevents invalid booking attempts
-  - System respects staff schedule constraints and service assignments
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification
 - **Simplified staff page to show staff names list first:**
@@ -268,15 +200,12 @@ Development workflow: User prefers quick solutions over lengthy debugging sessio
 
 ### Frontend Architecture
 
-The frontend is built with React and uses a modern, organized component-based architecture:
+The frontend is built with React and uses a component-based architecture following modern best practices:
 
-1. **Service Layer**: Centralized API operations in `services/` directory (e.g., `staffService.ts`)
-2. **Custom Hooks**: Business logic encapsulated in reusable hooks (e.g., `useStaffManagement`, `useScheduleManagement`)
-3. **UI Components**: Uses shadcn/ui component library with unified dialog components for consistent UX
-4. **Type Safety**: Centralized type definitions in `types/` directory for better maintainability
-5. **Routing**: Uses Wouter for lightweight client-side routing
-6. **State Management**: React Query for server state with custom hooks for complex operations
-7. **Styling**: Tailwind CSS for utility-first styling
+1. **UI Components**: Uses the shadcn/ui component library (based on Radix UI) for consistent design
+2. **Routing**: Uses Wouter for lightweight client-side routing
+3. **State Management**: Combines React context (for auth state) with React Query for server state management
+4. **Styling**: Uses Tailwind CSS for utility-first styling
 
 ### Backend Architecture
 

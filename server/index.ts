@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { config } from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { DatabaseStorage } from "./storage";
+import { PgStorage } from "./storage";
 
 // Load environment variables
 config();
@@ -42,14 +42,14 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app, new DatabaseStorage());
+  const server = await registerRoutes(app, new PgStorage());
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    console.error('Server error:', err);
     res.status(status).json({ message });
+    throw err;
   });
 
   // importantly only setup vite in development and after
