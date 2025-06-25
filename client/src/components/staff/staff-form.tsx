@@ -44,7 +44,7 @@ const staffFormSchema = z.object({
   commissionRate: z.number().min(0).max(100).default(0),
   hourlyRate: z.number().min(0).optional(),
   fixedSalary: z.number().min(0).optional(),
-  email: z.string(),
+  email: z.string().email("Please enter a valid email address"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -98,7 +98,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           form.reset({
             title: data.title || "",
             bio: data.bio || "",
-            commissionRate: data.commissionRate || 0,
+            photo: "",
+            commissionType: "commission",
+            commissionRate: (data.commissionRate * 100) || 45, // Convert decimal to percentage
+            hourlyRate: 0,
+            fixedSalary: 0,
             firstName: data.user?.firstName || "",
             lastName: data.user?.lastName || "",
             email: data.user?.email || "",
@@ -120,7 +124,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       form.reset({
         title: "",
         bio: "",
-        commissionRate: 0,
+        photo: "",
+        commissionType: "commission",
+        commissionRate: 45, // Default 45%
+        hourlyRate: 0,
+        fixedSalary: 0,
         email: "",
         firstName: "",
         lastName: "",
@@ -227,20 +235,20 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       if (!userId) throw new Error("Staff user ID not found");
       
       console.log("Updating user:", userId, "with data:", userData);
-      const userResponse = await apiRequest("PATCH", `/api/users/${userId}`, userData);
+      const userResponse = await apiRequest("PUT", `/api/users/${userId}`, userData);
       if (!userResponse.ok) {
         const errorData = await userResponse.json();
         throw new Error(errorData.error || "Failed to update user");
       }
 
       // Update staff information
-      const staffData = {
+      const updateStaffData = {
         title: data.title,
         bio: data.bio,
-        commissionRate: data.commissionRate,
+        commissionRate: data.commissionRate / 100, // Convert percentage to decimal
       };
 
-      const staffResponse = await apiRequest("PATCH", `/api/staff/${staffId}`, staffData);
+      const staffResponse = await apiRequest("PUT", `/api/staff/${staffId}`, updateStaffData);
       if (!staffResponse.ok) {
         const errorData = await staffResponse.json();
         throw new Error(errorData.error || "Failed to update staff member");
