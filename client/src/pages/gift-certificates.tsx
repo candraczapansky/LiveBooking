@@ -187,7 +187,9 @@ export default function GiftCertificatesPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <FormLabel>Gift Certificate Code</FormLabel>
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Gift Certificate Code
+                    </label>
                     <div className="relative">
                       <Input
                         placeholder="Enter your gift certificate code"
