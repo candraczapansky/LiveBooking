@@ -43,7 +43,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function SettingsMobile() {
   const { toast } = useToast();
   const { user, updateUser } = useContext(AuthContext);
-  const [localUser, setLocalUser] = useState<User | null>(null);
+  const [localUser, setLocalUser] = useState<any>(null);
   
   // Use context user or fallback to localStorage user
   const currentUser = user || localUser;
