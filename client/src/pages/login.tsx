@@ -333,15 +333,6 @@ const Login = () => {
               </Form>
             )}
         </CardContent>
-        <CardFooter className="px-8 pb-4 pt-2">
-          <Button 
-            variant="outline" 
-            className="w-full h-10 text-sm font-medium rounded-md" 
-            onClick={() => navigate("/booking")}
-          >
-            Continue as Guest to Book Appointment
-          </Button>
-        </CardFooter>
         </Card>
       </div>
     </div>

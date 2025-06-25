@@ -52,7 +52,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
-### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences
+### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**
   - Updated staff page to display clean list of staff members with names and titles only
   - Added click navigation to individual staff schedules when staff member is clicked
@@ -77,6 +77,13 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Cleaned up settings interface by removing redundant preset options
   - Maintained custom saved text colors functionality for user personalization
   - Simplified color picker interface while preserving full customization capabilities
+- **Enhanced mobile login/register interface:**
+  - Fixed tab display issues by replacing problematic Radix Tabs with custom flex layout
+  - Significantly reduced interface bulk with compact design and smaller input fields
+  - Resolved focus outline cutoff issues using custom box shadows instead of focus rings
+  - Added proper container padding and margins to prevent visual clipping
+  - Removed "Continue as Guest" button as user has separate client/staff frontends
+  - Applied consistent border styling and smooth transitions across all form elements
 
 ### June 24, 2025 - Mobile UI Improvements, SMS Marketing Fixes, Staff Schedule Completion, POS Sales Reporting Integration, Complete Database Migration, and Email Placeholder Cleanup
 - **Enhanced mobile button accessibility:**
