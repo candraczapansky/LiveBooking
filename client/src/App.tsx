@@ -47,6 +47,7 @@ export type AuthContextType = {
   isAuthenticated: boolean;
   login: (user: User) => void;
   logout: () => void;
+  updateUser: (updatedUserData: Partial<User>) => void;
 };
 
 export const AuthContext = React.createContext<AuthContextType>({
@@ -60,6 +61,9 @@ export const AuthContext = React.createContext<AuthContextType>({
     localStorage.removeItem('user');
     localStorage.clear();
     window.location.replace('/');
+  },
+  updateUser: () => {
+    console.log("Default updateUser function called - context not properly provided");
   },
 });
 
@@ -134,6 +138,14 @@ function useAuth() {
     localStorage.setItem('user', JSON.stringify(userData));
   };
 
+  const updateUser = (updatedUserData: Partial<User>) => {
+    if (user) {
+      const newUser = { ...user, ...updatedUserData };
+      setUser(newUser);
+      localStorage.setItem('user', JSON.stringify(newUser));
+    }
+  };
+
   const logout = () => {
     console.log("Logout function called");
     setUser(null);
@@ -144,7 +156,7 @@ function useAuth() {
     window.location.replace('/login');
   };
 
-  return { user, isAuthenticated, login, logout };
+  return { user, isAuthenticated, login, logout, updateUser };
 }
 
 function App() {

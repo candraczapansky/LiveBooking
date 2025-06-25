@@ -42,7 +42,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 
 export default function SettingsMobile() {
   const { toast } = useToast();
-  const { user } = useContext(AuthContext);
+  const { user, updateUser } = useContext(AuthContext);
 
   const [darkMode, setDarkMode] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
