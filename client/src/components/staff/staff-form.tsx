@@ -370,6 +370,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   });
 
   const onSubmit = async (data: StaffFormValues) => {
+    console.log("Form submission data:", data);
+    console.log("Form errors:", form.formState.errors);
+    
     if (staffId) {
       updateStaffMutation.mutate(data);
     } else {
