@@ -142,6 +142,107 @@ input:-moz-valid:focus {
   outline: none !important;
 }
 
+/* Last resort - completely override all possible validation styling */
+* {
+  --tw-ring-color: transparent !important;
+}
+
+input[aria-invalid="true"],
+input[aria-invalid="false"],
+input[data-invalid],
+input[data-state="invalid"],
+.peer:invalid ~ *,
+[data-radix-form-field] input,
+[data-radix-form-item] input {
+  border: 1px solid hsl(var(--border)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* Override any possible Radix UI validation styles */
+[data-invalid] input,
+[aria-invalid="true"] input,
+.form-field[data-invalid] input {
+  border: 1px solid hsl(var(--border)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+/* Force normal border styling with highest specificity */
+.force-border-normal,
+input.force-border-normal,
+input.force-border-normal:invalid,
+input.force-border-normal:valid,
+input.force-border-normal[aria-invalid="true"],
+input.force-border-normal[aria-invalid="false"] {
+  border: 1px solid hsl(var(--border)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+.force-border-normal:focus,
+input.force-border-normal:focus,
+input.force-border-normal:focus:invalid,
+input.force-border-normal:focus:valid,
+input.force-border-normal:focus[aria-invalid="true"],
+input.force-border-normal:focus[aria-invalid="false"] {
+  border: 1px solid hsl(var(--ring)) !important;
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+  outline: none !important;
+}
+
+/* Ultimate nuclear override for email validation */
+html input,
+html body input,
+html body div input,
+html body div form input,
+html body [data-radix-portal] input,
+html body [data-radix-dialog-content] input {
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+html input:focus,
+html body input:focus,
+html body div input:focus,
+html body div form input:focus,
+html body [data-radix-portal] input:focus,
+html body [data-radix-dialog-content] input:focus {
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+}
+
+/* Final nuclear option - override all possible browser validation */
+input[type="text"],
+input[type="email"],
+input[type="url"],
+input[type="search"] {
+  border: 1px solid hsl(var(--border)) !important;
+  border-color: hsl(var(--border)) !important;
+  box-shadow: none !important;
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="search"]:focus {
+  border: 1px solid hsl(var(--ring)) !important;
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+}
+
+/* Disable all possible pseudo-class validation styling */
+input:not([type="submit"]):not([type="button"]):not([type="reset"]) {
+  border-color: hsl(var(--border)) !important;
+}
+
+input:not([type="submit"]):not([type="button"]):not([type="reset"]):focus {
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+}
+
 
 
 /* Perfect circle profile picture */

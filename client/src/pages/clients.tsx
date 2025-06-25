@@ -793,8 +793,8 @@ const ClientsPage = () => {
                           spellCheck="false"
                           data-lpignore="true"
                           data-form-type="other"
-                          pattern=".*"
-                          className="no-validation"
+                          pattern=".*" data-no-validation="true"
+                          className="no-validation force-border-normal"
                           style={{borderColor: 'hsl(var(--border)) !important'}}
                           {...field} 
                         />
@@ -1170,8 +1170,8 @@ const ClientsPage = () => {
                           spellCheck="false"
                           data-lpignore="true"
                           data-form-type="other"
-                          pattern=".*"
-                          className="no-validation"
+                          pattern=".*" data-no-validation="true"
+                          className="no-validation force-border-normal"
                           style={{borderColor: 'hsl(var(--border)) !important'}}
                           {...field} 
                         />
