@@ -694,10 +694,14 @@ export class DatabaseStorage implements IStorage {
 
   // Staff operations
   async createStaff(staffMember: InsertStaff): Promise<Staff> {
-    const id = this.currentStaffId++;
-    const newStaff = { ...staffMember, id } as Staff;
-    this.staff.set(id, newStaff);
-    return newStaff;
+    try {
+      const [result] = await db.insert(staff).values(staffMember).returning();
+      console.log('Created staff record:', result);
+      return result;
+    } catch (error) {
+      console.error('Error creating staff:', error);
+      throw error;
+    }
   }
 
   async getStaff(id: number): Promise<Staff | undefined> {
