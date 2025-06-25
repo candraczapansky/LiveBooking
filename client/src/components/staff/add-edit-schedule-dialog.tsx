@@ -91,9 +91,12 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
   const createScheduleMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log("Creating schedule with data:", data);
       const response = await apiRequest("POST", "/api/schedules", data);
       if (!response.ok) {
-        throw new Error("Failed to create schedule");
+        const errorData = await response.text();
+        console.error("Schedule creation failed:", errorData);
+        throw new Error(`Failed to create schedule: ${response.status}`);
       }
       return response.json();
     },
@@ -110,7 +113,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       console.error("Failed to save schedules:", error);
       toast({
         title: "Error",
-        description: "Failed to create schedule. Please try again.",
+        description: `Failed to create schedule: ${error.message}`,
         variant: "destructive",
       });
     },
@@ -144,13 +147,21 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   });
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    console.log("Form submitted with data:", data);
+    
     const scheduleData = {
-      ...data,
       staffId: parseInt(data.staffId),
+      dayOfWeek: data.dayOfWeek,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      location: data.location,
       serviceCategories: data.serviceCategories || [],
+      startDate: data.startDate,
       endDate: data.endDate || null,
       isBlocked: data.isBlocked || false,
     };
+
+    console.log("Processed schedule data:", scheduleData);
 
     if (schedule) {
       updateScheduleMutation.mutate(scheduleData);
