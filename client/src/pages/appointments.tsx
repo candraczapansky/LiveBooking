@@ -435,16 +435,27 @@ const AppointmentsPage = () => {
                       const serviceName = appointment.service?.name || 'Unknown Service';
                       const serviceColor = appointment.service?.color || '#6b7280';
 
+                      // Check if appointment is paid
+                      const isPaid = appointment.paymentStatus === 'paid';
+                      const cardBackgroundClass = isPaid 
+                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
+                        : "bg-white dark:bg-gray-800";
+
                       return (
                         <div
                           key={appointment.id}
-                          className="bg-white dark:bg-gray-800 rounded-lg p-3 border-l-4 shadow-sm"
-                          style={{ borderLeftColor: serviceColor }}
+                          className={`${cardBackgroundClass} rounded-lg p-3 border-l-4 shadow-sm relative`}
+                          style={{ borderLeftColor: isPaid ? '#10b981' : serviceColor }}
                           onClick={() => {
                             setSelectedAppointmentId(appointment.id);
                             setIsFormOpen(true);
                           }}
                         >
+                          {isPaid && (
+                            <div className="absolute top-2 right-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 px-2 py-1 rounded-full text-xs font-medium">
+                              Paid
+                            </div>
+                          )}
                           <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{serviceName}</div>
                           <div className="text-sm text-gray-600 dark:text-gray-400">{clientName}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-500">{timeString}</div>
@@ -593,8 +604,12 @@ const AppointmentsPage = () => {
               const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
 
-              // Get service color for appointment
+              // Check if appointment is paid and set colors accordingly
+              const isPaid = appointment.paymentStatus === 'paid';
               const serviceColor = appointment.service?.color || '#6b7280';
+              const backgroundColor = isPaid ? '#10b981' : serviceColor; // Green for paid, service color for unpaid
+              const borderColor = isPaid ? '#059669' : serviceColor; // Darker green border for paid
+              
               const isServiceColorLight = (color: string) => {
                 const hex = color.replace('#', '');
                 const r = parseInt(hex.substr(0, 2), 16);
@@ -615,17 +630,22 @@ const AppointmentsPage = () => {
                     setSelectedAppointmentId(appointment.id);
                     setIsFormOpen(true);
                   }}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] group"
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] group relative"
                   style={{
                     left: `${leftPosition + 4}px`,
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
-                    backgroundColor: serviceColor,
-                    borderLeftColor: serviceColor,
-                    color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
-                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : (appointment.paymentStatus === 'paid' ? 1 : 0.7)
+                    backgroundColor: backgroundColor,
+                    borderLeftColor: borderColor,
+                    color: isPaid ? '#ffffff' : (isServiceColorLight(serviceColor) ? '#000000' : '#ffffff'),
+                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
                   }}
                 >
+                  {isPaid && (
+                    <div className="absolute top-1 right-1 bg-white/20 text-white px-1 py-0.5 rounded text-xs font-medium">
+                      PAID
+                    </div>
+                  )}
                   <div className="text-xs font-medium leading-tight mb-1" title={serviceName}>
                     {serviceName}
                   </div>
