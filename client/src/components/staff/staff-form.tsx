@@ -175,7 +175,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         userId: userId,
         title: data.title,
         bio: data.bio,
-        commissionRate: data.commissionRate,
+        commissionType: data.commissionType,
+        commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : undefined,
+        hourlyRate: data.commissionType === 'hourly' ? data.commissionRate : undefined,
+        fixedRate: data.commissionType === 'fixed' ? data.commissionRate : undefined,
       };
 
       const staffResponse = await apiRequest("POST", "/api/staff", staffData);
