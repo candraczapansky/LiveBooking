@@ -146,8 +146,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       let attempts = 0;
       
       while (!userCreated && attempts < 10) {
-        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts + 1}`;
+        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts}`;
         const defaultPassword = `${data.firstName}123!`; // Simple default password
+        
+        console.log(`Attempting to create user with username: ${username} (attempt ${attempts + 1})`);
         
         const userData = {
           username,
@@ -164,10 +166,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           const user = await userResponse.json();
           userId = user.id;
           userCreated = true;
+          console.log(`Successfully created user with username: ${username}`);
         } else {
           const errorData = await userResponse.json();
+          console.log(`Failed to create user with username: ${username}, error: ${errorData.error}`);
           if (errorData.error?.includes("Username already taken")) {
             attempts++;
+            console.log(`Incrementing attempts to: ${attempts}`);
           } else {
             throw new Error(errorData.error || "Failed to create user");
           }
@@ -273,10 +278,21 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     console.log("Form submission data:", data);
     console.log("Form errors:", form.formState.errors);
     
-    if (staffId) {
-      updateStaffMutation.mutate(data);
-    } else {
-      createStaffMutation.mutate(data);
+    try {
+      if (staffId) {
+        console.log("Calling update mutation for staff ID:", staffId);
+        updateStaffMutation.mutate(data);
+      } else {
+        console.log("Calling create mutation for new staff");
+        createStaffMutation.mutate(data);
+      }
+    } catch (error) {
+      console.error("Error in onSubmit:", error);
+      toast({
+        title: "Error",
+        description: `Form submission failed: ${error.message}`,
+        variant: "destructive",
+      });
     }
   };
 
