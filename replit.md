@@ -174,6 +174,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Updated placeholder text to "Enter email address" for better user experience
   - Fixed placeholders in client forms, booking widget, staff forms, and login page
   - Eliminated unwanted autocomplete suggestions in mobile browsers
+- **Simplified staff member creation form:**
+  - Removed assigned services section from create staff member page per user request
+  - Updated form schema to exclude service assignment fields and functions
+  - Fixed username generation logic with timestamp-based uniqueness
+  - Streamlined staff creation process to focus on essential information only
+  - Staff creation now working properly with permanent database storage
 
 ## System Architecture
 
