@@ -1025,20 +1025,7 @@ export class DatabaseStorage implements IStorage {
 
   // Gift Card operations
   async createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard> {
-    const id = this.currentGiftCardId++;
-    const newGiftCard: GiftCard = {
-      id,
-      createdAt: new Date(),
-      code: giftCard.code,
-      initialAmount: giftCard.initialAmount,
-      currentBalance: giftCard.currentBalance,
-      issuedToEmail: giftCard.issuedToEmail || null,
-      issuedToName: giftCard.issuedToName || null,
-      purchasedByUserId: giftCard.purchasedByUserId || null,
-      status: giftCard.status || 'active',
-      expiryDate: giftCard.expiryDate || null,
-    };
-    this.giftCards.set(id, newGiftCard);
+    const [newGiftCard] = await db.insert(giftCards).values(giftCard).returning();
     return newGiftCard;
   }
 
