@@ -52,6 +52,21 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 25, 2025 - Staff and Schedule Page UI Simplification
+- **Simplified staff page to show staff names list first:**
+  - Updated staff page to display clean list of staff members with names and titles only
+  - Added click navigation to individual staff schedules when staff member is clicked
+  - Kept edit and delete buttons available as quick action icons
+  - Added helpful instruction text guiding users to click for schedule access
+  - Improved mobile accessibility with larger touch targets and cleaner layout
+- **Simplified schedule page to show staff names list first:**
+  - Modified schedule page to display staff members in a list format
+  - Added click functionality to navigate to individual staff schedule details
+  - Shows schedule count badge for each staff member
+  - Includes search functionality to filter staff by name
+  - Added "Manage All" button for advanced schedule management access
+  - Consistent design pattern with staff page for better user experience
+
 ### June 24, 2025 - Mobile UI Improvements, SMS Marketing Fixes, Staff Schedule Completion, POS Sales Reporting Integration, Complete Database Migration, and Email Placeholder Cleanup
 - **Enhanced mobile button accessibility:**
   - Increased all button touch targets to meet 44px minimum standard

@@ -1,667 +1,175 @@
-import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar, Clock, MapPin, Users, Plus, Edit, Trash2, User } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { Calendar, Search, ChevronRight, User, Plus } from "lucide-react";
+import { useLocation } from "wouter";
 
-// Schedule form schema
-const scheduleFormSchema = z.object({
-  staffId: z.number().min(1, "Staff member is required"),
-  daysOfWeek: z.array(z.enum(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"])).min(1, "At least one day must be selected"),
-  startTime: z.string().min(1, "Start time is required"),
-  endTime: z.string().min(1, "End time is required"),
-  location: z.string().min(1, "Location is required"),
-  serviceCategories: z.array(z.number()).optional().default([]),
-  dateRange: z.object({
-    startDate: z.string().min(1, "Start date is required"),
-    endDate: z.string().optional(),
-  }),
-  isBlocked: z.boolean().optional().default(false),
-});
-
-type ScheduleFormValues = z.infer<typeof scheduleFormSchema>;
-
-type Schedule = {
+type StaffMember = {
   id: number;
-  staffId: number;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  location: string;
-  serviceCategories: number[];
-  startDate: string;
-  endDate?: string;
-  isBlocked: boolean;
-  staff?: {
-    id: number;
-    title: string;
-    user: {
-      firstName?: string;
-      lastName?: string;
-    };
+  title: string;
+  user?: {
+    firstName?: string;
+    lastName?: string;
   };
 };
 
-const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 const SchedulePage = () => {
   useDocumentTitle("Staff Schedule | BeautyBook");
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedScheduleId, setSelectedScheduleId] = useState<number | null>(null);
-  const [viewFilter, setViewFilter] = useState("current");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [, setLocation] = useLocation();
 
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined && globalSidebarState !== sidebarOpen) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    // Check immediately
-    checkSidebarState();
-    
-    // Then check periodically, but less frequently
-    const interval = setInterval(checkSidebarState, 1000);
-    return () => clearInterval(interval);
-  }, []); // Remove sidebarOpen from dependencies to prevent infinite loop
-
-  // Memoize the default date to prevent re-creation on every render
-  const defaultStartDate = useMemo(() => new Date().toISOString().split('T')[0], []);
-
-  const form = useForm<ScheduleFormValues>({
-    resolver: zodResolver(scheduleFormSchema),
-    defaultValues: {
-      staffId: 1,
-      daysOfWeek: ["Monday"],
-      startTime: "09:00",
-      endTime: "17:00",
-      location: "All Locations",
-      serviceCategories: [],
-      dateRange: {
-        startDate: defaultStartDate,
-        endDate: "",
-      },
-      isBlocked: false,
-    },
-  });
-
-  // Fetch schedules
-  const { data: schedules = [], isLoading: isSchedulesLoading } = useQuery<any[]>({
-    queryKey: ['/api/schedules'],
-  });
-
-  // Fetch staff
-  const { data: staff = [] } = useQuery<any[]>({
+  // Fetch staff for display
+  const { data: staff = [], isLoading } = useQuery({
     queryKey: ['/api/staff'],
   });
 
-  // Fetch rooms
-  const { data: rooms = [] } = useQuery<any[]>({
-    queryKey: ['/api/rooms'],
+  // Fetch schedules to show count per staff member
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['/api/schedules'],
   });
 
-  // Fetch service categories
-  const { data: serviceCategories = [] } = useQuery<any[]>({
-    queryKey: ['/api/service-categories'],
+  const getScheduleCount = (staffId: number) => {
+    return schedules.filter((schedule: any) => schedule.staffId === staffId).length;
+  };
+
+  const getStaffName = (staffMember: StaffMember) => {
+    if (staffMember.user) {
+      return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
+    }
+    return 'Unknown Staff';
+  };
+
+  const getInitials = (staffMember: StaffMember) => {
+    if (staffMember.user) {
+      const firstName = staffMember.user.firstName || '';
+      const lastName = staffMember.user.lastName || '';
+      return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || 'US';
+    }
+    return 'US';
+  };
+
+  // Filter staff based on search
+  const filteredStaff = staff.filter((staffMember: StaffMember) => {
+    const name = getStaffName(staffMember).toLowerCase();
+    const title = staffMember.title.toLowerCase();
+    return name.includes(searchQuery.toLowerCase()) || title.includes(searchQuery.toLowerCase());
   });
 
-  // Update schedule mutation (for editing existing schedules)
-  const updateScheduleMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await fetch(`/api/schedules/${selectedScheduleId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        throw new Error('Failed to update schedule');
-      }
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      setIsFormOpen(false);
-    },
-    onError: (error: any) => {
-      console.error("Failed to update schedule:", error);
-    }
-  });
-
-  // Delete schedule mutation
-  const deleteScheduleMutation = useMutation({
-    mutationFn: async (id: number) => {
-      return await apiRequest("DELETE", `/api/schedules/${id}`, {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-    },
-    onError: (error: any) => {
-      console.error("Failed to delete schedule:", error);
-    }
-  });
-
-  const handleAddSchedule = () => {
-    setSelectedScheduleId(null);
-    form.reset({
-      staffId: 1,
-      daysOfWeek: ["Monday"],
-      startTime: "09:00",
-      endTime: "17:00",
-      location: "All Locations",
-      serviceCategories: [],
-      dateRange: {
-        startDate: defaultStartDate,
-        endDate: "",
-      },
-      isBlocked: false,
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleEditSchedule = (schedule: Schedule) => {
-    setSelectedScheduleId(schedule.id);
-    form.reset({
-      staffId: schedule.staffId,
-      daysOfWeek: [schedule.dayOfWeek as any],
-      startTime: schedule.startTime,
-      endTime: schedule.endTime,
-      location: schedule.location,
-      serviceCategories: schedule.serviceCategories,
-      dateRange: {
-        startDate: schedule.startDate,
-        endDate: schedule.endDate || "",
-      },
-      isBlocked: schedule.isBlocked,
-    });
-    setIsFormOpen(true);
-  };
-
-  const handleDeleteSchedule = (id: number) => {
-    if (confirm("Are you sure you want to delete this schedule?")) {
-      deleteScheduleMutation.mutate(id);
-    }
-  };
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const onSubmit = async (data: ScheduleFormValues) => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-
-    try {
-      if (selectedScheduleId) {
-        // For editing, convert back to single day format
-        const singleDayData = {
-          staffId: data.staffId,
-          dayOfWeek: data.daysOfWeek[0], // Take the first selected day for editing
-          startTime: data.startTime,
-          endTime: data.endTime,
-          location: data.location,
-          serviceCategories: data.serviceCategories || [],
-          startDate: data.dateRange.startDate,
-          endDate: data.dateRange.endDate || null,
-          isBlocked: data.isBlocked || false,
-        };
-        
-        const response = await fetch(`/api/schedules/${selectedScheduleId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(singleDayData),
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to update schedule');
-        }
-        
-        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-        setIsFormOpen(false);
-        setSelectedScheduleId(null);
-      } else {
-        // For creating, submit multiple schedules for each selected day
-        const promises = data.daysOfWeek.map(async (dayOfWeek) => {
-          const singleDayData = {
-            staffId: data.staffId,
-            dayOfWeek,
-            startTime: data.startTime,
-            endTime: data.endTime,
-            location: data.location,
-            serviceCategories: data.serviceCategories || [],
-            startDate: data.dateRange.startDate,
-            endDate: data.dateRange.endDate || null,
-            isBlocked: data.isBlocked || false,
-          };
-          
-          const response = await fetch('/api/schedules', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(singleDayData),
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to create schedule for ${dayOfWeek}`);
-          }
-          
-          return response.json();
-        });
-        
-        await Promise.all(promises);
-        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-        setIsFormOpen(false);
-      }
-    } catch (error: any) {
-      console.error("Failed to save schedules:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const getServiceCategoriesText = (categoryIds: number[]) => {
-    if (!categoryIds || categoryIds.length === 0) return "Available";
-    
-    const categories = serviceCategories?.filter((cat: any) => categoryIds.includes(cat.id));
-    if (!categories || categories.length === 0) return "Available";
-    
-    return `${categories.length} service${categories.length > 1 ? 's' : ''}`;
-  };
-
-  const formatDateRange = (startDate: string, endDate?: string) => {
-    const start = new Date(startDate).toLocaleDateString();
-    if (endDate) {
-      const end = new Date(endDate).toLocaleDateString();
-      return `${start} - ${end}`;
-    }
-    return start;
+  const handleStaffClick = (staffId: number) => {
+    setLocation(`/staff-schedule/${staffId}`);
   };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
+      <div className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64">
         <SidebarController />
       </div>
       
-      <div className={`transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'
-      } min-h-screen flex flex-col`}>
+      <div className="lg:pl-64">
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">
-          <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
+        <main className="p-3 lg:p-6">
+          <div className="w-full space-y-4 lg:space-y-6">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Staff Schedule</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Manage staff availability and appointment scheduling
-                </p>
-              </div>
-              <div className="mt-4 sm:mt-0 flex items-center space-x-4">
-                <Select value={viewFilter} onValueChange={setViewFilter}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select view" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="current">Current and future</SelectItem>
-                    <SelectItem value="past">Past schedules</SelectItem>
-                    <SelectItem value="all">All schedules</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleAddSchedule}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add New Schedule
-                </Button>
-              </div>
-            </div>
-
-            {/* Schedules Table */}
-            {isSchedulesLoading ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              </div>
-            ) : schedules && schedules.length > 0 ? (
-              <div className="bg-white dark:bg-gray-800 shadow-sm rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Day Of Week
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <User className="h-4 w-4 mr-2" />
-                            Staff Member
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            Start Time
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <Clock className="h-4 w-4 mr-2" />
-                            End Time
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <Users className="h-4 w-4 mr-2" />
-                            Service Categories
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <Calendar className="h-4 w-4 mr-2" />
-                            Date Range
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          <div className="flex items-center">
-                            <MapPin className="h-4 w-4 mr-2" />
-                            Location
-                          </div>
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                      {schedules.map((schedule: any) => (
-                        <tr key={schedule.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {schedule.dayOfWeek}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {schedule.staff?.user?.firstName} {schedule.staff?.user?.lastName}
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{schedule.staff?.title}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {schedule.startTime}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {schedule.endTime}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            <Badge variant={schedule.isBlocked ? "destructive" : "default"}>
-                              {getServiceCategoriesText(schedule.serviceCategories)}
-                            </Badge>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {formatDateRange(schedule.startDate, schedule.endDate)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                            {schedule.location}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <div className="flex justify-end space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditSchedule(schedule)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteSchedule(schedule.id)}
-                                className="text-red-600 hover:text-red-900"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      Staff Schedules
+                    </h1>
+                    <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                      Click on a staff member to view and manage their schedule
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => setLocation('/staff-schedule')}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Calendar className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">Manage All</span>
+                  </Button>
+                </div>
+                
+                <div className="w-full">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <Input
+                      type="search"
+                      placeholder="Search staff by name..."
+                      className="pl-8 w-full"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
+            </div>
+            
+            {/* Staff List */}
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              </div>
+            ) : filteredStaff?.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No staff members found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {staff.length === 0 
+                    ? "Add staff members to manage their schedules." 
+                    : "No staff members match your search criteria."
+                  }
+                </p>
+              </div>
             ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-500 dark:text-gray-400">No schedules found.</p>
+              <div className="space-y-3">
+                {filteredStaff?.map((staffMember: StaffMember) => {
+                  const scheduleCount = getScheduleCount(staffMember.id);
+                  return (
+                    <Card 
+                      key={staffMember.id} 
+                      className="p-4 w-full shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer"
+                      onClick={() => handleStaffClick(staffMember.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-12 h-12 flex-shrink-0">
+                            <AvatarFallback className="text-sm font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                              {getInitials(staffMember)}
+                            </AvatarFallback>
+                          </Avatar>
+                          
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 leading-tight">
+                              {getStaffName(staffMember)}
+                            </h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              {staffMember.title}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className="text-xs">
+                            {scheduleCount} {scheduleCount === 1 ? 'schedule' : 'schedules'}
+                          </Badge>
+                          <ChevronRight className="w-5 h-5 text-gray-400" />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             )}
-
-            {/* Schedule Form Dialog */}
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>
-                    {selectedScheduleId ? "Edit Schedule" : "Add New Schedule"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Set up staff availability for appointments and services.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    {/* Staff Selection */}
-                    <FormField
-                      control={form.control}
-                      name="staffId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Staff Member</FormLabel>
-                          <Select 
-                            onValueChange={(value) => field.onChange(parseInt(value))}
-                            value={field.value?.toString() || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select staff member" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {staff?.map((staffMember: any) => (
-                                <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
-                                  {staffMember.user?.firstName} {staffMember.user?.lastName} - {staffMember.title}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Days of Week - Multiple Selection */}
-                    <FormField
-                      control={form.control}
-                      name="daysOfWeek"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Days of Week</FormLabel>
-                          <div className="grid grid-cols-2 gap-3 mt-2">
-                            {DAYS_OF_WEEK.map((day) => {
-                              const currentValue = field.value || [];
-                              const isChecked = currentValue.includes(day as any);
-                              
-                              return (
-                                <div key={day} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`day-${day}`}
-                                    checked={isChecked}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        field.onChange([...currentValue, day]);
-                                      } else {
-                                        field.onChange(currentValue.filter((d: string) => d !== day));
-                                      }
-                                    }}
-                                  />
-                                  <label
-                                    htmlFor={`day-${day}`}
-                                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                  >
-                                    {day}
-                                  </label>
-                                </div>
-                              );
-                            })}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Time Range */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="startTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Time</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      
-                      <FormField
-                        control={form.control}
-                        name="endTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Time</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* Location */}
-                    <FormField
-                      control={form.control}
-                      name="location"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select location" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="All Locations">All Locations</SelectItem>
-                              {rooms?.map((room: any) => (
-                                <SelectItem key={room.id} value={room.name}>
-                                  {room.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Date Range */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="dateRange.startDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="dateRange.endDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Date (Optional)</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    {/* Submit Button */}
-                    <div className="flex justify-end space-x-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsFormOpen(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button 
-                        type="submit"
-                        disabled={isSubmitting}
-                      >
-                        {isSubmitting ? "Saving..." : "Save Schedule"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
           </div>
         </main>
       </div>
