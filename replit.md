@@ -86,16 +86,21 @@ Development workflow: User prefers quick solutions over lengthy debugging sessio
   - Inserted additional client users to demonstrate proper metrics calculation
   - Reports page now shows meaningful client statistics and trends
 
-### June 25, 2025 - Schedule Creation Fixed and Code Complexity Management
+### June 25, 2025 - Major Code Reorganization and Architecture Cleanup
+- **Completed comprehensive code reorganization:**
+  - Created centralized service layer (`staffService.ts`) for all staff and schedule operations
+  - Implemented custom hooks (`useStaffManagement`, `useScheduleManagement`) for state management
+  - Consolidated multiple dialog components into unified `StaffManagementDialog` and `ScheduleManagementDialog`
+  - Removed duplicate and conflicting components that were causing editing difficulties
+  - Simplified component prop interfaces and eliminated complex state passing
+- **Enhanced development workflow:**
+  - All staff operations now use consistent API patterns through service layer
+  - Utility functions (`getStaffFullName`, `formatCommissionRate`) centralized for reuse
+  - Error handling and loading states managed through custom hooks
+  - Reduced file count and eliminated redundant code paths
 - **Fixed staff schedule creation functionality:**
   - Schedule creation now working properly with proper database persistence
-  - Added detailed logging to debug form submission and API calls
-  - Schedule data successfully saves to database with all required fields
-  - Form validation and error handling working correctly
-- **Identified code complexity management needs:**
-  - User expressed concerns about increasing difficulty of edits as app grows
-  - Need to implement better code organization and consolidation strategies
-  - Consider component consolidation and simplified state management patterns
+  - Form validation and error handling working correctly through new architecture
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification
 - **Simplified staff page to show staff names list first:**
@@ -245,12 +250,15 @@ Development workflow: User prefers quick solutions over lengthy debugging sessio
 
 ### Frontend Architecture
 
-The frontend is built with React and uses a component-based architecture following modern best practices:
+The frontend is built with React and uses a modern, organized component-based architecture:
 
-1. **UI Components**: Uses the shadcn/ui component library (based on Radix UI) for consistent design
-2. **Routing**: Uses Wouter for lightweight client-side routing
-3. **State Management**: Combines React context (for auth state) with React Query for server state management
-4. **Styling**: Uses Tailwind CSS for utility-first styling
+1. **Service Layer**: Centralized API operations in `services/` directory (e.g., `staffService.ts`)
+2. **Custom Hooks**: Business logic encapsulated in reusable hooks (e.g., `useStaffManagement`, `useScheduleManagement`)
+3. **UI Components**: Uses shadcn/ui component library with unified dialog components for consistent UX
+4. **Type Safety**: Centralized type definitions in `types/` directory for better maintainability
+5. **Routing**: Uses Wouter for lightweight client-side routing
+6. **State Management**: React Query for server state with custom hooks for complex operations
+7. **Styling**: Tailwind CSS for utility-first styling
 
 ### Backend Architecture
 

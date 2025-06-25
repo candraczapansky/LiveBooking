@@ -115,14 +115,14 @@ export default function StaffScheduleDetailPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEdit(schedule)}
+                      onClick={() => handleEditSchedule(schedule)}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => handleDelete(schedule.id)}
+                      onClick={() => handleDeleteSchedule(schedule.id)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -166,6 +166,7 @@ export default function StaffScheduleDetailPage() {
         schedule={editingSchedule}
         defaultStaffId={staffId}
         onSubmit={handleSubmitSchedule}
+        isSubmitting={false}
       />
     </div>
   );

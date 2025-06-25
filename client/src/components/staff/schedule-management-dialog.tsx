@@ -99,7 +99,7 @@ export function ScheduleManagementDialog({
 
   const handleSubmit = (data: ScheduleFormValues) => {
     const scheduleData: StaffSchedule = {
-      ...schedule,
+      ...(schedule || {}),
       staffId: parseInt(data.staffId),
       dayOfWeek: data.dayOfWeek,
       startTime: data.startTime,

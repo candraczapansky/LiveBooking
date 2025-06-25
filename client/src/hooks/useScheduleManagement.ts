@@ -105,7 +105,7 @@ export function useScheduleManagement(staffId?: number) {
   };
 
   const handleSubmitSchedule = (data: StaffSchedule) => {
-    if (editingSchedule?.id) {
+    if (editingSchedule && editingSchedule.id) {
       updateScheduleMutation.mutate({ 
         id: editingSchedule.id, 
         data 
