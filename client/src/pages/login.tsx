@@ -139,35 +139,49 @@ const Login = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900 items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-2">
-            <div className="bg-primary/10 p-2 rounded-full">
-              <Scissors className="h-8 w-8 text-primary" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 py-8">
+      <Card className="w-full max-w-md mx-auto">
+        <CardHeader className="text-center pb-4">
+          <div className="flex justify-center mb-4">
+            <div className="bg-primary/10 p-3 rounded-full">
+              <Scissors className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl">BeautyBook</CardTitle>
-          <CardDescription>Salon & Spa Management Platform</CardDescription>
+          <CardTitle className="text-3xl font-bold">BeautyBook</CardTitle>
+          <CardDescription className="text-base mt-2">Salon & Spa Management Platform</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-4 h-12 text-base">
-              <TabsTrigger value="login" className="text-sm sm:text-base">Login</TabsTrigger>
-              <TabsTrigger value="register" className="text-sm sm:text-base">Register</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 mb-6 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+              <TabsTrigger 
+                value="login" 
+                className="text-base font-medium rounded-md h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              >
+                Login
+              </TabsTrigger>
+              <TabsTrigger 
+                value="register" 
+                className="text-base font-medium rounded-md h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+              >
+                Register
+              </TabsTrigger>
             </TabsList>
             
-            <TabsContent value="login">
+            <TabsContent value="login" className="mt-0">
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4" noValidate>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
                   <FormField
                     control={loginForm.control}
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel className="text-base font-medium">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter your username" {...field} />
+                          <Input 
+                            placeholder="Enter your username" 
+                            className="h-12 text-base" 
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -188,25 +202,25 @@ const Login = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-12 text-base font-medium mt-6" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
                 </form>
               </Form>
             </TabsContent>
             
-            <TabsContent value="register">
+            <TabsContent value="register" className="mt-0">
               <Form {...registerForm}>
                 <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3">
                     <FormField
                       control={registerForm.control}
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>First Name</FormLabel>
+                          <FormLabel className="text-sm font-medium">First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" {...field} />
+                            <Input placeholder="John" className="h-11 text-base" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -218,9 +232,9 @@ const Login = () => {
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Last Name</FormLabel>
+                          <FormLabel className="text-sm font-medium">Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" {...field} />
+                            <Input placeholder="Doe" className="h-11 text-base" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -233,9 +247,9 @@ const Login = () => {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Username</FormLabel>
+                        <FormLabel className="text-sm font-medium">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" {...field} />
+                          <Input placeholder="johndoe" className="h-11 text-base" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -247,11 +261,12 @@ const Login = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel className="text-sm font-medium">Email</FormLabel>
                         <FormControl>
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
+                            className="h-11 text-base"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -271,9 +286,9 @@ const Login = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Password</FormLabel>
+                        <FormLabel className="text-sm font-medium">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" {...field} />
+                          <Input type="password" placeholder="••••••" className="h-11 text-base" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -285,16 +300,16 @@ const Login = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone (Optional)</FormLabel>
+                        <FormLabel className="text-sm font-medium">Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" {...field} />
+                          <Input placeholder="(123) 456-7890" className="h-11 text-base" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   
-                  <Button type="submit" className="w-full" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-12 text-base font-medium mt-2" disabled={isLoading}>
                     {isLoading ? "Registering..." : "Register"}
                   </Button>
                 </form>
@@ -302,10 +317,10 @@ const Login = () => {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="px-6 pb-6">
           <Button 
             variant="outline" 
-            className="w-full" 
+            className="w-full h-12 text-base font-medium" 
             onClick={() => navigate("/booking")}
           >
             Continue as Guest to Book Appointment
