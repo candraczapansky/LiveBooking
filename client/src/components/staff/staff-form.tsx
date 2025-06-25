@@ -287,7 +287,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     }
   };
 
-
+  const triggerFileUpload = () => {
+    fileInputRef.current?.click();
+  };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -340,10 +342,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       });
       setUploadingPhoto(false);
     }
-  };
-
-  const triggerFileUpload = () => {
-    fileInputRef.current?.click();
   };
 
   return (
