@@ -388,14 +388,22 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Create staff member profile
-    this.createStaff({
-      userId: 2, // The staff user we just created
-      title: 'Senior Hair Stylist',
-      bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
-      commissionType: 'commission',
-      commissionRate: 0.45, // 45% commission
-      photoUrl: null
+    // Create staff member profile after creating the staff user
+    this.getUserByUsername('stylist1').then(async existingUser => {
+      if (existingUser) {
+        // Check if staff profile already exists
+        const existingStaff = await this.getStaffByUserId(existingUser.id);
+        if (!existingStaff) {
+          this.createStaff({
+            userId: existingUser.id,
+            title: 'Senior Hair Stylist',
+            bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
+            commissionType: 'commission',
+            commissionRate: 0.45, // 45% commission
+            photoUrl: null
+          });
+        }
+      }
     });
 
     // Create sample services
