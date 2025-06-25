@@ -59,6 +59,7 @@ type StaffFormProps = {
 };
 
 const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
+  console.log("StaffForm component rendered - open:", open, "staffId:", staffId);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
