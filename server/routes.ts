@@ -1321,6 +1321,76 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Purchase gift certificate route
+  app.post("/api/gift-certificates/purchase", async (req, res) => {
+    try {
+      const { amount, recipientName, recipientEmail, purchaserName, purchaserEmail, message } = req.body;
+      
+      // Generate unique gift certificate code
+      const generateCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 12; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      };
+
+      let giftCardCode = generateCode();
+      
+      // Ensure the code is unique
+      let existingCard = await storage.getGiftCardByCode(giftCardCode);
+      while (existingCard) {
+        giftCardCode = generateCode();
+        existingCard = await storage.getGiftCardByCode(giftCardCode);
+      }
+
+      // Set expiry date to 1 year from now
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+
+      // Create gift card in database
+      const giftCard = await storage.createGiftCard({
+        code: giftCardCode,
+        initialAmount: amount,
+        currentBalance: amount,
+        issuedToEmail: recipientEmail,
+        issuedToName: recipientName,
+        status: 'active',
+        expiryDate: expiryDate
+      });
+
+      // Create gift card transaction record
+      await storage.createGiftCardTransaction({
+        giftCardId: giftCard.id,
+        transactionType: 'purchase',
+        amount: amount,
+        balanceAfter: amount,
+        notes: `Purchased by ${purchaserName} (${purchaserEmail})${message ? ` - Message: ${message}` : ''}`
+      });
+
+      res.json({
+        success: true,
+        giftCard: {
+          id: giftCard.id,
+          code: giftCard.code,
+          initialAmount: giftCard.initialAmount,
+          currentBalance: giftCard.currentBalance,
+          issuedToEmail: giftCard.issuedToEmail,
+          issuedToName: giftCard.issuedToName,
+          expiryDate: giftCard.expiryDate,
+          status: giftCard.status
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Gift certificate purchase error:', error);
+      res.status(500).json({ 
+        error: "Error purchasing gift certificate: " + error.message 
+      });
+    }
+  });
+
   app.get("/api/gift-card-balance/:code", async (req, res) => {
     try {
       const { code } = req.params;

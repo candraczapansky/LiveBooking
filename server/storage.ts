@@ -503,25 +503,7 @@ export class DatabaseStorage implements IStorage {
     });
 
     // Create sample gift cards
-    this.createGiftCard({
-      code: 'GIFT2025',
-      initialAmount: 100.00,
-      currentBalance: 100.00,
-      issuedToEmail: 'test@example.com',
-      issuedToName: 'Test User',
-      status: 'active',
-      expiryDate: new Date('2025-12-31')
-    });
-
-    this.createGiftCard({
-      code: 'HOLIDAY50',
-      initialAmount: 50.00,
-      currentBalance: 25.00,
-      issuedToEmail: 'user@example.com',
-      issuedToName: 'Holiday Gift',
-      status: 'active',
-      expiryDate: new Date('2025-06-30')
-    });
+    // Gift cards will be created through the purchase system
   }
 
   // User operations
@@ -1061,11 +1043,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGiftCard(id: number): Promise<GiftCard | undefined> {
-    return this.giftCards.get(id);
+    const [giftCard] = await db.select().from(giftCards).where(eq(giftCards.id, id));
+    return giftCard;
   }
 
   async getGiftCardByCode(code: string): Promise<GiftCard | undefined> {
-    return Array.from(this.giftCards.values()).find(card => card.code === code);
+    const [giftCard] = await db.select().from(giftCards).where(eq(giftCards.code, code));
+    return giftCard;
   }
 
   async getAllGiftCards(): Promise<GiftCard[]> {
@@ -1088,18 +1072,7 @@ export class DatabaseStorage implements IStorage {
 
   // Gift Card Transaction operations
   async createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction> {
-    const id = this.currentGiftCardTransactionId++;
-    const newTransaction: GiftCardTransaction = {
-      id,
-      createdAt: new Date(),
-      giftCardId: transaction.giftCardId,
-      appointmentId: transaction.appointmentId || null,
-      transactionType: transaction.transactionType,
-      amount: transaction.amount,
-      balanceAfter: transaction.balanceAfter,
-      notes: transaction.notes || null,
-    };
-    this.giftCardTransactions.set(id, newTransaction);
+    const [newTransaction] = await db.insert(giftCardTransactions).values(transaction).returning();
     return newTransaction;
   }
 

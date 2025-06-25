@@ -20,7 +20,8 @@ import {
   Monitor,
   DollarSign,
   Zap,
-  CalendarDays
+  CalendarDays,
+  Gift
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ const Sidebar = () => {
     { icon: <Scissors />, label: "Services", href: "/services" },
     { icon: <Package />, label: "Products", href: "/products" },
     { icon: <DollarSign />, label: "Point of Sale", href: "/pos" },
+    { icon: <Gift />, label: "Gift Certificates", href: "/gift-certificates" },
     { icon: <MapPin />, label: "Rooms", href: "/rooms" },
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },

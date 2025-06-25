@@ -28,6 +28,7 @@ import ClientBooking from "@/pages/client-booking";
 import PointOfSale from "@/pages/pos";
 import Products from "@/pages/products";
 import EmailTest from "@/pages/email-test";
+import GiftCertificatesPage from "@/pages/gift-certificates";
 
 type User = {
   id: number;
