@@ -88,18 +88,12 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
   // Fetch staff data if editing
   useEffect(() => {
-    console.log("StaffForm useEffect triggered - staffId:", staffId, "open:", open);
     if (staffId && open) {
-      console.log("Fetching staff data for ID:", staffId);
       setIsLoading(true);
       fetch(`/api/staff/${staffId}`)
-        .then(res => {
-          console.log("Staff fetch response status:", res.status);
-          return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
-          console.log("Staff data received:", data);
-          setStaffData(data); // Store staff data for later use
+          setStaffData(data);
           form.reset({
             title: data.title || "",
             bio: data.bio || "",
@@ -121,7 +115,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           setIsLoading(false);
         });
     } else if (open && !staffId) {
-      console.log("Opening form for new staff member");
       // Reset form for new staff member
       form.reset({
         title: "",

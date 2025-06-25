@@ -108,10 +108,8 @@ const StaffPage = () => {
   };
 
   const handleEditStaff = (staffId: number) => {
-    console.log("Edit staff clicked for ID:", staffId);
     setSelectedStaffId(staffId);
     setIsFormOpen(true);
-    console.log("Form should open with staffId:", staffId);
   };
 
   const handleDeleteStaff = () => {
