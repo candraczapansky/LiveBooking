@@ -701,31 +701,57 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getStaff(id: number): Promise<Staff | undefined> {
-    return this.staff.get(id);
+    try {
+      const [result] = await db.select().from(staff).where(eq(staff.id, id));
+      return result;
+    } catch (error) {
+      console.error('Error getting staff by id:', error);
+      return undefined;
+    }
   }
 
   async getStaffByUserId(userId: number): Promise<Staff | undefined> {
-    return Array.from(this.staff.values()).find(
-      (staffMember) => staffMember.userId === userId
-    );
+    try {
+      const [result] = await db.select().from(staff).where(eq(staff.userId, userId));
+      return result;
+    } catch (error) {
+      console.error('Error getting staff by user id:', error);
+      return undefined;
+    }
   }
 
   async getAllStaff(): Promise<Staff[]> {
-    return Array.from(this.staff.values());
+    try {
+      const result = await db.select().from(staff).orderBy(staff.id);
+      console.log('Retrieved staff from database:', result);
+      return result;
+    } catch (error) {
+      console.error('Error getting staff:', error);
+      return [];
+    }
   }
 
   async updateStaff(id: number, staffData: Partial<InsertStaff>): Promise<Staff> {
-    const staffMember = await this.getStaff(id);
-    if (!staffMember) {
-      throw new Error('Staff member not found');
+    try {
+      const [result] = await db.update(staff).set(staffData).where(eq(staff.id, id)).returning();
+      if (!result) {
+        throw new Error('Staff member not found');
+      }
+      return result;
+    } catch (error) {
+      console.error('Error updating staff:', error);
+      throw error;
     }
-    const updatedStaff = { ...staffMember, ...staffData };
-    this.staff.set(id, updatedStaff);
-    return updatedStaff;
   }
 
   async deleteStaff(id: number): Promise<boolean> {
-    return this.staff.delete(id);
+    try {
+      const result = await db.delete(staff).where(eq(staff.id, id));
+      return result.rowCount ? result.rowCount > 0 : false;
+    } catch (error) {
+      console.error('Error deleting staff:', error);
+      return false;
+    }
   }
 
   // Staff Service operations

@@ -450,28 +450,34 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
   
   // Staff routes
   app.get("/api/staff", async (req, res) => {
-    const allStaff = await storage.getAllStaff();
-    console.log("Current staff in storage:", allStaff);
-    
-    // Get user details for each staff member
-    const staffWithUserDetails = await Promise.all(
-      allStaff.map(async (staffMember) => {
-        const user = await storage.getUser(staffMember.userId);
-        return {
-          ...staffMember,
-          user: user ? { 
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            phone: user.phone
-          } : null
-        };
-      })
-    );
-    
-    return res.status(200).json(staffWithUserDetails);
+    try {
+      const allStaff = await storage.getAllStaff();
+      console.log("Current staff in storage:", allStaff);
+      
+      // Get user details for each staff member
+      const staffWithUserDetails = await Promise.all(
+        allStaff.map(async (staffMember) => {
+          const user = await storage.getUser(staffMember.userId);
+          return {
+            ...staffMember,
+            user: user ? { 
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              phone: user.phone
+            } : null
+          };
+        })
+      );
+      
+      console.log("Staff with user details:", staffWithUserDetails);
+      return res.status(200).json(staffWithUserDetails);
+    } catch (error) {
+      console.error("Error fetching staff:", error);
+      return res.status(500).json({ error: "Failed to fetch staff" });
+    }
   });
   
   app.post("/api/staff", validateBody(insertStaffSchema), async (req, res) => {
