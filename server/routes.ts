@@ -52,8 +52,8 @@ const serviceWithStaffSchema = insertServiceSchema.extend({
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
-  customRate: z.number().optional(),
-  customCommissionRate: z.number().optional(),
+  customRate: z.number().nullable().optional(),
+  customCommissionRate: z.number().nullable().optional(),
 });
 
 // Initialize Square

@@ -47,8 +47,8 @@ const serviceFormSchema = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code"),
   assignedStaff: z.array(z.object({
     staffId: z.number(),
-    customRate: z.coerce.number().min(0, "Rate must be 0 or greater").optional(),
-    customCommissionRate: z.coerce.number().min(0, "Commission rate must be 0 or greater").optional(),
+    customRate: z.union([z.coerce.number().min(0, "Rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
+    customCommissionRate: z.union([z.coerce.number().min(0, "Commission rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
   })).optional(),
   requiredDevices: z.array(z.number()).optional(),
 });
