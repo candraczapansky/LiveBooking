@@ -153,11 +153,11 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 pb-2">
-            <div className="flex w-full mb-6 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+            <div className="flex w-full mb-4 h-9 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 gap-0.5">
               <button
                 type="button"
                 onClick={() => setActiveTab("login")}
-                className={`flex-1 h-10 rounded-md text-base font-semibold transition-all duration-200 ${
+                className={`flex-1 h-8 rounded text-sm font-medium transition-all duration-200 ${
                   activeTab === "login" 
                     ? "bg-white shadow-sm text-primary" 
                     : "text-gray-600 hover:text-gray-800"
@@ -168,7 +168,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("register")}
-                className={`flex-1 h-10 rounded-md text-base font-semibold transition-all duration-200 ${
+                className={`flex-1 h-8 rounded text-sm font-medium transition-all duration-200 ${
                   activeTab === "register" 
                     ? "bg-white shadow-sm text-primary" 
                     : "text-gray-600 hover:text-gray-800"
@@ -180,17 +180,17 @@ const Login = () => {
             
             {activeTab === "login" && (
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4" noValidate>
                   <FormField
                     control={loginForm.control}
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
+                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="Enter your username" 
-                            className="h-12 text-base px-3 rounded-lg focus:ring-2 focus:ring-primary/20" 
+                            className="h-10 text-sm px-3 rounded-md focus:ring-1 focus:ring-primary/20" 
                             {...field} 
                           />
                         </FormControl>
@@ -213,7 +213,7 @@ const Login = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-12 text-base font-semibold mt-6 rounded-lg" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-10 text-sm font-medium mt-4 rounded-md" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
                 </form>
@@ -222,16 +222,16 @@ const Login = () => {
             
             {activeTab === "register" && (
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
-                  <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-3" noValidate>
+                  <div className="grid grid-cols-2 gap-2">
                     <FormField
                       control={registerForm.control}
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20" {...field} />
+                            <Input placeholder="John" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -243,9 +243,9 @@ const Login = () => {
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20" {...field} />
+                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -258,9 +258,9 @@ const Login = () => {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20" {...field} />
+                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -272,12 +272,12 @@ const Login = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Email</FormLabel>
                         <FormControl>
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
-                            className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20"
+                            className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -297,9 +297,9 @@ const Login = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20" {...field} />
+                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -311,26 +311,26 @@ const Login = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
+                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" className="h-11 text-base px-3 rounded-md focus:ring-2 focus:ring-primary/20" {...field} />
+                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-12 text-base font-semibold mt-4 rounded-lg" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-10 text-sm font-medium mt-3 rounded-md" disabled={isLoading}>
                     {isLoading ? "Registering..." : "Register"}
                   </Button>
                 </form>
               </Form>
             )}
         </CardContent>
-        <CardFooter className="px-6 pb-6 pt-4">
+        <CardFooter className="px-6 pb-4 pt-2">
           <Button 
             variant="outline" 
-            className="w-full h-12 text-base font-medium rounded-lg" 
+            className="w-full h-10 text-sm font-medium rounded-md" 
             onClick={() => navigate("/booking")}
           >
             Continue as Guest to Book Appointment
