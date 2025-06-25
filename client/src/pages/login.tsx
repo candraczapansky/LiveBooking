@@ -140,7 +140,7 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 py-8">
-      <Card className="w-full max-w-md mx-auto shadow-lg">
+      <Card className="w-full max-w-md mx-auto shadow-lg overflow-visible">
         <CardHeader className="text-center pb-4 px-6">
           <div className="flex justify-center mb-4">
             <div className="bg-primary/10 p-3 rounded-full">
@@ -152,7 +152,7 @@ const Login = () => {
             Salon & Spa Management Platform
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-6 pb-2">
+        <CardContent className="px-6 pb-2 overflow-visible">
             <div className="flex w-full mb-4 h-9 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 gap-0.5">
               <button
                 type="button"
@@ -190,7 +190,7 @@ const Login = () => {
                         <FormControl>
                           <Input 
                             placeholder="Enter your username" 
-                            className="h-10 text-sm px-3 rounded-md focus:ring-1 focus:ring-primary/20" 
+                            className="h-10 text-sm px-3 rounded-md focus:ring-1 focus:ring-primary/20 focus:outline-none" 
                             {...field} 
                           />
                         </FormControl>
@@ -231,7 +231,7 @@ const Login = () => {
                         <FormItem>
                           <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
+                            <Input placeholder="John" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -245,7 +245,7 @@ const Login = () => {
                         <FormItem>
                           <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
+                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -260,7 +260,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
+                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -277,7 +277,7 @@ const Login = () => {
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
-                            className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20"
+                            className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -299,7 +299,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
+                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -313,7 +313,7 @@ const Login = () => {
                       <FormItem>
                         <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20" {...field} />
+                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded focus:ring-1 focus:ring-primary/20 focus:outline-none" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
