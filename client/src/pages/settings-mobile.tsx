@@ -43,6 +43,10 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function SettingsMobile() {
   const { toast } = useToast();
   const { user, updateUser } = useContext(AuthContext);
+  const [localUser, setLocalUser] = useState<User | null>(null);
+  
+  // Use context user or fallback to localStorage user
+  const currentUser = user || localUser;
   
   // Debug logging for user context
   useEffect(() => {
@@ -50,19 +54,21 @@ export default function SettingsMobile() {
     console.log('User from context:', user);
     console.log('localStorage user data:', localStorage.getItem('user'));
     
-    // If user is null but localStorage has data, there's a context issue
+    // If user is null but localStorage has data, load it into local state
     if (!user) {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         console.error('User context is null but localStorage has user data:', storedUser);
-        // Try to force re-parse the user data
         try {
           const userData = JSON.parse(storedUser);
           console.log('Parsed localStorage user data:', userData);
+          setLocalUser(userData);
         } catch (e) {
           console.error('Error parsing localStorage user data:', e);
         }
       }
+    } else {
+      setLocalUser(user);
     }
   }, [user]);
 
@@ -393,12 +399,11 @@ export default function SettingsMobile() {
       console.log('Profile update success callback triggered');
       console.log('Updated user data received:', updatedUser);
       
-      // Update the user context with the new data using the context function
-      console.log('Calling updateUser with:', updatedUser);
-      updateUser(updatedUser);
-      console.log('updateUser call completed');
+      // Update localStorage first to ensure data persistence
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('localStorage updated with new user data');
       
-      // Update the profile data state to reflect the changes
+      // Update the profile data state to reflect the changes in UI
       setProfileData({
         firstName: updatedUser.firstName || '',
         lastName: updatedUser.lastName || '',
@@ -406,6 +411,18 @@ export default function SettingsMobile() {
         phone: updatedUser.phone || '',
         username: updatedUser.username || ''
       });
+      console.log('Profile data state updated for UI');
+      
+      // Try to update context (might not work due to timing issues)
+      if (updateUser && typeof updateUser === 'function') {
+        console.log('Attempting to update user context');
+        updateUser(updatedUser);
+      } else {
+        console.log('Context updateUser not available, relying on localStorage');
+      }
+      
+      // Update the local user state immediately for UI display
+      setLocalUser(updatedUser);
       
       toast({
         title: "Profile updated",
