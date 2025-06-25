@@ -140,48 +140,35 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       // Always create a new user for staff
       let userId;
       
-      // Generate username from first and last name
+      // Generate username from first and last name with timestamp for uniqueness
       const baseUsername = `${data.firstName.toLowerCase()}${data.lastName.toLowerCase()}`.replace(/[^a-z0-9]/g, '');
-      let userCreated = false;
-      let attempts = 0;
+      const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
+      const username = `${baseUsername}${timestamp}`;
+      const defaultPassword = `${data.firstName}123!`; // Simple default password
       
-      while (!userCreated && attempts < 10) {
-        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts}`;
-        const defaultPassword = `${data.firstName}123!`; // Simple default password
-        
-        console.log(`Attempting to create user with username: ${username} (attempt ${attempts + 1})`);
-        
-        const userData = {
-          username,
-          email: data.email,
-          password: defaultPassword,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          phone: data.phone,
-          role: "staff",
-        };
+      console.log(`Creating user with username: ${username}`);
+      
+      const userData = {
+        username,
+        email: data.email,
+        password: defaultPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        role: "staff",
+      };
 
-        const userResponse = await apiRequest("POST", "/api/register", userData);
-        if (userResponse.ok) {
-          const user = await userResponse.json();
-          userId = user.id;
-          userCreated = true;
-          console.log(`Successfully created user with username: ${username}`);
-        } else {
-          const errorData = await userResponse.json();
-          console.log(`Failed to create user with username: ${username}, error: ${errorData.error}`);
-          if (errorData.error?.includes("Username already taken")) {
-            attempts++;
-            console.log(`Incrementing attempts to: ${attempts}`);
-          } else {
-            throw new Error(errorData.error || "Failed to create user");
-          }
-        }
+      const userResponse = await apiRequest("POST", "/api/register", userData);
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        console.log(`Failed to create user with username: ${username}, error: ${errorData.error}`);
+        throw new Error(errorData.error || "Failed to create user");
       }
-      
-      if (!userCreated) {
-        throw new Error("Unable to create a unique username. Please try a different name combination.");
-      }
+
+      const user = await userResponse.json();
+      userId = user.id;
+      console.log(`Successfully created user with username: ${username}`);
+
 
       // Create staff member
       const staffData = {
