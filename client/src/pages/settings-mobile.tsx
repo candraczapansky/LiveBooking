@@ -487,7 +487,7 @@ export default function SettingsMobile() {
                       style={{ height: "48px", fontSize: "16px" }}
                     />
                   </div>
-                  <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
+                  <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
                     <Button 
                       onClick={handleSaveProfile} 
                       disabled={updateProfileMutation.isPending}
@@ -496,7 +496,8 @@ export default function SettingsMobile() {
                         height: "48px", 
                         fontSize: "16px",
                         backgroundColor: customColor,
-                        borderColor: customColor
+                        borderColor: customColor,
+                        minWidth: "140px"
                       }}
                     >
                       <Save style={{ width: "18px", height: "18px", marginRight: "8px", color: "white" }} />
