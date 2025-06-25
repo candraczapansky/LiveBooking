@@ -139,29 +139,31 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4 py-8">
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="text-center pb-4">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary/10 p-3 rounded-full">
-              <Scissors className="h-10 w-10 text-primary" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-3 py-6">
+      <Card className="w-full max-w-sm mx-auto border-0 shadow-lg">
+        <CardHeader className="text-center pb-6 px-6">
+          <div className="flex justify-center mb-6">
+            <div className="bg-primary/10 p-4 rounded-full">
+              <Scissors className="h-12 w-12 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold">BeautyBook</CardTitle>
-          <CardDescription className="text-base mt-2">Salon & Spa Management Platform</CardDescription>
+          <CardTitle className="text-4xl font-bold mb-2">BeautyBook</CardTitle>
+          <CardDescription className="text-lg text-gray-600 dark:text-gray-400">
+            Salon & Spa Management Platform
+          </CardDescription>
         </CardHeader>
-        <CardContent className="px-6">
+        <CardContent className="px-6 pb-2">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-6 h-14 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+            <TabsList className="grid w-full grid-cols-2 mb-8 h-16 bg-gray-100 dark:bg-gray-800 rounded-xl p-2">
               <TabsTrigger 
                 value="login" 
-                className="text-base font-semibold rounded-md h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
+                className="text-lg font-bold rounded-lg h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200"
               >
                 Login
               </TabsTrigger>
               <TabsTrigger 
                 value="register" 
-                className="text-base font-semibold rounded-md h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
+                className="text-lg font-bold rounded-lg h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-md data-[state=active]:text-primary transition-all duration-200"
               >
                 Register
               </TabsTrigger>
@@ -169,17 +171,17 @@ const Login = () => {
             
             <TabsContent value="login" className="mt-0">
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6" noValidate>
                   <FormField
                     control={loginForm.control}
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-medium">Username</FormLabel>
+                        <FormLabel className="text-lg font-semibold text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
                           <Input 
                             placeholder="Enter your username" 
-                            className="h-12 text-base" 
+                            className="h-14 text-lg px-4 border-2 rounded-xl focus:ring-2 focus:ring-primary/20" 
                             {...field} 
                           />
                         </FormControl>
@@ -202,7 +204,7 @@ const Login = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-12 text-base font-medium mt-6" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-14 text-lg font-bold mt-8 rounded-xl shadow-lg" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
                 </form>
@@ -211,16 +213,16 @@ const Login = () => {
             
             <TabsContent value="register" className="mt-0">
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
-                  <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-5" noValidate>
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={registerForm.control}
                       name="firstName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">First Name</FormLabel>
+                          <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="h-11 text-base" {...field} />
+                            <Input placeholder="John" className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -232,9 +234,9 @@ const Login = () => {
                       name="lastName"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-sm font-medium">Last Name</FormLabel>
+                          <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="h-11 text-base" {...field} />
+                            <Input placeholder="Doe" className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -247,9 +249,9 @@ const Login = () => {
                     name="username"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Username</FormLabel>
+                        <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">Username</FormLabel>
                         <FormControl>
-                          <Input placeholder="johndoe" className="h-11 text-base" {...field} />
+                          <Input placeholder="johndoe" className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -261,12 +263,12 @@ const Login = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Email</FormLabel>
+                        <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">Email</FormLabel>
                         <FormControl>
                           <Input 
                             type="text" 
                             placeholder="Enter email address" 
-                            className="h-11 text-base"
+                            className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20"
                             autoComplete="off"
                             autoCorrect="off"
                             autoCapitalize="off"
@@ -286,9 +288,9 @@ const Login = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Password</FormLabel>
+                        <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">Password</FormLabel>
                         <FormControl>
-                          <Input type="password" placeholder="••••••" className="h-11 text-base" {...field} />
+                          <Input type="password" placeholder="••••••" className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -300,16 +302,16 @@ const Login = () => {
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm font-medium">Phone (Optional)</FormLabel>
+                        <FormLabel className="text-base font-semibold text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" className="h-11 text-base" {...field} />
+                          <Input placeholder="(123) 456-7890" className="h-12 text-base px-3 border-2 rounded-lg focus:ring-2 focus:ring-primary/20" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-12 text-base font-medium mt-2" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-14 text-lg font-bold mt-6 rounded-xl shadow-lg" disabled={isLoading}>
                     {isLoading ? "Registering..." : "Register"}
                   </Button>
                 </form>
@@ -317,10 +319,10 @@ const Login = () => {
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="px-6 pb-6">
+        <CardFooter className="px-6 pb-8 pt-6">
           <Button 
             variant="outline" 
-            className="w-full h-12 text-base font-medium" 
+            className="w-full h-14 text-lg font-semibold rounded-xl border-2" 
             onClick={() => navigate("/booking")}
           >
             Continue as Guest to Book Appointment
