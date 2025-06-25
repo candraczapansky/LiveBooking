@@ -373,32 +373,7 @@ export default function AppointmentCheckout({
     }
   };
 
-  // Show test mode notice
-  const showTestModeNotice = () => {
-    return (
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
-        <div className="flex items-start">
-          <div className="flex-shrink-0">
-            <CreditCard className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-          </div>
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Test Mode Only
-            </h3>
-            <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-              <p>DO NOT use your real credit card!</p>
-              <p className="font-mono mt-1">
-                <strong>Card Number:</strong> 4242 4242 4242 4242<br />
-                <strong>Expiry:</strong> 12/25 (any future date)<br />
-                <strong>CVC:</strong> 123<br />
-                <strong>ZIP Code:</strong> 12345
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
+
 
   if (!isOpen) return null;
 
@@ -486,7 +461,7 @@ export default function AppointmentCheckout({
           {/* Credit Card Payment */}
           {paymentMethod === 'card' && (
             <div className="space-y-4">
-              {showTestModeNotice()}
+
               <CheckoutForm
                 appointment={appointment}
                 onSuccess={() => {
