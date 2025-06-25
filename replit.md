@@ -52,6 +52,22 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 25, 2025 - Complete Database Storage Migration and Data Persistence Fix
+- **Fixed critical data persistence issues:**
+  - Completely migrated DatabaseStorage class from in-memory Map operations to PostgreSQL database calls
+  - All appointment scheduling, payments, staff management, and reports now persist permanently
+  - Replaced all Map.set(), Map.get(), Map.delete() operations with proper database INSERT, SELECT, UPDATE, DELETE
+  - Fixed appointment creation, payment processing, and staff operations to save to database
+  - System now maintains all user input data across server restarts and application updates
+- **Enhanced database initialization:**
+  - Added proper sample data initialization that checks for existing data before creating
+  - Sample data includes admin user, service categories, rooms, devices, services, and staff
+  - Database schema properly supports all salon management operations
+- **Fixed data retrieval for reports:**
+  - Reports page now shows accurate data from database instead of empty in-memory storage
+  - Payment tracking, appointment history, and client metrics display real persistent data
+  - Revenue calculations and analytics reflect actual business transactions
+
 ### June 25, 2025 - Reports Page Client Calculation Fixes and Staff Form Restoration
 - **Fixed reports page client calculation issues:**
   - Updated client metrics to use actual user data instead of only payment data

@@ -89,6 +89,7 @@ export interface IStorage {
   // Appointment operations
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   getAppointment(id: number): Promise<Appointment | undefined>;
+  getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByClient(clientId: number): Promise<Appointment[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
@@ -198,9 +199,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async initializeSampleData() {
-    // Create admin user if not exists
-    const existingAdmin = await this.getUserByUsername('admin');
-    if (!existingAdmin) {
+    try {
+      // Check if data already exists
+      const existingUsers = await db.select().from(users).limit(1);
+      if (existingUsers.length > 0) {
+        console.log("Sample data already exists, skipping initialization");
+        return;
+      }
+
+      // Create admin user
       await this.createUser({
         username: 'admin',
         password: 'password',
@@ -210,242 +217,93 @@ export class DatabaseStorage implements IStorage {
         lastName: 'Johnson',
         phone: '555-123-4567'
       });
+
+      // Create sample service categories
+      const hairCategory = await this.createServiceCategory({
+        name: 'Hair Services',
+        description: 'Professional hair styling, cutting, and coloring services'
+      });
+
+      const facialCategory = await this.createServiceCategory({
+        name: 'Facial Treatments',
+        description: 'Skincare and facial rejuvenation treatments'
+      });
+
+      // Create sample rooms
+      await this.createRoom({
+        name: 'Treatment Room 1',
+        description: 'Main treatment room for facials and individual services',
+        capacity: 1,
+        isActive: true
+      });
+
+      await this.createRoom({
+        name: 'Treatment Room 2', 
+        description: 'Secondary treatment room for massages and body treatments',
+        capacity: 1,
+        isActive: true
+      });
+
+      // Create sample devices
+      await this.createDevice({
+        name: 'Professional Hair Dryer Station 1',
+        description: 'High-speed ionic hair dryer for quick styling',
+        deviceType: 'hair_dryer',
+        brand: 'Dyson',
+        model: 'Supersonic HD07',
+        serialNumber: 'DYS001234',
+        purchaseDate: '2024-01-15',
+        warrantyExpiry: '2026-01-15',
+        status: 'available',
+        isActive: true
+      });
+
+      // Create sample services
+      await this.createService({
+        name: "Women's Haircut & Style",
+        description: "Professional haircut with styling",
+        duration: 60,
+        price: 75,
+        categoryId: hairCategory.id,
+        bufferTimeBefore: 0,
+        bufferTimeAfter: 0,
+        color: "#3B82F6"
+      });
+
+      await this.createService({
+        name: "Men's Haircut",
+        description: "Classic men's haircut",
+        duration: 45,
+        price: 45,
+        categoryId: hairCategory.id,
+        bufferTimeBefore: 0,
+        bufferTimeAfter: 0,
+        color: "#3B82F6"
+      });
+
+      // Create staff user and staff member
+      const staffUser = await this.createUser({
+        username: 'stylist1',
+        password: 'password',
+        email: 'emma.martinez@beautybook.com',
+        role: 'staff',
+        firstName: 'Emma',
+        lastName: 'Martinez',
+        phone: '555-234-5678'
+      });
+
+      await this.createStaff({
+        userId: staffUser.id,
+        title: 'Senior Hair Stylist',
+        bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
+        commissionType: 'commission',
+        commissionRate: 0.45
+      });
+
+      console.log("Sample data initialized successfully");
+    } catch (error) {
+      console.error("Error initializing sample data:", error);
     }
-
-    // Create sample service categories
-    this.createServiceCategory({
-      name: 'Hair Services',
-      description: 'Professional hair styling, cutting, and coloring services'
-    });
-
-    this.createServiceCategory({
-      name: 'Facial Treatments',
-      description: 'Skincare and facial rejuvenation treatments'
-    });
-
-    // Create sample rooms
-    this.createRoom({
-      name: 'Treatment Room 1',
-      description: 'Main treatment room for facials and individual services',
-      capacity: 1,
-      isActive: true
-    });
-
-    this.createRoom({
-      name: 'Treatment Room 2', 
-      description: 'Secondary treatment room for massages and body treatments',
-      capacity: 1,
-      isActive: true
-    });
-
-    this.createRoom({
-      name: 'Styling Station Area',
-      description: 'Open area with multiple styling stations',
-      capacity: 4,
-      isActive: true
-    });
-
-    // Create sample devices
-    this.createDevice({
-      name: 'Professional Hair Dryer Station 1',
-      description: 'High-speed ionic hair dryer for quick styling',
-      deviceType: 'hair_dryer',
-      brand: 'Dyson',
-      model: 'Supersonic HD07',
-      serialNumber: 'DYS001234',
-      purchaseDate: '2024-01-15',
-      warrantyExpiry: '2026-01-15',
-      status: 'available',
-      isActive: true
-    });
-
-    this.createDevice({
-      name: 'Luxury Massage Table 1',
-      description: 'Electric height-adjustable massage table with heating',
-      deviceType: 'massage_table',
-      brand: 'Earthlite',
-      model: 'Ellora Vista',
-      serialNumber: 'EL789456',
-      purchaseDate: '2023-08-20',
-      warrantyExpiry: '2025-08-20',
-      status: 'available',
-      isActive: true
-    });
-
-    this.createDevice({
-      name: 'Hydraulic Styling Chair A',
-      description: 'Professional salon chair with 360-degree rotation',
-      deviceType: 'styling_chair',
-      brand: 'Takara Belmont',
-      model: 'Apollo II',
-      serialNumber: 'TB345678',
-      purchaseDate: '2023-05-10',
-      warrantyExpiry: '2028-05-10',
-      status: 'in_use',
-      isActive: true
-    });
-
-    this.createDevice({
-      name: 'Facial Steamer Pro',
-      description: 'Professional ozone facial steamer for deep cleansing',
-      deviceType: 'facial_steamer',
-      brand: 'Lucas',
-      model: 'Champagne 701',
-      serialNumber: 'LC112233',
-      purchaseDate: '2024-03-01',
-      status: 'maintenance',
-      isActive: true
-    });
-
-    // Create sample staff user (if not exists)
-    this.getUserByUsername('stylist1').then(existingUser => {
-      if (!existingUser) {
-        this.createUser({
-          username: 'stylist1',
-          password: 'password',
-          email: 'emma.martinez@beautybook.com',
-          role: 'staff',
-          firstName: 'Emma',
-          lastName: 'Martinez',
-          phone: '555-234-5678'
-        });
-      }
-    });
-
-    // Create staff member profile after creating the staff user
-    this.getUserByUsername('stylist1').then(async existingUser => {
-      if (existingUser) {
-        // Check if staff profile already exists
-        const existingStaff = await this.getStaffByUserId(existingUser.id);
-        if (!existingStaff) {
-          this.createStaff({
-            userId: existingUser.id,
-            title: 'Senior Hair Stylist',
-            bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
-            commissionType: 'commission',
-            commissionRate: 0.45, // 45% commission
-            photoUrl: null
-          });
-        }
-      }
-    });
-
-    // Create sample services
-    this.createService({
-      name: 'Women\'s Haircut & Style',
-      description: 'Professional haircut with wash, cut, and styling',
-      duration: 60,
-      price: 85.00,
-      categoryId: 1, // Hair Services category
-      roomId: 3, // Styling Station Area
-      bufferTimeBefore: 10,
-      bufferTimeAfter: 10,
-      color: '#FF6B9D'
-    });
-
-    this.createService({
-      name: 'Color & Highlights',
-      description: 'Full color service with highlights and toning',
-      duration: 120,
-      price: 150.00,
-      categoryId: 1, // Hair Services category
-      roomId: 3, // Styling Station Area
-      bufferTimeBefore: 15,
-      bufferTimeAfter: 15,
-      color: '#8B5CF6'
-    });
-
-    this.createService({
-      name: 'Deep Cleansing Facial',
-      description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
-      duration: 90,
-      price: 95.00,
-      categoryId: 2, // Facial Treatments category
-      roomId: 1, // Treatment Room 1
-      bufferTimeBefore: 10,
-      bufferTimeAfter: 10,
-      color: '#10B981'
-    });
-
-    // Assign services to staff member
-    this.assignServiceToStaff({
-      staffId: 1, // Emma Martinez
-      serviceId: 1, // Women's Haircut & Style
-      customRate: null,
-      customCommissionRate: null
-    });
-
-    this.assignServiceToStaff({
-      staffId: 1, // Emma Martinez  
-      serviceId: 2, // Color & Highlights
-      customRate: null,
-      customCommissionRate: 0.50 // Higher commission for complex color work
-    });
-
-    // Create sample completed appointments for payroll testing
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    // Create some appointments this month
-    this.createAppointment({
-      clientId: 1, // Admin user as client for testing
-      serviceId: 1, // Women's Haircut & Style
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days into month
-      endTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
-      status: 'completed',
-      notes: 'Regular haircut and style service'
-    });
-
-    this.createAppointment({
-      clientId: 1,
-      serviceId: 2, // Color & Highlights
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days into month
-      endTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2 hours
-      status: 'completed',
-      notes: 'Full color and highlights treatment'
-    });
-
-    this.createAppointment({
-      clientId: 1,
-      serviceId: 1, // Women's Haircut & Style
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000), // 15 days into month
-      endTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
-      status: 'completed',
-      notes: 'Follow-up styling appointment'
-    });
-
-    // Create sample membership
-    this.createMembership({
-      name: 'Premium',
-      description: 'Monthly premium membership with discounts',
-      price: 49.99,
-      duration: 30, // 30 days
-      benefits: 'Includes 10% off all services, one free blowout per month'
-    });
-
-    // Create sample gift cards
-    this.createGiftCard({
-      code: 'GIFT2025',
-      initialAmount: 100.00,
-      currentBalance: 100.00,
-      issuedToEmail: 'test@example.com',
-      issuedToName: 'Test User',
-      status: 'active',
-      expiryDate: new Date('2025-12-31')
-    });
-
-    this.createGiftCard({
-      code: 'HOLIDAY50',
-      initialAmount: 50.00,
-      currentBalance: 25.00,
-      issuedToEmail: 'user@example.com',
-      issuedToName: 'Holiday Gift',
-      status: 'active',
-      expiryDate: new Date('2025-06-30')
-    });
   }
 
   // User operations
@@ -460,7 +318,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    return await db.select().from(users).orderBy(users.createdAt);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -492,794 +350,96 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateServiceCategory(id: number, categoryData: Partial<InsertServiceCategory>): Promise<ServiceCategory> {
-    const category = await this.getServiceCategory(id);
-    if (!category) {
-      throw new Error('Service category not found');
-    }
-    const updatedCategory = { ...category, ...categoryData };
-    this.serviceCategories.set(id, updatedCategory);
-    return updatedCategory;
+    const [updated] = await db.update(serviceCategories).set(categoryData).where(eq(serviceCategories.id, id)).returning();
+    if (!updated) throw new Error('Service category not found');
+    return updated;
   }
 
   async deleteServiceCategory(id: number): Promise<boolean> {
-    return this.serviceCategories.delete(id);
+    const result = await db.delete(serviceCategories).where(eq(serviceCategories.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Room operations
   async createRoom(room: InsertRoom): Promise<Room> {
-    const id = this.currentRoomId++;
-    const newRoom = { ...room, id } as Room;
-    this.rooms.set(id, newRoom);
+    const [newRoom] = await db.insert(rooms).values(room).returning();
     return newRoom;
   }
 
   async getRoom(id: number): Promise<Room | undefined> {
-    return this.rooms.get(id);
+    const [room] = await db.select().from(rooms).where(eq(rooms.id, id));
+    return room;
   }
 
   async getAllRooms(): Promise<Room[]> {
-    return Array.from(this.rooms.values());
+    return await db.select().from(rooms);
   }
 
   async updateRoom(id: number, roomData: Partial<InsertRoom>): Promise<Room> {
-    const existingRoom = this.rooms.get(id);
-    if (!existingRoom) {
-      throw new Error("Room not found");
-    }
-    const updatedRoom: Room = { ...existingRoom, ...roomData };
-    this.rooms.set(id, updatedRoom);
-    return updatedRoom;
+    const [updated] = await db.update(rooms).set(roomData).where(eq(rooms.id, id)).returning();
+    if (!updated) throw new Error('Room not found');
+    return updated;
   }
 
   async deleteRoom(id: number): Promise<boolean> {
-    return this.rooms.delete(id);
+    const result = await db.delete(rooms).where(eq(rooms.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Device operations
   async createDevice(device: InsertDevice): Promise<Device> {
-    const id = this.currentDeviceId++;
-    const newDevice = { ...device, id } as Device;
-    this.devices.set(id, newDevice);
+    const [newDevice] = await db.insert(devices).values(device).returning();
     return newDevice;
   }
 
   async getDevice(id: number): Promise<Device | undefined> {
-    return this.devices.get(id);
+    const [device] = await db.select().from(devices).where(eq(devices.id, id));
+    return device;
   }
 
   async getAllDevices(): Promise<Device[]> {
-    return Array.from(this.devices.values());
+    return await db.select().from(devices);
   }
 
   async updateDevice(id: number, deviceData: Partial<InsertDevice>): Promise<Device> {
-    const existingDevice = this.devices.get(id);
-    if (!existingDevice) {
-      throw new Error(`Device with id ${id} not found`);
-    }
-    const updatedDevice: Device = { ...existingDevice, ...deviceData };
-    this.devices.set(id, updatedDevice);
-    return updatedDevice;
+    const [updated] = await db.update(devices).set(deviceData).where(eq(devices.id, id)).returning();
+    if (!updated) throw new Error('Device not found');
+    return updated;
   }
 
   async deleteDevice(id: number): Promise<boolean> {
-    return this.devices.delete(id);
+    const result = await db.delete(devices).where(eq(devices.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Service operations
   async createService(service: InsertService): Promise<Service> {
-    const id = this.currentServiceId++;
-    const newService = { ...service, id } as Service;
-    this.services.set(id, newService);
+    const [newService] = await db.insert(services).values(service).returning();
     return newService;
   }
 
   async getService(id: number): Promise<Service | undefined> {
-    const service = this.services.get(id);
-    if (service && !service.color) {
-      // Set default color for services that don't have one
-      service.color = "#3B82F6";
-      this.services.set(id, service);
-    }
+    const [service] = await db.select().from(services).where(eq(services.id, id));
     return service;
   }
 
   async getServicesByCategory(categoryId: number): Promise<Service[]> {
-    const services = Array.from(this.services.values()).filter(
-      (service) => service.categoryId === categoryId
-    );
-    // Ensure all services have a color field
-    return services.map(service => {
-      if (!service.color) {
-        service.color = "#3B82F6";
-        this.services.set(service.id, service);
-      }
-      return service;
-    });
+    return await db.select().from(services).where(eq(services.categoryId, categoryId));
   }
 
   async getAllServices(): Promise<Service[]> {
-    const services = Array.from(this.services.values());
-    // Ensure all services have a color field
-    return services.map(service => {
-      if (!service.color) {
-        service.color = "#3B82F6";
-        this.services.set(service.id, service);
-      }
-      return service;
-    });
+    return await db.select().from(services);
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
-    const service = await this.getService(id);
-    if (!service) {
-      throw new Error('Service not found');
-    }
-    const updatedService = { ...service, ...serviceData };
-    this.services.set(id, updatedService);
-    return updatedService;
+    const [updated] = await db.update(services).set(serviceData).where(eq(services.id, id)).returning();
+    if (!updated) throw new Error('Service not found');
+    return updated;
   }
 
   async deleteService(id: number): Promise<boolean> {
-    return this.services.delete(id);
-  }
-
-  // Staff operations
-  async createStaff(staffMember: InsertStaff): Promise<Staff> {
-    try {
-      const [result] = await db.insert(staff).values(staffMember).returning();
-      console.log('Created staff record:', result);
-      return result;
-    } catch (error) {
-      console.error('Error creating staff:', error);
-      throw error;
-    }
-  }
-
-  async getStaff(id: number): Promise<Staff | undefined> {
-    try {
-      const [result] = await db.select().from(staff).where(eq(staff.id, id));
-      return result;
-    } catch (error) {
-      console.error('Error getting staff by id:', error);
-      return undefined;
-    }
-  }
-
-  async getStaffByUserId(userId: number): Promise<Staff | undefined> {
-    try {
-      const [result] = await db.select().from(staff).where(eq(staff.userId, userId));
-      return result;
-    } catch (error) {
-      console.error('Error getting staff by user id:', error);
-      return undefined;
-    }
-  }
-
-  async getAllStaff(): Promise<Staff[]> {
-    try {
-      const result = await db.select().from(staff).orderBy(staff.id);
-      console.log('Retrieved staff from database:', result);
-      return result;
-    } catch (error) {
-      console.error('Error getting staff:', error);
-      return [];
-    }
-  }
-
-  async updateStaff(id: number, staffData: Partial<InsertStaff>): Promise<Staff> {
-    try {
-      const [result] = await db.update(staff).set(staffData).where(eq(staff.id, id)).returning();
-      if (!result) {
-        throw new Error('Staff member not found');
-      }
-      return result;
-    } catch (error) {
-      console.error('Error updating staff:', error);
-      throw error;
-    }
-  }
-
-  async deleteStaff(id: number): Promise<boolean> {
-    try {
-      const result = await db.delete(staff).where(eq(staff.id, id));
-      return result.rowCount ? result.rowCount > 0 : false;
-    } catch (error) {
-      console.error('Error deleting staff:', error);
-      return false;
-    }
-  }
-
-  // Staff Service operations
-  async assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService> {
-    const id = this.currentStaffServiceId++;
-    const newStaffService: StaffService = { 
-      ...staffService, 
-      id,
-      customRate: staffService.customRate || null,
-      customCommissionRate: staffService.customCommissionRate || null
-    };
-    this.staffServices.set(id, newStaffService);
-    return newStaffService;
-  }
-
-  async getStaffServices(staffId: number): Promise<StaffService[]> {
-    return Array.from(this.staffServices.values()).filter(
-      (staffService) => staffService.staffId === staffId
-    );
-  }
-
-  async getStaffServicesByService(serviceId: number): Promise<StaffService[]> {
-    return Array.from(this.staffServices.values()).filter(
-      (staffService) => staffService.serviceId === serviceId
-    );
-  }
-
-  async getStaffServiceById(id: number): Promise<StaffService | undefined> {
-    return this.staffServices.get(id);
-  }
-
-  async updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService> {
-    const existingStaffService = this.staffServices.get(id);
-    if (!existingStaffService) {
-      throw new Error("Staff service not found");
-    }
-
-    const updatedStaffService: StaffService = {
-      ...existingStaffService,
-      ...data,
-    };
-
-    this.staffServices.set(id, updatedStaffService);
-    return updatedStaffService;
-  }
-
-  async removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean> {
-    const staffServiceToRemove = Array.from(this.staffServices.values()).find(
-      (staffService) => staffService.staffId === staffId && staffService.serviceId === serviceId
-    );
-
-    if (staffServiceToRemove) {
-      return this.staffServices.delete(staffServiceToRemove.id);
-    }
-    return false;
-  }
-
-  // Appointment operations
-  async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
-    const id = this.currentAppointmentId++;
-    const newAppointment = { ...appointment, id, createdAt: new Date() } as Appointment;
-    this.appointments.set(id, newAppointment);
-    return newAppointment;
-  }
-
-  async getAppointment(id: number): Promise<Appointment | undefined> {
-    return this.appointments.get(id);
-  }
-
-  async getAppointmentsByClient(clientId: number): Promise<Appointment[]> {
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.clientId === clientId
-    );
-  }
-
-  async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.staffId === staffId
-    );
-  }
-
-  async getAppointmentsByDate(date: Date): Promise<Appointment[]> {
-    const dateString = date.toDateString();
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.startTime.toDateString() === dateString
-    );
-  }
-
-  async updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment> {
-    const appointment = await this.getAppointment(id);
-    if (!appointment) {
-      throw new Error('Appointment not found');
-    }
-    const updatedAppointment = { ...appointment, ...appointmentData };
-    this.appointments.set(id, updatedAppointment);
-    return updatedAppointment;
-  }
-
-  async deleteAppointment(id: number): Promise<boolean> {
-    return this.appointments.delete(id);
-  }
-
-  // Membership operations
-  async createMembership(membership: InsertMembership): Promise<Membership> {
-    const id = this.currentMembershipId++;
-    const newMembership = { ...membership, id } as Membership;
-    this.memberships.set(id, newMembership);
-    return newMembership;
-  }
-
-  async getMembership(id: number): Promise<Membership | undefined> {
-    return this.memberships.get(id);
-  }
-
-  async getAllMemberships(): Promise<Membership[]> {
-    return Array.from(this.memberships.values());
-  }
-
-  async updateMembership(id: number, membershipData: Partial<InsertMembership>): Promise<Membership> {
-    const membership = await this.getMembership(id);
-    if (!membership) {
-      throw new Error('Membership not found');
-    }
-    const updatedMembership = { ...membership, ...membershipData };
-    this.memberships.set(id, updatedMembership);
-    return updatedMembership;
-  }
-
-  async deleteMembership(id: number): Promise<boolean> {
-    return this.memberships.delete(id);
-  }
-
-  // Client Membership operations
-  async createClientMembership(clientMembership: InsertClientMembership): Promise<ClientMembership> {
-    const id = this.currentClientMembershipId++;
-    const newClientMembership = { ...clientMembership, id } as ClientMembership;
-    this.clientMemberships.set(id, newClientMembership);
-    return newClientMembership;
-  }
-
-  async getClientMembership(id: number): Promise<ClientMembership | undefined> {
-    return this.clientMemberships.get(id);
-  }
-
-  async getClientMembershipsByClient(clientId: number): Promise<ClientMembership[]> {
-    return Array.from(this.clientMemberships.values()).filter(
-      (clientMembership) => clientMembership.clientId === clientId
-    );
-  }
-
-  async updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership> {
-    const clientMembership = await this.getClientMembership(id);
-    if (!clientMembership) {
-      throw new Error('Client membership not found');
-    }
-    const updatedClientMembership = { ...clientMembership, ...data };
-    this.clientMemberships.set(id, updatedClientMembership);
-    return updatedClientMembership;
-  }
-
-  async deleteClientMembership(id: number): Promise<boolean> {
-    return this.clientMemberships.delete(id);
-  }
-
-  // Payment operations
-  async createPayment(payment: InsertPayment): Promise<Payment> {
-    const id = this.currentPaymentId++;
-    // @ts-ignore - Type assertion for demo data
-    const newPayment = { ...payment, id, createdAt: new Date() } as Payment;
-    this.payments.set(id, newPayment);
-    return newPayment;
-  }
-
-  async getPayment(id: number): Promise<Payment | undefined> {
-    return this.payments.get(id);
-  }
-
-  async getPaymentsByClient(clientId: number): Promise<Payment[]> {
-    // Get all client's appointments
-    const clientAppointments = await this.getAppointmentsByClient(clientId);
-    const appointmentIds = clientAppointments.map(appointment => appointment.id);
-    
-    // Get all client's memberships
-    const clientMemberships = await this.getClientMembershipsByClient(clientId);
-    const membershipIds = clientMemberships.map(membership => membership.id);
-    
-    // Get payments related to appointments or memberships
-    return Array.from(this.payments.values()).filter(
-      (payment) => 
-        (payment.appointmentId && appointmentIds.includes(payment.appointmentId)) ||
-        (payment.clientMembershipId && membershipIds.includes(payment.clientMembershipId))
-    );
-  }
-
-  async getAllPayments(): Promise<Payment[]> {
-    return Array.from(this.payments.values());
-  }
-
-  async updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment> {
-    const payment = await this.getPayment(id);
-    if (!payment) {
-      throw new Error('Payment not found');
-    }
-    const updatedPayment = { ...payment, ...paymentData };
-    this.payments.set(id, updatedPayment);
-    return updatedPayment;
-  }
-
-  // Saved Payment Methods operations
-  async createSavedPaymentMethod(paymentMethod: InsertSavedPaymentMethod): Promise<SavedPaymentMethod> {
-    const id = this.currentSavedPaymentMethodId++;
-    const savedMethod: SavedPaymentMethod = {
-      id,
-      ...paymentMethod,
-      isDefault: paymentMethod.isDefault || false,
-      createdAt: new Date()
-    };
-    this.savedPaymentMethods.set(id, savedMethod);
-    return savedMethod;
-  }
-
-  async getSavedPaymentMethod(id: number): Promise<SavedPaymentMethod | undefined> {
-    return this.savedPaymentMethods.get(id);
-  }
-
-  async getSavedPaymentMethodsByClient(clientId: number): Promise<SavedPaymentMethod[]> {
-    return Array.from(this.savedPaymentMethods.values()).filter(
-      method => method.clientId === clientId
-    );
-  }
-
-  async updateSavedPaymentMethod(id: number, data: Partial<InsertSavedPaymentMethod>): Promise<SavedPaymentMethod> {
-    const method = await this.getSavedPaymentMethod(id);
-    if (!method) {
-      throw new Error('Saved payment method not found');
-    }
-    const updatedMethod = { ...method, ...data };
-    this.savedPaymentMethods.set(id, updatedMethod);
-    return updatedMethod;
-  }
-
-  async deleteSavedPaymentMethod(id: number): Promise<boolean> {
-    return this.savedPaymentMethods.delete(id);
-  }
-
-  async setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean> {
-    // First, remove default status from all other payment methods for this client
-    const clientMethods = await this.getSavedPaymentMethodsByClient(clientId);
-    for (const method of clientMethods) {
-      if (method.isDefault) {
-        await this.updateSavedPaymentMethod(method.id, { isDefault: false });
-      }
-    }
-    
-    // Set the specified method as default
-    await this.updateSavedPaymentMethod(paymentMethodId, { isDefault: true });
-    return true;
-  }
-
-  async updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User> {
-    return this.updateUser(userId, { squareCustomerId });
-  }
-
-  // Gift Card operations
-  async createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard> {
-    const id = this.currentGiftCardId++;
-    const newGiftCard: GiftCard = {
-      id,
-      createdAt: new Date(),
-      code: giftCard.code,
-      initialAmount: giftCard.initialAmount,
-      currentBalance: giftCard.currentBalance,
-      issuedToEmail: giftCard.issuedToEmail || null,
-      issuedToName: giftCard.issuedToName || null,
-      purchasedByUserId: giftCard.purchasedByUserId || null,
-      status: giftCard.status || 'active',
-      expiryDate: giftCard.expiryDate || null,
-    };
-    this.giftCards.set(id, newGiftCard);
-    return newGiftCard;
-  }
-
-  async getGiftCard(id: number): Promise<GiftCard | undefined> {
-    return this.giftCards.get(id);
-  }
-
-  async getGiftCardByCode(code: string): Promise<GiftCard | undefined> {
-    return Array.from(this.giftCards.values()).find(card => card.code === code);
-  }
-
-  async getAllGiftCards(): Promise<GiftCard[]> {
-    return Array.from(this.giftCards.values());
-  }
-
-  async updateGiftCard(id: number, giftCardData: Partial<InsertGiftCard>): Promise<GiftCard> {
-    const giftCard = await this.getGiftCard(id);
-    if (!giftCard) {
-      throw new Error('Gift card not found');
-    }
-    const updatedGiftCard = { ...giftCard, ...giftCardData };
-    this.giftCards.set(id, updatedGiftCard);
-    return updatedGiftCard;
-  }
-
-  async deleteGiftCard(id: number): Promise<boolean> {
-    return this.giftCards.delete(id);
-  }
-
-  // Gift Card Transaction operations
-  async createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction> {
-    const id = this.currentGiftCardTransactionId++;
-    const newTransaction: GiftCardTransaction = {
-      id,
-      createdAt: new Date(),
-      giftCardId: transaction.giftCardId,
-      appointmentId: transaction.appointmentId || null,
-      transactionType: transaction.transactionType,
-      amount: transaction.amount,
-      balanceAfter: transaction.balanceAfter,
-      notes: transaction.notes || null,
-    };
-    this.giftCardTransactions.set(id, newTransaction);
-    return newTransaction;
-  }
-
-  async getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined> {
-    return this.giftCardTransactions.get(id);
-  }
-
-  async getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]> {
-    return Array.from(this.giftCardTransactions.values()).filter(
-      transaction => transaction.giftCardId === giftCardId
-    );
-  }
-
-  // Saved Gift Card operations
-  async createSavedGiftCard(savedGiftCard: InsertSavedGiftCard): Promise<SavedGiftCard> {
-    const id = this.currentSavedGiftCardId++;
-    const newSavedGiftCard: SavedGiftCard = {
-      id,
-      addedAt: new Date(),
-      clientId: savedGiftCard.clientId,
-      giftCardId: savedGiftCard.giftCardId,
-      nickname: savedGiftCard.nickname || null,
-    };
-    this.savedGiftCards.set(id, newSavedGiftCard);
-    return newSavedGiftCard;
-  }
-
-  async getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined> {
-    return this.savedGiftCards.get(id);
-  }
-
-  async getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]> {
-    return Array.from(this.savedGiftCards.values()).filter(
-      savedCard => savedCard.clientId === clientId
-    );
-  }
-
-  async deleteSavedGiftCard(id: number): Promise<boolean> {
-    return this.savedGiftCards.delete(id);
-  }
-
-  // Marketing Campaign operations
-  async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
-    const [newCampaign] = await db
-      .insert(marketingCampaigns)
-      .values({
-        ...campaign,
-        sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
-      })
-      .returning();
-    return newCampaign;
-  }
-
-  async getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined> {
-    const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
-    return campaign || undefined;
-  }
-
-  async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
-    return await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
-  }
-
-  async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
-    // Handle date conversion for sendDate if it's a string
-    const processedData = { ...campaignData };
-    if (processedData.sendDate && typeof processedData.sendDate === 'string') {
-      processedData.sendDate = new Date(processedData.sendDate);
-    }
-    if (processedData.sentAt && typeof processedData.sentAt === 'string') {
-      processedData.sentAt = new Date(processedData.sentAt);
-    }
-
-    const [updatedCampaign] = await db
-      .update(marketingCampaigns)
-      .set(processedData)
-      .where(eq(marketingCampaigns.id, id))
-      .returning();
-
-    if (!updatedCampaign) {
-      throw new Error(`Marketing campaign with id ${id} not found`);
-    }
-
-    return updatedCampaign;
-  }
-
-  async deleteMarketingCampaign(id: number): Promise<boolean> {
-    return this.marketingCampaigns.delete(id);
-  }
-
-  // Marketing Campaign Recipient operations
-  async createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient> {
-    const id = this.currentMarketingCampaignRecipientId++;
-    const trackingToken = this.generateTrackingToken();
-    const newRecipient: MarketingCampaignRecipient = {
-      id,
-      campaignId: recipient.campaignId,
-      userId: recipient.userId,
-      status: recipient.status || "pending",
-      sentAt: recipient.sentAt || null,
-      deliveredAt: recipient.deliveredAt || null,
-      openedAt: recipient.openedAt || null,
-      clickedAt: recipient.clickedAt || null,
-      unsubscribedAt: recipient.unsubscribedAt || null,
-      trackingToken,
-      errorMessage: recipient.errorMessage || null,
-    };
-    this.marketingCampaignRecipients.set(id, newRecipient);
-    return newRecipient;
-  }
-
-  private generateTrackingToken(): string {
-    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
-
-  async getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined> {
-    return this.marketingCampaignRecipients.get(id);
-  }
-
-  async getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]> {
-    return Array.from(this.marketingCampaignRecipients.values()).filter(
-      recipient => recipient.campaignId === campaignId
-    );
-  }
-
-  async updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient> {
-    const existingRecipient = this.marketingCampaignRecipients.get(id);
-    if (!existingRecipient) {
-      throw new Error(`Marketing campaign recipient with id ${id} not found`);
-    }
-
-    const updatedRecipient: MarketingCampaignRecipient = {
-      ...existingRecipient,
-      ...data,
-    };
-    this.marketingCampaignRecipients.set(id, updatedRecipient);
-    return updatedRecipient;
-  }
-
-  // User filtering for campaigns
-  async getUsersByAudience(audience: string): Promise<User[]> {
-    switch (audience) {
-      case "All Clients":
-        return await db.select().from(users).where(eq(users.role, "client"));
-        
-      case "Regular Clients": {
-        // Users with more than 3 appointments - simplified approach
-        const allClients = await db.select().from(users).where(eq(users.role, "client"));
-        const regularClients = [];
-        
-        for (const client of allClients) {
-          const appointmentCount = await db
-            .select({ count: count() })
-            .from(appointments)
-            .where(eq(appointments.clientId, client.id));
-          
-          if (appointmentCount[0]?.count > 3) {
-            regularClients.push(client);
-          }
-        }
-        return regularClients;
-      }
-        
-      case "New Clients": {
-        // Users with 3 or fewer appointments - simplified approach
-        const allClients = await db.select().from(users).where(eq(users.role, "client"));
-        const newClients = [];
-        
-        for (const client of allClients) {
-          const appointmentCount = await db
-            .select({ count: count() })
-            .from(appointments)
-            .where(eq(appointments.clientId, client.id));
-          
-          if ((appointmentCount[0]?.count || 0) <= 3) {
-            newClients.push(client);
-          }
-        }
-        return newClients;
-      }
-        
-      case "Inactive Clients": {
-        // Users with no appointments in the last 60 days
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        
-        const allClients = await db.select().from(users).where(eq(users.role, "client"));
-        const inactiveClients = [];
-        
-        for (const client of allClients) {
-          const recentAppointments = await db
-            .select({ count: count() })
-            .from(appointments)
-            .where(and(
-              eq(appointments.clientId, client.id),
-              gte(appointments.startTime, sixtyDaysAgo)
-            ));
-          
-          if ((recentAppointments[0]?.count || 0) === 0) {
-            inactiveClients.push(client);
-          }
-        }
-        return inactiveClients;
-      }
-        
-      case "Upcoming Appointments": {
-        // Users with appointments in the next 7 days
-        const nextWeek = new Date();
-        nextWeek.setDate(nextWeek.getDate() + 7);
-        const now = new Date();
-        
-        const allClients = await db.select().from(users).where(eq(users.role, "client"));
-        const upcomingClients = [];
-        
-        for (const client of allClients) {
-          const upcomingAppointments = await db
-            .select({ count: count() })
-            .from(appointments)
-            .where(and(
-              eq(appointments.clientId, client.id),
-              gte(appointments.startTime, now),
-              lte(appointments.startTime, nextWeek)
-            ));
-          
-          if ((upcomingAppointments[0]?.count || 0) > 0) {
-            upcomingClients.push(client);
-          }
-        }
-        return upcomingClients;
-      }
-        
-      default:
-        return await db.select().from(users).where(eq(users.role, "client"));
-    }
-  }
-
-  // Email tracking methods
-  async getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined> {
-    return Array.from(this.marketingCampaignRecipients.values()).find(
-      recipient => recipient.trackingToken === token
-    );
-  }
-
-  async createEmailUnsubscribe(unsubscribe: InsertEmailUnsubscribe): Promise<EmailUnsubscribe> {
-    const id = this.currentEmailUnsubscribeId++;
-    const newUnsubscribe: EmailUnsubscribe = {
-      id,
-      userId: unsubscribe.userId,
-      email: unsubscribe.email,
-      unsubscribedAt: new Date(),
-      campaignId: unsubscribe.campaignId || null,
-      reason: unsubscribe.reason || null,
-      ipAddress: unsubscribe.ipAddress || null,
-    };
-    this.emailUnsubscribes.set(id, newUnsubscribe);
-    return newUnsubscribe;
-  }
-
-  async getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined> {
-    return Array.from(this.emailUnsubscribes.values()).find(
-      unsubscribe => unsubscribe.userId === userId
-    );
-  }
-
-  async getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]> {
-    return Array.from(this.emailUnsubscribes.values());
-  }
-
-  async isUserUnsubscribed(email: string): Promise<boolean> {
-    return Array.from(this.emailUnsubscribes.values()).some(
-      unsubscribe => unsubscribe.email === email
-    );
+    const result = await db.delete(services).where(eq(services.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 
   // Product operations
@@ -1290,7 +450,7 @@ export class DatabaseStorage implements IStorage {
 
   async getProduct(id: number): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.id, id));
-    return product || undefined;
+    return product;
   }
 
   async getAllProducts(): Promise<Product[]> {
@@ -1298,12 +458,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProduct(id: number, productData: Partial<InsertProduct>): Promise<Product> {
-    const [updatedProduct] = await db
-      .update(products)
-      .set(productData)
-      .where(eq(products.id, id))
-      .returning();
-    return updatedProduct;
+    const [updated] = await db.update(products).set(productData).where(eq(products.id, id)).returning();
+    if (!updated) throw new Error('Product not found');
+    return updated;
   }
 
   async deleteProduct(id: number): Promise<boolean> {
@@ -1312,12 +469,410 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProductStock(id: number, quantity: number): Promise<Product> {
-    const [updatedProduct] = await db
-      .update(products)
-      .set({ stockQuantity: quantity })
+    const [updated] = await db.update(products)
+      .set({ 
+        stock: sql`${products.stock} + ${quantity}` 
+      })
       .where(eq(products.id, id))
       .returning();
-    return updatedProduct;
+    if (!updated) throw new Error('Product not found');
+    return updated;
+  }
+
+  // Staff operations
+  async createStaff(staffMember: InsertStaff): Promise<Staff> {
+    const [newStaff] = await db.insert(staff).values(staffMember).returning();
+    return newStaff;
+  }
+
+  async getStaff(id: number): Promise<Staff | undefined> {
+    const [staffMember] = await db.select().from(staff).where(eq(staff.id, id));
+    return staffMember;
+  }
+
+  async getStaffByUserId(userId: number): Promise<Staff | undefined> {
+    const [staffMember] = await db.select().from(staff).where(eq(staff.userId, userId));
+    return staffMember;
+  }
+
+  async getAllStaff(): Promise<Staff[]> {
+    const allStaff = await db.select().from(staff);
+    
+    // Get user details for each staff member
+    const staffWithUsers = await Promise.all(
+      allStaff.map(async (staffMember) => {
+        const user = await this.getUser(staffMember.userId);
+        return {
+          ...staffMember,
+          user: user ? {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phone: user.phone
+          } : null
+        };
+      })
+    );
+    
+    return staffWithUsers;
+  }
+
+  async updateStaff(id: number, staffData: Partial<InsertStaff>): Promise<Staff> {
+    const [updated] = await db.update(staff).set(staffData).where(eq(staff.id, id)).returning();
+    if (!updated) throw new Error('Staff member not found');
+    return updated;
+  }
+
+  async deleteStaff(id: number): Promise<boolean> {
+    const result = await db.delete(staff).where(eq(staff.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Staff Service operations
+  async assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService> {
+    const [newAssignment] = await db.insert(staffServices).values(staffService).returning();
+    return newAssignment;
+  }
+
+  async getStaffServices(staffId: number): Promise<StaffService[]> {
+    return await db.select().from(staffServices).where(eq(staffServices.staffId, staffId));
+  }
+
+  async getStaffServicesByService(serviceId: number): Promise<StaffService[]> {
+    return await db.select().from(staffServices).where(eq(staffServices.serviceId, serviceId));
+  }
+
+  async getStaffServiceById(id: number): Promise<StaffService | undefined> {
+    const [staffService] = await db.select().from(staffServices).where(eq(staffServices.id, id));
+    return staffService;
+  }
+
+  async updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService> {
+    const [updated] = await db.update(staffServices).set(data).where(eq(staffServices.id, id)).returning();
+    if (!updated) throw new Error('Staff service assignment not found');
+    return updated;
+  }
+
+  async removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean> {
+    const result = await db.delete(staffServices).where(
+      and(
+        eq(staffServices.staffId, staffId),
+        eq(staffServices.serviceId, serviceId)
+      )
+    );
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Appointment operations
+  async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
+    const [newAppointment] = await db.insert(appointments).values(appointment).returning();
+    return newAppointment;
+  }
+
+  async getAppointment(id: number): Promise<Appointment | undefined> {
+    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return appointment;
+  }
+
+  async getAllAppointments(): Promise<Appointment[]> {
+    return await db.select().from(appointments).orderBy(desc(appointments.createdAt));
+  }
+
+  async getAppointmentsByClient(clientId: number): Promise<Appointment[]> {
+    return await db.select().from(appointments).where(eq(appointments.clientId, clientId));
+  }
+
+  async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
+    return await db.select().from(appointments).where(eq(appointments.staffId, staffId));
+  }
+
+  async getAppointmentsByDate(date: Date): Promise<Appointment[]> {
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+    const nextDay = new Date(targetDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+
+    return await db.select().from(appointments).where(
+      and(
+        gte(appointments.startTime, targetDate),
+        lte(appointments.startTime, nextDay)
+      )
+    );
+  }
+
+  async updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment> {
+    const [updated] = await db.update(appointments).set(appointmentData).where(eq(appointments.id, id)).returning();
+    if (!updated) throw new Error('Appointment not found');
+    return updated;
+  }
+
+  async deleteAppointment(id: number): Promise<boolean> {
+    const result = await db.delete(appointments).where(eq(appointments.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Membership operations
+  async createMembership(membership: InsertMembership): Promise<Membership> {
+    const [newMembership] = await db.insert(memberships).values(membership).returning();
+    return newMembership;
+  }
+
+  async getMembership(id: number): Promise<Membership | undefined> {
+    const [membership] = await db.select().from(memberships).where(eq(memberships.id, id));
+    return membership;
+  }
+
+  async getAllMemberships(): Promise<Membership[]> {
+    return await db.select().from(memberships);
+  }
+
+  async updateMembership(id: number, membershipData: Partial<InsertMembership>): Promise<Membership> {
+    const [updated] = await db.update(memberships).set(membershipData).where(eq(memberships.id, id)).returning();
+    if (!updated) throw new Error('Membership not found');
+    return updated;
+  }
+
+  async deleteMembership(id: number): Promise<boolean> {
+    const result = await db.delete(memberships).where(eq(memberships.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Client Membership operations
+  async createClientMembership(clientMembership: InsertClientMembership): Promise<ClientMembership> {
+    const [newMembership] = await db.insert(clientMemberships).values(clientMembership).returning();
+    return newMembership;
+  }
+
+  async getClientMembership(id: number): Promise<ClientMembership | undefined> {
+    const [membership] = await db.select().from(clientMemberships).where(eq(clientMemberships.id, id));
+    return membership;
+  }
+
+  async getClientMembershipsByClient(clientId: number): Promise<ClientMembership[]> {
+    return await db.select().from(clientMemberships).where(eq(clientMemberships.clientId, clientId));
+  }
+
+  async updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership> {
+    const [updated] = await db.update(clientMemberships).set(data).where(eq(clientMemberships.id, id)).returning();
+    if (!updated) throw new Error('Client membership not found');
+    return updated;
+  }
+
+  async deleteClientMembership(id: number): Promise<boolean> {
+    const result = await db.delete(clientMemberships).where(eq(clientMemberships.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Payment operations
+  async createPayment(payment: InsertPayment): Promise<Payment> {
+    const [newPayment] = await db.insert(payments).values(payment).returning();
+    return newPayment;
+  }
+
+  async getPayment(id: number): Promise<Payment | undefined> {
+    const [payment] = await db.select().from(payments).where(eq(payments.id, id));
+    return payment;
+  }
+
+  async getPaymentsByClient(clientId: number): Promise<Payment[]> {
+    return await db.select().from(payments).where(eq(payments.clientId, clientId));
+  }
+
+  async getAllPayments(): Promise<Payment[]> {
+    console.log("Fetching all payments for reports...");
+    const allPayments = await db.select().from(payments);
+    console.log("Found", allPayments.length, "payments");
+    return allPayments;
+  }
+
+  async updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment> {
+    const [updated] = await db.update(payments).set(paymentData).where(eq(payments.id, id)).returning();
+    if (!updated) throw new Error('Payment not found');
+    return updated;
+  }
+
+  // Saved Payment Methods operations
+  async createSavedPaymentMethod(paymentMethod: InsertSavedPaymentMethod): Promise<SavedPaymentMethod> {
+    const [newMethod] = await db.insert(savedPaymentMethods).values(paymentMethod).returning();
+    return newMethod;
+  }
+
+  async getSavedPaymentMethod(id: number): Promise<SavedPaymentMethod | undefined> {
+    const [method] = await db.select().from(savedPaymentMethods).where(eq(savedPaymentMethods.id, id));
+    return method;
+  }
+
+  async getSavedPaymentMethodsByClient(clientId: number): Promise<SavedPaymentMethod[]> {
+    return await db.select().from(savedPaymentMethods).where(eq(savedPaymentMethods.clientId, clientId));
+  }
+
+  async updateSavedPaymentMethod(id: number, data: Partial<InsertSavedPaymentMethod>): Promise<SavedPaymentMethod> {
+    const [updated] = await db.update(savedPaymentMethods).set(data).where(eq(savedPaymentMethods.id, id)).returning();
+    if (!updated) throw new Error('Saved payment method not found');
+    return updated;
+  }
+
+  async deleteSavedPaymentMethod(id: number): Promise<boolean> {
+    const result = await db.delete(savedPaymentMethods).where(eq(savedPaymentMethods.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean> {
+    // First, remove default status from all other payment methods for this client
+    await db.update(savedPaymentMethods)
+      .set({ isDefault: false })
+      .where(eq(savedPaymentMethods.clientId, clientId));
+    
+    // Set the specified method as default
+    await this.updateSavedPaymentMethod(paymentMethodId, { isDefault: true });
+    return true;
+  }
+
+  async updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User> {
+    return await this.updateUser(userId, { squareCustomerId });
+  }
+
+  // Gift Card operations
+  async createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard> {
+    const [newCard] = await db.insert(giftCards).values(giftCard).returning();
+    return newCard;
+  }
+
+  async getGiftCard(id: number): Promise<GiftCard | undefined> {
+    const [card] = await db.select().from(giftCards).where(eq(giftCards.id, id));
+    return card;
+  }
+
+  async getGiftCardByCode(code: string): Promise<GiftCard | undefined> {
+    const [card] = await db.select().from(giftCards).where(eq(giftCards.code, code));
+    return card;
+  }
+
+  async getAllGiftCards(): Promise<GiftCard[]> {
+    return await db.select().from(giftCards);
+  }
+
+  async updateGiftCard(id: number, giftCardData: Partial<InsertGiftCard>): Promise<GiftCard> {
+    const [updated] = await db.update(giftCards).set(giftCardData).where(eq(giftCards.id, id)).returning();
+    if (!updated) throw new Error('Gift card not found');
+    return updated;
+  }
+
+  async deleteGiftCard(id: number): Promise<boolean> {
+    const result = await db.delete(giftCards).where(eq(giftCards.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Gift Card Transaction operations
+  async createGiftCardTransaction(transaction: InsertGiftCardTransaction): Promise<GiftCardTransaction> {
+    const [newTransaction] = await db.insert(giftCardTransactions).values(transaction).returning();
+    return newTransaction;
+  }
+
+  async getGiftCardTransaction(id: number): Promise<GiftCardTransaction | undefined> {
+    const [transaction] = await db.select().from(giftCardTransactions).where(eq(giftCardTransactions.id, id));
+    return transaction;
+  }
+
+  async getGiftCardTransactionsByCard(giftCardId: number): Promise<GiftCardTransaction[]> {
+    return await db.select().from(giftCardTransactions).where(eq(giftCardTransactions.giftCardId, giftCardId));
+  }
+
+  // Saved Gift Card operations
+  async createSavedGiftCard(savedGiftCard: InsertSavedGiftCard): Promise<SavedGiftCard> {
+    const [newCard] = await db.insert(savedGiftCards).values(savedGiftCard).returning();
+    return newCard;
+  }
+
+  async getSavedGiftCard(id: number): Promise<SavedGiftCard | undefined> {
+    const [card] = await db.select().from(savedGiftCards).where(eq(savedGiftCards.id, id));
+    return card;
+  }
+
+  async getSavedGiftCardsByClient(clientId: number): Promise<SavedGiftCard[]> {
+    return await db.select().from(savedGiftCards).where(eq(savedGiftCards.clientId, clientId));
+  }
+
+  async deleteSavedGiftCard(id: number): Promise<boolean> {
+    const result = await db.delete(savedGiftCards).where(eq(savedGiftCards.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Marketing Campaign operations
+  async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
+    const [newCampaign] = await db.insert(marketingCampaigns).values(campaign).returning();
+    return newCampaign;
+  }
+
+  async getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined> {
+    const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+    return campaign;
+  }
+
+  async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
+    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
+  }
+
+  async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
+    const [updated] = await db.update(marketingCampaigns).set(campaignData).where(eq(marketingCampaigns.id, id)).returning();
+    if (!updated) throw new Error('Marketing campaign not found');
+    return updated;
+  }
+
+  async deleteMarketingCampaign(id: number): Promise<boolean> {
+    const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Marketing Campaign Recipient operations
+  async createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient> {
+    const [newRecipient] = await db.insert(marketingCampaignRecipients).values(recipient).returning();
+    return newRecipient;
+  }
+
+  async getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined> {
+    const [recipient] = await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.id, id));
+    return recipient;
+  }
+
+  async getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]> {
+    return await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.campaignId, campaignId));
+  }
+
+  async updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient> {
+    const [updated] = await db.update(marketingCampaignRecipients).set(data).where(eq(marketingCampaignRecipients.id, id)).returning();
+    if (!updated) throw new Error('Marketing campaign recipient not found');
+    return updated;
+  }
+
+  async getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined> {
+    const [recipient] = await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.unsubscribeToken, token));
+    return recipient;
+  }
+
+  // Email unsubscribe operations
+  async createEmailUnsubscribe(unsubscribe: InsertEmailUnsubscribe): Promise<EmailUnsubscribe> {
+    const [newUnsubscribe] = await db.insert(emailUnsubscribes).values(unsubscribe).returning();
+    return newUnsubscribe;
+  }
+
+  async getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined> {
+    const [unsubscribe] = await db.select().from(emailUnsubscribes).where(eq(emailUnsubscribes.userId, userId));
+    return unsubscribe;
+  }
+
+  async getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]> {
+    return await db.select().from(emailUnsubscribes);
+  }
+
+  async isUserUnsubscribed(email: string): Promise<boolean> {
+    const user = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (user.length === 0) return false;
+    
+    const unsubscribe = await this.getEmailUnsubscribe(user[0].id);
+    return !!unsubscribe;
   }
 
   // Promo code operations
