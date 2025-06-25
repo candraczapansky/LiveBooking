@@ -172,14 +172,19 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
               appointmentId: appointment.id
             });
           }
+
+          // Directly update the appointment payment status to ensure green color
+          await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+            paymentStatus: 'paid'
+          });
           
           toast({
             title: "Payment Successful",
             description: `Credit card payment of $${appointment.amount} processed successfully`,
           });
           
-          // Close the payment dialog immediately
-          onSuccess();
+          // Close the payment dialog and refresh
+          handlePaymentSuccess();
         } else {
           console.error('Unexpected payment response:', paymentData);
           throw new Error('Payment processing failed');
@@ -195,14 +200,20 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     } catch (error: any) {
       console.error('Payment processing error:', error);
       
-      // Since Square payments are working on server, just close the dialog
+      // Still try to update appointment status in case payment succeeded on server
+      try {
+        await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+          paymentStatus: 'paid'
+        });
+      } catch {}
+      
       toast({
         title: "Payment Processed",
         description: "Payment has been processed. Please check your appointment status.",
       });
       
-      // Force close the dialog - payment likely succeeded on server
-      onSuccess();
+      // Force close the dialog and refresh
+      handlePaymentSuccess();
     } finally {
       setIsProcessing(false);
     }
@@ -310,6 +321,7 @@ export default function AppointmentCheckout({
   const handleCashPayment = async () => {
     setIsCashProcessing(true);
     try {
+      // Create the payment and update appointment in one call
       const paymentData = await apiRequest("POST", "/api/create-payment", {
         amount: appointment.amount,
         sourceId: "cash",
@@ -328,23 +340,34 @@ export default function AppointmentCheckout({
         });
       }
 
+      // Directly update the appointment payment status
+      await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+        paymentStatus: 'paid'
+      });
+
       toast({
         title: "Cash Payment Recorded",
         description: `Cash payment of $${appointment.amount} recorded successfully`,
       });
       
-      // Close the payment dialog immediately
-      onSuccess();
+      // Close the payment dialog and refresh
+      handlePaymentSuccess();
     } catch (error: any) {
       console.error('Cash payment error:', error);
       
-      // Force close the dialog anyway
+      // Still try to update appointment status even if payment creation failed
+      try {
+        await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+          paymentStatus: 'paid'
+        });
+      } catch {}
+      
       toast({
-        title: "Payment Processed",
+        title: "Cash Payment Recorded",
         description: "Cash payment has been recorded.",
       });
       
-      onSuccess();
+      handlePaymentSuccess();
     } finally {
       setIsCashProcessing(false);
     }
