@@ -1451,6 +1451,64 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
 
 
 
+  // Helper function to calculate staff earnings based on custom rates or defaults
+  const calculateStaffEarnings = async (appointment: any, service: any) => {
+    try {
+      // Get staff member
+      const staff = await storage.getStaff(appointment.staffId);
+      if (!staff) return null;
+
+      // Get staff service assignment to check for custom rates
+      const staffServices = await storage.getStaffServicesByService(service.id);
+      const staffService = staffServices.find((ss: any) => ss.staffId === appointment.staffId);
+
+      const servicePrice = service.price || 0;
+      let staffEarnings = 0;
+
+      if (staff.commissionType === 'commission') {
+        // Use custom commission rate if available, otherwise use default
+        const commissionRate = staffService?.customCommissionRate ?? staff.commissionRate ?? 0;
+        staffEarnings = servicePrice * (commissionRate / 100);
+      } else if (staff.commissionType === 'hourly') {
+        // Use custom hourly rate if available, otherwise use default
+        const hourlyRate = staffService?.customRate ?? staff.hourlyRate ?? 0;
+        const serviceDuration = service.duration || 60; // Duration in minutes
+        const hours = serviceDuration / 60;
+        staffEarnings = hourlyRate * hours;
+      } else if (staff.commissionType === 'fixed') {
+        // Use custom fixed rate if available, otherwise use default
+        staffEarnings = staffService?.customRate ?? staff.fixedRate ?? 0;
+      }
+
+      console.log('Staff earnings calculation:', {
+        staffId: appointment.staffId,
+        servicePrice,
+        commissionType: staff.commissionType,
+        customRate: staffService?.customRate,
+        customCommissionRate: staffService?.customCommissionRate,
+        defaultRate: staff.hourlyRate || staff.fixedRate || staff.commissionRate,
+        calculatedEarnings: staffEarnings
+      });
+
+      return {
+        staffId: appointment.staffId,
+        serviceId: service.id,
+        appointmentId: appointment.id,
+        earningsAmount: staffEarnings,
+        paymentMethod: 'appointment',
+        calculationDetails: {
+          servicePrice,
+          commissionType: staff.commissionType,
+          rateUsed: staffService?.customRate || staffService?.customCommissionRate || staff.hourlyRate || staff.fixedRate || staff.commissionRate,
+          isCustomRate: !!(staffService?.customRate || staffService?.customCommissionRate)
+        }
+      };
+    } catch (error) {
+      console.error('Error calculating staff earnings:', error);
+      return null;
+    }
+  };
+
   // Confirm payment and update appointment status
   app.post("/api/confirm-payment", async (req, res) => {
     try {
@@ -1460,23 +1518,38 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
         return res.status(400).json({ error: "Payment ID and appointment ID are required" });
       }
 
-      // Handle cash payments
-      if (paymentId.startsWith('cash_')) {
-        const appointment = await storage.getAppointment(appointmentId);
-        if (appointment) {
-          await storage.updateAppointment(appointmentId, { paymentStatus: 'paid' });
-          
-          await storage.createPayment({
-            clientId: appointment.clientId,
-            amount: Number(appointment.totalAmount || 0),
-            method: 'cash',
-            status: 'completed',
-            appointmentId: appointmentId,
-            squarePaymentId: paymentId
-          });
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
 
-          return res.json({ success: true, appointment });
+      // Get service details for earnings calculation
+      const service = await storage.getService(appointment.serviceId);
+
+      // Handle cash payments
+      if (paymentId.startsWith('cash_') || paymentId === 'cash') {
+        await storage.updateAppointment(appointmentId, { paymentStatus: 'paid' });
+        
+        await storage.createPayment({
+          clientId: appointment.clientId,
+          amount: service?.price || Number(appointment.totalAmount || 0),
+          method: 'cash',
+          status: 'completed',
+          appointmentId: appointmentId,
+          squarePaymentId: paymentId
+        });
+
+        // Calculate and save staff earnings
+        if (service) {
+          const staffEarnings = await calculateStaffEarnings(appointment, service);
+          if (staffEarnings) {
+            // Save staff earnings record for payroll reporting
+            console.log('Saving staff earnings for cash payment:', staffEarnings);
+            // This would be saved to a staff_earnings table when implemented
+          }
         }
+
+        return res.json({ success: true, appointment });
       }
 
       // Retrieve payment to verify it was successful
@@ -1484,27 +1557,32 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
       
       if (response.payment?.status === 'COMPLETED') {
         // Update appointment status to paid
-        const appointment = await storage.getAppointment(appointmentId);
-        if (appointment) {
-          await storage.updateAppointment(appointmentId, {
-            status: 'confirmed',
-            paymentStatus: 'paid'
-          });
+        await storage.updateAppointment(appointmentId, {
+          status: 'confirmed',
+          paymentStatus: 'paid'
+        });
 
-          // Create payment record
-          await storage.createPayment({
-            clientId: appointment.clientId,
-            amount: Number(response.payment?.amountMoney?.amount || 0) / 100, // Convert back from cents
-            method: 'card',
-            status: 'completed',
-            appointmentId: appointmentId,
-            squarePaymentId: paymentId
-          });
+        // Create payment record
+        await storage.createPayment({
+          clientId: appointment.clientId,
+          amount: Number(response.payment?.amountMoney?.amount || 0) / 100, // Convert back from cents
+          method: 'card',
+          status: 'completed',
+          appointmentId: appointmentId,
+          squarePaymentId: paymentId
+        });
 
-          res.json({ success: true, appointment });
-        } else {
-          res.status(404).json({ error: "Appointment not found" });
+        // Calculate and save staff earnings
+        if (service) {
+          const staffEarnings = await calculateStaffEarnings(appointment, service);
+          if (staffEarnings) {
+            // Save staff earnings record for payroll reporting
+            console.log('Saving staff earnings for card payment:', staffEarnings);
+            // This would be saved to a staff_earnings table when implemented
+          }
         }
+
+        res.json({ success: true, appointment });
       } else {
         res.status(400).json({ error: "Payment not successful" });
       }

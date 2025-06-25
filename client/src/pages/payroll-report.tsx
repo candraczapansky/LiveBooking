@@ -81,36 +81,46 @@ export default function PayrollReport() {
       let totalCommission = 0;
       let totalServices = staffAppointments.length;
 
-      // Calculate commission for each appointment
+      // Calculate earnings for each appointment using custom rates with fallbacks
+      let totalHourlyPay = 0;
+      let totalHours = 0;
+
       staffAppointments.forEach((apt: any) => {
         const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
         if (service) {
           const serviceRevenue = service.price;
           totalRevenue += serviceRevenue;
 
-          // Check if there's a custom commission rate for this staff-service combination
+          // Find staff service assignment for custom rates
           const staffService = (staffServices as any[]).find((ss: any) => 
             ss.staffId === staffMember.id && ss.serviceId === service.id
           );
 
-          const commissionRate = staffService?.customCommissionRate || staffMember.commissionRate || 0;
-          const commission = serviceRevenue * commissionRate;
-          totalCommission += commission;
+          let appointmentEarnings = 0;
+
+          if (staffMember.commissionType === 'commission') {
+            // Use custom commission rate if available, otherwise use default
+            const commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
+            appointmentEarnings = serviceRevenue * (commissionRate / 100);
+          } else if (staffMember.commissionType === 'hourly') {
+            // Use custom hourly rate if available, otherwise use default
+            const hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
+            const serviceDuration = service.duration || 60; // Duration in minutes
+            const hours = serviceDuration / 60;
+            appointmentEarnings = hourlyRate * hours;
+            totalHours += hours;
+          } else if (staffMember.commissionType === 'fixed') {
+            // Use custom fixed rate if available, otherwise use default
+            appointmentEarnings = staffService?.customRate ?? staffMember.fixedRate ?? 0;
+          }
+
+          totalCommission += appointmentEarnings;
         }
       });
 
-      // Calculate hourly pay if applicable
-      let totalHourlyPay = 0;
-      let totalHours = 0;
-
-      if (staffMember.commissionType === 'hourly' || staffMember.commissionType === 'hourly_plus_commission') {
-        // Estimate hours based on service durations
-        totalHours = staffAppointments.reduce((hours: number, apt: any) => {
-          const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
-          return hours + (service ? service.duration / 60 : 0); // Convert minutes to hours
-        }, 0);
-
-        totalHourlyPay = totalHours * (staffMember.hourlyRate || 0);
+      // For hourly staff, calculate total hourly pay separately for display
+      if (staffMember.commissionType === 'hourly') {
+        totalHourlyPay = totalCommission; // Already calculated above
       }
 
       // Calculate total earnings based on commission type
