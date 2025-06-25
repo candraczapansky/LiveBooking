@@ -174,7 +174,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     enabled: open && !!appointmentId && appointmentId > 0
   });
 
-    // Computed values
+  // Computed values
   const selectedServiceId = form.watch("serviceId");
   const selectedStaffId = form.watch("staffId");
   const selectedFormDate = form.watch("date");
@@ -544,7 +544,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                                 {staffName} - {staffMember.title}
                               </SelectItem>
                             );
-                          })}
+                          })
+                          )}
                         </SelectContent>
                       </Select>
                     </FormControl>
