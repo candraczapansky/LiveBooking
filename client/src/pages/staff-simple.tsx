@@ -8,7 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Edit, Trash2, PlusCircle, Search } from "lucide-react";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
-import StaffForm from "@/components/staff/staff-form";
+// import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -210,22 +210,7 @@ const StaffPageSimple = () => {
             </div>
           )}
 
-          {/* Edit/Add Staff Dialog */}
-          {isFormOpen && (
-            <StaffForm
-              staffId={selectedStaffId}
-              isOpen={isFormOpen}
-              onClose={() => {
-                setIsFormOpen(false);
-                setSelectedStaffId(null);
-              }}
-              onSave={() => {
-                setIsFormOpen(false);
-                setSelectedStaffId(null);
-                queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
-              }}
-            />
-          )}
+          {/* Edit/Add Staff Dialog - Temporarily disabled */}
 
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

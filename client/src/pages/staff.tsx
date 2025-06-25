@@ -157,9 +157,15 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <Button onClick={handleAddStaff} size="sm">
+                  <Button 
+                    onClick={() => {
+                      console.log("Direct button click - opening dialog");
+                      setIsAddStaffOpen(true);
+                    }} 
+                    size="sm"
+                  >
                     <PlusCircle className="h-4 w-4" />
-                    <span className="ml-1 hidden sm:inline">Add</span>
+                    <span className="ml-1 hidden sm:inline">Add Staff</span>
                   </Button>
                 </div>
                 
@@ -274,9 +280,13 @@ const StaffPage = () => {
       </div>
       
       {/* Add Staff Dialog */}
+      {console.log("Rendering dialog with isAddStaffOpen:", isAddStaffOpen)}
       <AddStaffDialog
         open={isAddStaffOpen}
-        onOpenChange={setIsAddStaffOpen}
+        onOpenChange={(open) => {
+          console.log("Dialog onOpenChange called with:", open);
+          setIsAddStaffOpen(open);
+        }}
       />
       
       {/* Delete Staff Dialog */}
