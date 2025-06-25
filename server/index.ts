@@ -2,7 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { config } from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { PgStorage } from "./storage";
+import { DatabaseStorage } from "./storage";
 
 // Load environment variables
 config();
@@ -42,7 +42,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app, new PgStorage());
+  const server = await registerRoutes(app, new DatabaseStorage());
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
