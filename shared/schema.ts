@@ -232,6 +232,28 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
 });
 
+// Staff earnings tracking
+export const staffEarnings = pgTable("staff_earnings", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").notNull(),
+  appointmentId: integer("appointment_id"),
+  serviceId: integer("service_id").notNull(),
+  paymentId: integer("payment_id"),
+  earningsAmount: doublePrecision("earnings_amount").notNull(),
+  rateType: text("rate_type").notNull(), // commission, hourly, fixed
+  rateUsed: doublePrecision("rate_used").notNull(),
+  isCustomRate: boolean("is_custom_rate").notNull().default(false),
+  servicePrice: doublePrecision("service_price").notNull(),
+  calculationDetails: text("calculation_details"), // JSON string with calculation breakdown
+  earningsDate: timestamp("earnings_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStaffEarningsSchema = createInsertSchema(staffEarnings).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Saved payment methods schema
 export const savedPaymentMethods = pgTable("saved_payment_methods", {
   id: serial("id").primaryKey(),

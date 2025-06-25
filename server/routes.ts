@@ -1541,11 +1541,26 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
 
         // Calculate and save staff earnings
         if (service) {
-          const staffEarnings = await calculateStaffEarnings(appointment, service);
-          if (staffEarnings) {
-            // Save staff earnings record for payroll reporting
-            console.log('Saving staff earnings for cash payment:', staffEarnings);
-            // This would be saved to a staff_earnings table when implemented
+          const staffEarningsData = await calculateStaffEarnings(appointment, service);
+          if (staffEarningsData) {
+            try {
+              const savedEarnings = await storage.createStaffEarnings({
+                staffId: staffEarningsData.staffId,
+                appointmentId: staffEarningsData.appointmentId,
+                serviceId: staffEarningsData.serviceId,
+                paymentId: null, // Cash payment doesn't have a payment ID
+                earningsAmount: staffEarningsData.earningsAmount,
+                rateType: staffEarningsData.calculationDetails.commissionType,
+                rateUsed: staffEarningsData.calculationDetails.rateUsed,
+                isCustomRate: staffEarningsData.calculationDetails.isCustomRate,
+                servicePrice: staffEarningsData.calculationDetails.servicePrice,
+                calculationDetails: JSON.stringify(staffEarningsData.calculationDetails),
+                earningsDate: new Date()
+              });
+              console.log('Saved staff earnings for cash payment:', savedEarnings);
+            } catch (error) {
+              console.error('Error saving staff earnings:', error);
+            }
           }
         }
 
@@ -1574,11 +1589,26 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
 
         // Calculate and save staff earnings
         if (service) {
-          const staffEarnings = await calculateStaffEarnings(appointment, service);
-          if (staffEarnings) {
-            // Save staff earnings record for payroll reporting
-            console.log('Saving staff earnings for card payment:', staffEarnings);
-            // This would be saved to a staff_earnings table when implemented
+          const staffEarningsData = await calculateStaffEarnings(appointment, service);
+          if (staffEarningsData) {
+            try {
+              const savedEarnings = await storage.createStaffEarnings({
+                staffId: staffEarningsData.staffId,
+                appointmentId: staffEarningsData.appointmentId,
+                serviceId: staffEarningsData.serviceId,
+                paymentId: null, // Will be updated with actual payment ID if needed
+                earningsAmount: staffEarningsData.earningsAmount,
+                rateType: staffEarningsData.calculationDetails.commissionType,
+                rateUsed: staffEarningsData.calculationDetails.rateUsed,
+                isCustomRate: staffEarningsData.calculationDetails.isCustomRate,
+                servicePrice: staffEarningsData.calculationDetails.servicePrice,
+                calculationDetails: JSON.stringify(staffEarningsData.calculationDetails),
+                earningsDate: new Date()
+              });
+              console.log('Saved staff earnings for card payment:', savedEarnings);
+            } catch (error) {
+              console.error('Error saving staff earnings:', error);
+            }
           }
         }
 
@@ -2753,6 +2783,33 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
       res.json({ message: "Custom automation triggered successfully" });
     } catch (error: any) {
       res.status(500).json({ error: "Error triggering custom automation: " + error.message });
+    }
+  });
+
+  // Staff Earnings routes
+  app.get("/api/staff-earnings", async (req, res) => {
+    try {
+      const earnings = await storage.getAllStaffEarnings();
+      return res.status(200).json(earnings);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching staff earnings: " + error.message });
+    }
+  });
+
+  app.get("/api/staff-earnings/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const { month } = req.query;
+      
+      let monthDate;
+      if (month) {
+        monthDate = new Date(month as string);
+      }
+      
+      const earnings = await storage.getStaffEarnings(staffId, monthDate);
+      return res.status(200).json(earnings);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching staff earnings: " + error.message });
     }
   });
 

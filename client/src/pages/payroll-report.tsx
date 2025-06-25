@@ -56,9 +56,19 @@ export default function PayrollReport() {
     queryKey: ['/api/staff-services'],
   });
 
+  // Fetch staff earnings from database
+  const { data: staffEarnings } = useQuery({
+    queryKey: ['/api/staff-earnings'],
+  });
+
   // Calculate payroll data
   const payrollData = useMemo(() => {
     if (!staff || !appointments || !services || !users || !staffServices) return [];
+    
+    // If we have staff earnings data from database, use that instead of calculated values
+    if (staffEarnings && staffEarnings.length > 0) {
+      return calculatePayrollFromEarnings();
+    }
 
     const monthStart = startOfMonth(selectedMonth);
     const monthEnd = endOfMonth(selectedMonth);
@@ -165,7 +175,42 @@ export default function PayrollReport() {
         appointments: staffAppointments,
       };
     });
-  }, [staff, appointments, services, users, staffServices, selectedMonth]);
+  }, [staff, appointments, services, users, staffServices, staffEarnings, selectedMonth]);
+
+  // Calculate payroll from staff earnings database records
+  const calculatePayrollFromEarnings = () => {
+    const monthStart = startOfMonth(selectedMonth);
+    const monthEnd = endOfMonth(selectedMonth);
+
+    return (staff as any[]).map((staffMember: any) => {
+      const user = (users as any[]).find((u: any) => u.id === staffMember.userId);
+      const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown';
+
+      // Get earnings for this staff member in the selected month
+      const monthlyEarnings = (staffEarnings as any[]).filter((earning: any) => {
+        const earningDate = new Date(earning.earningsDate);
+        return earning.staffId === staffMember.id &&
+               isWithinInterval(earningDate, { start: monthStart, end: monthEnd });
+      });
+
+      const totalEarnings = monthlyEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
+      const totalServices = monthlyEarnings.length;
+      const totalRevenue = monthlyEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
+
+      return {
+        staffId: staffMember.id,
+        staffName,
+        title: staffMember.title,
+        commissionType: staffMember.commissionType,
+        baseCommissionRate: staffMember.commissionRate || 0,
+        totalServices,
+        totalRevenue,
+        totalCommission: totalEarnings,
+        totalEarnings,
+        appointments: monthlyEarnings,
+      };
+    });
+  };
 
   // Filter by selected staff member
   const filteredPayrollData = selectedStaff === "all" 

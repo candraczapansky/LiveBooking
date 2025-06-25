@@ -11,6 +11,7 @@ import {
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
+  staffEarnings, InsertStaffEarningsSchema,
   savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
   savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   giftCards, GiftCard, InsertGiftCard,
@@ -183,6 +184,11 @@ export interface IStorage {
 
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
+  
+  // Staff Earnings operations
+  createStaffEarnings(earnings: InsertStaffEarningsSchema): Promise<any>;
+  getStaffEarnings(staffId: number, month?: Date): Promise<any[]>;
+  getAllStaffEarnings(): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
