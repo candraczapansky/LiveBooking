@@ -354,18 +354,21 @@ export default function SettingsMobile() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (profileData: { firstName: string; lastName: string; email: string; phone: string }) => {
-      if (!user?.id) {
-        console.error('No user ID found:', user);
+    mutationFn: async (profileDataWithUserId: { firstName: string; lastName: string; email: string; phone: string; userId?: number }) => {
+      const { userId, ...profileData } = profileDataWithUserId;
+      const targetUserId = userId || user?.id;
+      
+      if (!targetUserId) {
+        console.error('No user ID found');
         throw new Error('User ID is required');
       }
       
       console.log('Starting profile update...');
-      console.log('User ID:', user.id);
+      console.log('User ID:', targetUserId);
       console.log('Profile data being sent:', profileData);
-      console.log('API URL:', `/api/users/${user.id}`);
+      console.log('API URL:', `/api/users/${targetUserId}`);
       
-      const response = await fetch(`/api/users/${user.id}`, {
+      const response = await fetch(`/api/users/${targetUserId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -426,7 +429,24 @@ export default function SettingsMobile() {
     console.log('Current user:', user);
     console.log('Current profileData state:', profileData);
     
-    if (!user?.id) {
+    // Get user ID from context or localStorage as fallback
+    let userId = user?.id;
+    
+    if (!userId) {
+      console.log('User context not available, checking localStorage...');
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          userId = userData.id;
+          console.log('Using user ID from localStorage:', userId);
+        } catch (e) {
+          console.error('Error parsing localStorage user data:', e);
+        }
+      }
+    }
+    
+    if (!userId) {
       console.error('No user ID available for profile save');
       toast({
         title: "Error",
@@ -436,8 +456,14 @@ export default function SettingsMobile() {
       return;
     }
     
-    console.log('Starting profile mutation with data:', profileData);
-    updateProfileMutation.mutate(profileData);
+    console.log('Starting profile mutation with user ID:', userId);
+    updateProfileMutation.mutate({ 
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      email: profileData.email,
+      phone: profileData.phone,
+      userId 
+    });
     console.log('Profile mutation triggered');
   };
 
