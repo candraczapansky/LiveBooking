@@ -55,33 +55,45 @@ export default function StaffScheduleDetailPage() {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Link href="/staff-schedule">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-        </Link>
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <User className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-bold">{getStaffFullName(staffMember)}</h1>
-              <p className="text-muted-foreground">{staffMember.title}</p>
-            </div>
-          </div>
-        </div>
-        <Button 
-          onClick={() => handleAddSchedule(staffId)}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Schedule
-        </Button>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64">
+        <SidebarController />
       </div>
+      
+      <div className="lg:pl-64">
+        <Header />
+        
+        <main className="p-3 lg:p-6">
+          <div className="w-full space-y-4 lg:space-y-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
+              <div className="flex items-center gap-4 mb-6">
+                <Link href="/staff-schedule">
+                  <Button variant="outline" size="sm">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
+                  </Button>
+                </Link>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <User className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">{getStaffFullName(staffMember)}</h1>
+                      <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">{staffMember.title}</p>
+                    </div>
+                  </div>
+                </div>
+                <Button 
+                  onClick={() => handleAddSchedule(staffId)}
+                  className="flex items-center gap-2"
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="ml-1 hidden sm:inline">Add Schedule</span>
+                </Button>
+              </div>
+            </div>
 
       {isLoading ? (
         <div className="text-center py-8">Loading schedules...</div>
