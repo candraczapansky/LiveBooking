@@ -145,8 +145,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       let userCreated = false;
       let attempts = 0;
       
-      while (!userCreated && attempts < 5) {
-        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts}`;
+      while (!userCreated && attempts < 10) {
+        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts + 1}`;
         const defaultPassword = `${data.firstName}123!`; // Simple default password
         
         const userData = {
