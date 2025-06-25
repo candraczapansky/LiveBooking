@@ -303,9 +303,44 @@ export default function SettingsMobile() {
     }
   };
 
+  const saveColorPreferencesMutation = useMutation({
+    mutationFn: async (preferences: any) => {
+      if (!user?.id) {
+        throw new Error('User ID is required');
+      }
+      
+      const response = await fetch(`/api/users/${user.id}/color-preferences`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(preferences),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save color preferences');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      // Silently save to database - no toast needed for auto-save
+    },
+    onError: (error) => {
+      console.error('Failed to save color preferences:', error);
+    },
+  });
+
   const updateProfileMutation = useMutation({
     mutationFn: async (profileData: { firstName: string; lastName: string; email: string; phone: string }) => {
-      const response = await fetch(`/api/users/${user?.id}`, {
+      if (!user?.id) {
+        throw new Error('User ID is required');
+      }
+      
+      console.log('Updating profile for user ID:', user.id);
+      console.log('Profile data:', profileData);
+      
+      const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -314,7 +349,9 @@ export default function SettingsMobile() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json();
+        console.error('Update failed:', errorData);
+        throw new Error(errorData.error || 'Failed to update profile');
       }
       
       return response.json();
@@ -346,6 +383,16 @@ export default function SettingsMobile() {
   });
 
   const handleSaveProfile = () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User session not found. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log('Saving profile for user:', user);
     updateProfileMutation.mutate(profileData);
   };
 
@@ -732,7 +779,7 @@ export default function SettingsMobile() {
                   
                   {savedBrandColors.length > 0 ? (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
-                      {savedBrandColors.map((preset, index) => (
+                      {savedBrandColors.map((preset: any, index: number) => (
                         <div
                           key={index}
                           style={{
@@ -786,7 +833,7 @@ export default function SettingsMobile() {
                           </button>
                           <button
                             onClick={() => {
-                              const updated = savedBrandColors.filter((_, i) => i !== index);
+                              const updated = savedBrandColors.filter((_: any, i: number) => i !== index);
                               setSavedBrandColors(updated);
                               localStorage.setItem('savedBrandColors', JSON.stringify(updated));
                               // Auto-save to database
@@ -1085,7 +1132,7 @@ export default function SettingsMobile() {
                 
                 {savedTextColors.length > 0 ? (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(1, 1fr)", gap: "12px" }}>
-                    {savedTextColors.map((preset, index) => (
+                    {savedTextColors.map((preset: any, index: number) => (
                       <div
                         key={index}
                         style={{
@@ -1151,7 +1198,7 @@ export default function SettingsMobile() {
                         </button>
                         <button
                           onClick={() => {
-                            const updated = savedTextColors.filter((_, i) => i !== index);
+                            const updated = savedTextColors.filter((_: any, i: number) => i !== index);
                             setSavedTextColors(updated);
                             localStorage.setItem('savedTextColors', JSON.stringify(updated));
                             // Auto-save to database
