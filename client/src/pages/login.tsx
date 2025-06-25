@@ -158,7 +158,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("login")}
-                className={`flex-1 h-8 rounded text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 h-6 rounded text-sm font-medium transition-all duration-200 ${
                   activeTab === "login" 
                     ? "bg-white shadow-sm text-primary" 
                     : "text-gray-600 hover:text-gray-800"
@@ -169,7 +169,7 @@ const Login = () => {
               <button
                 type="button"
                 onClick={() => setActiveTab("register")}
-                className={`flex-1 h-8 rounded text-sm font-medium transition-all duration-200 ${
+                className={`flex-1 h-6 rounded text-sm font-medium transition-all duration-200 ${
                   activeTab === "register" 
                     ? "bg-white shadow-sm text-primary" 
                     : "text-gray-600 hover:text-gray-800"
