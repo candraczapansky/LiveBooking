@@ -49,11 +49,6 @@ const staffFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
-  assignedServices: z.array(z.number()).default([]),
-  serviceRates: z.record(z.string(), z.object({
-    customRate: z.number().optional(),
-    customCommissionRate: z.number().optional(),
-  })).default({}),
 });
 
 type StaffFormValues = z.infer<typeof staffFormSchema>;
@@ -87,21 +82,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       firstName: "",
       lastName: "",
       phone: "",
-      assignedServices: [],
-      serviceRates: {},
     },
   });
 
-  // Fetch all services for assignment
-  const { data: services } = useQuery({
-    queryKey: ['/api/services'],
-    queryFn: async () => {
-      const response = await fetch('/api/services');
-      if (!response.ok) throw new Error('Failed to fetch services');
-      return response.json();
-    },
-    enabled: open
-  });
+
 
   // Fetch staff data if editing
   useEffect(() => {
@@ -111,43 +95,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         .then(res => res.json())
         .then(data => {
           setStaffData(data); // Store staff data for later use
-          // Fetch staff services
-          fetch(`/api/staff/${staffId}/services`)
-            .then(res => res.json())
-            .then(staffServices => {
-              // Map to actual service IDs from the merged service data
-              const assignedServiceIds = staffServices.map((service: any) => service.id);
-              
-              // Build service rates object from existing assignments using service IDs
-              const serviceRates: Record<string, { customRate?: number; customCommissionRate?: number }> = {};
-              staffServices.forEach((service: any) => {
-                serviceRates[service.id.toString()] = {
-                  customRate: service.customRate,
-                  customCommissionRate: service.customCommissionRate,
-                };
-              });
-              
-              form.reset({
-                title: data.title || "",
-                bio: data.bio || "",
-                commissionRate: data.commissionRate || 0,
-                firstName: data.user?.firstName || "",
-                lastName: data.user?.lastName || "",
-                email: data.user?.email || "",
-                phone: data.user?.phone || "",
-                assignedServices: assignedServiceIds,
-                serviceRates: serviceRates,
-              });
-            })
-            .catch(err => {
-              console.error("Error fetching staff services:", err);
-              toast({
-                title: "Error",
-                description: "Failed to load staff services",
-                variant: "destructive",
-              });
-            })
-            .finally(() => setIsLoading(false));
+          form.reset({
+            title: data.title || "",
+            bio: data.bio || "",
+            commissionRate: data.commissionRate || 0,
+            firstName: data.user?.firstName || "",
+            lastName: data.user?.lastName || "",
+            email: data.user?.email || "",
+            phone: data.user?.phone || "",
+          });
+          setIsLoading(false);
         })
         .catch(err => {
           console.error("Error fetching staff:", err);
@@ -168,8 +125,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         firstName: "",
         lastName: "",
         phone: "",
-        assignedServices: [],
-        serviceRates: {},
       });
     }
   }, [staffId, open, form]);
@@ -239,19 +194,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
 
       const staff = await staffResponse.json();
-
-      // Assign services to staff
-      for (const serviceId of data.assignedServices) {
-        const serviceAssignment = {
-          staffId: staff.id,
-          serviceId: serviceId,
-          customRate: data.serviceRates[serviceId.toString()]?.customRate,
-          customCommissionRate: data.serviceRates[serviceId.toString()]?.customCommissionRate,
-        };
-        
-        await apiRequest("POST", "/api/staff-services", serviceAssignment);
-      }
-
       return staff;
     },
     onSuccess: () => {
@@ -309,61 +251,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         throw new Error(errorData.error || "Failed to update staff member");
       }
 
-      // Update service assignments
-      console.log("Fetching existing services for staff:", staffId);
-      const existingServices = await fetch(`/api/staff/${staffId}/services`).then(res => res.json());
-      console.log("Existing services:", existingServices);
-      const existingServiceIds = existingServices.map((service: any) => service.id);
-      console.log("Existing service IDs:", existingServiceIds);
-      console.log("New assigned services:", data.assignedServices);
-      console.log("Service rates:", data.serviceRates);
-
-      // Remove services that are no longer assigned
-      for (const existingService of existingServices) {
-        if (!data.assignedServices.includes(existingService.id)) {
-          console.log(`Removing service ${existingService.id} from staff ${staffId}`);
-          await apiRequest("DELETE", `/api/staff-services/staff/${staffId}/service/${existingService.id}`);
-        }
-      }
-
-      // Add new services or update existing ones
-      for (const serviceId of data.assignedServices) {
-        const serviceAssignment = {
-          staffId: staffId,
-          serviceId: serviceId,
-          customRate: data.serviceRates[serviceId.toString()]?.customRate,
-          customCommissionRate: data.serviceRates[serviceId.toString()]?.customCommissionRate,
-        };
-        console.log(`Processing service ${serviceId} with assignment:`, serviceAssignment);
-
-        if (existingServiceIds.includes(serviceId)) {
-          // Update existing assignment
-          const existingAssignment = existingServices.find((s: any) => s.id === serviceId);
-          if (existingAssignment) {
-            console.log(`Updating existing assignment ${existingAssignment.staffServiceId} with rates:`, {
-              customRate: serviceAssignment.customRate,
-              customCommissionRate: serviceAssignment.customCommissionRate
-            });
-            const updateResponse = await apiRequest("PATCH", `/api/staff-services/${existingAssignment.staffServiceId}`, {
-              customRate: serviceAssignment.customRate,
-              customCommissionRate: serviceAssignment.customCommissionRate
-            });
-            if (!updateResponse.ok) {
-              const errorData = await updateResponse.json();
-              throw new Error(`Failed to update service assignment: ${errorData.error}`);
-            }
-          }
-        } else {
-          // Create new assignment
-          console.log(`Creating new service assignment`);
-          const createResponse = await apiRequest("POST", "/api/staff-services", serviceAssignment);
-          if (!createResponse.ok) {
-            const errorData = await createResponse.json();
-            throw new Error(`Failed to create service assignment: ${errorData.error}`);
-          }
-        }
-      }
-
       return await staffResponse.json();
     },
     onSuccess: () => {
@@ -394,33 +281,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     }
   };
 
-  const handleServiceToggle = (serviceId: number, checked: boolean) => {
-    const currentServices = form.getValues('assignedServices');
-    if (checked) {
-      form.setValue('assignedServices', [...currentServices, serviceId]);
-    } else {
-      form.setValue('assignedServices', currentServices.filter(id => id !== serviceId));
-      // Remove custom rates for this service
-      const currentRates = form.getValues('serviceRates');
-      const newRates = { ...currentRates };
-      delete newRates[serviceId.toString()];
-      form.setValue('serviceRates', newRates);
-    }
-  };
 
-  const handleCustomRateChange = (serviceId: number, field: 'customRate' | 'customCommissionRate', value: string) => {
-    const numValue = value === '' ? undefined : parseFloat(value);
-    const currentRates = form.getValues('serviceRates');
-    const serviceKey = serviceId.toString();
-    
-    form.setValue('serviceRates', {
-      ...currentRates,
-      [serviceKey]: {
-        ...currentRates[serviceKey],
-        [field]: numValue,
-      }
-    });
-  };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -805,63 +666,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               )}
             </div>
 
-            {/* Service Assignment */}
-            {services && services.length > 0 && (
-              <div className="space-y-3">
-                <FormLabel>Assigned Services</FormLabel>
-                <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                  {services.map((service: any) => {
-                    const isAssigned = form.watch('assignedServices').includes(service.id);
-                    const serviceRates = form.watch('serviceRates')[service.id.toString()] || {};
-                    
-                    return (
-                      <div key={service.id} className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`service-${service.id}`}
-                            checked={isAssigned}
-                            onCheckedChange={(checked) => handleServiceToggle(service.id, !!checked)}
-                          />
-                          <label 
-                            htmlFor={`service-${service.id}`}
-                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                          >
-                            {service.name} - ${service.price}
-                          </label>
-                        </div>
-                        
-                        {isAssigned && (
-                          <div className="ml-6 grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs text-gray-600">Custom Rate ($)</label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder={service.price}
-                                value={serviceRates.customRate || ''}
-                                onChange={(e) => handleCustomRateChange(service.id, 'customRate', e.target.value)}
-                                className="h-7 text-xs"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-gray-600">Custom Commission (%)</label>
-                              <Input
-                                type="number"
-                                step="0.1"
-                                placeholder="Use default"
-                                value={serviceRates.customCommissionRate || ''}
-                                onChange={(e) => handleCustomRateChange(service.id, 'customCommissionRate', e.target.value)}
-                                className="h-7 text-xs"
-                              />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
