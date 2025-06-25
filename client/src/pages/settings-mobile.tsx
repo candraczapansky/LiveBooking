@@ -43,6 +43,28 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 export default function SettingsMobile() {
   const { toast } = useToast();
   const { user, updateUser } = useContext(AuthContext);
+  
+  // Debug logging for user context
+  useEffect(() => {
+    console.log('Settings page mounted');
+    console.log('User from context:', user);
+    console.log('localStorage user data:', localStorage.getItem('user'));
+    
+    // If user is null but localStorage has data, there's a context issue
+    if (!user) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        console.error('User context is null but localStorage has user data:', storedUser);
+        // Try to force re-parse the user data
+        try {
+          const userData = JSON.parse(storedUser);
+          console.log('Parsed localStorage user data:', userData);
+        } catch (e) {
+          console.error('Error parsing localStorage user data:', e);
+        }
+      }
+    }
+  }, [user]);
 
   const [darkMode, setDarkMode] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);

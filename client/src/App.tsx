@@ -118,16 +118,22 @@ function useAuth() {
   useEffect(() => {
     // Check for user in localStorage on initial load
     const storedUser = localStorage.getItem('user');
+    console.log('useAuth useEffect - checking localStorage for user');
+    console.log('Stored user data:', storedUser);
+    
     if (storedUser) {
       try {
         const userData = JSON.parse(storedUser);
+        console.log('Parsed user data:', userData);
         setUser(userData);
         setIsAuthenticated(true);
-
+        console.log('User context set successfully');
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
       }
+    } else {
+      console.log('No user data found in localStorage');
     }
   }, []);
 
@@ -139,10 +145,17 @@ function useAuth() {
   };
 
   const updateUser = (updatedUserData: Partial<User>) => {
+    console.log('updateUser called with:', updatedUserData);
+    console.log('Current user before update:', user);
+    
     if (user) {
       const newUser = { ...user, ...updatedUserData };
+      console.log('New user data after merge:', newUser);
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
+      console.log('User context and localStorage updated');
+    } else {
+      console.error('Cannot update user - current user is null');
     }
   };
 
