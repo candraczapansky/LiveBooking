@@ -117,6 +117,19 @@ export default function SettingsMobile() {
     root.style.setProperty('--accent', `${h} ${Math.max(s - 10, 0)}% ${Math.min(l + 10, 95)}%`);
     root.style.setProperty('--accent-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
     
+    // Apply dropdown colors to match primary color
+    root.style.setProperty('--dropdown-selected', `${h} ${s}% ${l}%`);
+    root.style.setProperty('--dropdown-selected-foreground', `${h} ${s}% ${l > 50 ? 10 : 90}%`);
+    
+    // Apply sidebar colors to match primary color
+    root.style.setProperty('--sidebar-primary', `${h} ${s}% ${l}%`);
+    root.style.setProperty('--sidebar-accent', `${h} ${Math.max(s - 10, 0)}% ${Math.min(l + 10, 95)}%`);
+    root.style.setProperty('--sidebar-accent-foreground', `${h} ${s}% ${l}%`);
+    root.style.setProperty('--sidebar-ring', `${h} ${s}% ${l}%`);
+    
+    // Apply ring color
+    root.style.setProperty('--ring', `${h} ${s}% ${l}%`);
+    
     // Apply dark/light mode styling
     if (isDark) {
       document.documentElement.classList.add('dark');

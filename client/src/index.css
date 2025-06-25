@@ -1457,6 +1457,19 @@ div[data-radix-select-content] div[data-radix-select-item]:focus {
   color: hsl(var(--dropdown-selected-foreground)) !important;
 }
 
+/* Nuclear option - override ALL possible dropdown selectors */
+.select-item:hover,
+.select-item[data-highlighted],
+.select-item[data-state="checked"],
+.select-item:focus,
+*[data-radix-select-item]:hover,
+*[data-radix-select-item][data-highlighted],
+*[data-radix-select-item][data-state="checked"],
+*[data-radix-select-item]:focus {
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+}
+
 /* Stats card hover effect */
 .stats-card {
   @apply transition-all duration-200;
