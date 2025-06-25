@@ -102,6 +102,24 @@ Development workflow: User prefers quick solutions over lengthy debugging sessio
   - Schedule creation now working properly with proper database persistence
   - Form validation and error handling working correctly through new architecture
 
+### June 25, 2025 - Intelligent Staff Availability Filtering for Appointment Booking
+- **Implemented comprehensive availability service:**
+  - Created `availabilityService.ts` with schedule-based staff filtering
+  - Added intelligent time slot generation based on staff schedules
+  - Implemented conflict detection to prevent double-booking
+  - Added validation for service capability checking
+- **Enhanced appointment booking system:**
+  - Staff dropdown now only shows available staff for selected service and date
+  - Time selection filtered to show only available slots based on staff schedules
+  - Added helpful guidance messages when no staff or times are available
+  - Prevents booking appointments outside staff working hours
+  - Real-time validation against existing appointments to avoid conflicts
+- **Improved user experience:**
+  - Clear feedback when staff unavailable for selected date/service
+  - Dynamic time slot filtering based on staff availability
+  - Form validation prevents invalid booking attempts
+  - System respects staff schedule constraints and service assignments
+
 ### June 25, 2025 - Staff and Schedule Page UI Simplification
 - **Simplified staff page to show staff names list first:**
   - Updated staff page to display clean list of staff members with names and titles only
