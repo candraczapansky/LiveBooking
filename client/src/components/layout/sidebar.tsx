@@ -66,7 +66,7 @@ const Sidebar = () => {
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
     { icon: <Calendar />, label: "Appointments", href: "/appointments" },
-    { icon: <CalendarDays />, label: "Schedules", href: "/schedule" },
+    { icon: <CalendarDays />, label: "Staff Schedule", href: "/staff-schedule" },
     { icon: <Users />, label: "Clients", href: "/clients" },
     { icon: <UserCircle />, label: "Staff", href: "/staff" },
     { icon: <Scissors />, label: "Services", href: "/services" },
