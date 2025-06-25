@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-import { formatPrice } from "@/lib/utils";
-import AddStaffDialog from "@/components/staff/add-staff-dialog";
+import { useStaffManagement } from "@/hooks/useStaffManagement";
+import { getStaffFullName, getStaffInitials, formatCommissionRate } from "@/services/staffService";
+import { StaffManagementDialog } from "@/components/staff/staff-management-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {
@@ -157,13 +155,7 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <Button 
-                    onClick={() => {
-                      console.log("Direct button click - opening dialog");
-                      setIsAddStaffOpen(true);
-                    }} 
-                    size="sm"
-                  >
+                  <Button onClick={handleAddStaff} size="sm">
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1 hidden sm:inline">Add Staff</span>
                   </Button>
@@ -279,14 +271,12 @@ const StaffPage = () => {
         </main>
       </div>
       
-      {/* Add Staff Dialog */}
-      {console.log("Rendering dialog with isAddStaffOpen:", isAddStaffOpen)}
-      <AddStaffDialog
-        open={isAddStaffOpen}
-        onOpenChange={(open) => {
-          console.log("Dialog onOpenChange called with:", open);
-          setIsAddStaffOpen(open);
-        }}
+      {/* Staff Management Dialog */}
+      <StaffManagementDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={(data) => createStaffMutation.mutate(data)}
+        isSubmitting={createStaffMutation.isPending}
       />
       
       {/* Delete Staff Dialog */}
