@@ -334,11 +334,14 @@ export default function SettingsMobile() {
   const updateProfileMutation = useMutation({
     mutationFn: async (profileData: { firstName: string; lastName: string; email: string; phone: string }) => {
       if (!user?.id) {
+        console.error('No user ID found:', user);
         throw new Error('User ID is required');
       }
       
-      console.log('Updating profile for user ID:', user.id);
-      console.log('Profile data:', profileData);
+      console.log('Starting profile update...');
+      console.log('User ID:', user.id);
+      console.log('Profile data being sent:', profileData);
+      console.log('API URL:', `/api/users/${user.id}`);
       
       const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
@@ -348,25 +351,46 @@ export default function SettingsMobile() {
         body: JSON.stringify(profileData),
       });
       
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Update failed:', errorData);
+        console.error('API Update failed:', errorData);
         throw new Error(errorData.error || 'Failed to update profile');
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('API Update successful, received:', result);
+      return result;
     },
     onSuccess: (updatedUser) => {
+      console.log('Profile update success callback triggered');
+      console.log('Updated user data received:', updatedUser);
+      
       // Update the user context with the new data using the context function
+      console.log('Calling updateUser with:', updatedUser);
       updateUser(updatedUser);
+      console.log('updateUser call completed');
+      
+      // Update the profile data state to reflect the changes
+      setProfileData({
+        firstName: updatedUser.firstName || '',
+        lastName: updatedUser.lastName || '',
+        email: updatedUser.email || '',
+        phone: updatedUser.phone || '',
+        username: updatedUser.username || ''
+      });
       
       toast({
         title: "Profile updated",
         description: "Your profile information has been saved successfully.",
       });
       setIsEditingProfile(false);
+      console.log('Profile update success flow completed');
     },
     onError: (error) => {
+      console.error('Profile update error callback triggered:', error);
       toast({
         title: "Update failed",
         description: "Failed to update profile. Please try again.",
@@ -376,7 +400,12 @@ export default function SettingsMobile() {
   });
 
   const handleSaveProfile = () => {
+    console.log('handleSaveProfile called');
+    console.log('Current user:', user);
+    console.log('Current profileData state:', profileData);
+    
     if (!user?.id) {
+      console.error('No user ID available for profile save');
       toast({
         title: "Error",
         description: "User session not found. Please log in again.",
@@ -385,8 +414,9 @@ export default function SettingsMobile() {
       return;
     }
     
-    console.log('Saving profile for user:', user);
+    console.log('Starting profile mutation with data:', profileData);
     updateProfileMutation.mutate(profileData);
+    console.log('Profile mutation triggered');
   };
 
   return (
