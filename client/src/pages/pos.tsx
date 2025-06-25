@@ -534,10 +534,10 @@ export default function PointOfSale() {
                             <Button 
                               size="default" 
                               variant="default" 
-                              className="lg:hidden flex-shrink-0 min-w-[44px] min-h-[44px] px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+                              className="lg:hidden flex-shrink-0 min-w-[44px] min-h-[44px] px-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md flex items-center justify-center"
                             >
-                              <Plus className="h-5 w-5 mr-1" />
                               <span className="hidden min-[380px]:inline text-sm font-medium">Add</span>
+                              <span className="min-[380px]:hidden text-lg">+</span>
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4">

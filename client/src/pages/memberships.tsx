@@ -173,8 +173,7 @@ const MembershipsPage = () => {
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                <Button onClick={handleAddMembership}>
-                  <PlusCircle className="h-4 w-4 mr-2" />
+                <Button onClick={handleAddMembership} className="flex items-center justify-center">
                   Add Membership Plan
                 </Button>
               </div>
@@ -207,8 +206,7 @@ const MembershipsPage = () => {
                       <p className="text-sm text-gray-500 mb-4 text-center max-w-md">
                         Create membership plans to offer your clients regular services at discounted rates or exclusive benefits.
                       </p>
-                      <Button onClick={handleAddMembership}>
-                        <PlusCircle className="h-4 w-4 mr-2" />
+                      <Button onClick={handleAddMembership} className="flex items-center justify-center">
                         Add Membership Plan
                       </Button>
                     </CardContent>
