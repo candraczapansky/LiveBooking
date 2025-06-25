@@ -103,9 +103,11 @@ const StaffPage = () => {
   });
 
   const handleAddStaff = () => {
-    console.log("Add staff clicked - setting form open");
+    console.log("Add staff clicked - setting form open to true");
+    console.log("Current form state before:", isFormOpen);
     setSelectedStaffId(null);
     setIsFormOpen(true);
+    console.log("After setting state - form should be open");
   };
 
   const handleEditStaff = (staffId: number) => {
@@ -133,6 +135,11 @@ const StaffPage = () => {
     staffMember.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (staffMember.user?.phone && staffMember.user.phone.includes(searchQuery))
   );
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log("Staff page state change - isFormOpen:", isFormOpen, "selectedStaffId:", selectedStaffId);
+  }, [isFormOpen, selectedStaffId]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -272,6 +279,7 @@ const StaffPage = () => {
       </div>
       
       {/* Staff Form Dialog */}
+      {console.log("Rendering StaffForm with props:", { open: isFormOpen, staffId: selectedStaffId })}
       <StaffForm
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
