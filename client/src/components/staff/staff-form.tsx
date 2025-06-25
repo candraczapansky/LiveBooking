@@ -45,9 +45,7 @@ const staffFormSchema = z.object({
   commissionRate: z.number().min(0).max(100).default(0),
   hourlyRate: z.number().min(0).optional(),
   fixedSalary: z.number().min(0).optional(),
-  username: z.string().min(1, "Username is required"),
   email: z.string(),
-  password: z.string().min(6, "Password must be at least 6 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -85,9 +83,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       commissionRate: 0,
       hourlyRate: 0,
       fixedSalary: 0,
-      username: "",
       email: "",
-      password: "",
       firstName: "",
       lastName: "",
       phone: "",
@@ -138,8 +134,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 firstName: data.user?.firstName || "",
                 lastName: data.user?.lastName || "",
                 email: data.user?.email || "",
-                username: data.user?.username || "",
-                password: "", // Don't pre-fill password
                 phone: data.user?.phone || "",
                 assignedServices: assignedServiceIds,
                 serviceRates: serviceRates,
@@ -170,9 +164,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         title: "",
         bio: "",
         commissionRate: 0,
-        username: "",
         email: "",
-        password: "",
         firstName: "",
         lastName: "",
         phone: "",
@@ -194,16 +186,19 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       // Always create a new user for staff
       let userId;
       
-      // Generate a unique username if the provided one fails
-      let username = data.username;
+      // Generate username from first and last name
+      const baseUsername = `${data.firstName.toLowerCase()}${data.lastName.toLowerCase()}`.replace(/[^a-z0-9]/g, '');
       let userCreated = false;
       let attempts = 0;
       
       while (!userCreated && attempts < 5) {
+        const username = attempts === 0 ? baseUsername : `${baseUsername}${attempts}`;
+        const defaultPassword = `${data.firstName}123!`; // Simple default password
+        
         const userData = {
-          username: attempts === 0 ? username : `${username}${attempts}`,
+          username,
           email: data.email,
-          password: data.password,
+          password: defaultPassword,
           firstName: data.firstName,
           lastName: data.lastName,
           phone: data.phone,
@@ -226,7 +221,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
       
       if (!userCreated) {
-        throw new Error("Unable to create a unique username. Please try a different username.");
+        throw new Error("Unable to create a unique username. Please try a different name combination.");
       }
 
       // Create staff member
@@ -535,37 +530,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="johndoe" {...field} disabled={!!staffId} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {!staffId && (
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
