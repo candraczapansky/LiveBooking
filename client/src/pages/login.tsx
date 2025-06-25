@@ -154,7 +154,7 @@ const Login = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="px-6 pb-8">
-            <div className="flex w-full mb-6 h-8 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
+            <div className="flex w-full mb-8 h-7 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
               <button
                 type="button"
                 onClick={() => setActiveTab("login")}
