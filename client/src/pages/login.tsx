@@ -152,16 +152,16 @@ const Login = () => {
         </CardHeader>
         <CardContent className="px-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 mb-6 h-12 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+            <TabsList className="grid w-full grid-cols-2 mb-6 h-14 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
               <TabsTrigger 
                 value="login" 
-                className="text-base font-medium rounded-md h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="text-base font-semibold rounded-md h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
               >
                 Login
               </TabsTrigger>
               <TabsTrigger 
                 value="register" 
-                className="text-base font-medium rounded-md h-10 data-[state=active]:bg-white data-[state=active]:shadow-sm"
+                className="text-base font-semibold rounded-md h-12 flex-1 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-primary transition-all"
               >
                 Register
               </TabsTrigger>
