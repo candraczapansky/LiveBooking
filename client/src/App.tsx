@@ -22,6 +22,8 @@ import Marketing from "@/pages/marketing";
 import Automations from "@/pages/automations";
 import Settings from "@/pages/settings-mobile";
 import Schedule from "@/pages/schedule";
+import StaffSchedule from "@/pages/staff-schedule";
+import StaffScheduleDetail from "@/pages/staff-schedule-detail";
 import ClientBooking from "@/pages/client-booking";
 import PointOfSale from "@/pages/pos";
 import Products from "@/pages/products";
