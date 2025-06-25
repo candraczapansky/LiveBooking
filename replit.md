@@ -52,7 +52,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
-### June 25, 2025 - Staff and Schedule Page UI Simplification
+### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences
 - **Simplified staff page to show staff names list first:**
   - Updated staff page to display clean list of staff members with names and titles only
   - Added click navigation to individual staff schedules when staff member is clicked
@@ -66,6 +66,17 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Includes search functionality to filter staff by name
   - Added "Manage All" button for advanced schedule management access
   - Consistent design pattern with staff page for better user experience
+- **Implemented database storage for user color preferences:**
+  - Created `user_color_preferences` table to permanently store user theme settings
+  - Added API endpoints for saving and retrieving color preferences by user ID
+  - Updated settings page to load preferences from database instead of localStorage
+  - Auto-saves color changes to database while maintaining localStorage backup
+  - Includes storage for primary color, text colors, dark mode, and saved color palettes
+  - Migrated from temporary localStorage to permanent database persistence
+- **Removed Text Color Presets section:**
+  - Cleaned up settings interface by removing redundant preset options
+  - Maintained custom saved text colors functionality for user personalization
+  - Simplified color picker interface while preserving full customization capabilities
 
 ### June 24, 2025 - Mobile UI Improvements, SMS Marketing Fixes, Staff Schedule Completion, POS Sales Reporting Integration, Complete Database Migration, and Email Placeholder Cleanup
 - **Enhanced mobile button accessibility:**

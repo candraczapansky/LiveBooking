@@ -6,10 +6,11 @@ import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import { apiRequest } from "@/lib/queryClient";
 
 import { 
   Bell, 
@@ -678,6 +679,8 @@ export default function SettingsMobile() {
                           const updated = [...savedBrandColors, newBrandColor];
                           setSavedBrandColors(updated);
                           localStorage.setItem('savedBrandColors', JSON.stringify(updated));
+                          // Auto-save to database
+                          saveColorPreferencesMutation.mutate({ savedBrandColors: JSON.stringify(updated) });
                         }
                       }}
                       style={{
@@ -751,6 +754,8 @@ export default function SettingsMobile() {
                               const updated = savedBrandColors.filter((_, i) => i !== index);
                               setSavedBrandColors(updated);
                               localStorage.setItem('savedBrandColors', JSON.stringify(updated));
+                              // Auto-save to database
+                              saveColorPreferencesMutation.mutate({ savedBrandColors: JSON.stringify(updated) });
                             }}
                             style={{
                               width: "24px",
@@ -974,6 +979,8 @@ export default function SettingsMobile() {
                         const updated = [...savedTextColors, newTextColor];
                         setSavedTextColors(updated);
                         localStorage.setItem('savedTextColors', JSON.stringify(updated));
+                        // Auto-save to database
+                        saveColorPreferencesMutation.mutate({ savedTextColors: JSON.stringify(updated) });
                       }
                     }}
                     style={{
@@ -1061,6 +1068,8 @@ export default function SettingsMobile() {
                             const updated = savedTextColors.filter((_, i) => i !== index);
                             setSavedTextColors(updated);
                             localStorage.setItem('savedTextColors', JSON.stringify(updated));
+                            // Auto-save to database
+                            saveColorPreferencesMutation.mutate({ savedTextColors: JSON.stringify(updated) });
                           }}
                           style={{
                             width: "28px",

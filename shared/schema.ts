@@ -322,6 +322,26 @@ export const insertGiftCardTransactionSchema = createInsertSchema(giftCardTransa
   createdAt: true,
 });
 
+// User color preferences schema
+export const userColorPreferences = pgTable("user_color_preferences", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  primaryColor: text("primary_color").notNull().default("#f4a4c0"), // HSL format
+  primaryTextColor: text("primary_text_color").notNull().default("#000000"),
+  secondaryTextColor: text("secondary_text_color").notNull().default("#6b7280"),
+  isDarkMode: boolean("is_dark_mode").notNull().default(false),
+  savedBrandColors: text("saved_brand_colors"), // JSON string array
+  savedTextColors: text("saved_text_colors"), // JSON string array
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserColorPreferencesSchema = createInsertSchema(userColorPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -364,6 +384,9 @@ export type InsertGiftCard = z.infer<typeof insertGiftCardSchema>;
 
 export type GiftCardTransaction = typeof giftCardTransactions.$inferSelect;
 export type InsertGiftCardTransaction = z.infer<typeof insertGiftCardTransactionSchema>;
+
+export type UserColorPreferences = typeof userColorPreferences.$inferSelect;
+export type InsertUserColorPreferences = z.infer<typeof insertUserColorPreferencesSchema>;
 
 export type Device = typeof devices.$inferSelect;
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
