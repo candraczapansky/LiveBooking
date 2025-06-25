@@ -75,6 +75,12 @@ export default function SettingsMobile() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Button icons state
+  const [showButtonIcons, setShowButtonIcons] = useState(() => {
+    const saved = localStorage.getItem('showButtonIcons');
+    return saved !== null ? JSON.parse(saved) : false;
+  });
+
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
     
@@ -219,6 +225,9 @@ export default function SettingsMobile() {
     // Save to localStorage
     localStorage.setItem('primaryTextColor', primaryText);
     localStorage.setItem('secondaryTextColor', secondaryText);
+    
+    // Apply button icons setting globally
+    document.documentElement.classList.toggle('hide-button-icons', !showButtonIcons);
   };
 
 
@@ -233,6 +242,10 @@ export default function SettingsMobile() {
     const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
     const savedPrimaryTextColor = localStorage.getItem('primaryTextColor') || '#111827';
     const savedSecondaryTextColor = localStorage.getItem('secondaryTextColor') || '#6b7280';
+    const savedShowButtonIcons = localStorage.getItem('showButtonIcons');
+    if (savedShowButtonIcons !== null) {
+      setShowButtonIcons(JSON.parse(savedShowButtonIcons));
+    }
     
     setSelectedTheme(savedTheme);
     setDarkMode(savedDarkMode);
@@ -245,6 +258,8 @@ export default function SettingsMobile() {
     setTimeout(() => {
       applyThemeColors(savedCustomColor, savedDarkMode);
       applyTextColors(savedPrimaryTextColor, savedSecondaryTextColor);
+      // Apply button icons setting
+      document.documentElement.classList.toggle('hide-button-icons', !showButtonIcons);
     }, 100);
   }, []);
 
@@ -255,10 +270,14 @@ export default function SettingsMobile() {
     localStorage.setItem('darkMode', darkMode.toString());
     localStorage.setItem('primaryTextColor', primaryTextColor);
     localStorage.setItem('secondaryTextColor', secondaryTextColor);
+    localStorage.setItem('showButtonIcons', JSON.stringify(showButtonIcons));
     
     // Apply the colors immediately
     applyThemeColors(customColor, darkMode);
     applyTextColors(primaryTextColor, secondaryTextColor);
+    
+    // Apply button icons setting
+    document.documentElement.classList.toggle('hide-button-icons', !showButtonIcons);
     
     toast({
       title: "Appearance saved",
@@ -983,6 +1002,49 @@ export default function SettingsMobile() {
                     fontSize: "14px"
                   }}>
                     Preview: This is how secondary text will look
+                  </div>
+                </div>
+
+                {/* Button Icons Toggle */}
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "14px", fontWeight: "500", marginBottom: "8px", display: "block", color: "#6b7280" }}>
+                    Button Icons
+                  </label>
+                  <p style={{ fontSize: "12px", color: "#6b7280", marginBottom: "12px" }}>
+                    Show or hide icons on buttons throughout the application
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <Switch
+                      checked={showButtonIcons}
+                      onCheckedChange={(checked) => {
+                        setShowButtonIcons(checked);
+                        localStorage.setItem('showButtonIcons', JSON.stringify(checked));
+                        document.documentElement.classList.toggle('hide-button-icons', !checked);
+                      }}
+                    />
+                    <span style={{ fontSize: "14px", color: primaryTextColor }}>
+                      {showButtonIcons ? 'Icons enabled' : 'Icons disabled'}
+                    </span>
+                  </div>
+                  <div style={{ 
+                    marginTop: "8px", 
+                    padding: "12px", 
+                    backgroundColor: "#f9fafb", 
+                    borderRadius: "6px",
+                    fontSize: "14px"
+                  }}>
+                    Preview: <Button 
+                      style={{ 
+                        fontSize: "12px", 
+                        height: "32px", 
+                        backgroundColor: customColor,
+                        borderColor: customColor,
+                        marginLeft: "8px"
+                      }}
+                    >
+                      {showButtonIcons && <Save style={{ width: "14px", height: "14px", marginRight: "6px" }} />}
+                      Sample Button
+                    </Button>
                   </div>
                 </div>
                 
