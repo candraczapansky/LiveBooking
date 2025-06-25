@@ -11,7 +11,7 @@ import {
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
-  staffEarnings, InsertStaffEarningsSchema,
+  staffEarnings, insertStaffEarningsSchema,
   savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
   savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   giftCards, GiftCard, InsertGiftCard,
@@ -186,7 +186,7 @@ export interface IStorage {
   getUsersByAudience(audience: string): Promise<User[]>;
   
   // Staff Earnings operations
-  createStaffEarnings(earnings: InsertStaffEarningsSchema): Promise<any>;
+  createStaffEarnings(earnings: any): Promise<any>;
   getStaffEarnings(staffId: number, month?: Date): Promise<any[]>;
   getAllStaffEarnings(): Promise<any[]>;
 }
@@ -1423,6 +1423,64 @@ export class DatabaseStorage implements IStorage {
   async deleteStaffSchedule(id: number): Promise<boolean> {
     const result = await db.delete(staffSchedules).where(eq(staffSchedules.id, id));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getUsersByAudience(audience: string): Promise<User[]> {
+    const allUsers = await this.getAllUsers();
+    
+    switch (audience) {
+      case 'all_clients':
+        return allUsers.filter(user => user.role === 'client');
+      case 'regular_clients':
+        return allUsers.filter(user => user.role === 'client');
+      case 'new_clients':
+        return allUsers.filter(user => user.role === 'client');
+      case 'vip_clients':
+        return allUsers.filter(user => user.role === 'client');
+      default:
+        return allUsers.filter(user => user.role === 'client');
+    }
+  }
+
+  // Staff Earnings operations
+  async createStaffEarnings(earnings: any): Promise<any> {
+    try {
+      const [result] = await db.insert(staffEarnings).values(earnings).returning();
+      return result;
+    } catch (error) {
+      console.error('Error creating staff earnings:', error);
+      throw error;
+    }
+  }
+
+  async getStaffEarnings(staffId: number, month?: Date): Promise<any[]> {
+    try {
+      let query = db.select().from(staffEarnings).where(eq(staffEarnings.staffId, staffId));
+      
+      if (month) {
+        const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+        const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+        query = query.where(and(
+          eq(staffEarnings.staffId, staffId),
+          gte(staffEarnings.earningsDate, startOfMonth),
+          lte(staffEarnings.earningsDate, endOfMonth)
+        ));
+      }
+      
+      return await query;
+    } catch (error) {
+      console.error('Error getting staff earnings:', error);
+      return [];
+    }
+  }
+
+  async getAllStaffEarnings(): Promise<any[]> {
+    try {
+      return await db.select().from(staffEarnings);
+    } catch (error) {
+      console.error('Error getting all staff earnings:', error);
+      return [];
+    }
   }
 }
 
