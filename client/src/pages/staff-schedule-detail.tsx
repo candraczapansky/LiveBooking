@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, MapPin, Plus, Edit, Trash2, ArrowLeft, User } from "lucide-react";
-import { AddEditScheduleDialog } from "@/components/staff/add-edit-schedule-dialog";
+import { useScheduleManagement } from "@/hooks/useScheduleManagement";
+import { ScheduleManagementDialog } from "@/components/staff/schedule-management-dialog";
+import { getStaffFullName } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -13,10 +15,19 @@ import { format } from "date-fns";
 export default function StaffScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const staffId = parseInt(id);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<any>(null);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+
+  // Use consolidated schedule management hook
+  const {
+    schedules: staffSchedules,
+    isLoading,
+    isDialogOpen,
+    editingSchedule,
+    handleAddSchedule,
+    handleEditSchedule,
+    handleDeleteSchedule,
+    handleSubmitSchedule,
+    setIsDialogOpen,
+  } = useScheduleManagement(staffId);
 
   // Fetch staff member details
   const { data: staff = [] } = useQuery({
@@ -24,56 +35,6 @@ export default function StaffScheduleDetailPage() {
   });
 
   const staffMember = staff.find((s: any) => s.id === staffId);
-
-  // Fetch schedules for this staff member
-  const { data: allSchedules = [], isLoading } = useQuery({
-    queryKey: ['/api/schedules'],
-  });
-
-  const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
-
-  // Delete schedule mutation
-  const deleteScheduleMutation = useMutation({
-    mutationFn: async (scheduleId: number) => {
-      const response = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
-      if (!response.ok) {
-        throw new Error("Failed to delete schedule");
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule deleted successfully.",
-      });
-    },
-    onError: (error) => {
-      console.error("Failed to delete schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete schedule. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleEdit = (schedule: any) => {
-    setEditingSchedule(schedule);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = async (scheduleId: number) => {
-    if (window.confirm("Are you sure you want to delete this schedule?")) {
-      deleteScheduleMutation.mutate(scheduleId);
-    }
-  };
-
-  const getStaffName = () => {
-    if (staffMember?.user) {
-      return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
-    }
-    return 'Unknown Staff';
-  };
 
   if (!staffMember) {
     return (
@@ -106,16 +67,13 @@ export default function StaffScheduleDetailPage() {
               <User className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold">{getStaffName()}</h1>
+              <h1 className="text-3xl font-bold">{getStaffFullName(staffMember)}</h1>
               <p className="text-muted-foreground">{staffMember.title}</p>
             </div>
           </div>
         </div>
         <Button 
-          onClick={() => {
-            setEditingSchedule(null);
-            setIsDialogOpen(true);
-          }}
+          onClick={() => handleAddSchedule(staffId)}
           className="flex items-center gap-2"
         >
           <Plus className="h-4 w-4" />
@@ -131,13 +89,10 @@ export default function StaffScheduleDetailPage() {
             <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No schedules found</h3>
             <p className="text-muted-foreground mb-4">
-              Create the first schedule for {getStaffName()}.
+              Create the first schedule for {getStaffFullName(staffMember)}.
             </p>
             <Button 
-              onClick={() => {
-                setEditingSchedule(null);
-                setIsDialogOpen(true);
-              }}
+              onClick={() => handleAddSchedule(staffId)}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Schedule
@@ -205,11 +160,12 @@ export default function StaffScheduleDetailPage() {
         </div>
       )}
 
-      <AddEditScheduleDialog
+      <ScheduleManagementDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
         schedule={editingSchedule}
         defaultStaffId={staffId}
+        onSubmit={handleSubmitSchedule}
       />
     </div>
   );
