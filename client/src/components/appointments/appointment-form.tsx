@@ -180,9 +180,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         date: appointmentDate,
         time: appointmentTime,
         notes: appointment.notes || "",
+        sendReminder: true,
       });
     }
-  }, [appointment, appointmentId, form]);
+  }, [appointment, appointmentId]);
 
   // Reset form when closing
   useEffect(() => {
@@ -194,9 +195,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         date: selectedDate || new Date(),
         time: "10:00",
         notes: "",
+        sendReminder: true,
       });
     }
-  }, [open, selectedDate, form]);
+  }, [open, selectedDate]);
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
