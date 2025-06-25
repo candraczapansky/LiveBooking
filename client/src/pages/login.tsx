@@ -139,9 +139,9 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-8 py-8">
-      <div className="w-full max-w-md mx-auto">
-        <Card className="w-full shadow-lg border-0 m-4">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm mx-auto">
+        <Card className="w-full shadow-lg border-0">
         <CardHeader className="text-center pb-4 px-8">
           <div className="flex justify-center mb-4">
             <div className="bg-primary/10 p-3 rounded-full">
@@ -153,8 +153,8 @@ const Login = () => {
             Salon & Spa Management Platform
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-8 pb-2 m-2">
-            <div className="flex w-full mb-4 h-9 bg-gray-100 dark:bg-gray-800 rounded-md p-0.5 gap-0.5">
+        <CardContent className="px-6 pb-8">
+            <div className="flex w-full mb-6 h-10 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 gap-1">
               <button
                 type="button"
                 onClick={() => setActiveTab("login")}
@@ -181,7 +181,7 @@ const Login = () => {
             
             {activeTab === "login" && (
               <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4" noValidate>
+                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
                   <FormField
                     control={loginForm.control}
                     name="username"
@@ -219,7 +219,7 @@ const Login = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-10 text-sm font-medium mt-4 rounded-md" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
                     {isLoading ? "Logging in..." : "Login"}
                   </Button>
                 </form>
@@ -228,7 +228,7 @@ const Login = () => {
             
             {activeTab === "register" && (
               <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-3" noValidate>
+                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
                   <div className="grid grid-cols-2 gap-2">
                     <FormField
                       control={registerForm.control}
@@ -326,7 +326,7 @@ const Login = () => {
                     )}
                   />
                   
-                  <Button type="submit" className="w-full h-10 text-sm font-medium mt-3 rounded-md" disabled={isLoading}>
+                  <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
                     {isLoading ? "Registering..." : "Register"}
                   </Button>
                 </form>
