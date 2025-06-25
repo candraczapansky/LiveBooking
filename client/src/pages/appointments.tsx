@@ -789,7 +789,7 @@ const AppointmentsPage = () => {
                       className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px]"
                       size="default"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4 text-primary-foreground" />
+                      <PlusCircle className="mr-2 h-4 w-4" />
                       <span className="hidden sm:inline">New Appointment</span>
                       <span className="sm:hidden">New</span>
                     </Button>
