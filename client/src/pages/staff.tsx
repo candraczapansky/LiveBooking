@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
-import StaffForm from "@/components/staff/staff-form";
+import AddStaffDialog from "@/components/staff/add-staff-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {
@@ -54,8 +54,7 @@ const StaffPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
+  const [isAddStaffOpen, setIsAddStaffOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -103,18 +102,17 @@ const StaffPage = () => {
   });
 
   const handleAddStaff = () => {
-    console.log("Add staff clicked - setting form open to true");
-    console.log("Current form state before:", isFormOpen);
-    setSelectedStaffId(null);
-    setIsFormOpen(true);
-    console.log("After setting state - form should be open");
+    console.log("Opening add staff dialog");
+    setIsAddStaffOpen(true);
   };
 
   const handleEditStaff = (staffId: number) => {
-    console.log("Edit staff clicked for ID:", staffId, "Current form state:", isFormOpen);
-    setSelectedStaffId(staffId);
-    setIsFormOpen(true);
-    console.log("After setting state - staffId:", staffId, "form open:", true);
+    console.log("Edit staff clicked for ID:", staffId);
+    // TODO: Implement edit functionality
+    toast({
+      title: "Feature Coming Soon",
+      description: "Staff editing functionality will be available soon.",
+    });
   };
 
   const handleDeleteStaff = () => {
@@ -136,10 +134,7 @@ const StaffPage = () => {
     (staffMember.user?.phone && staffMember.user.phone.includes(searchQuery))
   );
 
-  // Debug: Log state changes
-  useEffect(() => {
-    console.log("Staff page state change - isFormOpen:", isFormOpen, "selectedStaffId:", selectedStaffId);
-  }, [isFormOpen, selectedStaffId]);
+
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -278,12 +273,10 @@ const StaffPage = () => {
         </main>
       </div>
       
-      {/* Staff Form Dialog */}
-      {console.log("Rendering StaffForm with props:", { open: isFormOpen, staffId: selectedStaffId })}
-      <StaffForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        staffId={selectedStaffId || undefined}
+      {/* Add Staff Dialog */}
+      <AddStaffDialog
+        open={isAddStaffOpen}
+        onOpenChange={setIsAddStaffOpen}
       />
       
       {/* Delete Staff Dialog */}
