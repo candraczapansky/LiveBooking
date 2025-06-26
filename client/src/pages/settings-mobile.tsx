@@ -48,6 +48,51 @@ export default function SettingsMobile() {
   // Use context user or fallback to localStorage user
   const currentUser = user || localUser;
 
+  // Get current user ID for queries
+  const getCurrentUserId = () => {
+    if (currentUser?.id) return currentUser.id;
+    
+    // Fallback to localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        const userData = JSON.parse(storedUser);
+        return userData.id;
+      } catch (e) {
+        console.error('Error parsing localStorage user data:', e);
+      }
+    }
+    return null;
+  };
+
+  // Query to load color preferences from database
+  const { data: savedColorPreferences, isLoading: colorPrefsLoading } = useQuery({
+    queryKey: ['/api/users/color-preferences', getCurrentUserId()],
+    queryFn: async () => {
+      const userId = getCurrentUserId();
+      if (!userId) {
+        console.log('No user ID available for loading color preferences');
+        return null;
+      }
+      
+      console.log(`Loading color preferences for user ${userId}`);
+      const response = await fetch(`/api/users/${userId}/color-preferences`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No saved color preferences found');
+          return null;
+        }
+        throw new Error('Failed to load color preferences');
+      }
+      
+      const data = await response.json();
+      console.log('Loaded color preferences from database:', data);
+      return data;
+    },
+    enabled: !!getCurrentUserId(),
+  });
+
   // Update profileData when currentUser changes
   useEffect(() => {
     if (currentUser) {
@@ -178,6 +223,54 @@ export default function SettingsMobile() {
     const saved = localStorage.getItem('showButtonIcons');
     return saved !== null ? JSON.parse(saved) : false;
   });
+
+  // Apply loaded color preferences from database
+  useEffect(() => {
+    if (savedColorPreferences && !colorPrefsLoading) {
+      console.log('Applying loaded color preferences:', savedColorPreferences);
+      
+      // Apply primary color if saved
+      if (savedColorPreferences.primaryColor) {
+        setCustomColor(savedColorPreferences.primaryColor);
+        applyThemeColors(savedColorPreferences.primaryColor, darkMode);
+      }
+      
+      // Apply text colors if saved
+      if (savedColorPreferences.primaryTextColor) {
+        setPrimaryTextColor(savedColorPreferences.primaryTextColor);
+      }
+      if (savedColorPreferences.secondaryTextColor) {
+        setSecondaryTextColor(savedColorPreferences.secondaryTextColor);
+      }
+      
+      // Apply dark mode if saved
+      if (savedColorPreferences.darkMode !== undefined) {
+        setDarkMode(savedColorPreferences.darkMode);
+      }
+      
+      // Apply saved brand colors if available
+      if (savedColorPreferences.savedBrandColors) {
+        try {
+          const parsedBrandColors = JSON.parse(savedColorPreferences.savedBrandColors);
+          setSavedBrandColors(parsedBrandColors);
+        } catch (e) {
+          console.error('Error parsing saved brand colors:', e);
+        }
+      }
+      
+      // Apply saved text colors if available
+      if (savedColorPreferences.savedTextColors) {
+        try {
+          const parsedTextColors = JSON.parse(savedColorPreferences.savedTextColors);
+          setSavedTextColors(parsedTextColors);
+        } catch (e) {
+          console.error('Error parsing saved text colors:', e);
+        }
+      }
+      
+      console.log('Color preferences applied successfully');
+    }
+  }, [savedColorPreferences, colorPrefsLoading, darkMode]);
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
@@ -424,14 +517,31 @@ export default function SettingsMobile() {
       console.log('saveColorPreferencesMutation called with:', preferences);
       console.log('Current user:', user);
       
-      if (!user?.id) {
+      // Get user ID from context or localStorage as fallback
+      let userId = user?.id;
+      
+      if (!userId) {
+        console.log('User context not available, checking localStorage...');
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          try {
+            const userData = JSON.parse(storedUser);
+            userId = userData.id;
+            console.log('Using user ID from localStorage:', userId);
+          } catch (e) {
+            console.error('Error parsing localStorage user data:', e);
+          }
+        }
+      }
+      
+      if (!userId) {
         console.error('No user ID available for color preferences save');
         throw new Error('User ID is required');
       }
       
-      console.log(`Making PUT request to: /api/users/${user.id}/color-preferences`);
+      console.log(`Making PUT request to: /api/users/${userId}/color-preferences`);
       
-      const response = await fetch(`/api/users/${user.id}/color-preferences`, {
+      const response = await fetch(`/api/users/${userId}/color-preferences`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
