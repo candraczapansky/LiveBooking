@@ -330,36 +330,70 @@ export default function SettingsMobile() {
 
 
 
+  // Load color preferences from database when user is available
   useEffect(() => {
-    const savedProfilePicture = localStorage.getItem('profilePicture');
-    setProfilePicture(savedProfilePicture);
-    
-    const savedTheme = localStorage.getItem('theme') || 'blue';
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    const savedCustomColor = localStorage.getItem('customColor') || '#3b82f6';
-    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
-    const savedPrimaryTextColor = localStorage.getItem('primaryTextColor') || '#111827';
-    const savedSecondaryTextColor = localStorage.getItem('secondaryTextColor') || '#6b7280';
-    const savedShowButtonIcons = localStorage.getItem('showButtonIcons');
-    if (savedShowButtonIcons !== null) {
-      setShowButtonIcons(JSON.parse(savedShowButtonIcons));
-    }
-    
-    setSelectedTheme(savedTheme);
-    setDarkMode(savedDarkMode);
-    setCustomColor(savedCustomColor);
-    setSecondaryColor(savedSecondaryColor);
-    setPrimaryTextColor(savedPrimaryTextColor);
-    setSecondaryTextColor(savedSecondaryTextColor);
-    
-    // Apply saved theme after state update
-    setTimeout(() => {
+    const loadUserColorPreferences = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`/api/users/${user.id}/color-preferences`);
+          if (response.ok) {
+            const preferences = await response.json();
+            if (preferences) {
+              // Apply database preferences
+              setCustomColor(preferences.primaryColor || '#f4a4c0');
+              setPrimaryTextColor(preferences.primaryTextColor || '#000000');
+              setSecondaryTextColor(preferences.secondaryTextColor || '#6b7280');
+              setDarkMode(preferences.isDarkMode || false);
+              
+              if (preferences.savedBrandColors) {
+                setSavedBrandColors(JSON.parse(preferences.savedBrandColors));
+              }
+              if (preferences.savedTextColors) {
+                setSavedTextColors(JSON.parse(preferences.savedTextColors));
+              }
+              
+              // Apply the loaded colors
+              applyThemeColors(preferences.primaryColor || '#f4a4c0', preferences.isDarkMode || false);
+              applyTextColors(preferences.primaryTextColor || '#000000', preferences.secondaryTextColor || '#6b7280');
+              
+              console.log('Loaded color preferences from database:', preferences);
+              return; // Exit early if database preferences were loaded
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load color preferences from database:', error);
+        }
+      }
+      
+      // Fallback to localStorage if database loading fails or user not available
+      const savedProfilePicture = localStorage.getItem('profilePicture');
+      setProfilePicture(savedProfilePicture);
+      
+      const savedTheme = localStorage.getItem('theme') || 'blue';
+      const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+      const savedCustomColor = localStorage.getItem('customColor') || '#f4a4c0';
+      const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#6b7280';
+      const savedPrimaryTextColor = localStorage.getItem('primaryTextColor') || '#000000';
+      const savedSecondaryTextColor = localStorage.getItem('secondaryTextColor') || '#6b7280';
+      const savedShowButtonIcons = localStorage.getItem('showButtonIcons');
+      if (savedShowButtonIcons !== null) {
+        setShowButtonIcons(JSON.parse(savedShowButtonIcons));
+      }
+      
+      setSelectedTheme(savedTheme);
+      setDarkMode(savedDarkMode);
+      setCustomColor(savedCustomColor);
+      setSecondaryColor(savedSecondaryColor);
+      setPrimaryTextColor(savedPrimaryTextColor);
+      setSecondaryTextColor(savedSecondaryTextColor);
+      
+      // Apply the loaded colors
       applyThemeColors(savedCustomColor, savedDarkMode);
       applyTextColors(savedPrimaryTextColor, savedSecondaryTextColor);
-      // Apply button icons setting
-      document.documentElement.classList.toggle('hide-button-icons', !showButtonIcons);
-    }, 100);
-  }, []);
+    };
+    
+    loadUserColorPreferences();
+  }, [user?.id]); // Re-run when user ID changes
 
   const handleSaveAppearance = () => {
     localStorage.setItem('theme', selectedTheme);
@@ -850,6 +884,18 @@ export default function SettingsMobile() {
                     applyThemeColors(customColor, checked);
                     // Save dark mode preference
                     localStorage.setItem('darkMode', checked.toString());
+                    // Auto-save to database
+                    if (user?.id) {
+                      saveColorPreferencesMutation.mutate({
+                        userId: user.id,
+                        primaryColor: customColor,
+                        primaryTextColor,
+                        secondaryTextColor,
+                        isDarkMode: checked,
+                        savedBrandColors: JSON.stringify(savedBrandColors),
+                        savedTextColors: JSON.stringify(savedTextColors)
+                      });
+                    }
                   }}
                 />
               </div>
