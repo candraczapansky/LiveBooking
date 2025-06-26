@@ -638,24 +638,34 @@ export default function SettingsMobile() {
                     onChange={handleProfilePictureChange}
                     style={{ display: "none" }}
                     id="profile-picture-input"
+                    ref={(input) => {
+                      if (input) {
+                        (window as any).profileInputRef = input;
+                      }
+                    }}
                   />
-                  <label htmlFor="profile-picture-input" style={{ cursor: "pointer" }}>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      type="button"
-                      style={{ 
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "8px",
-                        margin: "0 auto"
-                      }}
-                    >
-                      <Camera style={{ width: "16px", height: "16px", color: primaryTextColor }} />
-                      Change Photo
-                    </Button>
-                  </label>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById('profile-picture-input') as HTMLInputElement;
+                      if (input) {
+                        input.click();
+                      }
+                    }}
+                    style={{ 
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      margin: "0 auto",
+                      cursor: "pointer"
+                    }}
+                  >
+                    <Camera style={{ width: "16px", height: "16px", color: primaryTextColor }} />
+                    Change Photo
+                  </Button>
                 </div>
               </div>
 
