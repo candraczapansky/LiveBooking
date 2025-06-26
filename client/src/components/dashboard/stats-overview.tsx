@@ -53,7 +53,6 @@ const StatsOverview = () => {
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4 lg:gap-6 mb-6">
       <StatsCard 
         icon={<Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />}
-        iconBgColor="bg-primary/10"
         title="Today's Appointments"
         value={todayAppointments}
         linkText="View all"
@@ -62,7 +61,6 @@ const StatsOverview = () => {
       
       <StatsCard 
         icon={<DollarSign className="h-4 w-4 sm:h-5 sm:w-5 text-secondary" />}
-        iconBgColor="bg-secondary/10"
         title="Revenue Today"
         value={formatPrice(todayRevenue)}
         linkText="View report"
@@ -71,7 +69,6 @@ const StatsOverview = () => {
       
       <StatsCard 
         icon={<UserPlus className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />}
-        iconBgColor="bg-accent/10"
         title="New Clients (Month)"
         value={newClients}
         linkText="View clients"
@@ -80,7 +77,6 @@ const StatsOverview = () => {
       
       <StatsCard 
         icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-pink-600" />}
-        iconBgColor="bg-pink-100"
         title="Active Memberships"
         value={activeMemberships}
         linkText="Manage memberships"

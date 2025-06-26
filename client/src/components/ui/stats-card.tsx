@@ -3,7 +3,6 @@ import { cn } from "@/lib/utils";
 
 type StatsCardProps = {
   icon: React.ReactNode;
-  iconBgColor: string;
   title: string;
   value: string | number;
   linkText?: string;
@@ -13,7 +12,6 @@ type StatsCardProps = {
 
 const StatsCard = ({
   icon,
-  iconBgColor,
   title,
   value,
   linkText,
@@ -24,7 +22,7 @@ const StatsCard = ({
     <Card className="stats-card flex flex-col overflow-hidden">
       <CardContent className="p-3 sm:p-4 lg:p-6 flex-grow">
         <div className="flex items-center">
-          <div className={cn("flex-shrink-0 rounded-md p-2 sm:p-3", iconBgColor)}>
+          <div className="flex-shrink-0 p-2 sm:p-3">
             {icon}
           </div>
           <div className="ml-3 sm:ml-4 lg:ml-5 w-0 flex-1 min-w-0">

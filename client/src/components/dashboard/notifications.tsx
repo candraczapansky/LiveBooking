@@ -25,20 +25,7 @@ const getNotificationIcon = (type: string) => {
   }
 };
 
-const getNotificationIconBg = (type: string) => {
-  switch(type) {
-    case 'appointment_booked':
-      return 'bg-primary/10';
-    case 'appointment_cancelled':
-      return 'bg-red-100';
-    case 'payment_received':
-      return 'bg-green-100';
-    case 'new_membership':
-      return 'bg-pink-100';
-    default:
-      return 'bg-gray-100';
-  }
-};
+
 
 const NotificationItem = ({ notification }: { notification: Notification }) => {
   return (
