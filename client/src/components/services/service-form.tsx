@@ -141,10 +141,12 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             duration: serviceData.duration,
             price: serviceData.price,
             categoryId: serviceData.categoryId,
+            roomId: serviceData.roomId || undefined,
             bufferTimeBefore: serviceData.bufferTimeBefore || 0,
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
             color: serviceData.color || "#3B82F6",
             assignedStaff: assignedStaff,
+            requiredDevices: serviceData.requiredDevices || [],
           });
           setIsLoading(false);
         })
@@ -254,6 +256,10 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
   });
 
   const onSubmit = (values: ServiceFormValues) => {
+    console.log("Form submitted with values:", values);
+    console.log("Form errors:", form.formState.errors);
+    console.log("Form is valid:", form.formState.isValid);
+    
     if (serviceId) {
       updateServiceMutation.mutate(values);
     } else {
@@ -604,6 +610,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
               <Button 
                 type="submit" 
                 disabled={isLoading || createServiceMutation.isPending || updateServiceMutation.isPending}
+                onClick={(e) => {
+                  console.log("Button clicked! Form state:");
+                  console.log("isLoading:", isLoading);
+                  console.log("createMutation pending:", createServiceMutation.isPending);
+                  console.log("updateMutation pending:", updateServiceMutation.isPending);
+                  console.log("Form valid:", form.formState.isValid);
+                  console.log("Form errors:", form.formState.errors);
+                  console.log("Current form values:", form.getValues());
+                }}
               >
                 {isLoading || createServiceMutation.isPending || updateServiceMutation.isPending
                   ? "Saving..."
