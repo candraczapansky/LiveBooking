@@ -1110,6 +1110,18 @@ export default function SettingsMobile() {
                         setCustomColor(e.target.value);
                         if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
                           applyThemeColors(e.target.value, darkMode);
+                          // Auto-save to database
+                          if (user?.id) {
+                            saveColorPreferencesMutation.mutate({
+                              userId: user.id,
+                              primaryColor: e.target.value,
+                              primaryTextColor,
+                              secondaryTextColor,
+                              isDarkMode: darkMode,
+                              savedBrandColors: JSON.stringify(savedBrandColors),
+                              savedTextColors: JSON.stringify(savedTextColors)
+                            });
+                          }
                         }
                       }}
                       style={{
@@ -1161,6 +1173,18 @@ export default function SettingsMobile() {
                       onChange={(e) => {
                         setPrimaryTextColor(e.target.value);
                         applyTextColors(e.target.value, secondaryTextColor);
+                        // Auto-save to database
+                        if (user?.id) {
+                          saveColorPreferencesMutation.mutate({
+                            userId: user.id,
+                            primaryColor: customColor,
+                            primaryTextColor: e.target.value,
+                            secondaryTextColor,
+                            isDarkMode: darkMode,
+                            savedBrandColors: JSON.stringify(savedBrandColors),
+                            savedTextColors: JSON.stringify(savedTextColors)
+                          });
+                        }
                       }}
                       style={{
                         width: "60px",
@@ -1178,6 +1202,18 @@ export default function SettingsMobile() {
                       onChange={(e) => {
                         setPrimaryTextColor(e.target.value);
                         applyTextColors(e.target.value, secondaryTextColor);
+                        // Auto-save to database
+                        if (user?.id && /^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                          saveColorPreferencesMutation.mutate({
+                            userId: user.id,
+                            primaryColor: customColor,
+                            primaryTextColor: e.target.value,
+                            secondaryTextColor,
+                            isDarkMode: darkMode,
+                            savedBrandColors: JSON.stringify(savedBrandColors),
+                            savedTextColors: JSON.stringify(savedTextColors)
+                          });
+                        }
                       }}
                       style={{
                         flex: 1,
@@ -1215,6 +1251,18 @@ export default function SettingsMobile() {
                       onChange={(e) => {
                         setSecondaryTextColor(e.target.value);
                         applyTextColors(primaryTextColor, e.target.value);
+                        // Auto-save to database
+                        if (user?.id) {
+                          saveColorPreferencesMutation.mutate({
+                            userId: user.id,
+                            primaryColor: customColor,
+                            primaryTextColor,
+                            secondaryTextColor: e.target.value,
+                            isDarkMode: darkMode,
+                            savedBrandColors: JSON.stringify(savedBrandColors),
+                            savedTextColors: JSON.stringify(savedTextColors)
+                          });
+                        }
                       }}
                       style={{
                         width: "60px",
@@ -1232,6 +1280,18 @@ export default function SettingsMobile() {
                       onChange={(e) => {
                         setSecondaryTextColor(e.target.value);
                         applyTextColors(primaryTextColor, e.target.value);
+                        // Auto-save to database
+                        if (user?.id && /^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                          saveColorPreferencesMutation.mutate({
+                            userId: user.id,
+                            primaryColor: customColor,
+                            primaryTextColor,
+                            secondaryTextColor: e.target.value,
+                            isDarkMode: darkMode,
+                            savedBrandColors: JSON.stringify(savedBrandColors),
+                            savedTextColors: JSON.stringify(savedTextColors)
+                          });
+                        }
                       }}
                       style={{
                         flex: 1,
