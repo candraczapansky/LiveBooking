@@ -128,6 +128,9 @@ function useAuth() {
         setUser(userData);
         setIsAuthenticated(true);
         console.log('User context set successfully');
+        
+        // Load and apply color preferences immediately after login
+        loadAndApplyColorPreferences(userData.id);
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
@@ -137,11 +140,98 @@ function useAuth() {
     }
   }, []);
 
+  // Function to load and apply color preferences
+  const loadAndApplyColorPreferences = async (userId: number) => {
+    try {
+      console.log(`Loading color preferences for user ${userId} in App.tsx`);
+      const response = await fetch(`/api/users/${userId}/color-preferences`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('No saved color preferences found in App.tsx');
+          return;
+        }
+        throw new Error('Failed to load color preferences');
+      }
+      
+      const colorPrefs = await response.json();
+      console.log('Loaded color preferences in App.tsx:', colorPrefs);
+      
+      // Apply the color preferences to the DOM
+      if (colorPrefs.primaryColor) {
+        applyThemeColors(colorPrefs.primaryColor, colorPrefs.isDarkMode || false);
+      }
+      
+      if (colorPrefs.primaryTextColor || colorPrefs.secondaryTextColor) {
+        applyTextColors(
+          colorPrefs.primaryTextColor || '#111827',
+          colorPrefs.secondaryTextColor || '#6b7280'
+        );
+      }
+      
+      console.log('Color preferences applied globally');
+    } catch (error) {
+      console.error('Failed to load color preferences in App.tsx:', error);
+    }
+  };
+
+  // Apply theme colors function (copied from settings)
+  const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
+    const root = document.documentElement;
+    
+    // Convert hex to HSL for CSS custom properties
+    const hexToHsl = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      
+      return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+    };
+
+    const hslColor = hexToHsl(primaryColor);
+    
+    // Apply CSS custom properties
+    root.style.setProperty('--primary', hslColor);
+    root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%');
+    
+    // Toggle dark mode class
+    if (isDark) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  };
+
+  // Apply text colors function (copied from settings)
+  const applyTextColors = (primaryTextColor: string, secondaryTextColor: string) => {
+    const root = document.documentElement;
+    root.style.setProperty('--text-primary', primaryTextColor);
+    root.style.setProperty('--text-secondary', secondaryTextColor);
+  };
+
   const login = (userData: User) => {
     console.log("Login called with:", userData);
     setUser(userData);
     setIsAuthenticated(true);
     localStorage.setItem('user', JSON.stringify(userData));
+    
+    // Load and apply color preferences after login
+    loadAndApplyColorPreferences(userData.id);
   };
 
   const updateUser = (updatedUserData: Partial<User>) => {
