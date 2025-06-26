@@ -421,9 +421,15 @@ export default function SettingsMobile() {
 
   const saveColorPreferencesMutation = useMutation({
     mutationFn: async (preferences: any) => {
+      console.log('saveColorPreferencesMutation called with:', preferences);
+      console.log('Current user:', user);
+      
       if (!user?.id) {
+        console.error('No user ID available for color preferences save');
         throw new Error('User ID is required');
       }
+      
+      console.log(`Making PUT request to: /api/users/${user.id}/color-preferences`);
       
       const response = await fetch(`/api/users/${user.id}/color-preferences`, {
         method: 'PUT',
@@ -433,13 +439,20 @@ export default function SettingsMobile() {
         body: JSON.stringify(preferences),
       });
       
+      console.log('Color preferences API response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to save color preferences');
+        const errorText = await response.text();
+        console.error('Color preferences API error:', errorText);
+        throw new Error(`Failed to save color preferences: ${response.status} ${errorText}`);
       }
       
-      return response.json();
+      const result = await response.json();
+      console.log('Color preferences saved successfully:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Color preferences mutation success:', data);
       // Silently save to database - no toast needed for auto-save
     },
     onError: (error) => {
