@@ -160,7 +160,7 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <Button
+                  <button
                     onClick={() => {
                       // Visual feedback for mobile testing
                       toast({
@@ -170,11 +170,19 @@ const StaffPage = () => {
                       setSelectedStaffId(null);
                       setIsFormOpen(true);
                     }}
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
+                    className="relative z-50 inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 border-0"
+                    style={{
+                      minHeight: '44px',
+                      minWidth: '120px',
+                      WebkitTapHighlightColor: 'rgba(0,0,0,0)',
+                      userSelect: 'none',
+                      touchAction: 'manipulation'
+                    }}
+                    type="button"
                   >
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1">Add Staff</span>
-                  </Button>
+                  </button>
                 </div>
                 
                 <div className="w-full">
