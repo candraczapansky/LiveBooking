@@ -20,7 +20,8 @@ import {
   insertSavedPaymentMethodSchema,
   insertMarketingCampaignSchema,
   insertPromoCodeSchema,
-  insertStaffScheduleSchema
+  insertStaffScheduleSchema,
+  insertUserColorPreferencesSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 
@@ -251,6 +252,53 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     } catch (error) {
       console.error("Error updating user profile:", error);
       return res.status(500).json({ error: "Failed to update user profile" });
+    }
+  });
+
+  // User Color Preferences routes
+  app.get("/api/users/:id/color-preferences", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    try {
+      const preferences = await storage.getUserColorPreferences(userId);
+      return res.status(200).json(preferences);
+    } catch (error: any) {
+      console.error('Error fetching color preferences:', error);
+      return res.status(500).json({ error: "Failed to fetch color preferences" });
+    }
+  });
+
+  app.put("/api/users/:id/color-preferences", validateBody(insertUserColorPreferencesSchema.partial()), async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    try {
+      // Check if preferences exist for this user
+      const existingPreferences = await storage.getUserColorPreferences(userId);
+      
+      let updatedPreferences;
+      if (existingPreferences) {
+        // Update existing preferences
+        updatedPreferences = await storage.updateUserColorPreferences(userId, req.body);
+      } else {
+        // Create new preferences
+        updatedPreferences = await storage.createUserColorPreferences({
+          userId,
+          ...req.body
+        });
+      }
+      
+      return res.status(200).json(updatedPreferences);
+    } catch (error: any) {
+      console.error('Error saving color preferences:', error);
+      return res.status(500).json({ error: "Failed to save color preferences" });
     }
   });
   

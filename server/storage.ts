@@ -20,7 +20,8 @@ import {
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
   promoCodes, PromoCode, InsertPromoCode,
-  staffSchedules, StaffSchedule, InsertStaffSchedule
+  staffSchedules, StaffSchedule, InsertStaffSchedule,
+  userColorPreferences, UserColorPreferences, InsertUserColorPreferences
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -181,6 +182,11 @@ export interface IStorage {
   getStaffSchedulesByStaffId(staffId: number): Promise<StaffSchedule[]>;
   updateStaffSchedule(id: number, scheduleData: Partial<InsertStaffSchedule>): Promise<StaffSchedule>;
   deleteStaffSchedule(id: number): Promise<boolean>;
+
+  // User Color Preferences operations
+  getUserColorPreferences(userId: number): Promise<UserColorPreferences | undefined>;
+  createUserColorPreferences(preferences: InsertUserColorPreferences): Promise<UserColorPreferences>;
+  updateUserColorPreferences(userId: number, preferences: Partial<InsertUserColorPreferences>): Promise<UserColorPreferences>;
 
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
@@ -1491,6 +1497,30 @@ export class DatabaseStorage implements IStorage {
       console.error('Error getting all staff earnings:', error);
       return [];
     }
+  }
+
+  // User Color Preferences operations
+  async getUserColorPreferences(userId: number): Promise<UserColorPreferences | undefined> {
+    try {
+      const result = await db.select().from(userColorPreferences).where(eq(userColorPreferences.userId, userId));
+      return result[0];
+    } catch (error) {
+      console.error('Error getting user color preferences:', error);
+      return undefined;
+    }
+  }
+
+  async createUserColorPreferences(preferences: InsertUserColorPreferences): Promise<UserColorPreferences> {
+    const result = await db.insert(userColorPreferences).values(preferences).returning();
+    return result[0];
+  }
+
+  async updateUserColorPreferences(userId: number, preferences: Partial<InsertUserColorPreferences>): Promise<UserColorPreferences> {
+    const result = await db.update(userColorPreferences)
+      .set({ ...preferences, updatedAt: new Date() })
+      .where(eq(userColorPreferences.userId, userId))
+      .returning();
+    return result[0];
   }
 }
 
