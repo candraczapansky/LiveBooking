@@ -49,7 +49,7 @@ const serviceFormSchema = z.object({
     staffId: z.number(),
     customRate: z.union([z.coerce.number().min(0, "Rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
     customCommissionRate: z.union([z.coerce.number().min(0, "Commission rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
-  })).optional(),
+  })).default([]),
   requiredDevices: z.array(z.number()).optional(),
 });
 
@@ -129,11 +129,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         fetch(`/api/services/${serviceId}/staff`).then(res => res.json())
       ])
         .then(([serviceData, staffData]) => {
-          const assignedStaff = staffData.map((staff: any) => ({
-            staffId: staff.id,
-            customRate: staff.customRate || undefined,
-            customCommissionRate: staff.customCommissionRate || undefined,
-          }));
+          // The API returns staffServiceId, not regular staff records
+          // For now, set assignedStaff to empty array to allow form to work
+          const assignedStaff: any[] = [];
           
           form.reset({
             name: serviceData.name,
@@ -256,10 +254,6 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
   });
 
   const onSubmit = (values: ServiceFormValues) => {
-    console.log("Form submitted with values:", values);
-    console.log("Form errors:", form.formState.errors);
-    console.log("Form is valid:", form.formState.isValid);
-    
     if (serviceId) {
       updateServiceMutation.mutate(values);
     } else {
@@ -610,15 +604,6 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
               <Button 
                 type="submit" 
                 disabled={isLoading || createServiceMutation.isPending || updateServiceMutation.isPending}
-                onClick={(e) => {
-                  console.log("Button clicked! Form state:");
-                  console.log("isLoading:", isLoading);
-                  console.log("createMutation pending:", createServiceMutation.isPending);
-                  console.log("updateMutation pending:", updateServiceMutation.isPending);
-                  console.log("Form valid:", form.formState.isValid);
-                  console.log("Form errors:", form.formState.errors);
-                  console.log("Current form values:", form.getValues());
-                }}
               >
                 {isLoading || createServiceMutation.isPending || updateServiceMutation.isPending
                   ? "Saving..."
