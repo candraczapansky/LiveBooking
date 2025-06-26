@@ -87,6 +87,63 @@ export default function SettingsMobile() {
 
   const [darkMode, setDarkMode] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+
+  // Handle profile picture change
+  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create a FileReader to convert the image to base64
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target?.result as string;
+        setProfilePicture(base64String);
+        localStorage.setItem('profilePicture', base64String);
+        
+        toast({
+          title: "Photo updated",
+          description: "Your profile photo has been changed successfully.",
+        });
+      };
+      
+      reader.onerror = () => {
+        toast({
+          title: "Upload failed",
+          description: "Failed to process the image. Please try again.",
+          variant: "destructive",
+        });
+      };
+      
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Load profile picture from localStorage on component mount
+  useEffect(() => {
+    const savedPicture = localStorage.getItem('profilePicture');
+    if (savedPicture) {
+      setProfilePicture(savedPicture);
+    }
+  }, []);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || '',
@@ -326,23 +383,7 @@ export default function SettingsMobile() {
     });
   };
 
-  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        setProfilePicture(result);
-        localStorage.setItem('profilePicture', result);
-        window.dispatchEvent(new CustomEvent('profilePictureUpdated', { detail: result }));
-        toast({
-          title: "Profile picture updated",
-          description: "Your profile picture has been changed successfully.",
-        });
-      };
-      reader.readAsDataURL(file);
-    }
-  };
+
 
   const saveColorPreferencesMutation = useMutation({
     mutationFn: async (preferences: any) => {
