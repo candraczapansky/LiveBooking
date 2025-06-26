@@ -112,98 +112,36 @@ const getReportDescription = (reportId: string) => {
 const ReportsLandingPage = ({ onSelectReport }: { onSelectReport: (reportId: string) => void }) => {
   return (
     <div className="space-y-6">
-      {/* Quick Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary bg-opacity-10 rounded-md p-3">
-                <BarChart2 className="h-6 w-6 text-primary" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Total Reports Available
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {reportCategories.length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-900 rounded-md p-3">
-                <TrendingUp className="h-6 w-6 text-green-600 dark:text-green-400" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Data Sources
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Real-time
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-100 dark:bg-blue-900 rounded-md p-3">
-                <PieChart className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Export Options
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  Available
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Report Categories Grid */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Report Categories
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {reportCategories.map((category) => (
-            <Card 
-              key={category.id}
-              className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group"
-              onClick={() => onSelectReport(category.id)}
-            >
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className={`inline-flex p-3 rounded-lg ${category.bgColor} mb-4`}>
-                      <category.icon className={`h-6 w-6 ${category.color}`} />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
-                      {category.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                      {category.description}
-                    </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {reportCategories.map((category) => (
+          <Card 
+            key={category.id}
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group"
+            onClick={() => onSelectReport(category.id)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className={`inline-flex p-3 rounded-lg ${category.bgColor} mb-4`}>
+                    <category.icon className={`h-6 w-6 ${category.color}`} />
                   </div>
-                  <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                    {category.title}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    {category.description}
+                  </p>
                 </div>
-                <div className="flex items-center text-sm text-primary group-hover:text-primary/80 transition-colors">
-                  View Report
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors" />
+              </div>
+              <div className="flex items-center text-sm text-primary group-hover:text-primary/80 transition-colors">
+                View Report
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );
