@@ -157,19 +157,38 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <button 
-                    onClick={(e) => {
-                      console.log("Button clicked!", e);
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleAddStaff();
-                    }} 
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                    type="button"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    <span className="ml-1 hidden sm:inline">Add</span>
-                  </button>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        console.log("TEST BUTTON CLICKED!");
+                        alert("Test button works!");
+                      }}
+                      className="px-3 py-2 bg-red-500 text-white rounded"
+                    >
+                      TEST
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        console.log("Button clicked!", e);
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAddStaff();
+                      }} 
+                      onMouseDown={() => console.log("Mouse down on button")}
+                      onMouseUp={() => console.log("Mouse up on button")}
+                      onPointerDown={() => console.log("Pointer down on button")}
+                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 relative z-50"
+                      type="button"
+                      style={{
+                        pointerEvents: 'all',
+                        position: 'relative',
+                        zIndex: 9999
+                      }}
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      <span className="ml-1 hidden sm:inline">Add Staff</span>
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="w-full">
