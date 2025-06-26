@@ -59,6 +59,12 @@ const StaffPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [forceRender, setForceRender] = useState(0);
+
+  // Debug state changes
+  useEffect(() => {
+    console.log("isFormOpen state changed to:", isFormOpen);
+  }, [isFormOpen]);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -105,9 +111,31 @@ const StaffPage = () => {
   const handleAddStaff = () => {
     console.log("Add staff clicked - setting form open");
     console.log("Current isFormOpen state:", isFormOpen);
-    setSelectedStaffId(null);
-    setIsFormOpen(true);
-    console.log("After setting isFormOpen to true");
+    console.log("Current selectedStaffId state:", selectedStaffId);
+    
+    try {
+      setSelectedStaffId(null);
+      console.log("Set selectedStaffId to null");
+      
+      setIsFormOpen(true);
+      console.log("Called setIsFormOpen(true)");
+      
+      // Force render
+      setForceRender(prev => prev + 1);
+      console.log("Forced re-render");
+      
+      // Try setTimeout approach
+      setTimeout(() => {
+        console.log("Timeout - isFormOpen:", isFormOpen);
+        if (!isFormOpen) {
+          console.log("State still false, trying again");
+          setIsFormOpen(true);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error("Error in handleAddStaff:", error);
+    }
   };
 
   const handleEditStaff = (staffId: number) => {
