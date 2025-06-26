@@ -52,48 +52,48 @@ const reportCategories = [
     title: "Sales Reports",
     description: "Revenue, transactions, and sales performance analytics",
     icon: BarChart2,
-    color: "text-green-600 dark:text-green-400",
-    bgColor: "bg-green-50 dark:bg-green-950",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
   {
     id: "clients",
     title: "Client Reports", 
     description: "Client demographics, retention, and engagement metrics",
     icon: Users,
-    color: "text-blue-600 dark:text-blue-400",
-    bgColor: "bg-blue-50 dark:bg-blue-950",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
   {
     id: "services",
     title: "Service Reports",
     description: "Service popularity, pricing, and performance insights",
     icon: Scissors,
-    color: "text-purple-600 dark:text-purple-400", 
-    bgColor: "bg-purple-50 dark:bg-purple-950",
+    color: "text-primary", 
+    bgColor: "bg-primary/10",
   },
   {
     id: "staff",
     title: "Staff Reports",
     description: "Staff performance, productivity, and utilization metrics",
     icon: Users,
-    color: "text-orange-600 dark:text-orange-400",
-    bgColor: "bg-orange-50 dark:bg-orange-950",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
   {
     id: "payroll",
     title: "Payroll Reports",
     description: "Staff earnings, commissions, and payroll summaries",
     icon: DollarSign,
-    color: "text-yellow-600 dark:text-yellow-400",
-    bgColor: "bg-yellow-50 dark:bg-yellow-950",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
   {
     id: "timeclock",
     title: "Time Clock Reports",
     description: "Staff attendance, hours worked, and time tracking",
     icon: Clock,
-    color: "text-indigo-600 dark:text-indigo-400",
-    bgColor: "bg-indigo-50 dark:bg-indigo-950",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
   },
 ];
 
@@ -180,7 +180,7 @@ const SalesReport = ({ timePeriod }: { timePeriod: string }) => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary bg-opacity-10 rounded-md p-3">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
                 <DollarSign className="h-5 w-5 text-primary" />
               </div>
               <div className="ml-5 w-0 flex-1">
@@ -199,8 +199,8 @@ const SalesReport = ({ timePeriod }: { timePeriod: string }) => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-900 rounded-md p-3">
-                <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <TrendingUp className="h-5 w-5 text-primary" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -218,8 +218,8 @@ const SalesReport = ({ timePeriod }: { timePeriod: string }) => {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-blue-100 dark:bg-blue-900 rounded-md p-3">
-                <BarChart2 className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <BarChart2 className="h-5 w-5 text-primary" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -309,30 +309,30 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
             <div className="space-y-4">
               {/* Summary Stats */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                <div className="bg-primary/10 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 mr-3" />
+                    <Clock className="h-8 w-8 text-primary mr-3" />
                     <div>
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Hours This Week</p>
-                      <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">0.0</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Hours This Week</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0.0</p>
                     </div>
                   </div>
                 </div>
-                <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
+                <div className="bg-primary/10 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <Users className="h-8 w-8 text-green-600 dark:text-green-400 mr-3" />
+                    <Users className="h-8 w-8 text-primary mr-3" />
                     <div>
-                      <p className="text-sm font-medium text-green-900 dark:text-green-100">Staff Currently Clocked In</p>
-                      <p className="text-2xl font-bold text-green-900 dark:text-green-100">0</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Staff Currently Clocked In</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</p>
                     </div>
                   </div>
                 </div>
-                <div className="bg-orange-50 dark:bg-orange-950 p-4 rounded-lg">
+                <div className="bg-primary/10 p-4 rounded-lg">
                   <div className="flex items-center">
-                    <Calendar className="h-8 w-8 text-orange-600 dark:text-orange-400 mr-3" />
+                    <Calendar className="h-8 w-8 text-primary mr-3" />
                     <div>
-                      <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Avg Daily Hours</p>
-                      <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">0.0</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Avg Daily Hours</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0.0</p>
                     </div>
                   </div>
                 </div>
