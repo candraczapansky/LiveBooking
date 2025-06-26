@@ -21,6 +21,7 @@ import {
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
   promoCodes, PromoCode, InsertPromoCode,
   staffSchedules, StaffSchedule, InsertStaffSchedule,
+  timeClockEntries, TimeClockEntry, InsertTimeClockEntry,
   userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
   notifications, Notification, InsertNotification
 } from "@shared/schema";

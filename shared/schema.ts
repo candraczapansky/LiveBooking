@@ -503,6 +503,7 @@ export const timeClockEntries = pgTable("time_clock_entries", {
   notes: text("notes"), // Optional notes for the time entry
   status: text("status").notNull().default("clocked_in"), // clocked_in, clocked_out
   location: text("location"), // Where they clocked in/out
+  externalId: text("external_id").unique(), // ID from external time clock system
   createdAt: timestamp("created_at").defaultNow(),
 });
 
