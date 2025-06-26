@@ -59,12 +59,6 @@ const StaffPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [forceRender, setForceRender] = useState(0);
-
-  // Debug state changes
-  useEffect(() => {
-    console.log("isFormOpen state changed to:", isFormOpen);
-  }, [isFormOpen]);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -109,40 +103,13 @@ const StaffPage = () => {
   });
 
   const handleAddStaff = () => {
-    console.log("Add staff clicked - setting form open");
-    console.log("Current isFormOpen state:", isFormOpen);
-    console.log("Current selectedStaffId state:", selectedStaffId);
-    
-    try {
-      setSelectedStaffId(null);
-      console.log("Set selectedStaffId to null");
-      
-      setIsFormOpen(true);
-      console.log("Called setIsFormOpen(true)");
-      
-      // Force render
-      setForceRender(prev => prev + 1);
-      console.log("Forced re-render");
-      
-      // Try setTimeout approach
-      setTimeout(() => {
-        console.log("Timeout - isFormOpen:", isFormOpen);
-        if (!isFormOpen) {
-          console.log("State still false, trying again");
-          setIsFormOpen(true);
-        }
-      }, 100);
-      
-    } catch (error) {
-      console.error("Error in handleAddStaff:", error);
-    }
+    setSelectedStaffId(null);
+    setIsFormOpen(true);
   };
 
   const handleEditStaff = (staffId: number) => {
-    console.log("Edit staff clicked for ID:", staffId, "Current form state:", isFormOpen);
     setSelectedStaffId(staffId);
     setIsFormOpen(true);
-    console.log("After setting state - staffId:", staffId, "form open:", true);
   };
 
   const handleDeleteStaff = () => {
@@ -185,24 +152,13 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <div 
-                    ref={(el) => {
-                      if (el) {
-                        el.onclick = () => {
-                          console.log("DIRECT DOM CLICK - calling handleAddStaff");
-                          setSelectedStaffId(null);
-                          setIsFormOpen(true);
-                          console.log("Direct DOM - set form open to true");
-                        };
-                        console.log("Button element attached with direct onclick");
-                      }
-                    }}
-                    className="cursor-pointer inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
-                    style={{ zIndex: 9999, position: 'relative' }}
+                  <Button
+                    onClick={handleAddStaff}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
                   >
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1">Add Staff</span>
-                  </div>
+                  </Button>
                 </div>
                 
                 <div className="w-full">
@@ -346,6 +302,13 @@ const StaffPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Staff Form Dialog */}
+      <StaffForm
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        staffId={selectedStaffId || undefined}
+      />
     </div>
   );
 };
