@@ -104,8 +104,10 @@ const StaffPage = () => {
 
   const handleAddStaff = () => {
     console.log("Add staff clicked - setting form open");
+    console.log("Current isFormOpen state:", isFormOpen);
     setSelectedStaffId(null);
     setIsFormOpen(true);
+    console.log("After setting isFormOpen to true");
   };
 
   const handleEditStaff = (staffId: number) => {
