@@ -157,7 +157,13 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <Button onClick={handleAddStaff} size="sm">
+                  <Button 
+                    onClick={(e) => {
+                      console.log("Button clicked!", e);
+                      handleAddStaff();
+                    }} 
+                    size="sm"
+                  >
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1 hidden sm:inline">Add</span>
                   </Button>
@@ -275,7 +281,7 @@ const StaffPage = () => {
       
       {/* Staff Form Dialog */}
       <StaffForm
-        open={isFormOpen}
+        open={Boolean(isFormOpen)}
         onOpenChange={setIsFormOpen}
         staffId={selectedStaffId || undefined}
       />
