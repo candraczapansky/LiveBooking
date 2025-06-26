@@ -47,6 +47,19 @@ export default function SettingsMobile() {
   
   // Use context user or fallback to localStorage user
   const currentUser = user || localUser;
+
+  // Update profileData when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setProfileData({
+        firstName: currentUser.firstName || '',
+        lastName: currentUser.lastName || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || '',
+        username: currentUser.username || ''
+      });
+    }
+  }, [currentUser]);
   
   // Debug logging for user context
   useEffect(() => {
@@ -685,7 +698,7 @@ export default function SettingsMobile() {
                           First Name
                         </label>
                         <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
-                          {user?.firstName || 'Not set'}
+                          {currentUser?.firstName || 'Not set'}
                         </p>
                       </div>
                       <div>
@@ -693,7 +706,7 @@ export default function SettingsMobile() {
                           Last Name
                         </label>
                         <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
-                          {user?.lastName || 'Not set'}
+                          {currentUser?.lastName || 'Not set'}
                         </p>
                       </div>
                       <div>
@@ -701,7 +714,7 @@ export default function SettingsMobile() {
                           Email
                         </label>
                         <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
-                          {user?.email || 'Not set'}
+                          {currentUser?.email || 'Not set'}
                         </p>
                       </div>
                       <div>
@@ -709,7 +722,7 @@ export default function SettingsMobile() {
                           Phone
                         </label>
                         <p style={{ fontSize: "16px", color: "#111827", margin: 0 }}>
-                          {user?.phone || 'Not set'}
+                          {currentUser?.phone || 'Not set'}
                         </p>
                       </div>
                     </div>
