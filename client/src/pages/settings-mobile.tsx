@@ -237,13 +237,22 @@ export default function SettingsMobile() {
     if (savedColorPreferences && !colorPrefsLoading) {
       console.log('Applying loaded color preferences:', savedColorPreferences);
       
+      // Apply dark mode first if saved
+      const isDarkMode = savedColorPreferences.isDarkMode !== undefined ? savedColorPreferences.isDarkMode : darkMode;
+      if (savedColorPreferences.isDarkMode !== undefined) {
+        setDarkMode(savedColorPreferences.isDarkMode);
+      }
+      
       // Apply primary color if saved
       if (savedColorPreferences.primaryColor) {
         setCustomColor(savedColorPreferences.primaryColor);
-        applyThemeColors(savedColorPreferences.primaryColor, darkMode);
+        applyThemeColors(savedColorPreferences.primaryColor, isDarkMode);
       }
       
-      // Apply text colors if saved
+      // Apply text colors if saved and call applyTextColors
+      const primaryText = savedColorPreferences.primaryTextColor || primaryTextColor;
+      const secondaryText = savedColorPreferences.secondaryTextColor || secondaryTextColor;
+      
       if (savedColorPreferences.primaryTextColor) {
         setPrimaryTextColor(savedColorPreferences.primaryTextColor);
       }
@@ -251,10 +260,8 @@ export default function SettingsMobile() {
         setSecondaryTextColor(savedColorPreferences.secondaryTextColor);
       }
       
-      // Apply dark mode if saved
-      if (savedColorPreferences.darkMode !== undefined) {
-        setDarkMode(savedColorPreferences.darkMode);
-      }
+      // Apply text colors to DOM
+      applyTextColors(primaryText, secondaryText);
       
       // Apply saved brand colors if available
       if (savedColorPreferences.savedBrandColors) {
@@ -278,7 +285,7 @@ export default function SettingsMobile() {
       
       console.log('Color preferences applied successfully');
     }
-  }, [savedColorPreferences, colorPrefsLoading, darkMode]);
+  }, [savedColorPreferences, colorPrefsLoading]);
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
