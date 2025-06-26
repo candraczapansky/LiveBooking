@@ -162,13 +162,13 @@ const StaffPage = () => {
                   </div>
                   <Button
                     onClick={() => {
-                      console.log("Button clicked directly!");
-                      setIsFormOpen(prev => {
-                        console.log("Previous state:", prev);
-                        console.log("Setting to true");
-                        return true;
+                      // Visual feedback for mobile testing
+                      toast({
+                        title: "Button Clicked!",
+                        description: "Add Staff button was clicked",
                       });
                       setSelectedStaffId(null);
+                      setIsFormOpen(true);
                     }}
                     className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
                   >
