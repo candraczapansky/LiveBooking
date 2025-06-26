@@ -642,17 +642,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getServicesByCategory(categoryId: number): Promise<Service[]> {
-    const services = Array.from(this.services.values()).filter(
-      (service) => service.categoryId === categoryId
-    );
-    // Ensure all services have a color field
-    return services.map(service => {
-      if (!service.color) {
-        service.color = "#3B82F6";
-        this.services.set(service.id, service);
-      }
-      return service;
-    });
+    const categoryServices = await db.select().from(services).where(eq(services.categoryId, categoryId));
+    return categoryServices;
   }
 
   async getAllServices(): Promise<Service[]> {
@@ -661,17 +652,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
-    const service = await this.getService(id);
-    if (!service) {
+    const [updatedService] = await db
+      .update(services)
+      .set(serviceData)
+      .where(eq(services.id, id))
+      .returning();
+    
+    if (!updatedService) {
       throw new Error('Service not found');
     }
-    const updatedService = { ...service, ...serviceData };
-    this.services.set(id, updatedService);
+    
     return updatedService;
   }
 
   async deleteService(id: number): Promise<boolean> {
-    return this.services.delete(id);
+    const result = await db.delete(services).where(eq(services.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Staff operations
