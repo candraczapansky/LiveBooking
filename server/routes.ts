@@ -830,6 +830,23 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     
     const newAppointment = await storage.createAppointment(req.body);
     
+    // Create notification for appointment booking
+    try {
+      const client = await storage.getUser(newAppointment.clientId);
+      const service = await storage.getService(newAppointment.serviceId);
+      const appointmentDate = new Date(newAppointment.startTime).toLocaleDateString();
+      
+      await storage.createNotification({
+        type: 'appointment_booked',
+        title: 'New appointment booked',
+        description: `${client?.firstName} ${client?.lastName} booked ${service?.name} for ${appointmentDate}`,
+        relatedId: newAppointment.id,
+        relatedType: 'appointment'
+      });
+    } catch (error) {
+      console.error('Failed to create appointment notification:', error);
+    }
+    
     // Trigger booking confirmation automation
     try {
       await triggerBookingConfirmation(newAppointment, storage);
@@ -1142,13 +1159,27 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
       });
 
       // Create payment record for cash payment
-      await storage.createPayment({
+      const payment = await storage.createPayment({
         clientId: appointment.clientId,
         amount: appointment.totalAmount || 0,
         method: 'cash',
         status: 'completed',
         appointmentId: appointmentId
       });
+
+      // Create notification for payment received
+      try {
+        const client = await storage.getUser(appointment.clientId);
+        await storage.createNotification({
+          type: 'payment_received',
+          title: 'Payment received',
+          description: `$${payment.amount} received from ${client?.firstName} ${client?.lastName}`,
+          relatedId: payment.id,
+          relatedType: 'payment'
+        });
+      } catch (error) {
+        console.error('Failed to create payment notification:', error);
+      }
 
       res.json({ 
         success: true, 

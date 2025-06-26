@@ -1,13 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Calendar, CalendarX, DollarSign, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { formatDistanceToNow } from "date-fns";
 
 type Notification = {
   id: number;
-  type: 'appointment_booked' | 'appointment_cancelled' | 'payment_received' | 'new_membership';
+  type: string;
   title: string;
   description: string;
-  timeAgo: string;
+  userId?: number;
+  relatedId?: number;
+  relatedType?: string;
+  isRead: boolean;
+  createdAt: string;
 };
 
 const getNotificationIcon = (type: string) => {
@@ -28,6 +34,10 @@ const getNotificationIcon = (type: string) => {
 
 
 const NotificationItem = ({ notification }: { notification: Notification }) => {
+  const timeAgo = notification.createdAt 
+    ? formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })
+    : 'Unknown time';
+  
   return (
     <li className="py-3 sm:py-4">
       <div className="flex items-start space-x-2 sm:space-x-3">
@@ -41,7 +51,7 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
         <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-tight">{notification.title}</p>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">{notification.description}</p>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{notification.timeAgo}</p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{timeAgo}</p>
         </div>
       </div>
     </li>
@@ -49,37 +59,37 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
 };
 
 const RecentNotifications = () => {
-  // In a real app, these would be fetched from an API
-  const notifications: Notification[] = [
-    {
-      id: 1,
-      type: 'appointment_booked',
-      title: 'New appointment booked',
-      description: 'Emma Wilson booked Haircut & Style for tomorrow',
-      timeAgo: '15 minutes ago'
-    },
-    {
-      id: 2,
-      type: 'appointment_cancelled',
-      title: 'Appointment cancelled',
-      description: 'James Wilson cancelled his 4:00 PM appointment',
-      timeAgo: '35 minutes ago'
-    },
-    {
-      id: 3,
-      type: 'payment_received',
-      title: 'Payment received',
-      description: '$85 received from Michael Brown',
-      timeAgo: '1 hour ago'
-    },
-    {
-      id: 4,
-      type: 'new_membership',
-      title: 'New membership',
-      description: 'Olivia Martinez purchased Premium membership',
-      timeAgo: '2 hours ago'
+  const { data: notifications = [], isLoading } = useQuery({
+    queryKey: ['/api/notifications'],
+    queryFn: async () => {
+      const response = await fetch('/api/notifications?limit=5');
+      if (!response.ok) throw new Error('Failed to fetch notifications');
+      return response.json();
     }
-  ];
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-4 sm:py-5">
+          <CardTitle className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100">Recent Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="p-3 sm:p-4">
+          <div className="animate-pulse space-y-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="flex space-x-3">
+                <div className="w-8 h-8 bg-gray-200 rounded"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
