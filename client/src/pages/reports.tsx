@@ -23,7 +23,8 @@ import {
   PieChart,
   Clock,
   ArrowLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from "lucide-react";
 import PayrollReport from "./payroll-report";
 import { formatPrice } from "@/lib/utils";
@@ -295,15 +296,73 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
 };
 
 const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
+  const { data: timeEntries = [], isLoading, refetch } = useQuery({ 
+    queryKey: ["/api/time-clock-entries"] 
+  });
+  
+  const [syncing, setSyncing] = useState(false);
+  
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const response = await fetch('/api/time-clock-sync', { method: 'POST' });
+      const result = await response.json();
+      console.log('Sync result:', result);
+      refetch(); // Refresh the data
+    } catch (error) {
+      console.error('Sync failed:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const calculateStats = () => {
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    
+    const weeklyEntries = timeEntries.filter((entry: any) => {
+      const entryDate = new Date(entry.clockInTime);
+      return entryDate >= weekStart;
+    });
+    
+    const totalHours = weeklyEntries.reduce((sum: number, entry: any) => {
+      if (entry.clockOutTime) {
+        const clockIn = new Date(entry.clockInTime);
+        const clockOut = new Date(entry.clockOutTime);
+        const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+        return sum + hours;
+      }
+      return sum;
+    }, 0);
+    
+    const currentlyClocked = timeEntries.filter((entry: any) => entry.status === 'clocked_in').length;
+    const avgDaily = weeklyEntries.length > 0 ? totalHours / 7 : 0;
+    
+    return { totalHours, currentlyClocked, avgDaily };
+  };
+
+  const stats = calculateStats();
+
   return (
     <div className="space-y-6">
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Time Clock Overview</CardTitle>
-            <CardDescription>
-              Staff clock-in/out records and hours worked
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Time Clock Overview</CardTitle>
+              <CardDescription>
+                Staff clock-in/out records and hours worked
+              </CardDescription>
+            </div>
+            <Button 
+              onClick={handleSync} 
+              disabled={syncing}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Data'}
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -314,7 +373,7 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
                     <Clock className="h-8 w-8 text-primary mr-3" />
                     <div>
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Total Hours This Week</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0.0</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.totalHours.toFixed(1)}</p>
                     </div>
                   </div>
                 </div>
@@ -323,7 +382,7 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
                     <Users className="h-8 w-8 text-primary mr-3" />
                     <div>
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Staff Currently Clocked In</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.currentlyClocked}</p>
                     </div>
                   </div>
                 </div>
@@ -332,19 +391,19 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
                     <Calendar className="h-8 w-8 text-primary mr-3" />
                     <div>
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Avg Daily Hours</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">0.0</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.avgDaily.toFixed(1)}</p>
                     </div>
                   </div>
                 </div>
               </div>
-              
-              {/* Recent Time Entries Table */}
+
+              {/* Time Entries Table */}
               <div className="border rounded-lg">
-                <div className="p-4 border-b bg-gray-50 dark:bg-gray-800">
-                  <h3 className="text-lg font-semibold">Recent Time Entries</h3>
+                <div className="px-4 py-3 border-b bg-gray-50 dark:bg-gray-800">
+                  <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">Recent Time Entries</h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     <thead className="bg-gray-50 dark:bg-gray-800">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Staff Member</th>
@@ -356,15 +415,61 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                      <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center">
-                            <Clock className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
-                            <p className="text-lg font-medium mb-1">No time clock entries yet</p>
-                            <p className="text-sm">Time clock entries will appear here once staff start clocking in and out</p>
-                          </div>
-                        </td>
-                      </tr>
+                      {isLoading ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                            <div className="flex justify-center items-center">
+                              <RefreshCw className="h-6 w-6 animate-spin mr-2" />
+                              Loading time clock entries...
+                            </div>
+                          </td>
+                        </tr>
+                      ) : timeEntries.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                            <div className="flex flex-col items-center">
+                              <Clock className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+                              <p className="text-lg font-medium mb-1">No time clock entries yet</p>
+                              <p className="text-sm mb-3">Click "Sync Data" to pull time clock entries from external source</p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        timeEntries.map((entry: any) => {
+                          const clockIn = new Date(entry.clockInTime);
+                          const clockOut = entry.clockOutTime ? new Date(entry.clockOutTime) : null;
+                          const hours = clockOut ? ((clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)).toFixed(1) : 'N/A';
+                          
+                          return (
+                            <tr key={entry.id}>
+                              <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
+                                Staff #{entry.staffId}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
+                                {clockIn.toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
+                                {clockIn.toLocaleTimeString()}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
+                                {clockOut ? clockOut.toLocaleTimeString() : '-'}
+                              </td>
+                              <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
+                                {hours} hrs
+                              </td>
+                              <td className="px-4 py-4 text-sm">
+                                <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                                  entry.status === 'clocked_in' 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                                }`}>
+                                  {entry.status === 'clocked_in' ? 'Clocked In' : 'Clocked Out'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
