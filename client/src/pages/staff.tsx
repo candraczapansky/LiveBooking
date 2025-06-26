@@ -186,11 +186,19 @@ const StaffPage = () => {
                     </p>
                   </div>
                   <div 
-                    onClick={() => {
-                      console.log("DIV CLICKED - calling handleAddStaff");
-                      handleAddStaff();
+                    ref={(el) => {
+                      if (el) {
+                        el.onclick = () => {
+                          console.log("DIRECT DOM CLICK - calling handleAddStaff");
+                          setSelectedStaffId(null);
+                          setIsFormOpen(true);
+                          console.log("Direct DOM - set form open to true");
+                        };
+                        console.log("Button element attached with direct onclick");
+                      }
                     }}
                     className="cursor-pointer inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
+                    style={{ zIndex: 9999, position: 'relative' }}
                   >
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1">Add Staff</span>
