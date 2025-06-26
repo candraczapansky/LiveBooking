@@ -492,6 +492,29 @@ export const insertStaffScheduleSchema = createInsertSchema(staffSchedules).omit
 export type StaffSchedule = typeof staffSchedules.$inferSelect;
 export type InsertStaffSchedule = z.infer<typeof insertStaffScheduleSchema>;
 
+// Time clock entries schema
+export const timeClockEntries = pgTable("time_clock_entries", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").notNull(),
+  clockInTime: timestamp("clock_in_time").notNull(),
+  clockOutTime: timestamp("clock_out_time"),
+  totalHours: doublePrecision("total_hours"), // Calculated when clocking out
+  breakTime: doublePrecision("break_time").default(0), // Minutes
+  notes: text("notes"), // Optional notes for the time entry
+  status: text("status").notNull().default("clocked_in"), // clocked_in, clocked_out
+  location: text("location"), // Where they clocked in/out
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTimeClockEntrySchema = createInsertSchema(timeClockEntries).omit({
+  id: true,
+  totalHours: true,
+  createdAt: true,
+});
+
+export type TimeClockEntry = typeof timeClockEntries.$inferSelect;
+export type InsertTimeClockEntry = z.infer<typeof insertTimeClockEntrySchema>;
+
 // Email unsubscribes schema (global unsubscribe tracking)
 export const emailUnsubscribes = pgTable("email_unsubscribes", {
   id: serial("id").primaryKey(),

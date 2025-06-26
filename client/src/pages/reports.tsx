@@ -19,7 +19,8 @@ import {
   Calendar, 
   TrendingUp, 
   BarChart2,
-  PieChart
+  PieChart,
+  Clock
 } from "lucide-react";
 import PayrollReport from "./payroll-report";
 import { formatPrice } from "@/lib/utils";
@@ -488,6 +489,10 @@ const ReportsPage = () => {
                   <DollarSign className="h-4 w-4 mr-2" />
                   Payroll
                 </TabsTrigger>
+                <TabsTrigger value="timeclock" className="flex items-center">
+                  <Clock className="h-4 w-4 mr-2" />
+                  Time Clock
+                </TabsTrigger>
               </TabsList>
               
               {/* Sales Report */}
@@ -947,6 +952,109 @@ const ReportsPage = () => {
               {/* Payroll Report */}
               <TabsContent value="payroll">
                 <PayrollReport />
+              </TabsContent>
+              
+              {/* Time Clock Report */}
+              <TabsContent value="timeclock">
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                  <Card className="md:col-span-2">
+                    <CardHeader>
+                      <CardTitle>Time Clock Overview</CardTitle>
+                      <CardDescription>
+                        Staff clock-in/out records and hours worked
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {/* Summary Stats */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                          <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                            <div className="flex items-center">
+                              <Clock className="h-8 w-8 text-blue-600 dark:text-blue-400 mr-3" />
+                              <div>
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Hours This Week</p>
+                                <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">0.0</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
+                            <div className="flex items-center">
+                              <Users className="h-8 w-8 text-green-600 dark:text-green-400 mr-3" />
+                              <div>
+                                <p className="text-sm font-medium text-green-900 dark:text-green-100">Staff Currently Clocked In</p>
+                                <p className="text-2xl font-bold text-green-900 dark:text-green-100">0</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-orange-50 dark:bg-orange-950 p-4 rounded-lg">
+                            <div className="flex items-center">
+                              <Calendar className="h-8 w-8 text-orange-600 dark:text-orange-400 mr-3" />
+                              <div>
+                                <p className="text-sm font-medium text-orange-900 dark:text-orange-100">Avg Daily Hours</p>
+                                <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">0.0</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Recent Time Entries Table */}
+                        <div className="border rounded-lg">
+                          <div className="p-4 border-b bg-gray-50 dark:bg-gray-800">
+                            <h3 className="text-lg font-semibold">Recent Time Entries</h3>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead className="bg-gray-50 dark:bg-gray-800">
+                                <tr>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Staff Member</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Clock In</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Clock Out</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Hours</th>
+                                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                <tr>
+                                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                                    <div className="flex flex-col items-center">
+                                      <Clock className="h-12 w-12 text-gray-300 dark:text-gray-600 mb-3" />
+                                      <p className="text-lg font-medium mb-1">No time clock entries yet</p>
+                                      <p className="text-sm">Time clock entries will appear here once staff start clocking in and out</p>
+                                    </div>
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                        
+                        {/* Note about time clock setup */}
+                        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                          <div className="flex">
+                            <div className="flex-shrink-0">
+                              <Clock className="h-5 w-5 text-blue-400" />
+                            </div>
+                            <div className="ml-3">
+                              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                Time Clock Feature
+                              </h3>
+                              <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
+                                <p>The time clock system allows staff to track their work hours. This report will show:</p>
+                                <ul className="list-disc list-inside mt-2 space-y-1">
+                                  <li>Daily and weekly hour summaries</li>
+                                  <li>Clock in/out history for all staff</li>
+                                  <li>Overtime tracking and reporting</li>
+                                  <li>Integration with payroll calculations</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </TabsContent>
             </Tabs>
           </div>
