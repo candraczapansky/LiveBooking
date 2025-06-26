@@ -180,14 +180,7 @@ input.force-border-normal[aria-invalid="false"] {
   box-shadow: none !important;
 }
 
-/* Button Icons Control */
-.hide-button-icons svg {
-  display: none !important;
-}
-
-.hide-button-icons button {
-  justify-content: center !important;
-}
+/* Button Icons are always enabled */
 
 /* Button Icon Colors - ensure icons inherit proper colors */
 button svg {

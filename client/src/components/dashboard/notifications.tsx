@@ -32,11 +32,11 @@ const NotificationItem = ({ notification }: { notification: Notification }) => {
     <li className="py-3 sm:py-4">
       <div className="flex items-start space-x-2 sm:space-x-3">
         <div className="flex-shrink-0">
-          <span className={cn("h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center", getNotificationIconBg(notification.type))}>
-            <div className="h-3 w-3 sm:h-4 sm:w-4">
+          <div className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center">
+            <div className="h-4 w-4 sm:h-5 sm:w-5">
               {getNotificationIcon(notification.type)}
             </div>
-          </span>
+          </div>
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 leading-tight">{notification.title}</p>

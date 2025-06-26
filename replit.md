@@ -52,6 +52,20 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 26, 2025 - Icon Background Removal and Button Icons Toggle Cleanup
+- **Removed all icon background styling throughout the application:**
+  - Eliminated background colors from dashboard stats cards (removed iconBgColor prop from StatsCard component)
+  - Removed notification icon circular backgrounds in Recent Notifications component
+  - Cleaned up CSS classes that applied bg- styles to icon containers
+  - Icons now display without any background colors or rounded backgrounds
+  - Maintained icon colors and sizing while removing visual backgrounds
+- **Completed Button Icons toggle section removal:**
+  - Removed Button Icons toggle from appearance settings interface
+  - Cleaned up all references to showButtonIcons state and localStorage storage
+  - Removed CSS classes for hiding/showing button icons (.hide-button-icons)
+  - Icons are now permanently enabled throughout the application interface
+  - Simplified settings page by removing unnecessary toggle functionality
+
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**
   - Updated staff page to display clean list of staff members with names and titles only
