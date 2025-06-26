@@ -93,7 +93,10 @@ export default function StaffSchedulePage() {
                 <h1 className="text-3xl font-bold">Staff Schedule</h1>
                 <p className="text-muted-foreground">Manage staff availability and schedules</p>
               </div>
-              <Button className="flex items-center gap-2">
+              <Button 
+                className="flex items-center gap-2"
+                onClick={() => setLocation('/staff')}
+              >
                 <Plus className="h-4 w-4" />
                 Add New Staff
               </Button>
