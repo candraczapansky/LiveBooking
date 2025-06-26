@@ -21,30 +21,68 @@ const Header = () => {
   const { user, logout } = useContext(AuthContext);
   const { toggleSidebar } = useSidebar();
   const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [localUser, setLocalUser] = useState<any>(null);
+  
+  // Use context user or fallback to localStorage user
+  const currentUser = user || localUser;
 
   useEffect(() => {
     const savedProfilePicture = localStorage.getItem('profilePicture');
     setProfilePicture(savedProfilePicture);
+
+    // Load user from localStorage if context isn't ready
+    if (!user) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setLocalUser(userData);
+        } catch (e) {
+          console.error('Error parsing stored user data:', e);
+        }
+      }
+    } else {
+      setLocalUser(user);
+    }
 
     // Listen for profile picture changes via custom event
     const handleProfilePictureUpdate = (event: CustomEvent) => {
       setProfilePicture(event.detail);
     };
 
+    // Listen for user data updates from settings page
+    const handleUserDataUpdate = (event: CustomEvent) => {
+      console.log('Header received user data update:', event.detail);
+      setLocalUser(event.detail);
+    };
+
     // Listen for storage changes from other tabs
     const handleStorageChange = () => {
       const updatedPicture = localStorage.getItem('profilePicture');
       setProfilePicture(updatedPicture);
+      
+      // Also update user data from localStorage
+      const updatedUser = localStorage.getItem('user');
+      if (updatedUser) {
+        try {
+          const userData = JSON.parse(updatedUser);
+          setLocalUser(userData);
+        } catch (e) {
+          console.error('Error parsing updated user data:', e);
+        }
+      }
     };
 
     window.addEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
+    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
       window.removeEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
+      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [user]);
 
   return (
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10 sticky top-0">
@@ -63,7 +101,7 @@ const Header = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-0">
                   <span className="hidden sm:inline-block text-sm font-medium truncate max-w-24 lg:max-w-none" style={{ color: 'hsl(0 0% 0%)' }}>
-                    {getFullName(user?.firstName, user?.lastName)}
+                    {getFullName(currentUser?.firstName, currentUser?.lastName)}
                   </span>
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0">
                     <AvatarImage 
@@ -71,7 +109,7 @@ const Header = () => {
                       alt="User profile"
                     />
                     <AvatarFallback>
-                      {getInitials(user?.firstName, user?.lastName)}
+                      {getInitials(currentUser?.firstName, currentUser?.lastName)}
                     </AvatarFallback>
                   </Avatar>
                   <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 hidden sm:block" />
@@ -81,10 +119,10 @@ const Header = () => {
                 <DropdownMenuLabel>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none" style={{ color: 'hsl(0 0% 0%)' }}>
-                      {getFullName(user?.firstName, user?.lastName)}
+                      {getFullName(currentUser?.firstName, currentUser?.lastName)}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground" style={{ color: 'hsl(0 0% 30%)' }}>
-                      {user?.email}
+                      {currentUser?.email}
                     </p>
                   </div>
                 </DropdownMenuLabel>

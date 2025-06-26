@@ -478,6 +478,12 @@ export default function SettingsMobile() {
       // Update the local user state immediately for UI display
       setLocalUser(updatedUser);
       
+      // Dispatch custom event to notify other components (like header) of user data update
+      window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+        detail: updatedUser 
+      }));
+      console.log('User data update event dispatched');
+      
       toast({
         title: "Profile updated",
         description: "Your profile information has been saved successfully.",
