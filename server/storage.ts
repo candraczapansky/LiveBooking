@@ -632,19 +632,12 @@ export class DatabaseStorage implements IStorage {
 
   // Service operations
   async createService(service: InsertService): Promise<Service> {
-    const id = this.currentServiceId++;
-    const newService = { ...service, id } as Service;
-    this.services.set(id, newService);
+    const [newService] = await db.insert(services).values(service).returning();
     return newService;
   }
 
   async getService(id: number): Promise<Service | undefined> {
-    const service = this.services.get(id);
-    if (service && !service.color) {
-      // Set default color for services that don't have one
-      service.color = "#3B82F6";
-      this.services.set(id, service);
-    }
+    const [service] = await db.select().from(services).where(eq(services.id, id));
     return service;
   }
 
@@ -663,15 +656,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllServices(): Promise<Service[]> {
-    const services = Array.from(this.services.values());
-    // Ensure all services have a color field
-    return services.map(service => {
-      if (!service.color) {
-        service.color = "#3B82F6";
-        this.services.set(service.id, service);
-      }
-      return service;
-    });
+    const allServices = await db.select().from(services);
+    return allServices;
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
