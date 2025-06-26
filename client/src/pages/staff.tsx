@@ -153,6 +153,35 @@ const StaffPage = () => {
             {/* Page Header */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
               <div className="space-y-3">
+                {/* Test Button Area - Temporarily at top */}
+                <div className="bg-red-100 p-4 rounded border-2 border-red-500">
+                  <p className="text-red-800 mb-2">Test Area - Click this button:</p>
+                  <button
+                    onTouchStart={() => console.log("Touch start")}
+                    onTouchEnd={() => console.log("Touch end")}
+                    onMouseDown={() => console.log("Mouse down")}
+                    onMouseUp={() => console.log("Mouse up")}
+                    onClick={() => {
+                      console.log("CLICK DETECTED!");
+                      alert("Button clicked!");
+                      toast({
+                        title: "SUCCESS!",
+                        description: "Button click is working!",
+                      });
+                      setSelectedStaffId(null);
+                      setIsFormOpen(true);
+                    }}
+                    className="w-full bg-green-500 text-white p-3 rounded text-lg font-bold"
+                    style={{
+                      minHeight: '60px',
+                      fontSize: '18px',
+                      border: '3px solid #000',
+                    }}
+                  >
+                    TEST BUTTON - CLICK ME
+                  </button>
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Staff</h1>
@@ -162,10 +191,10 @@ const StaffPage = () => {
                   </div>
                   <button
                     onClick={() => {
-                      // Visual feedback for mobile testing
+                      console.log("Add Staff button clicked");
                       toast({
-                        title: "Button Clicked!",
-                        description: "Add Staff button was clicked",
+                        title: "Add Staff Clicked!",
+                        description: "Original button works",
                       });
                       setSelectedStaffId(null);
                       setIsFormOpen(true);
