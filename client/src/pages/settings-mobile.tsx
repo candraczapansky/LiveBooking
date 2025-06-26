@@ -1048,6 +1048,15 @@ export default function SettingsMobile() {
                         onClick={() => {
                           setCustomColor(preset.color);
                           applyThemeColors(preset.color, darkMode);
+                          // Auto-save to database
+                          saveColorPreferencesMutation.mutate({
+                            primaryColor: preset.color,
+                            primaryTextColor,
+                            secondaryTextColor,
+                            isDarkMode: darkMode,
+                            savedBrandColors: JSON.stringify(savedBrandColors),
+                            savedTextColors: JSON.stringify(savedTextColors)
+                          });
                         }}
                         style={{
                           height: "56px",
@@ -1214,6 +1223,15 @@ export default function SettingsMobile() {
                       onChange={(e) => {
                         setCustomColor(e.target.value);
                         applyThemeColors(e.target.value, darkMode);
+                        // Auto-save to database
+                        saveColorPreferencesMutation.mutate({
+                          primaryColor: e.target.value,
+                          primaryTextColor,
+                          secondaryTextColor,
+                          isDarkMode: darkMode,
+                          savedBrandColors: JSON.stringify(savedBrandColors),
+                          savedTextColors: JSON.stringify(savedTextColors)
+                        });
                       }}
                       style={{ 
                         width: "80px", 
