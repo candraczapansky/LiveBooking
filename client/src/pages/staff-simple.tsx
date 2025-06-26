@@ -70,6 +70,11 @@ const StaffPageSimple = () => {
   };
 
   const handleAddStaff = () => {
+    console.log("Add Staff button clicked!");
+    toast({
+      title: "Add Staff Button Clicked!",
+      description: "Opening staff form...",
+    });
     setSelectedStaffId(null);
     setIsFormOpen(true);
   };
@@ -114,7 +119,7 @@ const StaffPageSimple = () => {
           {/* Header Section */}
           <Card className="mb-4 p-4 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">Staff Management</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">Staff Management - FIXED</h1>
               <Button 
                 onClick={handleAddStaff} 
                 className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-medium"
@@ -211,21 +216,17 @@ const StaffPageSimple = () => {
           )}
 
           {/* Edit/Add Staff Dialog */}
-          {isFormOpen && (
-            <StaffForm
-              staffId={selectedStaffId}
-              isOpen={isFormOpen}
-              onClose={() => {
-                setIsFormOpen(false);
-                setSelectedStaffId(null);
-              }}
-              onSave={() => {
-                setIsFormOpen(false);
+          <StaffForm
+            open={isFormOpen}
+            onOpenChange={(open) => {
+              setIsFormOpen(open);
+              if (!open) {
                 setSelectedStaffId(null);
                 queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
-              }}
-            />
-          )}
+              }
+            }}
+            staffId={selectedStaffId || undefined}
+          />
 
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
