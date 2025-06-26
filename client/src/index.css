@@ -1347,7 +1347,8 @@ button svg:not(.bg-secondary svg) {
 
 /* Custom styles for active sidebar item */
 .sidebar-item.active {
-  @apply border-l-4 border-primary bg-sidebar-accent text-primary;
+  @apply border-l-4 border-primary text-primary;
+  background-color: hsl(var(--primary) / 0.1) !important;
 }
 
 .sidebar-item {

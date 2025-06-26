@@ -71,6 +71,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - All select/dropdown components now inherit user's custom primary color theme
   - Dropdowns maintain proper contrast with primary-foreground text color
   - Complete visual consistency between user's custom colors and interface elements
+- **Fixed service form validation and sidebar menu highlighting:**
+  - Resolved service edit form validation issue preventing "Update Service" button functionality
+  - Fixed assigned staff data mapping that was causing form validation errors
+  - Updated sidebar active menu highlighting to use custom primary color from user settings
+  - Sidebar navigation now dynamically reflects user's chosen color theme
+  - Service color updates now work properly for all services
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**
