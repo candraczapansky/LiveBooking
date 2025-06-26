@@ -184,9 +184,9 @@ const StaffPage = () => {
                 
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Staff</h1>
+                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Staff TEST PAGE</h1>
                     <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                      Manage your salon staff
+                      Manage your salon staff - PAGE UPDATED
                     </p>
                   </div>
                   <button
