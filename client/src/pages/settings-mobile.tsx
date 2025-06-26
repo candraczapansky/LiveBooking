@@ -218,13 +218,21 @@ export default function SettingsMobile() {
     }
   };
 
-  // Load profile picture from localStorage on component mount
+  // Load profile picture from user data or localStorage on component mount
   useEffect(() => {
-    const savedPicture = localStorage.getItem('profilePicture');
-    if (savedPicture) {
-      setProfilePicture(savedPicture);
+    // Prioritize database profile picture from user context
+    if (user && (user as any).profilePicture) {
+      setProfilePicture((user as any).profilePicture);
+      // Also sync to localStorage as backup
+      localStorage.setItem('profilePicture', (user as any).profilePicture);
+    } else {
+      // Fallback to localStorage if no database profile picture
+      const savedPicture = localStorage.getItem('profilePicture');
+      if (savedPicture) {
+        setProfilePicture(savedPicture);
+      }
     }
-  }, []);
+  }, [user]);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     firstName: user?.firstName || '',

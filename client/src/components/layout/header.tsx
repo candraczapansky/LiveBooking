@@ -27,8 +27,16 @@ const Header = () => {
   const currentUser = user || localUser;
 
   useEffect(() => {
-    const savedProfilePicture = localStorage.getItem('profilePicture');
-    setProfilePicture(savedProfilePicture);
+    // Prioritize database profile picture from user context
+    if (user && (user as any).profilePicture) {
+      setProfilePicture((user as any).profilePicture);
+      // Also sync to localStorage as backup
+      localStorage.setItem('profilePicture', (user as any).profilePicture);
+    } else {
+      // Fallback to localStorage if no database profile picture
+      const savedProfilePicture = localStorage.getItem('profilePicture');
+      setProfilePicture(savedProfilePicture);
+    }
 
     // Load user from localStorage if context isn't ready
     if (!user) {
@@ -54,6 +62,11 @@ const Header = () => {
     const handleUserDataUpdate = (event: CustomEvent) => {
       console.log('Header received user data update:', event.detail);
       setLocalUser(event.detail);
+      // Also update profile picture if included in the event
+      if (event.detail && event.detail.profilePicture) {
+        setProfilePicture(event.detail.profilePicture);
+        localStorage.setItem('profilePicture', event.detail.profilePicture);
+      }
     };
 
     // Listen for storage changes from other tabs
