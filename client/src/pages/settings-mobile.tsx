@@ -66,8 +66,8 @@ export default function SettingsMobile() {
   };
 
   // Query to load color preferences from database
-  const { data: savedColorPreferences, isLoading: colorPrefsLoading } = useQuery({
-    queryKey: ['/api/users/color-preferences', getCurrentUserId()],
+  const { data: savedColorPreferences, isLoading: colorPrefsLoading, refetch: refetchColorPrefs } = useQuery({
+    queryKey: ['/api/users/color-preferences', currentUser?.id || null],
     queryFn: async () => {
       const userId = getCurrentUserId();
       if (!userId) {
@@ -90,8 +90,16 @@ export default function SettingsMobile() {
       console.log('Loaded color preferences from database:', data);
       return data;
     },
-    enabled: !!getCurrentUserId(),
+    enabled: !!currentUser?.id,
   });
+
+  // Trigger refetch when user context becomes available
+  useEffect(() => {
+    if (currentUser?.id && !savedColorPreferences && !colorPrefsLoading) {
+      console.log('User context now available, refetching color preferences...');
+      refetchColorPrefs();
+    }
+  }, [currentUser?.id, savedColorPreferences, colorPrefsLoading, refetchColorPrefs]);
 
   // Update profileData when currentUser changes
   useEffect(() => {
