@@ -1061,6 +1061,23 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
   
   app.post("/api/client-memberships", validateBody(insertClientMembershipSchema), async (req, res) => {
     const newClientMembership = await storage.createClientMembership(req.body);
+    
+    // Create notification for new membership
+    try {
+      const client = await storage.getUser(newClientMembership.clientId);
+      const membership = await storage.getMembership(newClientMembership.membershipId);
+      
+      await storage.createNotification({
+        type: 'new_membership',
+        title: 'New membership purchased',
+        description: `${client?.firstName} ${client?.lastName} purchased ${membership?.name} membership`,
+        relatedId: newClientMembership.id,
+        relatedType: 'membership'
+      });
+    } catch (error) {
+      console.error('Failed to create membership notification:', error);
+    }
+    
     return res.status(201).json(newClientMembership);
   });
   
