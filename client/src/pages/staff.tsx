@@ -157,16 +157,19 @@ const StaffPage = () => {
                       Manage your salon staff
                     </p>
                   </div>
-                  <Button 
+                  <button 
                     onClick={(e) => {
                       console.log("Button clicked!", e);
+                      e.preventDefault();
+                      e.stopPropagation();
                       handleAddStaff();
                     }} 
-                    size="sm"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                    type="button"
                   >
                     <PlusCircle className="h-4 w-4" />
                     <span className="ml-1 hidden sm:inline">Add</span>
-                  </Button>
+                  </button>
                 </div>
                 
                 <div className="w-full">
