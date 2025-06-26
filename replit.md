@@ -65,6 +65,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Removed CSS classes for hiding/showing button icons (.hide-button-icons)
   - Icons are now permanently enabled throughout the application interface
   - Simplified settings page by removing unnecessary toggle functionality
+- **Updated button and dropdown colors to match custom settings:**
+  - Modified button icons to use custom primary text color from user settings
+  - Fixed dropdown highlight colors to use custom primary color instead of hardcoded blue
+  - All select/dropdown components now inherit user's custom primary color theme
+  - Dropdowns maintain proper contrast with primary-foreground text color
+  - Complete visual consistency between user's custom colors and interface elements
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**

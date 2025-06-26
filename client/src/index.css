@@ -1369,45 +1369,45 @@ button svg:not(.bg-secondary svg) {
   }
 }
 
-/* Dropdown theme colors */
+/* Dropdown theme colors - use custom primary color */
 [data-radix-select-trigger][data-state="open"] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
-  border-color: hsl(var(--dropdown-selected)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: hsl(var(--primary)) !important;
 }
 
 [data-radix-select-item][data-highlighted] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 [data-radix-select-item][data-state="checked"] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Select content items */
 [data-radix-select-content] [data-radix-select-item]:hover {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Select viewport items */
 [data-radix-select-viewport] [data-radix-select-item][data-highlighted] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* More specific selectors for shadcn select components */
 .select-item-highlighted {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 button[data-radix-select-trigger][data-state="open"] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
-  border-color: hsl(var(--dropdown-selected)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: hsl(var(--primary)) !important;
 }
 
 /* Target all select components globally */
@@ -1416,15 +1416,15 @@ button[data-radix-select-trigger][data-state="open"] {
 [role="listbox"] [role="option"]:hover,
 .select-item[data-highlighted],
 .select-item:hover {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Ensure all select elements use theme colors */
 [data-radix-collection-item][data-highlighted],
 [data-radix-collection-item]:hover {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Target shadcn/ui specific select classes */
@@ -1432,8 +1432,8 @@ div[data-radix-select-content] div[data-radix-select-item][data-highlighted],
 div[data-radix-select-content] div[data-radix-select-item]:focus,
 .select-content .select-item[data-highlighted],
 .select-content .select-item:focus {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Universal dropdown item override - highest specificity */
@@ -1444,8 +1444,8 @@ div[data-radix-select-content] div[data-radix-select-item]:focus,
 * [data-radix-select-item][data-highlighted],
 * [data-radix-select-item]:hover,
 * [data-radix-select-item][data-state="checked"] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Additional dropdown selectors for complete coverage */
@@ -1456,15 +1456,15 @@ div[data-radix-select-content] div[data-radix-select-item]:focus,
 [data-radix-combobox-item][data-highlighted],
 [data-radix-select-trigger]:hover,
 [data-radix-select-trigger][data-state="open"] {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Force dropdown content styling */
 [data-radix-select-content],
 [data-radix-combobox-content] {
-  --accent: var(--dropdown-selected);
-  --accent-foreground: var(--dropdown-selected-foreground);
+  --accent: var(--primary);
+  --accent-foreground: var(--primary-foreground);
 }
 
 /* Override all select item colors with higher specificity */
@@ -1472,14 +1472,14 @@ div[data-radix-select-content] div[data-radix-select-item]:hover,
 div[data-radix-select-content] div[data-radix-select-item][data-highlighted],
 div[data-radix-select-content] div[data-radix-select-item][data-state="checked"],
 div[data-radix-select-content] div[data-radix-select-item]:focus {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Target shadcn select components with maximum specificity */
 [data-radix-select-content] [data-radix-select-item]:is(:hover, [data-highlighted], [data-state="checked"], :focus) {
-  background-color: hsl(var(--dropdown-selected)) !important;
-  color: hsl(var(--dropdown-selected-foreground)) !important;
+  background-color: hsl(var(--primary)) !important;
+  color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Nuclear option - override ALL possible dropdown selectors */
