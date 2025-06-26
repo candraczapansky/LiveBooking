@@ -55,6 +55,11 @@ const StaffPage = () => {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  
+  // Debug state changes
+  useEffect(() => {
+    console.log("isFormOpen state changed to:", isFormOpen);
+  }, [isFormOpen]);
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
@@ -103,8 +108,11 @@ const StaffPage = () => {
   });
 
   const handleAddStaff = () => {
+    console.log("handleAddStaff called");
+    console.log("Current isFormOpen state:", isFormOpen);
     setSelectedStaffId(null);
     setIsFormOpen(true);
+    console.log("After setting isFormOpen to true");
   };
 
   const handleEditStaff = (staffId: number) => {
@@ -153,7 +161,15 @@ const StaffPage = () => {
                     </p>
                   </div>
                   <Button
-                    onClick={handleAddStaff}
+                    onClick={() => {
+                      console.log("Button clicked directly!");
+                      setIsFormOpen(prev => {
+                        console.log("Previous state:", prev);
+                        console.log("Setting to true");
+                        return true;
+                      });
+                      setSelectedStaffId(null);
+                    }}
                     className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600"
                   >
                     <PlusCircle className="h-4 w-4" />
