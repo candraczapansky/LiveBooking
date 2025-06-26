@@ -2949,6 +2949,42 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Notification routes
+  app.get("/api/notifications", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const notifications = await storage.getRecentNotifications(limit);
+      return res.status(200).json(notifications);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching notifications: " + error.message });
+    }
+  });
+
+  app.get("/api/notifications/user/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const notifications = await storage.getNotificationsByUser(userId, limit);
+      return res.status(200).json(notifications);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching user notifications: " + error.message });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.markNotificationAsRead(id);
+      if (success) {
+        return res.status(200).json({ message: "Notification marked as read" });
+      } else {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error marking notification as read: " + error.message });
+    }
+  });
+
   // Staff Schedule routes
   app.get("/api/schedules", async (req: Request, res: Response) => {
     try {

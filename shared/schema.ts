@@ -513,3 +513,24 @@ export type InsertEmailUnsubscribe = z.infer<typeof insertEmailUnsubscribeSchema
 
 export type Product = typeof products.$inferSelect;
 export type InsertProduct = z.infer<typeof insertProductSchema>;
+
+// Notifications schema for tracking real system events
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  type: text("type").notNull(), // appointment_booked, appointment_cancelled, payment_received, new_membership, etc.
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  userId: integer("user_id"), // Who the notification is for (optional - can be system-wide)
+  relatedId: integer("related_id"), // ID of related entity (appointment, payment, etc.)
+  relatedType: text("related_type"), // appointment, payment, membership, etc.
+  isRead: boolean("is_read").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;

@@ -21,7 +21,8 @@ import {
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
   promoCodes, PromoCode, InsertPromoCode,
   staffSchedules, StaffSchedule, InsertStaffSchedule,
-  userColorPreferences, UserColorPreferences, InsertUserColorPreferences
+  userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
+  notifications, Notification, InsertNotification
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -195,6 +196,12 @@ export interface IStorage {
   createStaffEarnings(earnings: any): Promise<any>;
   getStaffEarnings(staffId: number, month?: Date): Promise<any[]>;
   getAllStaffEarnings(): Promise<any[]>;
+
+  // Notification operations
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  getRecentNotifications(limit?: number): Promise<Notification[]>;
+  getNotificationsByUser(userId: number, limit?: number): Promise<Notification[]>;
+  markNotificationAsRead(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1503,6 +1510,39 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userColorPreferences.userId, userId))
       .returning();
     return result[0];
+  }
+
+  // Notification operations
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const [newNotification] = await db.insert(notifications).values(notification).returning();
+    return newNotification;
+  }
+
+  async getRecentNotifications(limit: number = 10): Promise<Notification[]> {
+    const recentNotifications = await db
+      .select()
+      .from(notifications)
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+    return recentNotifications;
+  }
+
+  async getNotificationsByUser(userId: number, limit: number = 10): Promise<Notification[]> {
+    const userNotifications = await db
+      .select()
+      .from(notifications)
+      .where(or(eq(notifications.userId, userId), isNull(notifications.userId)))
+      .orderBy(desc(notifications.createdAt))
+      .limit(limit);
+    return userNotifications;
+  }
+
+  async markNotificationAsRead(id: number): Promise<boolean> {
+    const result = await db
+      .update(notifications)
+      .set({ isRead: true })
+      .where(eq(notifications.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 
