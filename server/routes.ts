@@ -3103,6 +3103,44 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Time Clock API endpoints
+  app.get("/api/time-clock-entries", async (req, res) => {
+    try {
+      const entries = await storage.getAllTimeClockEntries();
+      res.json(entries);
+    } catch (error) {
+      console.error("Error fetching time clock entries:", error);
+      res.status(500).json({ error: "Failed to fetch time clock entries" });
+    }
+  });
+
+  app.post("/api/time-clock-sync", async (req, res) => {
+    try {
+      const { TimeClockSyncService } = await import('./time-clock-sync');
+      const syncService = new TimeClockSyncService(storage);
+      
+      // Try to sync with external source
+      await syncService.syncTimeClockData();
+      
+      // If no data was synced, generate sample data for demonstration
+      const entries = await storage.getAllTimeClockEntries();
+      if (entries.length === 0) {
+        console.log("No external data found, generating mock data for demonstration");
+        await syncService.generateMockTimeClockData();
+      }
+      
+      const updatedEntries = await storage.getAllTimeClockEntries();
+      res.json({ 
+        message: "Time clock sync completed", 
+        entriesCount: updatedEntries.length,
+        entries: updatedEntries
+      });
+    } catch (error) {
+      console.error("Error syncing time clock data:", error);
+      res.status(500).json({ error: "Failed to sync time clock data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -63,7 +63,7 @@ export class TimeClockSyncService {
         }
 
         // Look for any JSON-like data structures in script tags
-        const scriptMatches = html.match(/<script[^>]*>(.*?)<\/script>/gs);
+        const scriptMatches = html.match(/<script[^>]*>(.*?)<\/script>/g);
         if (scriptMatches) {
           for (const script of scriptMatches) {
             try {
@@ -124,17 +124,14 @@ export class TimeClockSyncService {
         // Update existing entry
         await this.storage.updateTimeClockEntry(existingEntry.id, {
           clockOutTime: externalEntry.clockOutTime ? new Date(externalEntry.clockOutTime) : null,
-          totalHours: externalEntry.totalHours || 0,
           status: externalEntry.status
         });
       } else {
         // Create new entry
         await this.storage.createTimeClockEntry({
           staffId: staff.id,
-          date: new Date(externalEntry.date),
           clockInTime: new Date(externalEntry.clockInTime),
           clockOutTime: externalEntry.clockOutTime ? new Date(externalEntry.clockOutTime) : null,
-          totalHours: externalEntry.totalHours || 0,
           status: externalEntry.status,
           externalId: externalEntry.id
         });
@@ -157,10 +154,8 @@ export class TimeClockSyncService {
     const mockEntries = [
       {
         staffId: staff[0].id,
-        date: today,
         clockInTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 9, 0),
         clockOutTime: new Date(today.getFullYear(), today.getMonth(), today.getDate(), 17, 0),
-        totalHours: 8,
         status: 'clocked_out' as const,
         externalId: `mock-${staff[0].id}-${today.toISOString().split('T')[0]}`
       }

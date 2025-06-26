@@ -203,6 +203,16 @@ export interface IStorage {
   getRecentNotifications(limit?: number): Promise<Notification[]>;
   getNotificationsByUser(userId: number, limit?: number): Promise<Notification[]>;
   markNotificationAsRead(id: number): Promise<boolean>;
+
+  // Time Clock operations
+  createTimeClockEntry(entry: InsertTimeClockEntry): Promise<TimeClockEntry>;
+  getTimeClockEntry(id: number): Promise<TimeClockEntry | undefined>;
+  getAllTimeClockEntries(): Promise<TimeClockEntry[]>;
+  getTimeClockEntriesByStaffId(staffId: number): Promise<TimeClockEntry[]>;
+  getTimeClockEntryByExternalId(externalId: string): Promise<TimeClockEntry | undefined>;
+  updateTimeClockEntry(id: number, entryData: Partial<InsertTimeClockEntry>): Promise<TimeClockEntry>;
+  deleteTimeClockEntry(id: number): Promise<boolean>;
+  getStaffByName(name: string): Promise<Staff | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1544,6 +1554,61 @@ export class DatabaseStorage implements IStorage {
       .set({ isRead: true })
       .where(eq(notifications.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Time Clock operations
+  async createTimeClockEntry(entry: InsertTimeClockEntry): Promise<TimeClockEntry> {
+    const [created] = await db.insert(timeClockEntries).values(entry).returning();
+    return created;
+  }
+
+  async getTimeClockEntry(id: number): Promise<TimeClockEntry | undefined> {
+    const [entry] = await db.select().from(timeClockEntries).where(eq(timeClockEntries.id, id));
+    return entry;
+  }
+
+  async getAllTimeClockEntries(): Promise<TimeClockEntry[]> {
+    return await db.select().from(timeClockEntries).orderBy(desc(timeClockEntries.createdAt));
+  }
+
+  async getTimeClockEntriesByStaffId(staffId: number): Promise<TimeClockEntry[]> {
+    return await db.select().from(timeClockEntries)
+      .where(eq(timeClockEntries.staffId, staffId))
+      .orderBy(desc(timeClockEntries.createdAt));
+  }
+
+  async getTimeClockEntryByExternalId(externalId: string): Promise<TimeClockEntry | undefined> {
+    const [entry] = await db.select().from(timeClockEntries)
+      .where(eq(timeClockEntries.externalId, externalId));
+    return entry;
+  }
+
+  async updateTimeClockEntry(id: number, entryData: Partial<InsertTimeClockEntry>): Promise<TimeClockEntry> {
+    const [updated] = await db.update(timeClockEntries)
+      .set(entryData)
+      .where(eq(timeClockEntries.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTimeClockEntry(id: number): Promise<boolean> {
+    const result = await db.delete(timeClockEntries).where(eq(timeClockEntries.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getStaffByName(name: string): Promise<Staff | undefined> {
+    const result = await db.select()
+      .from(staff)
+      .leftJoin(users, eq(staff.userId, users.id))
+      .where(
+        or(
+          eq(users.firstName, name),
+          eq(users.lastName, name),
+          sql`${users.firstName} || ' ' || ${users.lastName} = ${name}`
+        )
+      );
+    
+    return result[0]?.staff;
   }
 }
 
