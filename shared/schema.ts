@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   city: text("city"),
   state: text("state"),
   zipCode: text("zip_code"),
+  profilePicture: text("profile_picture"), // Base64 encoded image data
   squareCustomerId: text("stripe_customer_id"),
   // Communication preferences
   emailAccountManagement: boolean("email_account_management").default(true),

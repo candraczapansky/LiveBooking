@@ -167,10 +167,38 @@ export default function SettingsMobile() {
 
       // Create a FileReader to convert the image to base64
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         const base64String = e.target?.result as string;
         setProfilePicture(base64String);
         localStorage.setItem('profilePicture', base64String);
+        
+        // Save to database immediately
+        const userId = getCurrentUserId();
+        if (userId) {
+          try {
+            const response = await fetch(`/api/users/${userId}`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                profilePicture: base64String
+              }),
+            });
+            
+            if (response.ok) {
+              console.log('Profile picture saved to database successfully');
+              // Dispatch custom event to notify other components (like header)
+              window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+                detail: { profilePicture: base64String }
+              }));
+            } else {
+              console.error('Failed to save profile picture to database');
+            }
+          } catch (error) {
+            console.error('Error saving profile picture to database:', error);
+          }
+        }
         
         toast({
           title: "Photo updated",
@@ -586,7 +614,7 @@ export default function SettingsMobile() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (profileDataWithUserId: { firstName: string; lastName: string; email: string; phone: string; userId?: number }) => {
+    mutationFn: async (profileDataWithUserId: { firstName: string; lastName: string; email: string; phone: string; profilePicture?: string; userId?: number }) => {
       const { userId, ...profileData } = profileDataWithUserId;
       const targetUserId = userId || user?.id;
       
@@ -711,6 +739,7 @@ export default function SettingsMobile() {
       lastName: profileData.lastName,
       email: profileData.email,
       phone: profileData.phone,
+      profilePicture: profilePicture ?? undefined,
       userId 
     });
     console.log('Profile mutation triggered');
