@@ -183,6 +183,43 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
 });
 
+// Appointment History schema - tracks all changes to appointments
+export const appointmentHistory = pgTable("appointment_history", {
+  id: serial("id").primaryKey(),
+  appointmentId: integer("appointment_id").notNull(),
+  
+  // Action tracking
+  action: text("action").notNull(), // "created", "updated", "cancelled", "confirmed", "completed", "rescheduled", "payment_updated"
+  actionBy: integer("action_by"), // User ID who performed the action
+  actionByRole: text("action_by_role"), // "admin", "staff", "client"
+  
+  // Previous and new values for tracking changes
+  previousValues: text("previous_values"), // JSON string of previous field values
+  newValues: text("new_values"), // JSON string of new field values
+  
+  // Snapshot of appointment state at time of change
+  clientId: integer("client_id"),
+  serviceId: integer("service_id"),
+  staffId: integer("staff_id"),
+  startTime: timestamp("start_time"),
+  endTime: timestamp("end_time"),
+  status: text("status"),
+  paymentStatus: text("payment_status"),
+  totalAmount: doublePrecision("total_amount"),
+  notes: text("notes"),
+  
+  // Additional context
+  reason: text("reason"), // Reason for cancellation, reschedule, etc.
+  systemGenerated: boolean("system_generated").default(false), // True for automated changes
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAppointmentHistorySchema = createInsertSchema(appointmentHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Memberships schema
 export const memberships = pgTable("memberships", {
   id: serial("id").primaryKey(),
@@ -670,3 +707,7 @@ export const insertSalesHistorySchema = createInsertSchema(salesHistory).omit({
 
 export type SalesHistory = typeof salesHistory.$inferSelect;
 export type InsertSalesHistory = z.infer<typeof insertSalesHistorySchema>;
+
+// Type definitions
+export type AppointmentHistory = typeof appointmentHistory.$inferSelect;
+export type InsertAppointmentHistory = z.infer<typeof insertAppointmentHistorySchema>;

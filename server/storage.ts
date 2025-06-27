@@ -8,6 +8,7 @@ import {
   staff, Staff, InsertStaff,
   staffServices, StaffService, InsertStaffService,
   appointments, Appointment, InsertAppointment,
+  appointmentHistory, AppointmentHistory, InsertAppointmentHistory,
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
@@ -99,6 +100,11 @@ export interface IStorage {
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
   updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment>;
   deleteAppointment(id: number): Promise<boolean>;
+
+  // Appointment History operations
+  createAppointmentHistory(history: InsertAppointmentHistory): Promise<AppointmentHistory>;
+  getAppointmentHistory(appointmentId: number): Promise<AppointmentHistory[]>;
+  getAllAppointmentHistory(): Promise<AppointmentHistory[]>;
 
   // Membership operations
   createMembership(membership: InsertMembership): Promise<Membership>;
