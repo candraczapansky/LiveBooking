@@ -339,6 +339,11 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
       const averagePrice = totalCashedOut > 0 ? totalRevenue / totalCashedOut : Number(service.price) || 0;
       const conversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
 
+      // Ensure all calculated values are valid numbers
+      const safeTotalRevenue = isNaN(totalRevenue) || totalRevenue < 0 ? 0 : totalRevenue;
+      const safeAveragePrice = isNaN(averagePrice) || averagePrice < 0 ? 0 : averagePrice;
+      const safeConversionRate = isNaN(conversionRate) || conversionRate < 0 ? 0 : Math.min(conversionRate, 100);
+
       return {
         id: service.id,
         name: service.name,
@@ -347,9 +352,9 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
         duration: Number(service.duration) || 0,
         totalBookings,
         totalCashedOut,
-        totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
-        averagePrice: isNaN(averagePrice) ? 0 : averagePrice,
-        conversionRate: isNaN(conversionRate) ? 0 : Math.min(conversionRate, 100)
+        totalRevenue: safeTotalRevenue,
+        averagePrice: safeAveragePrice,
+        conversionRate: safeConversionRate
       };
     });
 
@@ -365,19 +370,19 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
   const totalRevenue = serviceMetrics.reduce((sum, service) => sum + service.totalRevenue, 0);
   const overallConversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
 
-  // Prepare chart data
+  // Prepare chart data with safe number conversion
   const topServicesData = serviceMetrics.slice(0, 8).map(service => ({
     name: service.name,
-    revenue: service.totalRevenue,
-    bookings: service.totalBookings,
-    cashedOut: service.totalCashedOut
+    revenue: Number(service.totalRevenue) || 0,
+    bookings: Number(service.totalBookings) || 0,
+    cashedOut: Number(service.totalCashedOut) || 0
   }));
 
   const conversionData = serviceMetrics.filter(s => s.totalBookings > 0).slice(0, 10).map(service => ({
     name: service.name,
-    conversionRate: Math.round(service.conversionRate),
-    bookings: service.totalBookings,
-    cashedOut: service.totalCashedOut
+    conversionRate: Math.round(Number(service.conversionRate) || 0),
+    bookings: Number(service.totalBookings) || 0,
+    cashedOut: Number(service.totalCashedOut) || 0
   }));
 
   return (
