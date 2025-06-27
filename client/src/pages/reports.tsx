@@ -342,12 +342,13 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
         (apt: any) => apt.status === 'completed' || apt.paymentStatus === 'paid'
       );
 
-      const totalRevenue = staffSales.reduce((sum: number, sale: any) => 
-        sum + (sale.totalAmount || 0), 0
-      );
+      const totalRevenue = staffSales.reduce((sum: number, sale: any) => {
+        const amount = Number(sale.totalAmount) || 0;
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0);
 
       const totalServices = completedAppointments.length;
-      const averageTicket = totalServices > 0 ? totalRevenue / totalServices : 0;
+      const averageTicket = totalServices > 0 && totalRevenue > 0 ? totalRevenue / totalServices : 0;
 
       // Calculate utilization (assuming 8-hour workday, 5 days a week)
       const totalWorkingHours = timePeriod === "week" ? 40 : 
@@ -356,10 +357,21 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
       
       const serviceHours = completedAppointments.reduce((sum: number, apt: any) => {
         const service = services.find((s: any) => s.id === apt.serviceId);
-        return sum + (service?.duration || 60) / 60; // Convert minutes to hours
+        const duration = Number(service?.duration) || 60;
+        const hours = isNaN(duration) ? 1 : duration / 60; // Convert minutes to hours
+        return sum + hours;
       }, 0);
 
-      const utilization = totalWorkingHours > 0 ? (serviceHours / totalWorkingHours) * 100 : 0;
+      const utilization = totalWorkingHours > 0 && serviceHours >= 0 ? 
+        Math.min((serviceHours / totalWorkingHours) * 100, 100) : 0;
+
+      // Ensure all calculated values are valid numbers
+      const safeUtilization = isNaN(utilization) || utilization < 0 ? 0 : Math.min(utilization, 100);
+      const safeAverageTicket = isNaN(averageTicket) || averageTicket < 0 ? 0 : averageTicket;
+      const safeTotalRevenue = isNaN(totalRevenue) || totalRevenue < 0 ? 0 : totalRevenue;
+      const safeServiceHours = isNaN(serviceHours) || serviceHours < 0 ? 0 : serviceHours;
+      const safeCommissionRate = Number(staffMember.commissionRate) || 0;
+      const safeCommissionEarnings = isNaN(safeTotalRevenue * safeCommissionRate) ? 0 : safeTotalRevenue * safeCommissionRate;
 
       return {
         id: staffMember.id,
@@ -367,12 +379,12 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
         title: staffMember.title,
         totalAppointments: staffAppointments.length,
         completedAppointments: completedAppointments.length,
-        totalRevenue,
-        averageTicket,
-        utilization,
-        serviceHours,
-        commissionRate: staffMember.commissionRate || 0,
-        commissionEarnings: totalRevenue * (staffMember.commissionRate || 0)
+        totalRevenue: safeTotalRevenue,
+        averageTicket: safeAverageTicket,
+        utilization: safeUtilization,
+        serviceHours: safeServiceHours,
+        commissionRate: safeCommissionRate,
+        commissionEarnings: safeCommissionEarnings
       };
     });
 
@@ -388,18 +400,18 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
   const averageUtilization = staffMetrics.length > 0 ? 
     staffMetrics.reduce((sum, staff) => sum + staff.utilization, 0) / staffMetrics.length : 0;
 
-  // Prepare chart data
+  // Prepare chart data with safe number conversion
   const performanceChartData = staffMetrics.slice(0, 10).map(staff => ({
     name: staff.name,
-    revenue: staff.totalRevenue,
-    appointments: staff.completedAppointments,
-    utilization: Math.round(staff.utilization)
+    revenue: Number(staff.totalRevenue) || 0,
+    appointments: Number(staff.completedAppointments) || 0,
+    utilization: Math.round(Number(staff.utilization) || 0)
   }));
 
   const utilizationData = staffMetrics.map(staff => ({
     name: staff.name,
-    utilization: Math.round(staff.utilization),
-    hours: Math.round(staff.serviceHours * 10) / 10
+    utilization: Math.round(Number(staff.utilization) || 0),
+    hours: Math.round((Number(staff.serviceHours) || 0) * 10) / 10
   }));
 
   return (
