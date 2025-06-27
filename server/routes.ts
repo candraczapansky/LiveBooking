@@ -1184,6 +1184,9 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
         appointmentId: appointmentId
       });
 
+      // Create sales history record
+      await createSalesHistoryRecord(payment, 'appointment');
+
       // Create notification for payment received
       try {
         const client = await storage.getUser(appointment.clientId);
@@ -1542,6 +1545,13 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
           paymentDate: new Date(),
           appointmentId: appointmentId || null
         });
+
+        // Create sales history record
+        if (type === "pos_payment") {
+          await createSalesHistoryRecord(paymentRecord, 'pos_sale');
+        } else if (appointmentId) {
+          await createSalesHistoryRecord(paymentRecord, 'appointment');
+        }
         
         console.log('Cash payment record saved to database:', paymentRecord);
         
@@ -2729,6 +2739,15 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
           paymentDate: new Date()
         });
 
+        // Create sales history record with product details
+        const productData = {
+          productIds: JSON.stringify(items.map(item => item.id)),
+          productNames: JSON.stringify(items.map(item => item.name)),
+          productQuantities: JSON.stringify(items.map(item => item.quantity)),
+          productUnitPrices: JSON.stringify(items.map(item => item.price))
+        };
+        await createSalesHistoryRecord(paymentRecord, 'pos_sale', productData);
+
         console.log('Transaction processed:', transaction);
         console.log('Payment record created for reporting:', paymentRecord);
       } catch (paymentError) {
@@ -3465,6 +3484,198 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     } catch (error) {
       console.error("Error deleting payroll history:", error);
       res.status(500).json({ error: "Failed to delete payroll history" });
+    }
+  });
+
+  // Helper function to create sales history record
+  async function createSalesHistoryRecord(paymentData: any, transactionType: string, additionalData?: any) {
+    try {
+      const transactionDate = new Date();
+      const businessDate = transactionDate.toISOString().split('T')[0];
+      const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][transactionDate.getDay()];
+      const monthYear = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+      const quarter = `${transactionDate.getFullYear()}-Q${Math.ceil((transactionDate.getMonth() + 1) / 3)}`;
+
+      let clientInfo = null;
+      let staffInfo = null;
+      let appointmentInfo = null;
+      let serviceInfo = null;
+
+      // Get client information if clientId exists
+      if (paymentData.clientId) {
+        clientInfo = await storage.getUser(paymentData.clientId);
+      }
+
+      // Get appointment and service information for appointment payments
+      if (paymentData.appointmentId && transactionType === 'appointment') {
+        appointmentInfo = await storage.getAppointment(paymentData.appointmentId);
+        if (appointmentInfo) {
+          serviceInfo = await storage.getService(appointmentInfo.serviceId);
+          if (appointmentInfo.staffId) {
+            staffInfo = await storage.getStaff(appointmentInfo.staffId);
+            if (staffInfo) {
+              const staffUser = await storage.getUser(staffInfo.userId);
+              staffInfo.user = staffUser;
+            }
+          }
+        }
+      }
+
+      const salesHistoryData = {
+        transactionType,
+        transactionDate,
+        paymentId: paymentData.id,
+        totalAmount: paymentData.amount,
+        paymentMethod: paymentData.method,
+        paymentStatus: paymentData.status,
+        
+        // Client information
+        clientId: clientInfo?.id || null,
+        clientName: clientInfo ? `${clientInfo.firstName || ''} ${clientInfo.lastName || ''}`.trim() : null,
+        clientEmail: clientInfo?.email || null,
+        clientPhone: clientInfo?.phone || null,
+        
+        // Staff information
+        staffId: staffInfo?.id || null,
+        staffName: staffInfo?.user ? `${staffInfo.user.firstName || ''} ${staffInfo.user.lastName || ''}`.trim() : null,
+        
+        // Appointment and service information
+        appointmentId: appointmentInfo?.id || null,
+        serviceIds: serviceInfo ? JSON.stringify([serviceInfo.id]) : null,
+        serviceNames: serviceInfo ? JSON.stringify([serviceInfo.name]) : null,
+        serviceTotalAmount: transactionType === 'appointment' ? paymentData.amount : null,
+        
+        // POS information
+        productIds: additionalData?.productIds || null,
+        productNames: additionalData?.productNames || null,
+        productQuantities: additionalData?.productQuantities || null,
+        productUnitPrices: additionalData?.productUnitPrices || null,
+        productTotalAmount: transactionType === 'pos_sale' ? paymentData.amount : null,
+        
+        // Membership information
+        membershipId: additionalData?.membershipId || null,
+        membershipName: additionalData?.membershipName || null,
+        membershipDuration: additionalData?.membershipDuration || null,
+        
+        // Business insights
+        businessDate,
+        dayOfWeek,
+        monthYear,
+        quarter,
+        
+        // External tracking
+        squarePaymentId: paymentData.squarePaymentId || null,
+        
+        // Audit
+        createdBy: null, // Could be set to current user ID if available
+        notes: paymentData.description || null
+      };
+
+      const salesHistory = await storage.createSalesHistory(salesHistoryData);
+      console.log('Sales history record created:', salesHistory.id);
+      return salesHistory;
+    } catch (error) {
+      console.error('Error creating sales history record:', error);
+      // Don't throw error to prevent breaking payment flow
+    }
+  }
+
+  // Sales History Routes
+
+  // Create sales history record
+  app.post("/api/sales-history", async (req, res) => {
+    try {
+      const salesHistoryData = req.body;
+      const newSalesHistory = await storage.createSalesHistory(salesHistoryData);
+      res.json(newSalesHistory);
+    } catch (error) {
+      console.error("Error creating sales history:", error);
+      res.status(500).json({ error: "Failed to create sales history" });
+    }
+  });
+
+  // Get all sales history
+  app.get("/api/sales-history", async (req, res) => {
+    try {
+      const { startDate, endDate, transactionType, clientId, staffId, monthYear } = req.query;
+      
+      let salesHistory;
+      
+      if (startDate && endDate) {
+        salesHistory = await storage.getSalesHistoryByDateRange(new Date(startDate as string), new Date(endDate as string));
+      } else if (transactionType) {
+        salesHistory = await storage.getSalesHistoryByTransactionType(transactionType as string);
+      } else if (clientId) {
+        salesHistory = await storage.getSalesHistoryByClient(parseInt(clientId as string));
+      } else if (staffId) {
+        salesHistory = await storage.getSalesHistoryByStaff(parseInt(staffId as string));
+      } else if (monthYear) {
+        salesHistory = await storage.getSalesHistoryByMonth(monthYear as string);
+      } else {
+        salesHistory = await storage.getAllSalesHistory();
+      }
+      
+      res.json(salesHistory);
+    } catch (error) {
+      console.error("Error fetching sales history:", error);
+      res.status(500).json({ error: "Failed to fetch sales history" });
+    }
+  });
+
+  // Get sales history by ID
+  app.get("/api/sales-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid sales history ID is required" });
+      }
+      
+      const salesHistory = await storage.getSalesHistory(id);
+      if (!salesHistory) {
+        return res.status(404).json({ error: "Sales history not found" });
+      }
+      
+      res.json(salesHistory);
+    } catch (error) {
+      console.error("Error fetching sales history:", error);
+      res.status(500).json({ error: "Failed to fetch sales history" });
+    }
+  });
+
+  // Update sales history record
+  app.put("/api/sales-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid sales history ID is required" });
+      }
+      
+      const updateData = req.body;
+      const updatedSalesHistory = await storage.updateSalesHistory(id, updateData);
+      res.json(updatedSalesHistory);
+    } catch (error) {
+      console.error("Error updating sales history:", error);
+      res.status(500).json({ error: "Failed to update sales history" });
+    }
+  });
+
+  // Delete sales history record
+  app.delete("/api/sales-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid sales history ID is required" });
+      }
+      
+      const deleted = await storage.deleteSalesHistory(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Sales history not found" });
+      }
+      
+      res.json({ message: "Sales history deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting sales history:", error);
+      res.status(500).json({ error: "Failed to delete sales history" });
     }
   });
 
