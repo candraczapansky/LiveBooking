@@ -262,7 +262,7 @@ export default function ClientPaymentMethods({ clientId, clientName }: ClientPay
             <Button
               onClick={() => setShowAddCard(true)}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:bg-primary/90"
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Card
