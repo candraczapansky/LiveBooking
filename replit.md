@@ -190,6 +190,11 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Added smooth transition effects for better user experience
   - Maintained full desktop functionality while optimizing mobile view
   - Visual appointment indicators: green dots for paid appointments, primary color for unpaid
+- **Fixed Back button in Reports page to use custom theme colors:**
+  - Updated Back button styling to use user's selected primary color from settings
+  - Replaced hardcoded button styling with dynamic CSS variables
+  - Back button now properly reflects user's custom color theme
+  - Maintained proper contrast with primary-foreground text color
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**

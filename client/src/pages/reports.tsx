@@ -1331,7 +1331,11 @@ const ReportsPage = () => {
                       variant="ghost" 
                       size="sm" 
                       onClick={() => setSelectedReport(null)}
-                      className="mr-3 min-h-[44px] flex-shrink-0"
+                      className="mr-3 min-h-[44px] flex-shrink-0 hover:bg-primary/10"
+                      style={{ 
+                        backgroundColor: 'hsl(var(--primary))',
+                        color: 'hsl(var(--primary-foreground))'
+                      }}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
