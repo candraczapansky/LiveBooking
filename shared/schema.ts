@@ -516,6 +516,46 @@ export const insertTimeClockEntrySchema = createInsertSchema(timeClockEntries).o
 export type TimeClockEntry = typeof timeClockEntries.$inferSelect;
 export type InsertTimeClockEntry = z.infer<typeof insertTimeClockEntrySchema>;
 
+// Payroll history schema - for storing generated payroll reports
+export const payrollHistory = pgTable("payroll_history", {
+  id: serial("id").primaryKey(),
+  staffId: integer("staff_id").notNull(),
+  periodStart: date("period_start").notNull(), // Start date of payroll period
+  periodEnd: date("period_end").notNull(), // End date of payroll period
+  periodType: text("period_type").notNull().default("monthly"), // monthly, weekly, biweekly
+  totalHours: doublePrecision("total_hours").default(0),
+  totalServices: integer("total_services").default(0),
+  totalRevenue: doublePrecision("total_revenue").default(0),
+  totalCommission: doublePrecision("total_commission").default(0),
+  totalHourlyPay: doublePrecision("total_hourly_pay").default(0),
+  totalFixedPay: doublePrecision("total_fixed_pay").default(0),
+  totalEarnings: doublePrecision("total_earnings").notNull(),
+  commissionType: text("commission_type").notNull(), // commission, hourly, fixed, hourly_plus_commission
+  baseCommissionRate: doublePrecision("base_commission_rate"),
+  hourlyRate: doublePrecision("hourly_rate"),
+  fixedRate: doublePrecision("fixed_rate"),
+  earningsBreakdown: text("earnings_breakdown"), // JSON string with detailed breakdown
+  timeEntriesData: text("time_entries_data"), // JSON string with time clock data
+  appointmentsData: text("appointments_data"), // JSON string with appointment details
+  payrollStatus: text("payroll_status").notNull().default("generated"), // generated, reviewed, approved, paid
+  generatedBy: integer("generated_by"), // User ID who generated the payroll
+  reviewedBy: integer("reviewed_by"), // User ID who reviewed the payroll
+  approvedBy: integer("approved_by"), // User ID who approved the payroll
+  paidDate: timestamp("paid_date"), // When payroll was marked as paid
+  notes: text("notes"), // Additional notes for this payroll period
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPayrollHistorySchema = createInsertSchema(payrollHistory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PayrollHistory = typeof payrollHistory.$inferSelect;
+export type InsertPayrollHistory = z.infer<typeof insertPayrollHistorySchema>;
+
 // Email unsubscribes schema (global unsubscribe tracking)
 export const emailUnsubscribes = pgTable("email_unsubscribes", {
   id: serial("id").primaryKey(),

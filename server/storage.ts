@@ -23,7 +23,8 @@ import {
   staffSchedules, StaffSchedule, InsertStaffSchedule,
   timeClockEntries, TimeClockEntry, InsertTimeClockEntry,
   userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
-  notifications, Notification, InsertNotification
+  notifications, Notification, InsertNotification,
+  payrollHistory, PayrollHistory, InsertPayrollHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -213,6 +214,15 @@ export interface IStorage {
   updateTimeClockEntry(id: number, entryData: Partial<InsertTimeClockEntry>): Promise<TimeClockEntry>;
   deleteTimeClockEntry(id: number): Promise<boolean>;
   getStaffByName(name: string): Promise<Staff | undefined>;
+
+  // Payroll History operations
+  createPayrollHistory(payrollHistory: InsertPayrollHistory): Promise<PayrollHistory>;
+  getPayrollHistory(id: number): Promise<PayrollHistory | undefined>;
+  getPayrollHistoryByStaff(staffId: number): Promise<PayrollHistory[]>;
+  getPayrollHistoryByPeriod(staffId: number, periodStart: Date, periodEnd: Date): Promise<PayrollHistory | undefined>;
+  getAllPayrollHistory(): Promise<PayrollHistory[]>;
+  updatePayrollHistory(id: number, payrollData: Partial<InsertPayrollHistory>): Promise<PayrollHistory>;
+  deletePayrollHistory(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1609,6 +1619,60 @@ export class DatabaseStorage implements IStorage {
       );
     
     return result[0]?.staff;
+  }
+
+  // Payroll History operations
+  async createPayrollHistory(payrollData: InsertPayrollHistory): Promise<PayrollHistory> {
+    const [payroll] = await db.insert(payrollHistory)
+      .values(payrollData)
+      .returning();
+    return payroll;
+  }
+
+  async getPayrollHistory(id: number): Promise<PayrollHistory | undefined> {
+    const [payroll] = await db.select()
+      .from(payrollHistory)
+      .where(eq(payrollHistory.id, id));
+    return payroll;
+  }
+
+  async getPayrollHistoryByStaff(staffId: number): Promise<PayrollHistory[]> {
+    return await db.select()
+      .from(payrollHistory)
+      .where(eq(payrollHistory.staffId, staffId))
+      .orderBy(desc(payrollHistory.periodStart));
+  }
+
+  async getPayrollHistoryByPeriod(staffId: number, periodStart: Date, periodEnd: Date): Promise<PayrollHistory | undefined> {
+    const [payroll] = await db.select()
+      .from(payrollHistory)
+      .where(
+        and(
+          eq(payrollHistory.staffId, staffId),
+          eq(payrollHistory.periodStart, periodStart.toISOString().split('T')[0]),
+          eq(payrollHistory.periodEnd, periodEnd.toISOString().split('T')[0])
+        )
+      );
+    return payroll;
+  }
+
+  async getAllPayrollHistory(): Promise<PayrollHistory[]> {
+    return await db.select()
+      .from(payrollHistory)
+      .orderBy(desc(payrollHistory.periodStart));
+  }
+
+  async updatePayrollHistory(id: number, payrollData: Partial<InsertPayrollHistory>): Promise<PayrollHistory> {
+    const [updated] = await db.update(payrollHistory)
+      .set({ ...payrollData, updatedAt: new Date() })
+      .where(eq(payrollHistory.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePayrollHistory(id: number): Promise<boolean> {
+    const result = await db.delete(payrollHistory).where(eq(payrollHistory.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 
