@@ -279,16 +279,365 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
 
 const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
   const { data: staff = [] } = useQuery({ queryKey: ["/api/staff"] });
+  const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
+  const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
+  const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
+  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+
+  // Calculate date range based on time period
+  const getDateRange = () => {
+    const now = new Date();
+    const startDate = new Date();
+    
+    switch (timePeriod) {
+      case "week":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case "quarter":
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case "year":
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(now.getMonth() - 1);
+    }
+    
+    return { startDate, endDate: now };
+  };
+
+  const { startDate, endDate } = getDateRange();
+
+  // Filter data by date range
+  const filteredAppointments = (appointments as any[]).filter((apt: any) => {
+    const aptDate = new Date(apt.date);
+    return aptDate >= startDate && aptDate <= endDate;
+  });
+
+  const filteredPayments = (payments as any[]).filter((payment: any) => {
+    const paymentDate = new Date(payment.createdAt || payment.paymentDate);
+    return paymentDate >= startDate && paymentDate <= endDate && payment.status === 'completed';
+  });
+
+  const filteredSalesHistory = (salesHistory as any[]).filter((sale: any) => {
+    const saleDate = new Date(sale.transactionDate);
+    return saleDate >= startDate && saleDate <= endDate;
+  });
+
+  // Calculate staff performance metrics
+  const calculateStaffMetrics = () => {
+    const staffMetrics = (staff as any[]).map((staffMember: any) => {
+      const staffAppointments = filteredAppointments.filter(
+        (apt: any) => apt.staffId === staffMember.id
+      );
+      
+      const staffSales = filteredSalesHistory.filter(
+        (sale: any) => sale.staffId === staffMember.id && sale.transactionType === 'appointment'
+      );
+
+      const completedAppointments = staffAppointments.filter(
+        (apt: any) => apt.status === 'completed' || apt.paymentStatus === 'paid'
+      );
+
+      const totalRevenue = staffSales.reduce((sum: number, sale: any) => 
+        sum + (sale.totalAmount || 0), 0
+      );
+
+      const totalServices = completedAppointments.length;
+      const averageTicket = totalServices > 0 ? totalRevenue / totalServices : 0;
+
+      // Calculate utilization (assuming 8-hour workday, 5 days a week)
+      const totalWorkingHours = timePeriod === "week" ? 40 : 
+                               timePeriod === "month" ? 160 : 
+                               timePeriod === "quarter" ? 480 : 640;
+      
+      const serviceHours = completedAppointments.reduce((sum: number, apt: any) => {
+        const service = services.find((s: any) => s.id === apt.serviceId);
+        return sum + (service?.duration || 60) / 60; // Convert minutes to hours
+      }, 0);
+
+      const utilization = totalWorkingHours > 0 ? (serviceHours / totalWorkingHours) * 100 : 0;
+
+      return {
+        id: staffMember.id,
+        name: `${staffMember.user?.firstName || ''} ${staffMember.user?.lastName || ''}`.trim() || 'Unknown',
+        title: staffMember.title,
+        totalAppointments: staffAppointments.length,
+        completedAppointments: completedAppointments.length,
+        totalRevenue,
+        averageTicket,
+        utilization,
+        serviceHours,
+        commissionRate: staffMember.commissionRate || 0,
+        commissionEarnings: totalRevenue * (staffMember.commissionRate || 0)
+      };
+    });
+
+    return staffMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue);
+  };
+
+  const staffMetrics = calculateStaffMetrics();
+
+  // Calculate overall stats
+  const totalStaff = staff.length;
+  const totalRevenue = staffMetrics.reduce((sum, staff) => sum + staff.totalRevenue, 0);
+  const totalAppointments = staffMetrics.reduce((sum, staff) => sum + staff.completedAppointments, 0);
+  const averageUtilization = staffMetrics.length > 0 ? 
+    staffMetrics.reduce((sum, staff) => sum + staff.utilization, 0) / staffMetrics.length : 0;
+
+  // Prepare chart data
+  const performanceChartData = staffMetrics.slice(0, 10).map(staff => ({
+    name: staff.name,
+    revenue: staff.totalRevenue,
+    appointments: staff.completedAppointments,
+    utilization: Math.round(staff.utilization)
+  }));
+
+  const utilizationData = staffMetrics.map(staff => ({
+    name: staff.name,
+    utilization: Math.round(staff.utilization),
+    hours: Math.round(staff.serviceHours * 10) / 10
+  }));
 
   return (
     <div className="space-y-6">
+      {/* Overview Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <Users className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Staff
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {totalStaff}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Revenue
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <Scissors className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Services
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {totalAppointments}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <BarChart2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Avg Utilization
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {Math.round(averageUtilization)}%
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Performance Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Staff Performance Overview</CardTitle>
+            <CardDescription>Revenue and appointments by staff member</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={performanceChartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  interval={0}
+                />
+                <YAxis yAxisId="revenue" orientation="left" />
+                <YAxis yAxisId="appointments" orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Bar 
+                  yAxisId="revenue" 
+                  dataKey="revenue" 
+                  fill="hsl(var(--primary))" 
+                  name="Revenue ($)"
+                />
+                <Bar 
+                  yAxisId="appointments" 
+                  dataKey="appointments" 
+                  fill="hsl(var(--primary)/0.6)" 
+                  name="Appointments"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Staff Utilization</CardTitle>
+            <CardDescription>Utilization percentage by staff member</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={utilizationData} layout="horizontal">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" domain={[0, 100]} />
+                <YAxis type="category" dataKey="name" width={100} />
+                <Tooltip 
+                  formatter={(value, name) => [
+                    name === 'utilization' ? `${value}%` : `${value}h`,
+                    name === 'utilization' ? 'Utilization' : 'Service Hours'
+                  ]}
+                />
+                <Bar 
+                  dataKey="utilization" 
+                  fill="hsl(var(--primary))" 
+                  name="Utilization %"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detailed Staff Metrics Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Staff Overview</CardTitle>
+          <CardTitle>Individual Staff Metrics</CardTitle>
+          <CardDescription>Detailed performance and productivity metrics for each staff member</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">{(staff as any[]).length}</div>
-          <p className="text-gray-600 dark:text-gray-400">Total Staff Members</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Staff Member
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Appointments
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Revenue
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Avg Ticket
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Utilization
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Commission
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {staffMetrics.map((staff, index) => (
+                  <tr key={staff.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {staff.name}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {staff.title}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
+                        {staff.completedAppointments}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {Math.round(staff.serviceHours * 10) / 10}h
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(staff.totalRevenue)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(staff.averageTicket)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full" 
+                            style={{ width: `${Math.min(staff.utilization, 100)}%` }}
+                          ></div>
+                        </div>
+                        <span className="ml-2 text-sm text-gray-900 dark:text-gray-100">
+                          {Math.round(staff.utilization)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">
+                        {formatPrice(staff.commissionEarnings)}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {(staff.commissionRate * 100).toFixed(1)}% rate
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>
