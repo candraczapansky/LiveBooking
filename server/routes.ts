@@ -3141,6 +3141,235 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Payroll Data Sync endpoint - sends payroll data to external front-end
+  app.post("/api/payroll-sync", async (req, res) => {
+    try {
+      const { staffId, month } = req.body;
+      
+      if (!staffId) {
+        return res.status(400).json({ error: "Staff ID is required" });
+      }
+
+      // Get staff member details
+      const staff = await storage.getStaff(staffId);
+      if (!staff) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Get user details for staff member
+      const user = await storage.getUser(staff.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User details not found for staff member" });
+      }
+
+      // Parse month parameter or use current month
+      const targetMonth = month ? new Date(month) : new Date();
+      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+
+      // Get staff earnings for the specified month
+      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
+      
+      // Get time clock entries for the staff member in the month
+      const timeEntries = await storage.getAllTimeClockEntries();
+      const staffTimeEntries = timeEntries.filter((entry: any) => {
+        const entryDate = new Date(entry.clockInTime);
+        return entry.staffId === staffId && 
+               entryDate >= monthStart && 
+               entryDate <= monthEnd;
+      });
+
+      // Calculate total hours worked
+      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
+        if (entry.clockOutTime) {
+          const clockIn = new Date(entry.clockInTime);
+          const clockOut = new Date(entry.clockOutTime);
+          const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+          return sum + hours;
+        }
+        return sum;
+      }, 0);
+
+      // Calculate payroll summary
+      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
+      const totalServices = staffEarnings.length;
+      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
+
+      // Prepare payroll data for external system
+      const payrollData = {
+        staffId: staff.id,
+        userId: user.id,
+        staffName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        title: staff.title,
+        commissionType: staff.commissionType,
+        baseCommissionRate: staff.commissionRate || 0,
+        hourlyRate: staff.hourlyRate || 0,
+        fixedRate: staff.fixedRate || 0,
+        month: targetMonth.toISOString().substring(0, 7), // YYYY-MM format
+        monthStart: monthStart.toISOString(),
+        monthEnd: monthEnd.toISOString(),
+        totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
+        totalServices,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        earnings: staffEarnings.map((earning: any) => ({
+          id: earning.id,
+          appointmentId: earning.appointmentId,
+          serviceId: earning.serviceId,
+          earningsAmount: earning.earningsAmount,
+          rateType: earning.rateType,
+          rateUsed: earning.rateUsed,
+          servicePrice: earning.servicePrice,
+          earningsDate: earning.earningsDate,
+          calculationDetails: earning.calculationDetails
+        })),
+        timeEntries: staffTimeEntries.map((entry: any) => ({
+          id: entry.id,
+          clockInTime: entry.clockInTime,
+          clockOutTime: entry.clockOutTime,
+          totalHours: entry.clockOutTime ? 
+            Math.round(((new Date(entry.clockOutTime).getTime() - new Date(entry.clockInTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 0,
+          status: entry.status,
+          location: entry.location,
+          notes: entry.notes
+        })),
+        syncedAt: new Date().toISOString()
+      };
+
+      // Send data to external front-end system
+      try {
+        const externalResponse = await fetch('https://salon-staff-dashboard-candraczapansky.replit.app/api/payroll-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payrollData)
+        });
+
+        if (externalResponse.ok) {
+          const result = await externalResponse.json();
+          console.log('Successfully sent payroll data to external system:', result);
+          
+          res.json({
+            message: "Payroll data synchronized successfully",
+            staffId,
+            month: payrollData.month,
+            totalEarnings: payrollData.totalEarnings,
+            totalHours: payrollData.totalHours,
+            externalSyncStatus: "success",
+            data: payrollData
+          });
+        } else {
+          console.error('External API error:', externalResponse.status, externalResponse.statusText);
+          
+          // Still return the payroll data even if external sync fails
+          res.json({
+            message: "Payroll data prepared but external sync failed",
+            staffId,
+            month: payrollData.month,
+            totalEarnings: payrollData.totalEarnings,
+            totalHours: payrollData.totalHours,
+            externalSyncStatus: "failed",
+            externalError: `${externalResponse.status} ${externalResponse.statusText}`,
+            data: payrollData
+          });
+        }
+      } catch (externalError) {
+        console.error('Error sending to external system:', externalError);
+        
+        // Return payroll data even if external system is unavailable
+        res.json({
+          message: "Payroll data prepared but external system unavailable",
+          staffId,
+          month: payrollData.month,
+          totalEarnings: payrollData.totalEarnings,
+          totalHours: payrollData.totalHours,
+          externalSyncStatus: "unavailable",
+          externalError: externalError.message,
+          data: payrollData
+        });
+      }
+
+    } catch (error) {
+      console.error("Error processing payroll sync:", error);
+      res.status(500).json({ error: "Failed to process payroll sync" });
+    }
+  });
+
+  // Get payroll data for a specific staff member (for local use)
+  app.get("/api/payroll/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const month = req.query.month ? new Date(req.query.month as string) : new Date();
+      
+      if (!staffId) {
+        return res.status(400).json({ error: "Valid staff ID is required" });
+      }
+
+      // Get staff member details
+      const staff = await storage.getStaff(staffId);
+      if (!staff) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Get user details
+      const user = await storage.getUser(staff.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User details not found" });
+      }
+
+      const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+      const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+
+      // Get staff earnings for the month
+      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
+      
+      // Get time clock entries
+      const timeEntries = await storage.getAllTimeClockEntries();
+      const staffTimeEntries = timeEntries.filter((entry: any) => {
+        const entryDate = new Date(entry.clockInTime);
+        return entry.staffId === staffId && 
+               entryDate >= monthStart && 
+               entryDate <= monthEnd;
+      });
+
+      // Calculate totals
+      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
+        if (entry.clockOutTime) {
+          const clockIn = new Date(entry.clockInTime);
+          const clockOut = new Date(entry.clockOutTime);
+          const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+          return sum + hours;
+        }
+        return sum;
+      }, 0);
+
+      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
+      const totalServices = staffEarnings.length;
+      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
+
+      res.json({
+        staffId: staff.id,
+        staffName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        title: staff.title,
+        commissionType: staff.commissionType,
+        month: month.toISOString().substring(0, 7),
+        totalHours: Math.round(totalHours * 100) / 100,
+        totalServices,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        earnings: staffEarnings,
+        timeEntries: staffTimeEntries
+      });
+
+    } catch (error) {
+      console.error("Error fetching payroll data:", error);
+      res.status(500).json({ error: "Failed to fetch payroll data" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

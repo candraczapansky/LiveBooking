@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from "date-fns";
 
 interface PayrollData {
@@ -30,6 +30,7 @@ interface PayrollData {
 export default function PayrollReport() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedStaff, setSelectedStaff] = useState<string>("all");
+  const [syncing, setSyncing] = useState<number | null>(null); // Track which staff member is being synced
 
   // Fetch staff data
   const { data: staff } = useQuery({
