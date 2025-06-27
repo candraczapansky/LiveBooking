@@ -53,95 +53,35 @@ const AddCardForm = ({ clientId, onSuccess, onCancel }: {
   onSuccess: () => void; 
   onCancel: () => void; 
 }) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-
-    setIsLoading(true);
-
-    try {
-      // Create setup intent
-      const setupResponse = await apiRequest("POST", "/api/create-setup-intent", {
-        clientId: clientId
-      });
-      const { clientSecret } = await setupResponse.json();
-
-      // Confirm setup intent with card element
-      const cardElement = elements.getElement(CardElement);
-      if (!cardElement) {
-        throw new Error('Card element not found');
-      }
-
-      const { setupIntent, error } = await stripe.confirmCardSetup(clientSecret, {
-        payment_method: {
-          card: cardElement,
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      if (setupIntent && setupIntent.payment_method) {
-        // Save payment method to database
-        await apiRequest("POST", "/api/save-payment-method", {
-          paymentMethodId: setupIntent.payment_method,
-          clientId: clientId
-        });
-
-        toast({
-          title: "Success",
-          description: "Payment method added successfully",
-        });
-        onSuccess();
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to add payment method",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+  const handlePlaceholder = () => {
+    toast({
+      title: "Coming Soon",
+      description: "Payment method management will be available soon",
+    });
+    onCancel();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="p-4 border rounded-lg">
-        <CardElement
-          options={{
-            style: {
-              base: {
-                fontSize: '16px',
-                color: '#424770',
-                '::placeholder': {
-                  color: '#aab7c4',
-                },
-                iconColor: '#666EE8',
-              },
-              invalid: {
-                color: '#9e2146',
-              },
-            },
-          }}
-        />
+    <div className="space-y-4">
+      <div className="text-center py-8">
+        <CreditCard className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <h3 className="text-lg font-medium mb-2">Payment Method Setup</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          Advanced payment method management is coming soon. For now, payments are processed during checkout.
+        </p>
       </div>
-      
+
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
+          Close
         </Button>
-        <Button type="submit" disabled={!stripe || isLoading}>
-          {isLoading ? "Adding..." : "Add Card"}
+        <Button type="button" onClick={handlePlaceholder}>
+          Got It
         </Button>
       </DialogFooter>
-    </form>
+    </div>
   );
 };
 
@@ -338,16 +278,14 @@ export default function ClientPaymentMethods({ clientId, clientName }: ClientPay
             </DialogDescription>
           </DialogHeader>
           
-          <Elements stripe={stripePromise}>
-            <AddCardForm
-              clientId={clientId}
-              onSuccess={() => {
-                setShowAddCard(false);
-                queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
-              }}
-              onCancel={() => setShowAddCard(false)}
-            />
-          </Elements>
+          <AddCardForm
+            clientId={clientId}
+            onSuccess={() => {
+              setShowAddCard(false);
+              queryClient.invalidateQueries({ queryKey: ['/api/clients', clientId, 'payment-methods'] });
+            }}
+            onCancel={() => setShowAddCard(false)}
+          />
         </DialogContent>
       </Dialog>
     </>
