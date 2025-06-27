@@ -62,6 +62,37 @@ export default function PayrollReport() {
     queryKey: ['/api/staff-earnings'],
   });
 
+  // Sync payroll data to external system
+  const handlePayrollSync = async (staffId: number) => {
+    setSyncing(staffId);
+    try {
+      const response = await fetch('/api/payroll-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          staffId,
+          month: selectedMonth.toISOString()
+        })
+      });
+      
+      const result = await response.json();
+      console.log('Payroll sync result:', result);
+      
+      // You could add a toast notification here to show success/failure
+      if (result.externalSyncStatus === 'success') {
+        console.log(`Payroll data synced successfully for staff ${staffId}`);
+      } else {
+        console.log(`Payroll sync failed for staff ${staffId}: ${result.externalError || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Payroll sync failed:', error);
+    } finally {
+      setSyncing(null);
+    }
+  };
+
   // Calculate payroll data
   const payrollData = useMemo(() => {
     if (!staff || !appointments || !services || !users || !staffServices) return [];
@@ -402,6 +433,7 @@ export default function PayrollReport() {
                   <TableHead className="text-right">Hours</TableHead>
                   <TableHead className="text-right">Hourly Pay</TableHead>
                   <TableHead className="text-right">Total Earnings</TableHead>
+                  <TableHead className="text-center">Sync</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -431,11 +463,23 @@ export default function PayrollReport() {
                     <TableCell className="text-right font-semibold">
                       {formatCurrency(data.totalEarnings)}
                     </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        onClick={() => handlePayrollSync(data.staffId)}
+                        disabled={syncing === data.staffId}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${syncing === data.staffId ? 'animate-spin' : ''}`} />
+                        {syncing === data.staffId ? 'Syncing...' : 'Sync'}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {filteredPayrollData.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={10} className="text-center py-8 text-gray-500">
                       No payroll data found for the selected period
                     </TableCell>
                   </TableRow>
