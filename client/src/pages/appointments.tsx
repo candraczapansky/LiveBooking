@@ -409,6 +409,29 @@ const AppointmentsPage = () => {
     setIsFormOpen(true);
   };
 
+  const handleAppointmentClick = (appointmentId: number) => {
+    setSelectedAppointmentId(appointmentId);
+    setIsFormOpen(true);
+  };
+
+  const getStatusColor = (appointment: any) => {
+    if (appointment.paymentStatus === 'paid') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
+    }
+    switch (appointment.status) {
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
+      case 'completed':
+        return 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100';
+    }
+  };
+
   const renderDayView = () => {
     const staffCount = staff?.length || 1;
     const isMobileView = window.innerWidth < 768;
@@ -679,19 +702,180 @@ const AppointmentsPage = () => {
 
   const renderWeekView = () => {
     const weekDays = getWeekDays(currentDate);
+    const isMobile = window.innerWidth < 768;
     
+    // Mobile: Show simplified card-based week view
+    if (isMobile) {
+      return (
+        <div className="p-4 space-y-4">
+          {weekDays.map((day, dayIndex) => {
+            const dayAppointments = appointments?.filter((appointment: any) => {
+              const appointmentDate = new Date(appointment.startTime);
+              const dayStr = day.getFullYear() + '-' + 
+                String(day.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(day.getDate()).padStart(2, '0');
+              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(appointmentDate.getDate()).padStart(2, '0');
+              
+              return appointmentDateStr === dayStr;
+            }) || [];
+
+            return (
+              <div key={dayIndex} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
+                <div className="flex justify-between items-center mb-3">
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-gray-100">
+                      {day.toLocaleDateString('en-US', { weekday: 'long' })}
+                    </div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    {dayAppointments.length} appointment{dayAppointments.length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+                
+                {dayAppointments.length === 0 ? (
+                  <div className="text-center py-4 text-gray-400 text-sm">
+                    No appointments
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {dayAppointments.map((appointment: any, index: number) => {
+                      const startTime = new Date(appointment.startTime);
+                      const timeString = startTime.toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      const staffName = appointment.staff?.user ? 
+                        `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
+                        'Unknown Staff';
+
+                      return (
+                        <div 
+                          key={index}
+                          className="p-2 rounded border-l-4 border-primary bg-primary/5 cursor-pointer hover:bg-primary/10"
+                          onClick={() => handleAppointmentClick(appointment.id)}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium text-sm">
+                                {timeString} - {appointment.service?.name}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {appointment.client?.firstName} {appointment.client?.lastName}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {staffName}
+                              </div>
+                            </div>
+                            <div className={`px-2 py-1 rounded text-xs ${getStatusColor(appointment)}`}>
+                              {appointment.paymentStatus === 'paid' ? 'Paid' : appointment.status}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
+    // Desktop: Full calendar grid view
     return (
-      <div className="text-center p-8 text-gray-500 dark:text-gray-400">
-        <p>Week view coming soon...</p>
-        <div className="mt-4 flex justify-center space-x-4">
+      <div className="min-h-[600px]">
+        {/* Week Header */}
+        <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
+          <div className="p-3 border-r border-gray-200 dark:border-gray-700"></div>
           {weekDays.map((day, index) => (
-            <div key={index} className="text-center">
-              <div className="text-sm font-medium">
+            <div key={index} className="p-3 text-center border-r border-gray-200 dark:border-gray-700 last:border-r-0">
+              <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">
                 {day.toLocaleDateString('en-US', { weekday: 'short' })}
               </div>
-              <div className="text-lg">
+              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
                 {day.getDate()}
               </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {day.toLocaleDateString('en-US', { month: 'short' })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Time Grid */}
+        <div className="relative">
+          {timeSlots.map((timeSlot, timeIndex) => (
+            <div key={timeIndex} className="grid grid-cols-8 min-h-[60px] border-b border-gray-100 dark:border-gray-800">
+              {/* Time Label */}
+              <div className="p-2 text-right text-sm text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                {timeSlot}
+              </div>
+              
+              {/* Day Columns */}
+              {weekDays.map((day, dayIndex) => (
+                <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                  {/* Day appointments for this time slot */}
+                  {appointments?.filter((appointment: any) => {
+                    const appointmentDate = new Date(appointment.startTime);
+                    const appointmentTime = appointmentDate.toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true
+                    });
+                    
+                    const dayStr = day.getFullYear() + '-' + 
+                      String(day.getMonth() + 1).padStart(2, '0') + '-' + 
+                      String(day.getDate()).padStart(2, '0');
+                    const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                      String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                      String(appointmentDate.getDate()).padStart(2, '0');
+                    
+                    return appointmentDateStr === dayStr && appointmentTime === timeSlot;
+                  }).map((appointment: any, index: number) => {
+                    const endTime = new Date(appointment.endTime);
+                    const startTime = new Date(appointment.startTime);
+                    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+                    const heightInSlots = Math.max(1, Math.round(duration / 30));
+                    const staffName = appointment.staff?.user ? 
+                      `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
+                      'Unknown Staff';
+
+                    return (
+                      <div
+                        key={index}
+                        className={`absolute inset-x-1 bg-primary/90 text-white rounded p-1 text-xs cursor-pointer hover:bg-primary z-10 ${
+                          appointment.paymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : ''
+                        }`}
+                        style={{ 
+                          height: `${heightInSlots * 60 - 4}px`,
+                          top: '2px'
+                        }}
+                        onClick={() => handleAppointmentClick(appointment.id)}
+                      >
+                        <div className="font-medium truncate">
+                          {appointment.service?.name}
+                        </div>
+                        <div className="truncate opacity-90">
+                          {appointment.client?.firstName} {appointment.client?.lastName}
+                        </div>
+                        <div className="truncate opacity-75 text-xs">
+                          {staffName}
+                        </div>
+                        {appointment.paymentStatus === 'paid' && (
+                          <div className="text-xs opacity-90">✓ Paid</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           ))}
         </div>
