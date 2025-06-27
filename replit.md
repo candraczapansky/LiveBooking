@@ -166,6 +166,13 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Improved statistics cards with responsive icon and text sizing
   - Fixed layout overflow issues and added proper text truncation
   - Mobile interface now provides improved usability and touch-friendly interactions
+- **Fixed custom date range functionality in Sales Reports:**
+  - Implemented controlled popover state management for date picker popup
+  - Fixed Apply button to properly close popup and update report data
+  - Added auto-open functionality when "Custom Range" is selected from dropdown
+  - Enhanced Clear button to reset dates and close popup properly
+  - Added validation to disable Apply button until both dates are selected
+  - Custom date range filtering now works correctly for all report types
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**

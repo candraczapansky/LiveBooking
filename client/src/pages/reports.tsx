@@ -1298,6 +1298,7 @@ const ReportsPage = () => {
   const [customEndDate, setCustomEndDate] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -1347,7 +1348,15 @@ const ReportsPage = () => {
                 {selectedReport && (
                   <div className="flex flex-col md:flex-row md:items-center md:justify-end gap-3 md:gap-4">
                     <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
-                      <Select value={timePeriod} onValueChange={setTimePeriod}>
+                      <Select 
+                        value={timePeriod} 
+                        onValueChange={(value) => {
+                          setTimePeriod(value);
+                          if (value === "custom") {
+                            setDatePopoverOpen(true);
+                          }
+                        }}
+                      >
                         <SelectTrigger className="w-full sm:w-[180px] min-h-[44px] text-left">
                           <SelectValue placeholder="Select period" />
                         </SelectTrigger>
@@ -1361,7 +1370,7 @@ const ReportsPage = () => {
                       </Select>
                       
                       {timePeriod === "custom" && (
-                        <Popover>
+                        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full sm:w-auto min-h-[44px] justify-start text-left font-normal px-3">
                               <Calendar className="mr-2 h-4 w-4 flex-shrink-0" />
@@ -1401,6 +1410,7 @@ const ReportsPage = () => {
                                   onClick={() => {
                                     setCustomStartDate("");
                                     setCustomEndDate("");
+                                    setDatePopoverOpen(false);
                                   }}
                                   className="min-h-[40px] flex-1"
                                 >
@@ -1409,9 +1419,10 @@ const ReportsPage = () => {
                                 <Button 
                                   size="sm"
                                   onClick={() => {
-                                    // The component will automatically update when dates change
+                                    setDatePopoverOpen(false);
                                   }}
                                   className="min-h-[40px] flex-1"
+                                  disabled={!customStartDate || !customEndDate}
                                 >
                                   Apply
                                 </Button>
