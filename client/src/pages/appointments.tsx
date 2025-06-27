@@ -1044,7 +1044,7 @@ const AppointmentsPage = () => {
                   <div className="flex items-center space-x-2">
                     <Button
                       onClick={handleAddAppointment}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px]"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px] justify-center"
                       size="default"
                     >
                       <PlusCircle className="mr-2 h-4 w-4" />
