@@ -716,17 +716,17 @@ body {
     padding: 0.75rem !important;
   }
   
-  /* Force button text centering on mobile */
-  button {
+  /* Mobile button centering fix */
+  .mobile-center-button {
     display: flex !important;
-    justify-content: center !important;
+    flex-direction: row !important;
     align-items: center !important;
+    justify-content: center !important;
     text-align: center !important;
   }
   
-  button span {
+  .mobile-center-button * {
     text-align: center !important;
-    width: 100% !important;
   }
   
   /* Exception for buttons that already have adequate padding */
