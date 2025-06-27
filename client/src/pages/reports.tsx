@@ -1323,8 +1323,8 @@ const ReportsPage = () => {
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
           <div className="container mx-auto px-3 md:px-6 py-3 md:py-8">
             {/* Header Section */}
-            <div className="mb-3 md:mb-8">
-              <div className="space-y-4 md:space-y-0">
+            <div className="mb-1 md:mb-8">
+              <div className="space-y-2 md:space-y-0">
                 <div className="flex items-start">
                   {selectedReport && (
                     <Button 
