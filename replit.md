@@ -195,11 +195,14 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Replaced hardcoded button styling with dynamic CSS variables
   - Back button now properly reflects user's custom color theme
   - Maintained proper contrast with primary-foreground text color
-- **Fixed button text alignment across the application:**
-  - Corrected Sign Out button in sidebar to use justify-center instead of justify-start
-  - Updated New Appointment button to explicitly center text content
-  - Ensured all buttons properly center their text instead of aligning to the right
-  - Fixed mobile and desktop button text alignment consistency
+- **Enhanced mobile-friendly button design and alignment across the application:**
+  - Corrected Sign Out button in sidebar with improved mobile touch targets (48px height)
+  - Updated New Appointment button with explicit centering and mobile-optimized spacing
+  - Added mobile-specific CSS rules forcing button text centering with display: flex and justify-content: center
+  - Enhanced Button component base styles with text-center class for all button variants
+  - Implemented mobile-specific button styling with minimum 44px touch targets meeting accessibility standards
+  - Fixed button text alignment to be consistently centered instead of appearing right-aligned on mobile devices
+  - Added responsive button padding and spacing optimizations for better mobile usability
 
 ### June 25, 2025 - Staff and Schedule Page UI Simplification, Database Color Preferences, Mobile Login Interface Improvements
 - **Simplified staff page to show staff names list first:**

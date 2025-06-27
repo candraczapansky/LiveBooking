@@ -714,6 +714,10 @@ body {
     -webkit-user-select: none !important;
     user-select: none !important;
     padding: 0.75rem !important;
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+    display: flex !important;
   }
   
   /* Exception for buttons that already have adequate padding */
