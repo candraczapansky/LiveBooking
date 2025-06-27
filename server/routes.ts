@@ -14,6 +14,7 @@ import {
   insertStaffSchema,
   insertStaffServiceSchema,
   insertAppointmentSchema,
+  insertAppointmentHistorySchema,
   insertMembershipSchema,
   insertClientMembershipSchema,
   insertPaymentSchema,
@@ -830,6 +831,29 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     
     const newAppointment = await storage.createAppointment(req.body);
     
+    // Create appointment history record for creation
+    try {
+      await storage.createAppointmentHistory({
+        appointmentId: newAppointment.id,
+        action: 'created',
+        actionBy: newAppointment.clientId, // Assuming client created the appointment
+        actionByRole: 'client',
+        newValues: JSON.stringify(newAppointment),
+        clientId: newAppointment.clientId,
+        serviceId: newAppointment.serviceId,
+        staffId: newAppointment.staffId,
+        startTime: newAppointment.startTime,
+        endTime: newAppointment.endTime,
+        status: newAppointment.status,
+        paymentStatus: newAppointment.paymentStatus,
+        totalAmount: newAppointment.totalAmount,
+        notes: newAppointment.notes,
+        systemGenerated: false
+      });
+    } catch (error) {
+      console.error('Failed to create appointment history:', error);
+    }
+    
     // Create notification for appointment booking
     try {
       const client = await storage.getUser(newAppointment.clientId);
@@ -945,6 +969,34 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
       
       const updatedAppointment = await storage.updateAppointment(id, req.body);
       
+      // Create appointment history record for update
+      try {
+        const action = req.body.status && existingAppointment.status !== req.body.status 
+          ? `status_changed_to_${req.body.status}` 
+          : 'updated';
+        
+        await storage.createAppointmentHistory({
+          appointmentId: id,
+          action,
+          actionBy: updatedAppointment.clientId, // Could be enhanced to track actual user
+          actionByRole: 'client',
+          previousValues: JSON.stringify(existingAppointment),
+          newValues: JSON.stringify(updatedAppointment),
+          clientId: updatedAppointment.clientId,
+          serviceId: updatedAppointment.serviceId,
+          staffId: updatedAppointment.staffId,
+          startTime: updatedAppointment.startTime,
+          endTime: updatedAppointment.endTime,
+          status: updatedAppointment.status,
+          paymentStatus: updatedAppointment.paymentStatus,
+          totalAmount: updatedAppointment.totalAmount,
+          notes: updatedAppointment.notes,
+          systemGenerated: false
+        });
+      } catch (error) {
+        console.error('Failed to create appointment history:', error);
+      }
+      
       // Trigger automations based on status changes
       if (existingAppointment && req.body.status && existingAppointment.status !== req.body.status) {
         try {
@@ -990,6 +1042,35 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
     
     return res.status(204).end();
+  });
+
+  // Appointment History routes
+  app.get("/api/appointment-history", async (req, res) => {
+    try {
+      const history = await storage.getAllAppointmentHistory();
+      return res.status(200).json(history);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching appointment history: " + error.message });
+    }
+  });
+
+  app.get("/api/appointment-history/:appointmentId", async (req, res) => {
+    try {
+      const appointmentId = parseInt(req.params.appointmentId);
+      const history = await storage.getAppointmentHistory(appointmentId);
+      return res.status(200).json(history);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error fetching appointment history: " + error.message });
+    }
+  });
+
+  app.post("/api/appointment-history", validateBody(insertAppointmentHistorySchema), async (req, res) => {
+    try {
+      const newHistory = await storage.createAppointmentHistory(req.body);
+      return res.status(201).json(newHistory);
+    } catch (error: any) {
+      return res.status(500).json({ error: "Error creating appointment history: " + error.message });
+    }
   });
   
   // Memberships routes

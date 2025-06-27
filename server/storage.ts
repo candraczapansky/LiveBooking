@@ -897,6 +897,20 @@ export class DatabaseStorage implements IStorage {
     return this.appointments.delete(id);
   }
 
+  // Appointment History operations
+  async createAppointmentHistory(history: InsertAppointmentHistory): Promise<AppointmentHistory> {
+    const [newHistory] = await db.insert(appointmentHistory).values(history).returning();
+    return newHistory;
+  }
+
+  async getAppointmentHistory(appointmentId: number): Promise<AppointmentHistory[]> {
+    return await db.select().from(appointmentHistory).where(eq(appointmentHistory.appointmentId, appointmentId)).orderBy(desc(appointmentHistory.createdAt));
+  }
+
+  async getAllAppointmentHistory(): Promise<AppointmentHistory[]> {
+    return await db.select().from(appointmentHistory).orderBy(desc(appointmentHistory.createdAt));
+  }
+
   // Membership operations
   async createMembership(membership: InsertMembership): Promise<Membership> {
     const id = this.currentMembershipId++;
