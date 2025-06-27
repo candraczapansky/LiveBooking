@@ -225,9 +225,18 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
-  const completedPayments = (payments as any[]).filter((payment: any) => payment.status === "completed");
-  const totalRevenue = completedPayments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
+  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+  const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  
+  // Filter sales by date range and completed status
+  const filteredSales = (salesHistory as any[]).filter((sale: any) => {
+    const saleDate = new Date(sale.transactionDate || sale.transaction_date);
+    return saleDate >= startDate && saleDate <= endDate && 
+           sale.paymentStatus === "completed";
+  });
+  
+  const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
+  const totalTransactions = filteredSales.length;
 
   return (
     <div className="space-y-6">
@@ -263,7 +272,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
                     Transactions
                   </dt>
                   <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {completedPayments.length}
+                    {totalTransactions}
                   </dd>
                 </dl>
               </div>
@@ -282,7 +291,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
                     Avg Transaction
                   </dt>
                   <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                    {formatPrice(completedPayments.length > 0 ? totalRevenue / completedPayments.length : 0)}
+                    {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
                   </dd>
                 </dl>
               </div>
