@@ -191,10 +191,11 @@ const SpecificReportView = ({
 // Helper function to calculate date range
 const getDateRange = (timePeriod: string, customStartDate?: string, customEndDate?: string) => {
   if (timePeriod === "custom" && customStartDate && customEndDate) {
-    return {
-      startDate: new Date(customStartDate),
-      endDate: new Date(customEndDate)
-    };
+    const startDate = new Date(customStartDate);
+    const endDate = new Date(customEndDate);
+    // Set end date to end of day (23:59:59.999) to include all transactions from that day
+    endDate.setHours(23, 59, 59, 999);
+    return { startDate, endDate };
   }
   
   const now = new Date();
@@ -232,7 +233,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
     return saleDate >= startDate && saleDate <= endDate && 
-           sale.paymentStatus === "completed";
+           (sale.paymentStatus === "completed" || sale.payment_status === "completed");
   });
   
   const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
