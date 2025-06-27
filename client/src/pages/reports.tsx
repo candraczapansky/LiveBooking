@@ -339,10 +339,22 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
       const averagePrice = totalCashedOut > 0 ? totalRevenue / totalCashedOut : Number(service.price) || 0;
       const conversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
 
-      // Ensure all calculated values are valid numbers
-      const safeTotalRevenue = isNaN(totalRevenue) || totalRevenue < 0 ? 0 : totalRevenue;
-      const safeAveragePrice = isNaN(averagePrice) || averagePrice < 0 ? 0 : averagePrice;
-      const safeConversionRate = isNaN(conversionRate) || conversionRate < 0 ? 0 : Math.min(conversionRate, 100);
+      // Debug logging for problematic values
+      if (isNaN(totalRevenue) || isNaN(averagePrice) || isNaN(conversionRate)) {
+        console.warn(`Service ${service.name} has invalid calculations:`, {
+          totalRevenue,
+          averagePrice,
+          conversionRate,
+          totalBookings,
+          totalCashedOut,
+          servicePrice: service.price
+        });
+      }
+
+      // Ensure all calculated values are valid numbers with strict validation
+      const safeTotalRevenue = Number.isFinite(totalRevenue) && totalRevenue >= 0 ? totalRevenue : 0;
+      const safeAveragePrice = Number.isFinite(averagePrice) && averagePrice >= 0 ? averagePrice : 0;
+      const safeConversionRate = Number.isFinite(conversionRate) && conversionRate >= 0 ? Math.min(conversionRate, 100) : 0;
 
       return {
         id: service.id,
@@ -370,20 +382,50 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
   const totalRevenue = serviceMetrics.reduce((sum, service) => sum + service.totalRevenue, 0);
   const overallConversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
 
-  // Prepare chart data with safe number conversion
-  const topServicesData = serviceMetrics.slice(0, 8).map(service => ({
-    name: service.name,
-    revenue: Number(service.totalRevenue) || 0,
-    bookings: Number(service.totalBookings) || 0,
-    cashedOut: Number(service.totalCashedOut) || 0
-  }));
+  // Prepare chart data with comprehensive validation
+  const topServicesData = serviceMetrics.slice(0, 8).map(service => {
+    const revenue = Number(service.totalRevenue);
+    const bookings = Number(service.totalBookings);
+    const cashedOut = Number(service.totalCashedOut);
+    
+    const chartItem = {
+      name: service.name || 'Unknown Service',
+      revenue: Number.isFinite(revenue) && revenue >= 0 ? revenue : 0,
+      bookings: Number.isFinite(bookings) && bookings >= 0 ? bookings : 0,
+      cashedOut: Number.isFinite(cashedOut) && cashedOut >= 0 ? cashedOut : 0
+    };
+    
+    // Debug log any invalid chart data
+    if (!Number.isFinite(chartItem.revenue) || !Number.isFinite(chartItem.bookings) || !Number.isFinite(chartItem.cashedOut)) {
+      console.warn(`Invalid chart data for service ${service.name}:`, chartItem);
+    }
+    
+    return chartItem;
+  }).filter(item => Number.isFinite(item.revenue) && Number.isFinite(item.bookings) && Number.isFinite(item.cashedOut));
 
-  const conversionData = serviceMetrics.filter(s => s.totalBookings > 0).slice(0, 10).map(service => ({
-    name: service.name,
-    conversionRate: Math.round(Number(service.conversionRate) || 0),
-    bookings: Number(service.totalBookings) || 0,
-    cashedOut: Number(service.totalCashedOut) || 0
-  }));
+  const conversionData = serviceMetrics.filter(s => s.totalBookings > 0).slice(0, 10).map(service => {
+    const conversionRate = Number(service.conversionRate);
+    const bookings = Number(service.totalBookings);
+    const cashedOut = Number(service.totalCashedOut);
+    
+    const chartItem = {
+      name: service.name || 'Unknown Service',
+      conversionRate: Number.isFinite(conversionRate) && conversionRate >= 0 ? Math.min(Math.round(conversionRate), 100) : 0,
+      bookings: Number.isFinite(bookings) && bookings >= 0 ? bookings : 0,
+      cashedOut: Number.isFinite(cashedOut) && cashedOut >= 0 ? cashedOut : 0
+    };
+    
+    // Debug log any invalid chart data
+    if (!Number.isFinite(chartItem.conversionRate) || !Number.isFinite(chartItem.bookings) || !Number.isFinite(chartItem.cashedOut)) {
+      console.warn(`Invalid conversion chart data for service ${service.name}:`, chartItem);
+    }
+    
+    return chartItem;
+  }).filter(item => Number.isFinite(item.conversionRate) && Number.isFinite(item.bookings) && Number.isFinite(item.cashedOut));
+
+  // Final debug check
+  console.log('Top Services Chart Data:', topServicesData);
+  console.log('Conversion Chart Data:', conversionData);
 
   return (
     <div className="space-y-6">
@@ -479,32 +521,38 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={topServicesData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                />
-                <YAxis yAxisId="revenue" orientation="left" />
-                <YAxis yAxisId="bookings" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Bar 
-                  yAxisId="revenue" 
-                  dataKey="revenue" 
-                  fill="hsl(var(--primary))" 
-                  name="Revenue ($)"
-                />
-                <Bar 
-                  yAxisId="bookings" 
-                  dataKey="bookings" 
-                  fill="hsl(var(--primary)/0.6)" 
-                  name="Bookings"
-                />
-              </BarChart>
+              {topServicesData.length > 0 ? (
+                <BarChart data={topServicesData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="name" 
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                    interval={0}
+                  />
+                  <YAxis yAxisId="revenue" orientation="left" />
+                  <YAxis yAxisId="bookings" orientation="right" />
+                  <Tooltip />
+                  <Legend />
+                  <Bar 
+                    yAxisId="revenue" 
+                    dataKey="revenue" 
+                    fill="hsl(var(--primary))" 
+                    name="Revenue ($)"
+                  />
+                  <Bar 
+                    yAxisId="bookings" 
+                    dataKey="bookings" 
+                    fill="hsl(var(--primary)/0.6)" 
+                    name="Bookings"
+                  />
+                </BarChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No service data available for the selected time period
+                </div>
+              )}
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -516,22 +564,28 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={conversionData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis type="category" dataKey="name" width={120} />
-                <Tooltip 
-                  formatter={(value, name) => [
-                    name === 'conversionRate' ? `${value}%` : value,
-                    name === 'conversionRate' ? 'Conversion Rate' : name
-                  ]}
-                />
-                <Bar 
-                  dataKey="conversionRate" 
-                  fill="hsl(var(--primary))" 
-                  name="Conversion %"
-                />
-              </BarChart>
+              {conversionData.length > 0 ? (
+                <BarChart data={conversionData} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 100]} />
+                  <YAxis type="category" dataKey="name" width={120} />
+                  <Tooltip 
+                    formatter={(value, name) => [
+                      name === 'conversionRate' ? `${value}%` : value,
+                      name === 'conversionRate' ? 'Conversion Rate' : name
+                    ]}
+                  />
+                  <Bar 
+                    dataKey="conversionRate" 
+                    fill="hsl(var(--primary))" 
+                    name="Conversion %"
+                  />
+                </BarChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No conversion data available for the selected time period
+                </div>
+              )}
             </ResponsiveContainer>
           </CardContent>
         </Card>
