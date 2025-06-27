@@ -1044,12 +1044,14 @@ const AppointmentsPage = () => {
                   <div className="flex items-center space-x-2">
                     <Button
                       onClick={handleAddAppointment}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[48px] justify-center text-center items-center flex px-4 py-2"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
                       size="default"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4 flex-shrink-0" />
-                      <span className="hidden sm:inline text-center">New Appointment</span>
-                      <span className="sm:hidden text-center">New</span>
+                      <div className="flex items-center justify-center w-full">
+                        <PlusCircle className="mr-2 h-4 w-4 flex-shrink-0" />
+                        <span className="hidden sm:inline">New Appointment</span>
+                        <span className="sm:hidden">New</span>
+                      </div>
                     </Button>
                   </div>
                 </div>
