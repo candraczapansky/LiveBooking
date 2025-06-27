@@ -14,6 +14,13 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { 
+  Popover, 
+  PopoverContent, 
+  PopoverTrigger 
+} from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { 
   DollarSign, 
   Users, 
   Scissors, 
@@ -149,28 +156,75 @@ const ReportsLandingPage = ({ onSelectReport }: { onSelectReport: (reportId: str
 };
 
 // Specific Report View Component
-const SpecificReportView = ({ reportType, timePeriod }: { reportType: string; timePeriod: string }) => {
+const SpecificReportView = ({ 
+  reportType, 
+  timePeriod, 
+  customStartDate, 
+  customEndDate 
+}: { 
+  reportType: string; 
+  timePeriod: string; 
+  customStartDate: string; 
+  customEndDate: string; 
+}) => {
   // Generate reports based on type
   switch (reportType) {
     case "sales":
-      return <SalesReport timePeriod={timePeriod} />;
+      return <SalesReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "clients": 
-      return <ClientsReport timePeriod={timePeriod} />;
+      return <ClientsReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "services":
-      return <ServicesReport timePeriod={timePeriod} />;
+      return <ServicesReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "staff":
-      return <StaffReport timePeriod={timePeriod} />;
+      return <StaffReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "payroll":
       return <PayrollReport />;
     case "timeclock":
-      return <TimeClockReport timePeriod={timePeriod} />;
+      return <TimeClockReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     default:
       return <div>Report not found</div>;
   }
 };
 
 // Individual Report Components
-const SalesReport = ({ timePeriod }: { timePeriod: string }) => {
+
+// Helper function to calculate date range
+const getDateRange = (timePeriod: string, customStartDate?: string, customEndDate?: string) => {
+  if (timePeriod === "custom" && customStartDate && customEndDate) {
+    return {
+      startDate: new Date(customStartDate),
+      endDate: new Date(customEndDate)
+    };
+  }
+  
+  const now = new Date();
+  const startDate = new Date();
+  
+  switch (timePeriod) {
+    case "week":
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case "month":
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    case "quarter":
+      startDate.setMonth(now.getMonth() - 3);
+      break;
+    case "year":
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+    default:
+      startDate.setMonth(now.getMonth() - 1);
+  }
+  
+  return { startDate, endDate: now };
+};
+
+const SalesReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
   const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
   const completedPayments = (payments as any[]).filter((payment: any) => payment.status === "completed");
   const totalRevenue = completedPayments.reduce((sum: number, payment: any) => sum + payment.amount, 0);
@@ -1240,6 +1294,8 @@ const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
 const ReportsPage = () => {
   useDocumentTitle("Reports | BeautyBook");
   const [timePeriod, setTimePeriod] = useState("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
 
@@ -1289,7 +1345,7 @@ const ReportsPage = () => {
                   </div>
                 </div>
                 {selectedReport && (
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-4 flex-wrap gap-2">
                     <Select value={timePeriod} onValueChange={setTimePeriod}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Select period" />
@@ -1299,8 +1355,65 @@ const ReportsPage = () => {
                         <SelectItem value="month">This Month</SelectItem>
                         <SelectItem value="quarter">This Quarter</SelectItem>
                         <SelectItem value="year">This Year</SelectItem>
+                        <SelectItem value="custom">Custom Range</SelectItem>
                       </SelectContent>
                     </Select>
+                    
+                    {timePeriod === "custom" && (
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
+                            <Calendar className="mr-2 h-4 w-4" />
+                            {customStartDate && customEndDate 
+                              ? `${customStartDate} to ${customEndDate}`
+                              : "Select date range"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="start">
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="startDate">Start Date</Label>
+                              <Input
+                                id="startDate"
+                                type="date"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="endDate">End Date</Label>
+                              <Input
+                                id="endDate"
+                                type="date"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                              />
+                            </div>
+                            <div className="flex justify-between">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => {
+                                  setCustomStartDate("");
+                                  setCustomEndDate("");
+                                }}
+                              >
+                                Clear
+                              </Button>
+                              <Button 
+                                size="sm"
+                                onClick={() => {
+                                  // The component will automatically update when dates change
+                                }}
+                              >
+                                Apply
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+                    
                     <Button variant="outline">
                       Export Report
                     </Button>
@@ -1311,7 +1424,12 @@ const ReportsPage = () => {
 
             {/* Content */}
             {selectedReport ? (
-              <SpecificReportView reportType={selectedReport} timePeriod={timePeriod} />
+              <SpecificReportView 
+                reportType={selectedReport} 
+                timePeriod={timePeriod}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+              />
             ) : (
               <ReportsLandingPage onSelectReport={setSelectedReport} />
             )}
