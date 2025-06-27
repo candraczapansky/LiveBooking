@@ -261,16 +261,351 @@ const ClientsReport = ({ timePeriod }: { timePeriod: string }) => {
 
 const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
   const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
+  const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
+  const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
+  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+
+  // Calculate date range based on time period
+  const getDateRange = () => {
+    const now = new Date();
+    const startDate = new Date();
+    
+    switch (timePeriod) {
+      case "week":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+      case "quarter":
+        startDate.setMonth(now.getMonth() - 3);
+        break;
+      case "year":
+        startDate.setFullYear(now.getFullYear() - 1);
+        break;
+      default:
+        startDate.setMonth(now.getMonth() - 1);
+    }
+    
+    return { startDate, endDate: now };
+  };
+
+  const { startDate, endDate } = getDateRange();
+
+  // Filter appointments and payments by date range
+  const filteredAppointments = (appointments as any[]).filter((apt: any) => {
+    const aptDate = new Date(apt.createdAt || apt.date);
+    return aptDate >= startDate && aptDate <= endDate && 
+           (apt.status === 'completed' || apt.paymentStatus === 'paid');
+  });
+
+  const filteredPayments = (payments as any[]).filter((payment: any) => {
+    const paymentDate = new Date(payment.createdAt || payment.paymentDate);
+    return paymentDate >= startDate && paymentDate <= endDate && 
+           payment.status === 'completed' && payment.type === 'appointment_payment';
+  });
+
+  const filteredSalesHistory = (salesHistory as any[]).filter((sale: any) => {
+    const saleDate = new Date(sale.transactionDate);
+    return saleDate >= startDate && saleDate <= endDate && 
+           sale.transactionType === 'appointment';
+  });
+
+  // Calculate service performance metrics
+  const calculateServiceMetrics = () => {
+    const serviceMetrics = (services as any[]).map((service: any) => {
+      const serviceAppointments = filteredAppointments.filter(
+        (apt: any) => apt.serviceId === service.id
+      );
+
+      const serviceSales = filteredSalesHistory.filter(
+        (sale: any) => sale.serviceId === service.id
+      );
+
+      const servicePayments = filteredPayments.filter(
+        (payment: any) => {
+          const matchingApt = serviceAppointments.find(apt => apt.id === payment.appointmentId);
+          return matchingApt !== undefined;
+        }
+      );
+
+      const totalRevenue = serviceSales.reduce((sum: number, sale: any) => {
+        const amount = Number(sale.totalAmount) || 0;
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0);
+
+      const totalBookings = serviceAppointments.length;
+      const totalCashedOut = servicePayments.length;
+      const averagePrice = totalCashedOut > 0 ? totalRevenue / totalCashedOut : Number(service.price) || 0;
+      const conversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
+
+      return {
+        id: service.id,
+        name: service.name,
+        category: service.category,
+        price: Number(service.price) || 0,
+        duration: Number(service.duration) || 0,
+        totalBookings,
+        totalCashedOut,
+        totalRevenue: isNaN(totalRevenue) ? 0 : totalRevenue,
+        averagePrice: isNaN(averagePrice) ? 0 : averagePrice,
+        conversionRate: isNaN(conversionRate) ? 0 : Math.min(conversionRate, 100)
+      };
+    });
+
+    return serviceMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue);
+  };
+
+  const serviceMetrics = calculateServiceMetrics();
+
+  // Calculate totals
+  const totalServices = services.length;
+  const totalBookings = serviceMetrics.reduce((sum, service) => sum + service.totalBookings, 0);
+  const totalCashedOut = serviceMetrics.reduce((sum, service) => sum + service.totalCashedOut, 0);
+  const totalRevenue = serviceMetrics.reduce((sum, service) => sum + service.totalRevenue, 0);
+  const overallConversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
+
+  // Prepare chart data
+  const topServicesData = serviceMetrics.slice(0, 8).map(service => ({
+    name: service.name,
+    revenue: service.totalRevenue,
+    bookings: service.totalBookings,
+    cashedOut: service.totalCashedOut
+  }));
+
+  const conversionData = serviceMetrics.filter(s => s.totalBookings > 0).slice(0, 10).map(service => ({
+    name: service.name,
+    conversionRate: Math.round(service.conversionRate),
+    bookings: service.totalBookings,
+    cashedOut: service.totalCashedOut
+  }));
 
   return (
     <div className="space-y-6">
+      {/* Overview Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <Scissors className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Services
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {totalServices}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <Calendar className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Bookings
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {totalBookings}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <DollarSign className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Revenue Generated
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
+                <TrendingUp className="h-5 w-5 text-primary" />
+              </div>
+              <div className="ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Conversion Rate
+                  </dt>
+                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                    {Math.round(overallConversionRate)}%
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Performing Services</CardTitle>
+            <CardDescription>Revenue and bookings by service</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={topServicesData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="name" 
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  interval={0}
+                />
+                <YAxis yAxisId="revenue" orientation="left" />
+                <YAxis yAxisId="bookings" orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Bar 
+                  yAxisId="revenue" 
+                  dataKey="revenue" 
+                  fill="hsl(var(--primary))" 
+                  name="Revenue ($)"
+                />
+                <Bar 
+                  yAxisId="bookings" 
+                  dataKey="bookings" 
+                  fill="hsl(var(--primary)/0.6)" 
+                  name="Bookings"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Service Conversion Rates</CardTitle>
+            <CardDescription>Booking to payment conversion by service</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={conversionData} layout="horizontal">
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" domain={[0, 100]} />
+                <YAxis type="category" dataKey="name" width={120} />
+                <Tooltip 
+                  formatter={(value, name) => [
+                    name === 'conversionRate' ? `${value}%` : value,
+                    name === 'conversionRate' ? 'Conversion Rate' : name
+                  ]}
+                />
+                <Bar 
+                  dataKey="conversionRate" 
+                  fill="hsl(var(--primary))" 
+                  name="Conversion %"
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detailed Service Performance Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Service Overview</CardTitle>
+          <CardTitle>Individual Service Performance</CardTitle>
+          <CardDescription>Detailed breakdown of all services with booking and revenue metrics</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">{(services as any[]).length}</div>
-          <p className="text-gray-600 dark:text-gray-400">Total Services</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Service
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Bookings
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Cashed Out
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Revenue
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Avg Price
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Conversion Rate
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {serviceMetrics.map((service, index) => (
+                  <tr key={service.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {service.name}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {service.category} • {service.duration}min • {formatPrice(service.price)}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {service.totalBookings}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {service.totalCashedOut}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {formatPrice(service.totalRevenue)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(service.averagePrice)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full" 
+                            style={{ width: `${Math.min(service.conversionRate, 100)}%` }}
+                          ></div>
+                        </div>
+                        <span className="ml-2 text-sm text-gray-900 dark:text-gray-100">
+                          {Math.round(service.conversionRate)}%
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </CardContent>
       </Card>
     </div>
