@@ -128,12 +128,6 @@ const Sidebar = () => {
           <Button 
             variant="ghost" 
             className="text-sm font-medium text-destructive w-full min-h-[48px]"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center'
-            }}
             onClick={() => {
               console.log("Sign out button clicked");
               console.log("Logout function:", logout);
@@ -145,7 +139,6 @@ const Sidebar = () => {
               }
             }}
           >
-            <LogOut className="w-5 h-5 mr-3" />
             Sign Out
           </Button>
         </div>

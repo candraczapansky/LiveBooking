@@ -1046,14 +1046,7 @@ const AppointmentsPage = () => {
                       onClick={handleAddAppointment}
                       className="bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
                       size="default"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        textAlign: 'center'
-                      }}
                     >
-                      <PlusCircle className="mr-2 h-4 w-4 flex-shrink-0" />
                       <span className="hidden sm:inline">New Appointment</span>
                       <span className="sm:hidden">New</span>
                     </Button>
