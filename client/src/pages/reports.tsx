@@ -294,7 +294,11 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   );
 };
 
-const ClientsReport = ({ timePeriod }: { timePeriod: string }) => {
+const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
   const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
   const clients = (users as any[]).filter((user: any) => user.role === "client");
 
@@ -313,38 +317,17 @@ const ClientsReport = ({ timePeriod }: { timePeriod: string }) => {
   );
 };
 
-const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
+const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
   const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
   const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
   const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
   const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
 
-  // Calculate date range based on time period
-  const getDateRange = () => {
-    const now = new Date();
-    const startDate = new Date();
-    
-    switch (timePeriod) {
-      case "week":
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case "quarter":
-        startDate.setMonth(now.getMonth() - 3);
-        break;
-      case "year":
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        startDate.setMonth(now.getMonth() - 1);
-    }
-    
-    return { startDate, endDate: now };
-  };
-
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
 
   // Filter appointments and payments by date range
   const filteredAppointments = (appointments as any[]).filter((apt: any) => {
@@ -725,7 +708,11 @@ const ServicesReport = ({ timePeriod }: { timePeriod: string }) => {
   );
 };
 
-const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
+const StaffReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
   const { data: staff = [] } = useQuery({ queryKey: ["/api/staff"] });
   const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
   const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
@@ -1104,7 +1091,11 @@ const StaffReport = ({ timePeriod }: { timePeriod: string }) => {
   );
 };
 
-const TimeClockReport = ({ timePeriod }: { timePeriod: string }) => {
+const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
   const { data: timeEntries = [], isLoading, refetch } = useQuery({ 
     queryKey: ["/api/time-clock-entries"] 
   });
