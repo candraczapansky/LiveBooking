@@ -1032,7 +1032,7 @@ const AppointmentsPage = () => {
       <div className="lg:ml-64 min-h-screen flex flex-col">
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 md:p-6 pb-safe-area-inset-bottom"
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-1 md:p-6 pb-safe-area-inset-bottom"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}

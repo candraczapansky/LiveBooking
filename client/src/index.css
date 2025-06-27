@@ -760,21 +760,65 @@ body {
   
   /* Target specific mobile spacing issues */
   @media (max-width: 768px) {
-    .mb-3 {
+    .mb-3, .mb-1, .mb-0 {
+      margin-bottom: 0 !important;
+    }
+    
+    .space-y-4 > * + *, .space-y-3 > * + *, .space-y-2 > * + *, .space-y-1 > * + * {
+      margin-top: 0.125rem !important;
+    }
+    
+    .py-3, .py-1 {
+      padding-top: 0.25rem !important;
+      padding-bottom: 0.25rem !important;
+    }
+    
+    .px-3, .px-2 {
+      padding-left: 0.5rem !important;
+      padding-right: 0.5rem !important;
+    }
+    
+    /* Remove all gap spacing on mobile */
+    .gap-3, .gap-2, .gap-1 {
+      gap: 0.25rem !important;
+    }
+    
+    /* Compress main container */
+    main > div {
+      padding-top: 0.25rem !important;
+      padding-bottom: 0.25rem !important;
+    }
+    
+    /* Eliminate all card padding on mobile */
+    .card {
       margin-bottom: 0.25rem !important;
     }
     
-    .space-y-4 > * + * {
-      margin-top: 0.25rem !important;
+    /* Remove header margins */
+    h1, h2, h3 {
+      margin-top: 0 !important;
+      margin-bottom: 0.25rem !important;
     }
     
-    .space-y-3 > * + * {
-      margin-top: 0.25rem !important;
+    /* Compress button spacing */
+    .min-h-\[44px\] {
+      min-height: 2.5rem !important;
     }
     
-    .py-3 {
-      padding-top: 0.5rem !important;
-      padding-bottom: 0.5rem !important;
+    /* Ultra-compact mobile layout */
+    .container {
+      max-width: 100% !important;
+      padding-left: 0.25rem !important;
+      padding-right: 0.25rem !important;
+    }
+    
+    /* Force zero margins everywhere */
+    * {
+      margin-top: 0 !important;
+    }
+    
+    *:not(:first-child) {
+      margin-top: 0.125rem !important;
     }
   }
   
