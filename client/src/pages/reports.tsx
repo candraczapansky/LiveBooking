@@ -239,20 +239,20 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const totalTransactions = filteredSales.length;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 md:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Total Revenue
                   </dt>
-                  <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatPrice(totalRevenue)}
                   </dd>
                 </dl>
@@ -261,17 +261,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <TrendingUp className="h-5 w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 md:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Transactions
                   </dt>
-                  <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {totalTransactions}
                   </dd>
                 </dl>
@@ -280,17 +280,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <BarChart2 className="h-5 w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-5 w-0 flex-1">
+              <div className="ml-3 md:ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Avg Transaction
                   </dt>
-                  <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
                   </dd>
                 </dl>
@@ -1319,102 +1319,110 @@ const ReportsPage = () => {
       }`}>
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-6 py-8">
+          <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
             {/* Header Section */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
+            <div className="mb-6 md:mb-8">
+              <div className="space-y-4 md:space-y-0">
+                <div className="flex items-start">
                   {selectedReport && (
                     <Button 
                       variant="ghost" 
                       size="sm" 
                       onClick={() => setSelectedReport(null)}
-                      className="mr-3"
+                      className="mr-3 min-h-[44px] flex-shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
                     </Button>
                   )}
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
                       {selectedReport ? getReportTitle(selectedReport) : "Reports Dashboard"}
                     </h1>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                       {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business"}
                     </p>
                   </div>
                 </div>
                 {selectedReport && (
-                  <div className="flex items-center space-x-4 flex-wrap gap-2">
-                    <Select value={timePeriod} onValueChange={setTimePeriod}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Select period" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="week">This Week</SelectItem>
-                        <SelectItem value="month">This Month</SelectItem>
-                        <SelectItem value="quarter">This Quarter</SelectItem>
-                        <SelectItem value="year">This Year</SelectItem>
-                        <SelectItem value="custom">Custom Range</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-end gap-3 md:gap-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-2">
+                      <Select value={timePeriod} onValueChange={setTimePeriod}>
+                        <SelectTrigger className="w-full sm:w-[180px] min-h-[44px] text-left">
+                          <SelectValue placeholder="Select period" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="week">This Week</SelectItem>
+                          <SelectItem value="month">This Month</SelectItem>
+                          <SelectItem value="quarter">This Quarter</SelectItem>
+                          <SelectItem value="year">This Year</SelectItem>
+                          <SelectItem value="custom">Custom Range</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {timePeriod === "custom" && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="outline" className="w-full sm:w-auto min-h-[44px] justify-start text-left font-normal px-3">
+                              <Calendar className="mr-2 h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">
+                                {customStartDate && customEndDate 
+                                  ? `${customStartDate} to ${customEndDate}`
+                                  : "Select date range"}
+                              </span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80" align="start">
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="startDate">Start Date</Label>
+                                <Input
+                                  id="startDate"
+                                  type="date"
+                                  value={customStartDate}
+                                  onChange={(e) => setCustomStartDate(e.target.value)}
+                                  className="min-h-[44px]"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="endDate">End Date</Label>
+                                <Input
+                                  id="endDate"
+                                  type="date"
+                                  value={customEndDate}
+                                  onChange={(e) => setCustomEndDate(e.target.value)}
+                                  className="min-h-[44px]"
+                                />
+                              </div>
+                              <div className="flex justify-between gap-2">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setCustomStartDate("");
+                                    setCustomEndDate("");
+                                  }}
+                                  className="min-h-[40px] flex-1"
+                                >
+                                  Clear
+                                </Button>
+                                <Button 
+                                  size="sm"
+                                  onClick={() => {
+                                    // The component will automatically update when dates change
+                                  }}
+                                  className="min-h-[40px] flex-1"
+                                >
+                                  Apply
+                                </Button>
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </div>
                     
-                    {timePeriod === "custom" && (
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-[200px] justify-start text-left font-normal">
-                            <Calendar className="mr-2 h-4 w-4" />
-                            {customStartDate && customEndDate 
-                              ? `${customStartDate} to ${customEndDate}`
-                              : "Select date range"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80" align="start">
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="startDate">Start Date</Label>
-                              <Input
-                                id="startDate"
-                                type="date"
-                                value={customStartDate}
-                                onChange={(e) => setCustomStartDate(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="endDate">End Date</Label>
-                              <Input
-                                id="endDate"
-                                type="date"
-                                value={customEndDate}
-                                onChange={(e) => setCustomEndDate(e.target.value)}
-                              />
-                            </div>
-                            <div className="flex justify-between">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setCustomStartDate("");
-                                  setCustomEndDate("");
-                                }}
-                              >
-                                Clear
-                              </Button>
-                              <Button 
-                                size="sm"
-                                onClick={() => {
-                                  // The component will automatically update when dates change
-                                }}
-                              >
-                                Apply
-                              </Button>
-                            </div>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    )}
-                    
-                    <Button variant="outline">
+                    <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">
                       Export Report
                     </Button>
                   </div>
