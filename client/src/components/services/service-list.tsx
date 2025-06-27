@@ -199,7 +199,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditService(service.id)}
-                        className="text-primary hover:text-primary/80"
+                        className="text-primary hover:text-primary/80 hover:bg-primary/10"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -207,7 +207,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteService(service.id)}
-                        className="text-gray-500 hover:text-red-500"
+                        className="text-gray-500 hover:text-primary hover:bg-primary/10"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -236,7 +236,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteService} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction onClick={confirmDeleteService} className="bg-primary hover:bg-primary/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
