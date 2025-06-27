@@ -598,3 +598,75 @@ export const insertNotificationSchema = createInsertSchema(notifications).omit({
 
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+
+// Sales History schema - comprehensive tracking of all transactions
+export const salesHistory = pgTable("sales_history", {
+  id: serial("id").primaryKey(),
+  
+  // Transaction identification
+  transactionType: text("transaction_type").notNull(), // "appointment", "pos_sale", "membership"
+  transactionDate: timestamp("transaction_date").notNull(),
+  
+  // Payment information
+  paymentId: integer("payment_id"), // Links to payments table
+  totalAmount: doublePrecision("total_amount").notNull(),
+  paymentMethod: text("payment_method").notNull(), // "cash", "card", "check"
+  paymentStatus: text("payment_status").notNull().default("completed"), // "completed", "refunded", "failed"
+  
+  // Customer information
+  clientId: integer("client_id"),
+  clientName: text("client_name"),
+  clientEmail: text("client_email"),
+  clientPhone: text("client_phone"),
+  
+  // Staff information (for appointments)
+  staffId: integer("staff_id"),
+  staffName: text("staff_name"),
+  
+  // Appointment-specific data
+  appointmentId: integer("appointment_id"),
+  serviceIds: text("service_ids"), // JSON array of service IDs
+  serviceNames: text("service_names"), // JSON array of service names
+  serviceTotalAmount: doublePrecision("service_total_amount"),
+  
+  // POS-specific data
+  productIds: text("product_ids"), // JSON array of product IDs  
+  productNames: text("product_names"), // JSON array of product names
+  productQuantities: text("product_quantities"), // JSON array of quantities
+  productUnitPrices: text("product_unit_prices"), // JSON array of unit prices
+  productTotalAmount: doublePrecision("product_total_amount"),
+  
+  // Membership-specific data
+  membershipId: integer("membership_id"),
+  membershipName: text("membership_name"),
+  membershipDuration: integer("membership_duration"), // in months
+  
+  // Tax and fees
+  taxAmount: doublePrecision("tax_amount").default(0),
+  tipAmount: doublePrecision("tip_amount").default(0),
+  discountAmount: doublePrecision("discount_amount").default(0),
+  
+  // Business insights
+  businessDate: date("business_date"), // Date for business day grouping
+  dayOfWeek: text("day_of_week"),
+  monthYear: text("month_year"), // Format: "2025-06" for easy monthly grouping
+  quarter: text("quarter"), // Format: "2025-Q2"
+  
+  // External tracking
+  squarePaymentId: text("square_payment_id"),
+  
+  // Audit trail
+  createdBy: integer("created_by"), // User who created the record
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSalesHistorySchema = createInsertSchema(salesHistory).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type SalesHistory = typeof salesHistory.$inferSelect;
+export type InsertSalesHistory = z.infer<typeof insertSalesHistorySchema>;

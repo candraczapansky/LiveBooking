@@ -24,7 +24,8 @@ import {
   timeClockEntries, TimeClockEntry, InsertTimeClockEntry,
   userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
   notifications, Notification, InsertNotification,
-  payrollHistory, PayrollHistory, InsertPayrollHistory
+  payrollHistory, PayrollHistory, InsertPayrollHistory,
+  salesHistory, SalesHistory, InsertSalesHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -223,6 +224,18 @@ export interface IStorage {
   getAllPayrollHistory(): Promise<PayrollHistory[]>;
   updatePayrollHistory(id: number, payrollData: Partial<InsertPayrollHistory>): Promise<PayrollHistory>;
   deletePayrollHistory(id: number): Promise<boolean>;
+
+  // Sales History operations
+  createSalesHistory(salesHistory: InsertSalesHistory): Promise<SalesHistory>;
+  getSalesHistory(id: number): Promise<SalesHistory | undefined>;
+  getSalesHistoryByDateRange(startDate: Date, endDate: Date): Promise<SalesHistory[]>;
+  getSalesHistoryByTransactionType(transactionType: string): Promise<SalesHistory[]>;
+  getSalesHistoryByClient(clientId: number): Promise<SalesHistory[]>;
+  getSalesHistoryByStaff(staffId: number): Promise<SalesHistory[]>;
+  getSalesHistoryByMonth(monthYear: string): Promise<SalesHistory[]>;
+  getAllSalesHistory(): Promise<SalesHistory[]>;
+  updateSalesHistory(id: number, salesData: Partial<InsertSalesHistory>): Promise<SalesHistory>;
+  deleteSalesHistory(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1672,6 +1685,83 @@ export class DatabaseStorage implements IStorage {
 
   async deletePayrollHistory(id: number): Promise<boolean> {
     const result = await db.delete(payrollHistory).where(eq(payrollHistory.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Sales History operations
+  async createSalesHistory(salesHistoryData: InsertSalesHistory): Promise<SalesHistory> {
+    const [newSalesHistory] = await db.insert(salesHistory).values(salesHistoryData).returning();
+    return newSalesHistory;
+  }
+
+  async getSalesHistory(id: number): Promise<SalesHistory | undefined> {
+    const [result] = await db.select().from(salesHistory).where(eq(salesHistory.id, id));
+    return result || undefined;
+  }
+
+  async getSalesHistoryByDateRange(startDate: Date, endDate: Date): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .where(
+        and(
+          gte(salesHistory.transactionDate, startDate),
+          lte(salesHistory.transactionDate, endDate)
+        )
+      )
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async getSalesHistoryByTransactionType(transactionType: string): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .where(eq(salesHistory.transactionType, transactionType))
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async getSalesHistoryByClient(clientId: number): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .where(eq(salesHistory.clientId, clientId))
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async getSalesHistoryByStaff(staffId: number): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .where(eq(salesHistory.staffId, staffId))
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async getSalesHistoryByMonth(monthYear: string): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .where(eq(salesHistory.monthYear, monthYear))
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async getAllSalesHistory(): Promise<SalesHistory[]> {
+    return await db
+      .select()
+      .from(salesHistory)
+      .orderBy(desc(salesHistory.transactionDate));
+  }
+
+  async updateSalesHistory(id: number, salesData: Partial<InsertSalesHistory>): Promise<SalesHistory> {
+    const [updatedSalesHistory] = await db
+      .update(salesHistory)
+      .set({ ...salesData, updatedAt: new Date() })
+      .where(eq(salesHistory.id, id))
+      .returning();
+    return updatedSalesHistory;
+  }
+
+  async deleteSalesHistory(id: number): Promise<boolean> {
+    const result = await db.delete(salesHistory).where(eq(salesHistory.id, id));
     return (result.rowCount ?? 0) > 0;
   }
 }
