@@ -240,20 +240,20 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const totalTransactions = filteredSales.length;
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+    <div className="space-y-1 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-6">
         <Card>
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
-                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
+                <DollarSign className="h-3 w-3 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-3 md:ml-5 w-0 flex-1">
+              <div className="ml-2 md:ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Total Revenue
                   </dt>
-                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatPrice(totalRevenue)}
                   </dd>
                 </dl>
@@ -262,17 +262,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
-                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
+                <TrendingUp className="h-3 w-3 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-3 md:ml-5 w-0 flex-1">
+              <div className="ml-2 md:ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Transactions
                   </dt>
-                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {totalTransactions}
                   </dd>
                 </dl>
@@ -281,17 +281,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="p-4 md:p-6">
+          <CardContent className="p-2 md:p-6">
             <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
-                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
+                <BarChart2 className="h-3 w-3 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="ml-3 md:ml-5 w-0 flex-1">
+              <div className="ml-2 md:ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
                     Avg Transaction
                   </dt>
-                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
                     {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
                   </dd>
                 </dl>
