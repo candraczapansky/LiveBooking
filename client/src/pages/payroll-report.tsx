@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw } from "lucide-react";
+import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths, isWithinInterval } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface PayrollData {
   staffId: number;
@@ -31,6 +33,9 @@ export default function PayrollReport() {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedStaff, setSelectedStaff] = useState<string>("all");
   const [syncing, setSyncing] = useState<number | null>(null); // Track which staff member is being synced
+  const [saving, setSaving] = useState<number | null>(null); // Track which staff member payroll is being saved
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch staff data
   const { data: staff } = useQuery({
@@ -90,6 +95,95 @@ export default function PayrollReport() {
       console.error('Payroll sync failed:', error);
     } finally {
       setSyncing(null);
+    }
+  };
+
+  // Save payroll to history
+  const handleSavePayroll = async (staffMember: PayrollData) => {
+    setSaving(staffMember.staffId);
+    
+    try {
+      const monthStart = startOfMonth(selectedMonth);
+      const monthEnd = endOfMonth(selectedMonth);
+      
+      // Check if payroll already exists for this period
+      const existingResponse = await fetch(`/api/payroll-history/staff/${staffMember.staffId}`);
+      const existingPayrolls = await existingResponse.json();
+      
+      const existingPayroll = existingPayrolls.find((p: any) => {
+        const pStart = new Date(p.periodStart);
+        const pEnd = new Date(p.periodEnd);
+        return pStart.toDateString() === monthStart.toDateString() && 
+               pEnd.toDateString() === monthEnd.toDateString();
+      });
+
+      if (existingPayroll) {
+        toast({
+          title: "Payroll Already Saved",
+          description: `Payroll for ${staffMember.staffName} for ${format(selectedMonth, 'MMMM yyyy')} already exists in history.`,
+          variant: "default",
+        });
+        return;
+      }
+
+      const payrollHistoryData = {
+        staffId: staffMember.staffId,
+        periodStart: monthStart.toISOString().split('T')[0],
+        periodEnd: monthEnd.toISOString().split('T')[0],
+        periodType: 'monthly',
+        totalHours: staffMember.totalHours || 0,
+        totalServices: staffMember.totalServices,
+        totalRevenue: staffMember.totalRevenue,
+        totalCommission: staffMember.totalCommission,
+        totalHourlyPay: staffMember.totalHourlyPay || 0,
+        totalFixedPay: 0, // Add if you have fixed pay data
+        totalEarnings: staffMember.totalEarnings,
+        commissionType: staffMember.commissionType,
+        baseCommissionRate: staffMember.baseCommissionRate,
+        hourlyRate: staffMember.hourlyWage || 0,
+        fixedRate: 0, // Add if you have fixed rate data
+        earningsBreakdown: JSON.stringify({
+          totalCommission: staffMember.totalCommission,
+          totalHourlyPay: staffMember.totalHourlyPay || 0,
+          totalServices: staffMember.totalServices,
+          totalRevenue: staffMember.totalRevenue
+        }),
+        timeEntriesData: JSON.stringify([]), // Add time entries if available
+        appointmentsData: JSON.stringify(staffMember.appointments),
+        payrollStatus: 'generated',
+        generatedBy: null, // Add current user ID if available
+        notes: `Generated for ${format(selectedMonth, 'MMMM yyyy')}`
+      };
+
+      const response = await apiRequest('/api/payroll-history', {
+        method: 'POST',
+        body: JSON.stringify(payrollHistoryData),
+      });
+
+      if (response.ok) {
+        const savedPayroll = await response.json();
+        console.log('Payroll saved successfully:', savedPayroll);
+        
+        toast({
+          title: "Payroll Saved",
+          description: `Payroll for ${staffMember.staffName} for ${format(selectedMonth, 'MMMM yyyy')} has been saved to history.`,
+          variant: "default",
+        });
+
+        // Refresh payroll history data
+        queryClient.invalidateQueries({ queryKey: ['/api/payroll-history'] });
+      } else {
+        throw new Error(`Failed to save payroll: ${response.status}`);
+      }
+    } catch (error) {
+      console.error('Payroll save failed:', error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save payroll to history. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(null);
     }
   };
 
@@ -433,7 +527,7 @@ export default function PayrollReport() {
                   <TableHead className="text-right">Hours</TableHead>
                   <TableHead className="text-right">Hourly Pay</TableHead>
                   <TableHead className="text-right">Total Earnings</TableHead>
-                  <TableHead className="text-center">Sync</TableHead>
+                  <TableHead className="text-center">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -464,16 +558,28 @@ export default function PayrollReport() {
                       {formatCurrency(data.totalEarnings)}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button
-                        onClick={() => handlePayrollSync(data.staffId)}
-                        disabled={syncing === data.staffId}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center gap-2"
-                      >
-                        <RefreshCw className={`h-4 w-4 ${syncing === data.staffId ? 'animate-spin' : ''}`} />
-                        {syncing === data.staffId ? 'Syncing...' : 'Sync'}
-                      </Button>
+                      <div className="flex gap-2 justify-center">
+                        <Button
+                          onClick={() => handleSavePayroll(data)}
+                          disabled={saving === data.staffId}
+                          variant="default"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <Save className={`h-4 w-4 ${saving === data.staffId ? 'animate-pulse' : ''}`} />
+                          {saving === data.staffId ? 'Saving...' : 'Save'}
+                        </Button>
+                        <Button
+                          onClick={() => handlePayrollSync(data.staffId)}
+                          disabled={syncing === data.staffId}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${syncing === data.staffId ? 'animate-spin' : ''}`} />
+                          {syncing === data.staffId ? 'Syncing...' : 'Sync'}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

@@ -3370,6 +3370,104 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Payroll History Routes
+
+  // Create/Save payroll history
+  app.post("/api/payroll-history", async (req, res) => {
+    try {
+      const payrollHistoryData = req.body;
+      const newPayrollHistory = await storage.createPayrollHistory(payrollHistoryData);
+      res.json(newPayrollHistory);
+    } catch (error) {
+      console.error("Error creating payroll history:", error);
+      res.status(500).json({ error: "Failed to create payroll history" });
+    }
+  });
+
+  // Get all payroll history
+  app.get("/api/payroll-history", async (req, res) => {
+    try {
+      const payrollHistory = await storage.getAllPayrollHistory();
+      res.json(payrollHistory);
+    } catch (error) {
+      console.error("Error fetching payroll history:", error);
+      res.status(500).json({ error: "Failed to fetch payroll history" });
+    }
+  });
+
+  // Get payroll history for specific staff member
+  app.get("/api/payroll-history/staff/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      if (!staffId) {
+        return res.status(400).json({ error: "Valid staff ID is required" });
+      }
+      
+      const payrollHistory = await storage.getPayrollHistoryByStaff(staffId);
+      res.json(payrollHistory);
+    } catch (error) {
+      console.error("Error fetching payroll history for staff:", error);
+      res.status(500).json({ error: "Failed to fetch payroll history for staff" });
+    }
+  });
+
+  // Get specific payroll history record
+  app.get("/api/payroll-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid payroll history ID is required" });
+      }
+      
+      const payrollHistory = await storage.getPayrollHistory(id);
+      if (!payrollHistory) {
+        return res.status(404).json({ error: "Payroll history not found" });
+      }
+      
+      res.json(payrollHistory);
+    } catch (error) {
+      console.error("Error fetching payroll history:", error);
+      res.status(500).json({ error: "Failed to fetch payroll history" });
+    }
+  });
+
+  // Update payroll history record
+  app.put("/api/payroll-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid payroll history ID is required" });
+      }
+      
+      const updateData = req.body;
+      const updatedPayrollHistory = await storage.updatePayrollHistory(id, updateData);
+      res.json(updatedPayrollHistory);
+    } catch (error) {
+      console.error("Error updating payroll history:", error);
+      res.status(500).json({ error: "Failed to update payroll history" });
+    }
+  });
+
+  // Delete payroll history record
+  app.delete("/api/payroll-history/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ error: "Valid payroll history ID is required" });
+      }
+      
+      const deleted = await storage.deletePayrollHistory(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Payroll history not found" });
+      }
+      
+      res.json({ message: "Payroll history deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting payroll history:", error);
+      res.status(500).json({ error: "Failed to delete payroll history" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
