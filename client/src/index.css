@@ -726,6 +726,31 @@ body {
     display: block !important;
     width: 100% !important;
   }
+
+  /* Optimize mobile layout spacing */
+  .container {
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+  
+  /* Reduce card padding on mobile */
+  .card .card-content {
+    padding: 0.75rem !important;
+  }
+  
+  /* Optimize mobile margins and spacing */
+  .space-y-6 > * + * {
+    margin-top: 0.75rem !important;
+  }
+  
+  .space-y-4 > * + * {
+    margin-top: 0.5rem !important;
+  }
+  
+  /* Reduce grid gaps on mobile */
+  .grid {
+    gap: 0.75rem !important;
+  }
   
   /* Exception for buttons that already have adequate padding */
   button[class*="px-"], button[class*="py-"] {

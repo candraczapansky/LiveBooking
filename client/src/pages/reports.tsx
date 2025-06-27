@@ -119,29 +119,29 @@ const getReportDescription = (reportId: string) => {
 // Landing Page Component
 const ReportsLandingPage = ({ onSelectReport }: { onSelectReport: (reportId: string) => void }) => {
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-3 md:space-y-6">
       {/* Report Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
         {reportCategories.map((category) => (
           <Card 
             key={category.id}
-            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group min-h-[120px] md:min-h-[160px]"
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group min-h-[100px] md:min-h-[160px]"
             onClick={() => onSelectReport(category.id)}
           >
-            <CardContent className="p-4 md:p-6">
+            <CardContent className="p-3 md:p-6">
               <div className="flex items-start justify-between h-full">
                 <div className="flex-1">
-                  <div className={`inline-flex p-2 md:p-3 rounded-lg ${category.bgColor} mb-3 md:mb-4`}>
-                    <category.icon className={`h-5 w-5 md:h-6 md:w-6 ${category.color}`} />
+                  <div className={`inline-flex p-1.5 md:p-3 rounded-lg ${category.bgColor} mb-2 md:mb-4`}>
+                    <category.icon className={`h-4 w-4 md:h-6 md:w-6 ${category.color}`} />
                   </div>
-                  <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 md:mb-2 leading-tight">
+                  <h3 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 md:mb-2 leading-tight">
                     {category.title}
                   </h3>
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-3 md:mb-4 line-clamp-2">
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-2 md:mb-4 line-clamp-2">
                     {category.description}
                   </p>
                 </div>
-                <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 ml-2" />
+                <ChevronRight className="h-3 w-3 md:h-5 md:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 ml-2" />
               </div>
               <div className="flex items-center text-xs md:text-sm text-primary group-hover:text-primary/80 transition-colors mt-auto">
                 View Report
@@ -1321,9 +1321,9 @@ const ReportsPage = () => {
       }`}>
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
+          <div className="container mx-auto px-3 md:px-6 py-3 md:py-8">
             {/* Header Section */}
-            <div className="mb-6 md:mb-8">
+            <div className="mb-3 md:mb-8">
               <div className="space-y-4 md:space-y-0">
                 <div className="flex items-start">
                   {selectedReport && (
