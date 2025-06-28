@@ -28,10 +28,10 @@ const Header = () => {
 
   useEffect(() => {
     // Prioritize database profile picture from user context
-    if (user && (user as any).profilePicture) {
-      setProfilePicture((user as any).profilePicture);
+    if (user && user.profilePicture) {
+      setProfilePicture(user.profilePicture);
       // Also sync to localStorage as backup
-      localStorage.setItem('profilePicture', (user as any).profilePicture);
+      localStorage.setItem('profilePicture', user.profilePicture);
     } else {
       // Fallback to localStorage if no database profile picture
       const savedProfilePicture = localStorage.getItem('profilePicture');

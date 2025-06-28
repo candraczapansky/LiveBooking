@@ -39,6 +39,7 @@ type User = {
   firstName?: string;
   lastName?: string;
   phone?: string;
+  profilePicture?: string;
   createdAt?: string;
   stripeCustomerId?: string | null;
 };

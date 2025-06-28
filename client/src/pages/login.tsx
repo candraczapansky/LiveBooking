@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { AuthContext } from "@/App";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -79,8 +79,8 @@ const Login = () => {
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // Store user data in localStorage (simpler than context for now)
-      localStorage.setItem('user', JSON.stringify(userData));
+      // Use authentication context to properly set user data
+      login(userData);
       
       // Show success toast
       toast({
@@ -88,8 +88,8 @@ const Login = () => {
         description: "Welcome back to BeautyBook!",
       });
       
-      // Force redirect to dashboard page (bypassing router)
-      document.location.href = "/dashboard";
+      // Navigate to dashboard
+      setLocation("/dashboard");
       
     } catch (error: any) {
       console.error("Login error:", error);
