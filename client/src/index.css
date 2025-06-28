@@ -823,6 +823,33 @@ body {
       gap: 0 !important;
     }
     
+    /* Aggressive Reports page content targeting */
+    .mt-0 {
+      margin-top: 0 !important;
+    }
+    
+    /* Remove any remaining spacing from Reports page elements */
+    [class*="container"] > div {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+    
+    /* Target specific Reports page spacing */
+    main > div > div {
+      padding-top: 0 !important;
+      margin-top: 0 !important;
+    }
+    
+    /* Ultra-aggressive negative margin to eliminate all gaps */
+    .mt-0 {
+      margin-top: -2rem !important;
+    }
+    
+    /* Pull content up closer to header on mobile */
+    main .container > div:last-child {
+      margin-top: -1rem !important;
+    }
+    
     /* Compress button spacing */
     .min-h-\[44px\] {
       min-height: 2.5rem !important;

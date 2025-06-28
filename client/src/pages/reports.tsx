@@ -1447,16 +1447,18 @@ const ReportsPage = () => {
             </div>
 
             {/* Content */}
-            {selectedReport ? (
-              <SpecificReportView 
-                reportType={selectedReport} 
-                timePeriod={timePeriod}
-                customStartDate={customStartDate}
-                customEndDate={customEndDate}
-              />
-            ) : (
-              <ReportsLandingPage onSelectReport={setSelectedReport} />
-            )}
+            <div className="mt-0 md:mt-8 -mb-0 md:mb-0">
+              {selectedReport ? (
+                <SpecificReportView 
+                  reportType={selectedReport} 
+                  timePeriod={timePeriod}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                />
+              ) : (
+                <ReportsLandingPage onSelectReport={setSelectedReport} />
+              )}
+            </div>
           </div>
         </main>
       </div>
