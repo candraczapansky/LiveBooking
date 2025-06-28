@@ -1447,7 +1447,7 @@ const ReportsPage = () => {
             </div>
 
             {/* Content */}
-            <div className="mt-0 md:mt-8 -mb-0 md:mb-0">
+            <div className="mt-0 md:mt-8 -mb-0 md:mb-0 reports-content">
               {selectedReport ? (
                 <SpecificReportView 
                   reportType={selectedReport} 

@@ -840,23 +840,9 @@ body {
       margin-top: 0 !important;
     }
     
-    /* Ultra-aggressive negative margin to eliminate all gaps */
-    .mt-0 {
-      margin-top: -4rem !important;
-    }
-    
-    /* Pull content up closer to header on mobile */
-    main .container > div:last-child {
-      margin-top: -3rem !important;
-    }
-    
-    /* Force Reports page content to use absolute positioning */
-    .container.mx-auto > div:last-child {
-      position: absolute !important;
-      top: 4rem !important;
-      left: 0.5rem !important;
-      right: 0.5rem !important;
-      width: calc(100% - 1rem) !important;
+    /* Target only the specific Reports page content spacing */
+    .reports-content {
+      margin-top: -1rem !important;
     }
     
     /* Compress button spacing */
