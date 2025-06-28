@@ -887,22 +887,131 @@ const AppointmentsPage = () => {
     const monthDays = getDaysInMonth(currentDate);
     const isMobile = window.innerWidth < 768;
     
+    // Mobile: Use a more spacious card-based layout
+    if (isMobile) {
+      return (
+        <div className="p-3 space-y-4">
+          {/* Month header with navigation */}
+          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateDate('prev')}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </h2>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigateDate('next')}
+              className="h-9 w-9 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Simplified day headers */}
+          <div className="grid grid-cols-7 gap-1 mb-3">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+              <div key={index} className="text-center text-sm font-medium text-gray-600 dark:text-gray-300 py-2">
+                {day}
+              </div>
+            ))}
+          </div>
+          
+          {/* Calendar grid with better spacing */}
+          <div className="grid grid-cols-7 gap-2">
+            {monthDays.map((day, index) => {
+              if (!day) {
+                return <div key={index} className="h-20"></div>;
+              }
+              
+              const isToday = day.toDateString() === new Date().toDateString();
+              const dayAppointments = appointments?.filter((appointment: any) => {
+                const appointmentDate = new Date(appointment.startTime);
+                const dayStr = day.getFullYear() + '-' + 
+                  String(day.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(day.getDate()).padStart(2, '0');
+                const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                  String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(appointmentDate.getDate()).padStart(2, '0');
+                
+                return appointmentDateStr === dayStr;
+              }) || [];
+              
+              return (
+                <div 
+                  key={index} 
+                  className={`h-20 border-2 rounded-lg p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${
+                    isToday 
+                      ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-600' 
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
+                  } active:scale-95`}
+                  onClick={() => {
+                    setCurrentDate(day);
+                    setViewMode('day');
+                  }}
+                >
+                  {/* Date number */}
+                  <div className={`text-sm font-semibold mb-1 ${
+                    isToday 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : 'text-gray-700 dark:text-gray-300'
+                  }`}>
+                    {day.getDate()}
+                  </div>
+                  
+                  {/* Appointment indicators */}
+                  {dayAppointments.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {dayAppointments.slice(0, 2).map((appointment: any, i: number) => (
+                        <div 
+                          key={i}
+                          className={`w-2 h-2 rounded-full ${
+                            appointment.paymentStatus === 'paid' 
+                              ? 'bg-green-500' 
+                              : 'bg-primary'
+                          }`}
+                        />
+                      ))}
+                      {dayAppointments.length > 2 && (
+                        <div className="text-xs text-gray-500 font-medium">
+                          +{dayAppointments.length - 2}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      );
+    }
+
+    // Desktop: Use original compact layout
     return (
-      <div className={`${isMobile ? 'p-2' : 'p-4'}`}>
-        {/* Compact day headers for mobile */}
-        <div className="grid grid-cols-7 gap-px mb-2">
+      <div className="p-4">
+        {/* Compact day headers for desktop */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className={`${isMobile ? 'py-1 px-1' : 'p-2'} text-center text-xs font-medium text-gray-600 dark:text-gray-300`}>
-              {isMobile ? day[0] : day}
+            <div key={day} className="p-2 text-center text-xs font-medium text-gray-600 dark:text-gray-300">
+              {day}
             </div>
           ))}
         </div>
         
-        {/* Calendar grid - compact for mobile */}
-        <div className={`grid grid-cols-7 ${isMobile ? 'gap-px' : 'gap-1'}`}>
+        {/* Calendar grid - compact for desktop */}
+        <div className="grid grid-cols-7 gap-1">
           {monthDays.map((day, index) => {
             if (!day) {
-              return <div key={index} className={`${isMobile ? 'h-16' : 'h-24'}`}></div>;
+              return <div key={index} className="h-24"></div>;
             }
             
             const isToday = day.toDateString() === new Date().toDateString();
@@ -921,7 +1030,7 @@ const AppointmentsPage = () => {
             return (
               <div 
                 key={index} 
-                className={`${isMobile ? 'h-16' : 'h-24'} border ${isMobile ? 'rounded-sm' : 'rounded-lg'} ${isMobile ? 'p-0.5' : 'p-1'} cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
+                className={`h-24 border rounded-lg p-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
                   isToday ? 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700' : 'bg-white dark:bg-gray-800'
                 } transition-colors`}
                 onClick={() => {
@@ -930,64 +1039,37 @@ const AppointmentsPage = () => {
                 }}
               >
                 {/* Date number */}
-                <div className={`${isMobile ? 'text-xs' : 'text-sm'} ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'} ${isMobile ? 'text-center' : ''}`}>
+                <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
                   {day.getDate()}
                 </div>
                 
-                {/* Appointment indicators */}
+                {/* Desktop appointment indicators */}
                 {dayAppointments.length > 0 && (
-                  <div className={`${isMobile ? 'mt-0.5' : 'mt-1'}`}>
-                    {isMobile ? (
-                      /* Mobile: Show count and colored dots */
-                      <div className="flex flex-col items-center">
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {dayAppointments.length}
+                  <div className="space-y-1 mt-1">
+                    {dayAppointments.slice(0, 2).map((appointment: any, i: number) => {
+                      const startTime = new Date(appointment.startTime);
+                      const timeString = startTime.toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit',
+                        hour12: true
+                      });
+                      
+                      return (
+                        <div 
+                          key={i}
+                          className={`text-xs p-1 rounded ${
+                            appointment.paymentStatus === 'paid' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
+                              : 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground'
+                          } truncate`}
+                        >
+                          {timeString} {appointment.service?.name}
                         </div>
-                        <div className="flex space-x-0.5 mt-0.5">
-                          {dayAppointments.slice(0, 3).map((appointment: any, i: number) => (
-                            <div 
-                              key={i}
-                              className={`w-1.5 h-1.5 rounded-full ${
-                                appointment.paymentStatus === 'paid' 
-                                  ? 'bg-green-500' 
-                                  : 'bg-primary'
-                              }`}
-                            />
-                          ))}
-                          {dayAppointments.length > 3 && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-gray-400" />
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      /* Desktop: Show first few appointments */
-                      <div className="space-y-1">
-                        {dayAppointments.slice(0, 2).map((appointment: any, i: number) => {
-                          const startTime = new Date(appointment.startTime);
-                          const timeString = startTime.toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true
-                          });
-                          
-                          return (
-                            <div 
-                              key={i}
-                              className={`text-xs p-1 rounded ${
-                                appointment.paymentStatus === 'paid' 
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
-                                  : 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground'
-                              } truncate`}
-                            >
-                              {timeString} {appointment.service?.name}
-                            </div>
-                          );
-                        })}
-                        {dayAppointments.length > 2 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                            +{dayAppointments.length - 2} more
-                          </div>
-                        )}
+                      );
+                    })}
+                    {dayAppointments.length > 2 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                        +{dayAppointments.length - 2} more
                       </div>
                     )}
                   </div>
