@@ -55,10 +55,28 @@ const Sidebar = () => {
   const { isOpen, isMobile, closeSidebar, toggleSidebar } = useSidebar();
   const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
+  const [primaryColor, setPrimaryColor] = useState('#d38301');
 
   useEffect(() => {
-
-  }, [isOpen, isMobile]);
+    // Load user's color preferences
+    const loadUserColor = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`/api/users/${user.id}/color-preferences`);
+          if (response.ok) {
+            const colorPrefs = await response.json();
+            if (colorPrefs.primaryColor) {
+              setPrimaryColor(colorPrefs.primaryColor);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load color preferences:', error);
+        }
+      }
+    };
+    
+    loadUserColor();
+  }, [user?.id, isOpen, isMobile]);
 
   // Don't render original sidebar on mobile - SimpleMobileMenu handles mobile navigation
   if (isMobile) {
@@ -106,7 +124,7 @@ const Sidebar = () => {
                 className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-5 w-5" style={{ color: primaryColor }} />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
             </div>

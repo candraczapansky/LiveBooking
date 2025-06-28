@@ -188,11 +188,6 @@ button svg {
   fill: currentColor !important;
 }
 
-/* Hamburger menu icon should use primary color */
-.sidebar button svg {
-  color: hsl(var(--primary)) !important;
-}
-
 /* Primary button icons should use primary-foreground color for contrast */
 button[class*="bg-primary"] svg,
 .bg-primary svg {
