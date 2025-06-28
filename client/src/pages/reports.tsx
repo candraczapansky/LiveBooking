@@ -241,7 +241,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
 
   return (
     <div className="space-y-0 md:space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-6 mt-0">
         <Card>
           <CardContent className="p-2 md:p-6">
             <div className="flex items-center">

@@ -842,7 +842,26 @@ body {
     
     /* Target only the specific Reports page content spacing */
     .reports-content {
-      margin-top: -1rem !important;
+      margin-top: -3rem !important;
+      padding-top: 0 !important;
+    }
+    
+    /* Force all report components to have zero top spacing */
+    .reports-content > div {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+    }
+    
+    /* Target report cards and grids specifically */
+    .reports-content .grid {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+    }
+    
+    /* Ultra-aggressive mobile layout fix for reports */
+    .reports-content > div:first-child {
+      position: relative !important;
+      top: -2rem !important;
     }
     
     /* Compress button spacing */
