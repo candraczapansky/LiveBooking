@@ -1036,118 +1036,127 @@ const AppointmentsPage = () => {
               style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
-            <div className="bg-white dark:bg-gray-800 border-b px-4 py-4">
-              <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-                <div className="flex items-center justify-between">
-                  <h1 className="text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
-                  
-                  <div className="flex items-center space-x-2">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+              {/* Header with Title and New Button */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
+                <Button
+                  onClick={handleAddAppointment}
+                  className="min-h-[44px] justify-center"
+                  size="default"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">New Appointment</span>
+                  <span className="sm:hidden">New</span>
+                </Button>
+              </div>
+              
+              {/* Controls organized in cards */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Date Navigation Card */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
                     <Button
-                      onClick={handleAddAppointment}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px] justify-center"
-                      size="default"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigateDate('prev')}
+                      className="h-9 w-9 p-0"
                     >
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      <span className="hidden sm:inline">New Appointment</span>
-                      <span className="sm:hidden">New</span>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="text-center flex-1 mx-3">
+                      <span className="text-lg font-semibold block">
+                        {formatDate(currentDate)}
+                      </span>
+                    </div>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigateDate('next')}
+                      className="h-9 w-9 p-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                
-                <div className="flex flex-wrap items-center gap-2 lg:space-x-4">
-                {/* Date Navigation */}
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => navigateDate('prev')}
-                    className="min-h-[44px] min-w-[44px] p-3"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  <span className="text-sm font-medium min-w-32 lg:min-w-48 text-center">
-                    {formatDate(currentDate)}
-                  </span>
-                  
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => navigateDate('next')}
-                    className="min-h-[44px] min-w-[44px] p-3"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+
+                {/* View and Zoom Controls Card */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-center space-x-3">
+                    <Select value={viewMode} onValueChange={setViewMode}>
+                      <SelectTrigger className="w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="day">Day</SelectItem>
+                        <SelectItem value="week">Week</SelectItem>
+                        <SelectItem value="month">Month</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {/* Zoom Controls */}
+                    <div className="hidden lg:flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={zoomOut}
+                        className="h-8 w-8 p-0 rounded-none border-r"
+                        disabled={zoomLevel <= 0.5}
+                      >
+                        <ZoomOut className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={zoomIn}
+                        className="h-8 w-8 p-0 rounded-none"
+                        disabled={zoomLevel >= 3}
+                      >
+                        <ZoomIn className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
-                {/* View Mode Toggle */}
-                <Select value={viewMode} onValueChange={setViewMode}>
-                  <SelectTrigger className="w-20 lg:w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Day</SelectItem>
-                    <SelectItem value="week">Week</SelectItem>
-                    <SelectItem value="month">Month</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Zoom Controls - Hidden on mobile */}
-                <div className="hidden lg:flex border rounded-lg overflow-hidden">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={zoomOut}
-                    className="h-8 w-8 p-0 rounded-none border-r"
-                    disabled={zoomLevel <= 0.5}
-                  >
-                    <ZoomOut className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={zoomIn}
-                    className="h-8 w-8 p-0 rounded-none border-l"
-                    disabled={zoomLevel >= 3}
-                  >
-                    <ZoomIn className="h-3 w-3" />
-                  </Button>
+                {/* Filters Card */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All stylists" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All stylists</SelectItem>
+                        {staff?.map((staffMember: any) => {
+                          const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+                          return (
+                            <SelectItem key={staffMember.id} value={staffName}>
+                              {staffName}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={selectedService} onValueChange={setSelectedService}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="All services" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All services</SelectItem>
+                        {services?.map((service: any) => (
+                          <SelectItem key={service.id} value={service.name}>
+                            {service.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                
-                <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger className="w-32 lg:w-48">
-                    <SelectValue placeholder="Staff..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All stylists</SelectItem>
-                    {staff?.map((staffMember: any) => {
-                      const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-                      return (
-                        <SelectItem key={staffMember.id} value={staffName}>
-                          {staffName}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                
-                <Select value={selectedService} onValueChange={setSelectedService}>
-                  <SelectTrigger className="w-32 lg:w-48">
-                    <SelectValue placeholder="Service..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All services</SelectItem>
-                    {services?.map((service: any) => (
-                      <SelectItem key={service.id} value={service.name}>
-                        {service.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
             </div>
-          </div>
-
             {/* Calendar Views */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
               <div className="overflow-x-auto">
