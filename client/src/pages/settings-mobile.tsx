@@ -189,8 +189,14 @@ export default function SettingsMobile() {
             if (response.ok) {
               console.log('Profile picture saved to database successfully');
               
-              // Update the user context with the new profile picture
-              updateUser({ profilePicture: base64String });
+              // Update localStorage directly since context might not be working properly
+              const currentUser = localStorage.getItem('user');
+              if (currentUser) {
+                const userData = JSON.parse(currentUser);
+                userData.profilePicture = base64String;
+                localStorage.setItem('user', JSON.stringify(userData));
+                console.log('Updated user data in localStorage with new profile picture');
+              }
               
               // Dispatch custom event to notify other components (like header)
               window.dispatchEvent(new CustomEvent('userDataUpdated', { 
