@@ -95,7 +95,7 @@ export default function PhonePage() {
 
   // Make outbound call mutation
   const makeCallMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/phone/outbound', 'POST', data),
+    mutationFn: (data: any) => apiRequest('POST', '/api/phone/outbound', data),
     onSuccess: () => {
       toast({
         title: "Call initiated",
@@ -116,7 +116,7 @@ export default function PhonePage() {
   // Add call notes mutation
   const addNotesMutation = useMutation({
     mutationFn: ({ callId, notes, staffId }: { callId: number; notes: string; staffId: number }) =>
-      apiRequest(`/api/phone/notes/${callId}`, 'PUT', { notes, staffId }),
+      apiRequest('PUT', `/api/phone/notes/${callId}`, { notes, staffId }),
     onSuccess: () => {
       toast({
         title: "Notes saved",
