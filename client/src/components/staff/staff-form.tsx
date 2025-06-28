@@ -96,17 +96,19 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   useEffect(() => {
     if (staffQueryData && open) {
       console.log("Setting form data from staffQueryData:", staffQueryData);
-      setStaffData(staffQueryData);
+      // staffQueryData comes back as an array, so we need to get the first element
+      const staffData = Array.isArray(staffQueryData) ? staffQueryData[0] : staffQueryData;
+      setStaffData(staffData);
       const formData = {
-        title: (staffQueryData as any).title || "",
-        bio: (staffQueryData as any).bio || "",
-        commissionRate: (staffQueryData as any).commissionRate || 0,
-        commissionType: (staffQueryData as any).commissionType || "commission",
-        firstName: (staffQueryData as any).user?.firstName || "",
-        lastName: (staffQueryData as any).user?.lastName || "",
-        email: (staffQueryData as any).user?.email || "",
-        phone: (staffQueryData as any).user?.phone || "",
-        photo: (staffQueryData as any).photoUrl || "",
+        title: staffData?.title || "",
+        bio: staffData?.bio || "",
+        commissionRate: staffData?.commissionRate || 0,
+        commissionType: staffData?.commissionType || "commission",
+        firstName: staffData?.user?.firstName || "",
+        lastName: staffData?.user?.lastName || "",
+        email: staffData?.user?.email || "",
+        phone: staffData?.user?.phone || "",
+        photo: staffData?.photoUrl || "",
       };
       console.log("Form data being set:", formData);
       form.reset(formData);
