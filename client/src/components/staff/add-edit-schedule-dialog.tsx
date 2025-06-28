@@ -37,7 +37,7 @@ import { apiRequest } from "@/lib/queryClient";
 
 const formSchema = z.object({
   staffId: z.string().min(1, "Staff member is required"),
-  dayOfWeek: z.string().min(1, "Day of week is required"),
+  daysOfWeek: z.array(z.string()).min(1, "At least one day must be selected"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().min(1, "Location is required"),
@@ -78,7 +78,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
     resolver: zodResolver(formSchema),
     defaultValues: useMemo(() => ({
       staffId: schedule?.staffId?.toString() || defaultStaffId?.toString() || "",
-      dayOfWeek: schedule?.dayOfWeek || "",
+      daysOfWeek: schedule?.dayOfWeek ? [schedule.dayOfWeek] : [],
       startTime: schedule?.startTime || "09:00",
       endTime: schedule?.endTime || "17:00",
       location: schedule?.location || "All Locations",
@@ -98,13 +98,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
-      toast({
-        title: "Success",
-        description: "Schedule created successfully.",
-      });
-      onOpenChange(false);
-      form.reset();
+      // Success handling is done manually in onSubmit for multiple schedules
     },
     onError: (error) => {
       console.error("Failed to save schedules:", error);
@@ -144,18 +138,66 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   });
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    const scheduleData = {
-      ...data,
-      staffId: parseInt(data.staffId),
-      serviceCategories: data.serviceCategories || [],
-      endDate: data.endDate || null,
-      isBlocked: data.isBlocked || false,
-    };
-
     if (schedule) {
+      // For editing, update the single schedule
+      const scheduleData = {
+        ...data,
+        dayOfWeek: data.daysOfWeek[0], // Use first selected day for editing
+        staffId: parseInt(data.staffId),
+        serviceCategories: data.serviceCategories || [],
+        endDate: data.endDate || null,
+        isBlocked: data.isBlocked || false,
+      };
       updateScheduleMutation.mutate(scheduleData);
     } else {
-      createScheduleMutation.mutate(scheduleData);
+      // For creating, create a schedule for each selected day
+      try {
+        const baseScheduleData = {
+          staffId: parseInt(data.staffId),
+          startTime: data.startTime,
+          endTime: data.endTime,
+          location: data.location,
+          serviceCategories: data.serviceCategories || [],
+          startDate: data.startDate,
+          endDate: data.endDate || null,
+          isBlocked: data.isBlocked || false,
+        };
+
+        // Create schedules sequentially for each selected day
+        for (const day of data.daysOfWeek) {
+          const scheduleData = {
+            ...baseScheduleData,
+            dayOfWeek: day,
+          };
+          await createScheduleMutation.mutateAsync(scheduleData);
+        }
+
+        // Close dialog and show success message after all schedules are created
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        toast({
+          title: "Success",
+          description: `${data.daysOfWeek.length} schedule(s) created successfully.`,
+        });
+        onOpenChange(false);
+        form.reset({
+          staffId: defaultStaffId?.toString() || "",
+          daysOfWeek: [],
+          startTime: "09:00",
+          endTime: "17:00",
+          location: "All Locations",
+          serviceCategories: [],
+          startDate: format(new Date(), 'yyyy-MM-dd'),
+          endDate: "",
+          isBlocked: false,
+        });
+      } catch (error) {
+        console.error("Failed to create schedules:", error);
+        toast({
+          title: "Error",
+          description: "Failed to create schedule(s). Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -211,24 +253,45 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
             <FormField
               control={form.control}
-              name="dayOfWeek"
-              render={({ field }) => (
+              name="daysOfWeek"
+              render={() => (
                 <FormItem>
-                  <FormLabel>Day of Week</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select day" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {daysOfWeek.map((day) => (
-                        <SelectItem key={day} value={day}>
-                          {day}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Days of Week</FormLabel>
+                  <div className="grid grid-cols-2 gap-2">
+                    {daysOfWeek.map((day) => (
+                      <FormField
+                        key={day}
+                        control={form.control}
+                        name="daysOfWeek"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={day}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(day)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), day])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value: string) => value !== day
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal">
+                                {day}
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
