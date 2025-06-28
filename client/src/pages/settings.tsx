@@ -141,10 +141,9 @@ export default function Settings() {
     const hsl = hexToHsl(savedPrimaryColor);
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
-    // Calculate and apply hover color on mount
-    const hoverLightness = hsl.l > 50 ? hsl.l - 5 : hsl.l + 5;
-    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hoverLightness}%`);
-    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    // Apply transparent hover colors on mount
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
     
     // Update other color properties
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
@@ -173,12 +172,11 @@ export default function Settings() {
     const hsl = hexToHsl(customColor);
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
-    // Calculate hover color (slightly darker/lighter depending on lightness)
-    const hoverLightness = hsl.l > 50 ? hsl.l - 5 : hsl.l + 5;
-    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hoverLightness}%`);
+    // Set transparent hover colors using the primary color with opacity
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
     
-    // Update outline button hover color to use the primary color
-    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    // Update outline button hover color to use transparent primary color
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
     
     // Also update dropdown colors to match the primary color
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);

@@ -213,17 +213,13 @@ function useAuth() {
     const s = parseInt(hslValues[1]);
     const l = parseInt(hslValues[2]);
     
-    // Calculate hover color (slightly darker/lighter depending on lightness)
-    const hoverLightness = l > 50 ? l - 5 : l + 5;
-    const hoverColor = `${h} ${s}% ${hoverLightness}%`;
-    
     // Apply CSS custom properties
     root.style.setProperty('--primary', hslColor);
     root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%');
     
-    // Apply button hover colors using the primary color
-    root.style.setProperty('--button-primary-hover', hoverColor);
-    root.style.setProperty('--button-outline-hover', hslColor);
+    // Apply transparent button hover colors using the primary color with opacity
+    root.style.setProperty('--button-primary-hover', `${hslColor} / 0.1`);
+    root.style.setProperty('--button-outline-hover', `${hslColor} / 0.1`);
     
     // Update other color properties to match
     root.style.setProperty('--dropdown-selected', hslColor);
