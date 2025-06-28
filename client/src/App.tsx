@@ -29,6 +29,7 @@ import PointOfSale from "@/pages/pos";
 import Products from "@/pages/products";
 import EmailTest from "@/pages/email-test";
 import GiftCertificatesPage from "@/pages/gift-certificates";
+import Phone from "@/pages/phone";
 
 type User = {
   id: number;
@@ -100,6 +101,7 @@ function Router() {
       <Route path="/reports" component={Reports} />
       <Route path="/marketing" component={Marketing} />
       <Route path="/automations" component={Automations} />
+      <Route path="/phone" component={Phone} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
