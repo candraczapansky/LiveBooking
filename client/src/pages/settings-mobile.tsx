@@ -188,6 +188,10 @@ export default function SettingsMobile() {
             
             if (response.ok) {
               console.log('Profile picture saved to database successfully');
+              
+              // Update the user context with the new profile picture
+              updateUser({ profilePicture: base64String });
+              
               // Dispatch custom event to notify other components (like header)
               window.dispatchEvent(new CustomEvent('userDataUpdated', { 
                 detail: { profilePicture: base64String }
