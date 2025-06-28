@@ -184,8 +184,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         bio: data.bio,
         commissionType: data.commissionType,
         commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : undefined,
-        hourlyRate: data.commissionType === 'hourly' ? data.commissionRate : undefined,
-        fixedRate: data.commissionType === 'fixed' ? data.commissionRate : undefined,
+        hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : undefined,
+        fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : undefined,
       };
 
       const staffResponse = await apiRequest("POST", "/api/staff", staffData);
@@ -245,8 +245,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         bio: data.bio,
         commissionType: data.commissionType,
         commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
-        hourlyRate: data.commissionType === 'hourly' ? data.commissionRate : null,
-        fixedRate: data.commissionType === 'fixed' ? data.commissionRate : null,
+        hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
+        fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
         photoUrl: data.photo || null,
       };
 
