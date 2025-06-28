@@ -994,7 +994,7 @@ If you didn't request this password reset, please ignore this email and your pas
       appointments = await storage.getAppointmentsByDate(new Date(date as string));
     } else {
       // Return all appointments when no filters are specified
-      appointments = Array.from((storage as any).appointments.values());
+      appointments = await storage.getAllAppointments();
     }
     
     // Get detailed information for each appointment

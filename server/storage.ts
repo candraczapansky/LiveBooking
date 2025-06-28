@@ -99,6 +99,7 @@ export interface IStorage {
   // Appointment operations
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
   getAppointment(id: number): Promise<Appointment | undefined>;
+  getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
@@ -970,14 +971,38 @@ export class DatabaseStorage implements IStorage {
 
   // Appointment operations
   async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
-    const id = this.currentAppointmentId++;
-    const newAppointment = { ...appointment, id, createdAt: new Date() } as Appointment;
-    this.appointments.set(id, newAppointment);
+    const [newAppointment] = await db.insert(appointments).values(appointment).returning();
+    
+    // Create appointment history entry for tracking
+    await this.createAppointmentHistory({
+      appointmentId: newAppointment.id,
+      action: 'created',
+      actionBy: null,
+      actionByRole: 'system',
+      previousValues: null,
+      newValues: JSON.stringify(newAppointment),
+      clientId: newAppointment.clientId,
+      serviceId: newAppointment.serviceId,
+      staffId: newAppointment.staffId,
+      startTime: newAppointment.startTime,
+      endTime: newAppointment.endTime,
+      status: newAppointment.status,
+      paymentStatus: newAppointment.paymentStatus,
+      totalAmount: newAppointment.totalAmount,
+      notes: newAppointment.notes,
+      systemGenerated: true
+    });
+    
     return newAppointment;
   }
 
   async getAppointment(id: number): Promise<Appointment | undefined> {
-    return this.appointments.get(id);
+    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
+    return appointment;
+  }
+
+  async getAllAppointments(): Promise<Appointment[]> {
+    return await db.select().from(appointments).orderBy(desc(appointments.startTime));
   }
 
   async getAppointmentsByClient(clientId: number): Promise<any[]> {
@@ -1001,30 +1026,88 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.staffId === staffId
-    );
+    return await db.select().from(appointments).where(eq(appointments.staffId, staffId)).orderBy(desc(appointments.startTime));
   }
 
   async getAppointmentsByDate(date: Date): Promise<Appointment[]> {
-    const dateString = date.toDateString();
-    return Array.from(this.appointments.values()).filter(
-      (appointment) => appointment.startTime.toDateString() === dateString
-    );
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    
+    return await db.select().from(appointments).where(
+      and(
+        gte(appointments.startTime, startOfDay),
+        lte(appointments.startTime, endOfDay)
+      )
+    ).orderBy(appointments.startTime);
   }
 
   async updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment> {
-    const appointment = await this.getAppointment(id);
-    if (!appointment) {
+    const existingAppointment = await this.getAppointment(id);
+    if (!existingAppointment) {
       throw new Error('Appointment not found');
     }
-    const updatedAppointment = { ...appointment, ...appointmentData };
-    this.appointments.set(id, updatedAppointment);
+    
+    const [updatedAppointment] = await db
+      .update(appointments)
+      .set(appointmentData)
+      .where(eq(appointments.id, id))
+      .returning();
+    
+    if (!updatedAppointment) {
+      throw new Error('Failed to update appointment');
+    }
+    
+    // Create appointment history entry for tracking
+    await this.createAppointmentHistory({
+      appointmentId: id,
+      action: 'updated',
+      actionBy: null,
+      actionByRole: 'system',
+      previousValues: JSON.stringify(existingAppointment),
+      newValues: JSON.stringify(updatedAppointment),
+      clientId: updatedAppointment.clientId,
+      serviceId: updatedAppointment.serviceId,
+      staffId: updatedAppointment.staffId,
+      startTime: updatedAppointment.startTime,
+      endTime: updatedAppointment.endTime,
+      status: updatedAppointment.status,
+      paymentStatus: updatedAppointment.paymentStatus,
+      totalAmount: updatedAppointment.totalAmount,
+      notes: updatedAppointment.notes,
+      systemGenerated: true
+    });
+    
     return updatedAppointment;
   }
 
   async deleteAppointment(id: number): Promise<boolean> {
-    return this.appointments.delete(id);
+    const existingAppointment = await this.getAppointment(id);
+    if (!existingAppointment) {
+      return false;
+    }
+    
+    // Create appointment history entry for tracking
+    await this.createAppointmentHistory({
+      appointmentId: id,
+      action: 'deleted',
+      actionBy: null,
+      actionByRole: 'system',
+      previousValues: JSON.stringify(existingAppointment),
+      newValues: null,
+      clientId: existingAppointment.clientId,
+      serviceId: existingAppointment.serviceId,
+      staffId: existingAppointment.staffId,
+      startTime: existingAppointment.startTime,
+      endTime: existingAppointment.endTime,
+      status: existingAppointment.status,
+      paymentStatus: existingAppointment.paymentStatus,
+      totalAmount: existingAppointment.totalAmount,
+      notes: existingAppointment.notes,
+      systemGenerated: true
+    });
+    
+    const result = await db.delete(appointments).where(eq(appointments.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Appointment History operations
