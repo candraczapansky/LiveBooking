@@ -758,8 +758,10 @@ body {
     padding-bottom: 0.5rem !important;
   }
   
-  /* Target specific mobile spacing issues */
-  @media (max-width: 768px) {
+}
+
+/* Target specific mobile spacing issues */
+@media (max-width: 768px) {
     .mb-3, .mb-1, .mb-0 {
       margin-bottom: 0 !important;
     }
@@ -841,16 +843,15 @@ body {
     *:not(:first-child) {
       margin-top: 0.125rem !important;
     }
-  }
 }
-  
-  /* Exception for buttons that already have adequate padding */
-  button[class*="px-"], button[class*="py-"] {
-    padding: revert !important;
-  }
-  
-  /* Tables responsive handling */
-  table {
+
+/* Exception for buttons that already have adequate padding */
+button[class*="px-"], button[class*="py-"] {
+  padding: revert !important;
+}
+
+/* Tables responsive handling */
+table {
     display: block !important;
     overflow-x: auto !important;
     white-space: nowrap !important;
@@ -881,22 +882,21 @@ body {
     width: 100% !important;
   }
 
-  /* Point of Sale specific mobile fixes */
-  .flex[class*="h-screen"] {
-    min-height: 100vh !important;
-    height: auto !important;
-  }
+/* Point of Sale specific mobile fixes */
+.flex[class*="h-screen"] {
+  min-height: 100vh !important;
+  height: auto !important;
+}
 
-  .flex[class*="h-full"] {
-    min-height: 0 !important;
-    height: auto !important;
-  }
+.flex[class*="h-full"] {
+  min-height: 0 !important;
+  height: auto !important;
+}
 
-  /* Ensure all pages can scroll properly */
-  main {
-    min-height: calc(100vh - 4rem) !important;
-    overflow-y: auto !important;
-  }
+/* Ensure all pages can scroll properly */
+main {
+  min-height: calc(100vh - 4rem) !important;
+  overflow-y: auto !important;
 }
 
 :root {
