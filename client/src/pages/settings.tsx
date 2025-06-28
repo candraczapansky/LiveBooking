@@ -142,8 +142,10 @@ export default function Settings() {
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
     // Apply transparent hover colors on mount
-    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
-    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+    document.documentElement.style.setProperty('--button-primary-hover-opacity', '0.1');
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+    document.documentElement.style.setProperty('--button-outline-hover-opacity', '0.1');
     
     // Update other color properties
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
@@ -173,10 +175,12 @@ export default function Settings() {
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
     // Set transparent hover colors using the primary color with opacity
-    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+    document.documentElement.style.setProperty('--button-primary-hover-opacity', '0.1');
     
     // Update outline button hover color to use transparent primary color
-    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}% / 0.1`);
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+    document.documentElement.style.setProperty('--button-outline-hover-opacity', '0.1');
     
     // Also update dropdown colors to match the primary color
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);

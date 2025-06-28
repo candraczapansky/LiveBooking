@@ -218,8 +218,10 @@ function useAuth() {
     root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%');
     
     // Apply transparent button hover colors using the primary color with opacity
-    root.style.setProperty('--button-primary-hover', `${hslColor} / 0.1`);
-    root.style.setProperty('--button-outline-hover', `${hslColor} / 0.1`);
+    root.style.setProperty('--button-primary-hover', hslColor);
+    root.style.setProperty('--button-primary-hover-opacity', '0.1');
+    root.style.setProperty('--button-outline-hover', hslColor);
+    root.style.setProperty('--button-outline-hover-opacity', '0.1');
     
     // Update other color properties to match
     root.style.setProperty('--dropdown-selected', hslColor);

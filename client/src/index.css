@@ -995,7 +995,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: hsl(var(--button-primary-hover));
+  background-color: hsla(var(--button-primary-hover), var(--button-primary-hover-opacity, 0.1));
   transform: translateY(-1px);
   box-shadow: 0 4px 12px hsla(var(--button-primary), 0.3);
 }
@@ -1019,7 +1019,7 @@ body {
 }
 
 .btn-outline:hover {
-  background-color: hsl(var(--button-outline-hover));
+  background-color: hsla(var(--button-outline-hover), var(--button-outline-hover-opacity, 0.1));
   color: hsl(var(--accent-foreground));
 }
 
