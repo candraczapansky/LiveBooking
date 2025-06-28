@@ -184,7 +184,7 @@ const StaffPageSimple = () => {
                         <p className="text-sm text-gray-500 break-all">
                           {staffMember.user?.email}
                         </p>
-                        <div className="inline-flex items-center px-2 py-1 rounded-full bg-green-100 text-green-800 text-sm font-medium">
+                        <div className="inline-flex items-center px-2 py-1 rounded-full bg-[hsl(var(--primary)/0.1)] text-primary text-sm font-medium">
                           Commission: {staffMember.commissionRate}%
                         </div>
                       </div>
