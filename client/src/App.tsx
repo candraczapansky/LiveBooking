@@ -70,10 +70,13 @@ export const AuthContext = React.createContext<AuthContextType>({
 });
 
 function Router() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  console.log("Router render - isAuthenticated:", isAuthenticated, "user:", user);
 
   // Public routes that don't require authentication
   if (!isAuthenticated) {
+    console.log("Showing public routes (not authenticated)");
     return (
       <Switch>
         <Route path="/login" component={Login} />
@@ -85,6 +88,7 @@ function Router() {
   }
 
   // Protected routes that require authentication
+  console.log("Showing protected routes (authenticated)");
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
