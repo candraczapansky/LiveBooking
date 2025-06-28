@@ -234,13 +234,14 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
 
       // Update staff information
-      const staffData = {
+      const staffUpdateData = {
         title: data.title,
         bio: data.bio,
         commissionRate: data.commissionRate,
+        photoUrl: data.photo || null,
       };
 
-      const staffResponse = await apiRequest("PATCH", `/api/staff/${staffId}`, staffData);
+      const staffResponse = await apiRequest("PATCH", `/api/staff/${staffId}`, staffUpdateData);
       if (!staffResponse.ok) {
         const errorData = await staffResponse.json();
         throw new Error(errorData.error || "Failed to update staff member");
