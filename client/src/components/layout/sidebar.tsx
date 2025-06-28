@@ -106,7 +106,7 @@ const Sidebar = () => {
                 className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
               >
-                <Menu className="h-5 w-5 text-primary" style={{ color: 'var(--primary)' }} />
+                <Menu className="h-5 w-5" />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
             </div>
