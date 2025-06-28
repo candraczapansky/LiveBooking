@@ -62,7 +62,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   console.log("StaffForm component rendered - open:", open, "staffId:", staffId);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isLoading, setIsLoading] = useState(false);
   const [staffData, setStaffData] = useState<any>(null);
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,47 +86,40 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
 
 
-  // Fetch staff data if editing
+  // Use React Query to fetch staff data
+  const { data: staffQueryData, isLoading } = useQuery({
+    queryKey: ['/api/staff', staffId],
+    enabled: !!staffId && open,
+  });
+
+  // Update form when staff data changes
   useEffect(() => {
-    if (staffId && open) {
-      setIsLoading(true);
-      fetch(`/api/staff/${staffId}`)
-        .then(res => res.json())
-        .then(data => {
-          setStaffData(data);
-          form.reset({
-            title: data.title || "",
-            bio: data.bio || "",
-            commissionRate: data.commissionRate || 0,
-            firstName: data.user?.firstName || "",
-            lastName: data.user?.lastName || "",
-            email: data.user?.email || "",
-            phone: data.user?.phone || "",
-          });
-          setIsLoading(false);
-        })
-        .catch(err => {
-          console.error("Error fetching staff:", err);
-          toast({
-            title: "Error",
-            description: "Failed to load staff data",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-        });
+    if (staffQueryData && open) {
+      setStaffData(staffQueryData);
+      form.reset({
+        title: (staffQueryData as any).title || "",
+        bio: (staffQueryData as any).bio || "",
+        commissionRate: (staffQueryData as any).commissionRate || 0,
+        commissionType: (staffQueryData as any).commissionType || "commission",
+        firstName: (staffQueryData as any).user?.firstName || "",
+        lastName: (staffQueryData as any).user?.lastName || "",
+        email: (staffQueryData as any).user?.email || "",
+        phone: (staffQueryData as any).user?.phone || "",
+      });
     } else if (open && !staffId) {
       // Reset form for new staff member
       form.reset({
         title: "",
         bio: "",
         commissionRate: 0,
+        commissionType: "commission",
         email: "",
         firstName: "",
         lastName: "",
         phone: "",
       });
     }
-  }, [staffId, open, form]);
+  }, [staffQueryData, open, staffId, form]);
 
   // Reset form when dialog closes
   useEffect(() => {
