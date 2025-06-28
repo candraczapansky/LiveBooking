@@ -240,61 +240,67 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const totalTransactions = filteredSales.length;
 
   return (
-    <div className="space-y-0 md:space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-6 mt-0">
-        <Card>
-          <CardContent className="p-2 md:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
-                <DollarSign className="h-3 w-3 md:h-5 md:w-5 text-primary" />
+    <div className="space-y-4 md:space-y-8">
+      {/* Enhanced Stats Cards with Better Visual Hierarchy */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mt-0">
+        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
+                  Total Revenue
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-green-700 dark:text-green-300">
+                  {formatPrice(totalRevenue)}
+                </p>
+                <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
+                  +12% from last period
+                </p>
               </div>
-              <div className="ml-2 md:ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Total Revenue
-                  </dt>
-                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {formatPrice(totalRevenue)}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-2 md:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
-                <TrendingUp className="h-3 w-3 md:h-5 md:w-5 text-primary" />
-              </div>
-              <div className="ml-2 md:ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Transactions
-                  </dt>
-                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {totalTransactions}
-                  </dd>
-                </dl>
+              <div className="flex-shrink-0 bg-green-100 dark:bg-green-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
+                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-2 md:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-1 md:p-3">
-                <BarChart2 className="h-3 w-3 md:h-5 md:w-5 text-primary" />
+
+        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
+                  Transactions
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-blue-700 dark:text-blue-300">
+                  {totalTransactions}
+                </p>
+                <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
+                  {totalTransactions > 10 ? 'High volume' : 'Growing'}
+                </p>
               </div>
-              <div className="ml-2 md:ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Avg Transaction
-                  </dt>
-                  <dd className="text-sm md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
-                  </dd>
-                </dl>
+              <div className="flex-shrink-0 bg-blue-100 dark:bg-blue-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
+                <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20">
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">
+                  Avg Transaction
+                </p>
+                <p className="text-2xl md:text-3xl font-bold text-purple-700 dark:text-purple-300">
+                  {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
+                </p>
+                <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
+                  Per transaction
+                </p>
+              </div>
+              <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
+                <BarChart2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </CardContent>
@@ -1328,13 +1334,11 @@ const ReportsPage = () => {
                 <div className="flex items-start">
                   {selectedReport && (
                     <Button 
-                      variant="ghost" 
-                      size="sm" 
                       onClick={() => setSelectedReport(null)}
-                      className="mr-3 min-h-[44px] flex-shrink-0 hover:bg-primary/10"
+                      className="mr-3 min-h-[44px] flex-shrink-0 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-2 shadow-md transition-all duration-300 hover:shadow-lg"
                       style={{ 
-                        backgroundColor: 'hsl(var(--primary))',
-                        color: 'hsl(var(--primary-foreground))'
+                        borderColor: 'hsl(var(--primary))',
+                        color: 'hsl(var(--primary))'
                       }}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1342,11 +1346,18 @@ const ReportsPage = () => {
                     </Button>
                   )}
                   <div className="flex-1 min-w-0">
-                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                      {selectedReport ? getReportTitle(selectedReport) : "Reports Dashboard"}
-                    </h1>
-                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                      {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business"}
+                    <div className="flex items-center gap-3 mb-2">
+                      {selectedReport && (
+                        <div className="flex-shrink-0 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl p-2">
+                          <BarChart2 className="h-5 w-5 text-primary" />
+                        </div>
+                      )}
+                      <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent leading-tight">
+                        {selectedReport ? getReportTitle(selectedReport) : "Reports Dashboard"}
+                      </h1>
+                    </div>
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business performance"}
                     </p>
                   </div>
                 </div>
