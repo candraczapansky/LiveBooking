@@ -14,51 +14,103 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
 }) => {
   const [internalValue, setInternalValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [randomId] = useState(() => `input_${Math.random().toString(36).substr(2, 9)}`);
+  const [randomId] = useState(() => `nosave_${Math.random().toString(36).substr(2, 15)}`);
+  const [randomName] = useState(() => `field_${Math.random().toString(36).substr(2, 15)}`);
   
   // Sync external value changes
   useEffect(() => {
     if (value !== internalValue) {
       setInternalValue(value);
+      // Force update the DOM input value
+      if (inputRef.current) {
+        inputRef.current.value = value;
+      }
     }
   }, [value, internalValue]);
 
-  // Monitor for unauthorized changes (autofill detection)
+  // Ultra-aggressive monitoring for autofill
   useEffect(() => {
     const input = inputRef.current;
     if (!input) return;
 
-    // Also check periodically
-    const interval = setInterval(() => {
-      if (input.value !== internalValue && input.value !== value) {
-        console.log(`Periodic check: Autofill detected! Reverting from "${input.value}" to "${value}"`);
+    // Multiple monitoring strategies
+    const interval1 = setInterval(() => {
+      if (input.value !== value && input.value !== internalValue) {
+        console.log(`AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
         input.value = value;
         setInternalValue(value);
       }
-    }, 100);
+    }, 50); // Check every 50ms
+
+    const interval2 = setInterval(() => {
+      // Force reset if value differs
+      if (input.value !== value) {
+        input.value = value;
+      }
+    }, 200);
+
+    // Listen for various events that might indicate autofill
+    const handleInput = () => {
+      if (input.value !== value && input.value !== internalValue) {
+        console.log(`INPUT EVENT - AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
+        setTimeout(() => {
+          input.value = value;
+          setInternalValue(value);
+        }, 0);
+      }
+    };
+
+    const handleFocus = () => {
+      // Delay to let autofill happen first, then override
+      setTimeout(() => {
+        if (input.value !== value) {
+          console.log(`FOCUS EVENT - AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
+          input.value = value;
+          setInternalValue(value);
+        }
+      }, 10);
+    };
+
+    input.addEventListener('input', handleInput);
+    input.addEventListener('focus', handleFocus);
+    input.addEventListener('blur', handleFocus);
 
     return () => {
-      clearInterval(interval);
+      clearInterval(interval1);
+      clearInterval(interval2);
+      input.removeEventListener('input', handleInput);
+      input.removeEventListener('focus', handleFocus);
+      input.removeEventListener('blur', handleFocus);
     };
-  }, [internalValue, value]);
+  }, [value, internalValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
+    console.log(`User typing: "${newValue}"`);
     setInternalValue(newValue);
     onChange(newValue);
   };
 
   return (
     <div className="relative">
-      {/* Decoy input to confuse autofill */}
+      {/* Multiple decoy inputs with different patterns */}
       <input
         type="text"
-        style={{ 
-          position: 'absolute', 
-          left: '-9999px', 
-          opacity: 0, 
-          pointerEvents: 'none' 
-        }}
+        name="username"
+        style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}
+        tabIndex={-1}
+        autoComplete="username"
+      />
+      <input
+        type="text"
+        name="fname"
+        style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}
+        tabIndex={-1}
+        autoComplete="given-name"
+      />
+      <input
+        type="password"
+        style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: 'none' }}
         tabIndex={-1}
         autoComplete="new-password"
       />
@@ -66,19 +118,22 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
       <input
         ref={inputRef}
         id={randomId}
-        name={randomId}
+        name={randomName}
         className={cn(
           "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
         value={internalValue}
         onChange={handleChange}
-        autoComplete="new-password"
+        autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck="false"
         data-lpignore="true"
+        data-1p-ignore="true"
+        data-bwignore="true"
         data-form-type="other"
+        role="textbox"
         {...props}
       />
     </div>
