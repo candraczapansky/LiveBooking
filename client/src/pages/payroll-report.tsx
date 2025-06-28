@@ -85,11 +85,27 @@ export default function PayrollReport() {
       const result = await response.json();
       console.log('Payroll sync result:', result);
       
-      // You could add a toast notification here to show success/failure
+      // Show detailed feedback about sync status
       if (result.externalSyncStatus === 'success') {
-        console.log(`Payroll data synced successfully for staff ${staffId}`);
+        toast({
+          title: "Payroll Sync Successful",
+          description: `Successfully synced payroll data for ${result.data?.staffName} to external dashboard at ${result.syncedToUrl}`,
+        });
+      } else if (result.externalSyncStatus === 'failed') {
+        toast({
+          title: "Sync Failed",
+          description: `Could not sync payroll data for ${result.data?.staffName}. ${result.note || result.externalError || 'Unknown error'}`,
+          variant: "destructive",
+        });
+        console.log('Attempted URLs:', result.attemptedUrls);
+        console.log('Payroll data ready for sync:', result.data);
       } else {
-        console.log(`Payroll sync failed for staff ${staffId}: ${result.externalError || 'Unknown error'}`);
+        toast({
+          title: "External Dashboard Unavailable",
+          description: `Payroll data prepared for ${result.data?.staffName} but external dashboard not reachable. Please check your SalonStaffDashboard is running.`,
+          variant: "destructive",
+        });
+        console.log('Sync result details:', result);
       }
     } catch (error) {
       console.error('Payroll sync failed:', error);
