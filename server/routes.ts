@@ -3560,62 +3560,164 @@ If you didn't request this password reset, please ignore this email and your pas
       };
 
       // Send data to external front-end system
-      try {
-        const externalResponse = await fetch('https://salon-staff-dashboard-candraczapansky.replit.app/api/payroll-data', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payrollData)
-        });
+      console.log('Preparing to sync payroll data for staff:', staffId);
+      console.log('Payroll data summary:', {
+        staffName: payrollData.staffName,
+        month: payrollData.month,
+        totalEarnings: payrollData.totalEarnings,
+        totalHours: payrollData.totalHours,
+        totalServices: payrollData.totalServices
+      });
 
-        if (externalResponse.ok) {
-          const result = await externalResponse.json();
-          console.log('Successfully sent payroll data to external system:', result);
+      // Try multiple potential URLs for your SalonStaffDashboard
+      const possibleUrls = [
+        'https://salonstaffdashboard.candraczapansky.repl.co/api/payroll-data',
+        'https://salon-staff-dashboard.candraczapansky.repl.co/api/payroll-data',
+        'https://salonstaffdashboard--candraczapansky.repl.co/api/payroll-data',
+        'https://salon-staff-dashboard--candraczapansky.repl.co/api/payroll-data'
+      ];
+
+      let syncSuccess = false;
+      let lastError = null;
+
+      for (const url of possibleUrls) {
+        try {
+          console.log(`Attempting to sync with: ${url}`);
           
-          res.json({
-            message: "Payroll data synchronized successfully",
-            staffId,
-            month: payrollData.month,
-            totalEarnings: payrollData.totalEarnings,
-            totalHours: payrollData.totalHours,
-            externalSyncStatus: "success",
-            data: payrollData
-          });
-        } else {
-          console.error('External API error:', externalResponse.status, externalResponse.statusText);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
           
-          // Still return the payroll data even if external sync fails
-          res.json({
-            message: "Payroll data prepared but external sync failed",
-            staffId,
-            month: payrollData.month,
-            totalEarnings: payrollData.totalEarnings,
-            totalHours: payrollData.totalHours,
-            externalSyncStatus: "failed",
-            externalError: `${externalResponse.status} ${externalResponse.statusText}`,
-            data: payrollData
+          const externalResponse = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'BeautyBook-PayrollSync/1.0'
+            },
+            body: JSON.stringify(payrollData),
+            signal: controller.signal
           });
+          
+          clearTimeout(timeoutId);
+
+          if (externalResponse.ok) {
+            const result = await externalResponse.json();
+            console.log(`Successfully sent payroll data to external system at ${url}:`, result);
+            
+            syncSuccess = true;
+            res.json({
+              message: "Payroll data synchronized successfully",
+              staffId,
+              month: payrollData.month,
+              totalEarnings: payrollData.totalEarnings,
+              totalHours: payrollData.totalHours,
+              externalSyncStatus: "success",
+              syncedToUrl: url,
+              data: payrollData
+            });
+            break;
+          } else {
+            console.log(`Failed to sync with ${url}: ${externalResponse.status} ${externalResponse.statusText}`);
+            lastError = `${externalResponse.status} ${externalResponse.statusText}`;
+          }
+        } catch (error) {
+          console.log(`Error connecting to ${url}:`, error.message);
+          lastError = error.message;
         }
-      } catch (externalError) {
-        console.error('Error sending to external system:', externalError);
+      }
+
+      if (!syncSuccess) {
+        console.error('Failed to sync with all attempted URLs. Last error:', lastError);
         
-        // Return payroll data even if external system is unavailable
+        // Still return the payroll data even if external sync fails
         res.json({
-          message: "Payroll data prepared but external system unavailable",
+          message: "Payroll data prepared but could not reach external dashboard",
           staffId,
           month: payrollData.month,
           totalEarnings: payrollData.totalEarnings,
           totalHours: payrollData.totalHours,
-          externalSyncStatus: "unavailable",
-          externalError: externalError.message,
-          data: payrollData
+          externalSyncStatus: "failed",
+          externalError: lastError,
+          attemptedUrls: possibleUrls,
+          data: payrollData,
+          note: "Please verify your SalonStaffDashboard is running and accessible"
         });
       }
 
     } catch (error) {
       console.error("Error processing payroll sync:", error);
       res.status(500).json({ error: "Failed to process payroll sync" });
+    }
+  });
+
+  // Test endpoint to check payroll data preparation (without external sync)
+  app.get("/api/payroll-test/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const month = req.query.month ? new Date(req.query.month as string) : new Date();
+      
+      if (!staffId) {
+        return res.status(400).json({ error: "Valid staff ID is required" });
+      }
+
+      // Get staff member details
+      const staff = await storage.getStaff(staffId);
+      if (!staff) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Get user details
+      const user = await storage.getUser(staff.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User details not found" });
+      }
+
+      const targetMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
+      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
+
+      // Get staff earnings for the month
+      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
+      
+      // Get time clock entries
+      const staffTimeEntries = await storage.getTimeClockEntriesByStaffId(staffId, monthStart, monthEnd);
+
+      // Calculate totals
+      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
+      const totalServices = staffEarnings.length;
+      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
+      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
+        if (entry.clockInTime && entry.clockOutTime) {
+          const clockIn = new Date(entry.clockInTime);
+          const clockOut = new Date(entry.clockOutTime);
+          return sum + (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
+        }
+        return sum;
+      }, 0);
+
+      const testData = {
+        staffId: staff.id,
+        userId: user.id,
+        staffName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        title: staff.title,
+        commissionType: staff.commissionType,
+        month: targetMonth.toISOString().substring(0, 7),
+        totalHours: Math.round(totalHours * 100) / 100,
+        totalServices,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+        earningsCount: staffEarnings.length,
+        timeEntriesCount: staffTimeEntries.length
+      };
+
+      res.json({
+        message: "Payroll data test - ready for sync",
+        data: testData
+      });
+
+    } catch (error) {
+      console.error("Error testing payroll data:", error);
+      res.status(500).json({ error: "Failed to test payroll data" });
     }
   });
 
