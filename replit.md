@@ -52,6 +52,21 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
+### June 28, 2025 - Collapsed Sidebar Implementation and Hamburger Menu Color Theming
+
+- **Implemented proper collapsed sidebar functionality:**
+  - Fixed sidebar to show collapsed state with icons-only instead of completely disappearing
+  - Added width transition between expanded (64 units) and collapsed (16 units) states
+  - Updated SidebarItem component to handle collapsed state with centered icons and tooltips
+  - Added proper CSS styling for collapsed navigation items with appropriate padding and alignment
+  - Implemented responsive content area adjustment to account for collapsed sidebar width
+  - Sign Out button now shows icon-only in collapsed state with tooltip functionality
+  - Header hamburger menu and branding title adapt properly to collapsed/expanded states
+- **Enhanced hamburger menu color theming:**
+  - Updated hamburger menu icon to use custom primary color from user settings instead of hardcoded gray
+  - Menu icon now dynamically reflects user's chosen color theme for consistent branding
+  - Hamburger menu maintains proper color coordination across expanded and collapsed states
+
 ### June 27, 2025 - Icon Background Removal, Button Icons Toggle Cleanup, Real-Time Notification System Implementation, Time Clock Reports Feature, Reports Navigation Enhancement, Payroll Data Synchronization, and Payroll History Database Implementation
 - **Removed all icon background styling throughout the application:**
   - Eliminated background colors from dashboard stats cards (removed iconBgColor prop from StatsCard component)
