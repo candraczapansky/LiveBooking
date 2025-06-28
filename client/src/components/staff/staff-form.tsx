@@ -251,6 +251,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId] });
       toast({
         title: "Success",
         description: "Staff member updated successfully!",
