@@ -95,8 +95,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   // Update form when staff data changes
   useEffect(() => {
     if (staffQueryData && open) {
+      console.log("Setting form data from staffQueryData:", staffQueryData);
       setStaffData(staffQueryData);
-      form.reset({
+      const formData = {
         title: (staffQueryData as any).title || "",
         bio: (staffQueryData as any).bio || "",
         commissionRate: (staffQueryData as any).commissionRate || 0,
@@ -105,7 +106,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         lastName: (staffQueryData as any).user?.lastName || "",
         email: (staffQueryData as any).user?.email || "",
         phone: (staffQueryData as any).user?.phone || "",
-      });
+        photo: (staffQueryData as any).photoUrl || "",
+      };
+      console.log("Form data being set:", formData);
+      form.reset(formData);
     } else if (open && !staffId) {
       // Reset form for new staff member
       form.reset({
@@ -117,6 +121,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         firstName: "",
         lastName: "",
         phone: "",
+        photo: "",
       });
     }
   }, [staffQueryData, open, staffId, form]);
