@@ -143,7 +143,9 @@ export default function SettingsMobile() {
 
   // Handle profile picture change
   const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('=== PROFILE PICTURE CHANGE HANDLER CALLED ===');
     const file = event.target.files?.[0];
+    console.log('File selected:', file);
     if (file) {
       // Check if file is an image
       if (!file.type.startsWith('image/')) {

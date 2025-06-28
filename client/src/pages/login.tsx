@@ -82,8 +82,12 @@ const Login = () => {
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // Store user data directly in localStorage and redirect
+      // Clear any stale localStorage data first
+      localStorage.removeItem('user');
+      
+      // Store fresh user data from database in localStorage
       localStorage.setItem('user', JSON.stringify(userData));
+      console.log("Fresh user data stored in localStorage:", JSON.stringify(userData, null, 2));
       
       // Show success toast
       toast({
@@ -91,7 +95,7 @@ const Login = () => {
         description: "Welcome back to BeautyBook!",
       });
       
-      // Force page reload to reinitialize auth context
+      // Force page reload to reinitialize auth context with fresh data
       window.location.href = "/dashboard";
       
     } catch (error: any) {
