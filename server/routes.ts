@@ -290,6 +290,31 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // Individual user route
+  app.get("/api/users/:id", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    try {
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      
+      return res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      return res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
   // User Color Preferences routes
   app.get("/api/users/:id/color-preferences", async (req, res) => {
     const userId = parseInt(req.params.id);
