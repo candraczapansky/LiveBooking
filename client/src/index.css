@@ -986,42 +986,7 @@ body {
   height: 100% !important;
 }
 
-/* Enhanced component theming utilities */
-.btn-primary {
-  background-color: hsl(var(--button-primary));
-  color: hsl(var(--primary-foreground));
-  border: 1px solid hsl(var(--button-primary));
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-primary:hover {
-  background-color: hsla(var(--button-primary-hover), var(--button-primary-hover-opacity, 0.1));
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px hsla(var(--button-primary), 0.3);
-}
-
-.btn-secondary {
-  background-color: hsl(var(--button-secondary));
-  color: hsl(var(--secondary-foreground));
-  border: 1px solid hsl(var(--button-secondary));
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-secondary:hover {
-  background-color: hsl(var(--button-secondary-hover));
-}
-
-.btn-outline {
-  background-color: hsl(var(--button-outline));
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--button-outline-border));
-  transition: all 0.2s ease-in-out;
-}
-
-.btn-outline:hover {
-  background-color: hsla(var(--button-outline-hover), var(--button-outline-hover-opacity, 0.1));
-  color: hsl(var(--accent-foreground));
-}
+/* Custom button hover effects now handled in button.tsx component */
 
 /* Form styling enhancements */
 .form-input {
