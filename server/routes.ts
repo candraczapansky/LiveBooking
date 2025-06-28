@@ -582,6 +582,19 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  app.patch("/api/staff/:id", validateBody(insertStaffSchema.partial()), async (req, res) => {
+    const id = parseInt(req.params.id);
+    console.log(`PATCH /api/staff/${id} received data:`, req.body);
+    try {
+      const updatedStaff = await storage.updateStaff(id, req.body);
+      console.log(`PATCH /api/staff/${id} updated successfully:`, updatedStaff);
+      return res.status(200).json(updatedStaff);
+    } catch (error) {
+      console.error(`PATCH /api/staff/${id} error:`, error);
+      return res.status(404).json({ error: "Staff member not found" });
+    }
+  });
+
   app.delete("/api/staff/:id", async (req, res) => {
     const id = parseInt(req.params.id);
     console.log(`Attempting to delete staff member with ID: ${id}`);
