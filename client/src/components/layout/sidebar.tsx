@@ -21,7 +21,8 @@ import {
   DollarSign,
   Zap,
   CalendarDays,
-  Gift
+  Gift,
+  Phone
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,7 @@ const Sidebar = () => {
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
     { icon: <Zap />, label: "Automations", href: "/automations" },
+    { icon: <Phone />, label: "Phone", href: "/phone" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
