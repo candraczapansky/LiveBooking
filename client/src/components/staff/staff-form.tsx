@@ -399,6 +399,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
                       <Input 
+                        key={`firstName-${staffId}-${field.value}`}
                         placeholder="John" 
                         autoComplete="nope"
                         autoCorrect="off"
@@ -406,8 +407,15 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
-                        name="field_xyz_123"
-                        {...field} 
+                        name={`field_xyz_${Date.now()}`}
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        readOnly={true}
+                        onFocus={(e) => {
+                          e.target.removeAttribute('readonly');
+                          e.target.readOnly = false;
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -423,6 +431,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
                       <Input 
+                        key={`lastName-${staffId}-${field.value}`}
                         placeholder="Doe" 
                         autoComplete="nope"
                         autoCorrect="off"
@@ -430,8 +439,15 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
-                        name="field_abc_456"
-                        {...field} 
+                        name={`field_abc_${Date.now()}`}
+                        value={field.value || ''}
+                        onChange={field.onChange}
+                        onBlur={field.onBlur}
+                        readOnly={true}
+                        onFocus={(e) => {
+                          e.target.removeAttribute('readonly');
+                          e.target.readOnly = false;
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
