@@ -189,11 +189,18 @@ export default function SettingsMobile() {
             if (response.ok) {
               console.log('Profile picture saved to database successfully');
               
+              console.log('updateUser function available:', !!updateUser);
+              console.log('Profile picture to save:', base64String.substring(0, 100) + '...');
+              
               // Update auth context with new profile picture
               if (updateUser) {
                 updateUser({ profilePicture: base64String });
                 console.log('Updated auth context with new profile picture');
+                
+                // Verify the update worked by checking user context
+                console.log('User context after updateUser call:', user);
               } else {
+                console.log('updateUser function not available, using fallback');
                 // Fallback: Update localStorage directly if context is not available
                 const currentUser = localStorage.getItem('user');
                 if (currentUser) {
