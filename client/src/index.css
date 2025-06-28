@@ -1359,6 +1359,18 @@ button svg:not(.bg-secondary svg) {
   @apply text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800;
 }
 
+/* Collapsed sidebar styles */
+.sidebar-item.collapsed {
+  @apply px-2 py-3 justify-center;
+  width: 100%;
+  min-height: 44px;
+}
+
+.sidebar-item.collapsed.active {
+  @apply border-l-0 border-b-4 border-primary;
+  background-color: hsl(var(--primary) / 0.1) !important;
+}
+
 /* Mobile sidebar toggle */
 @media (max-width: 768px) {
   .sidebar {

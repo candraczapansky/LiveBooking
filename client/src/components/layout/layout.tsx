@@ -40,9 +40,9 @@ const Layout = ({ children }: LayoutProps) => {
       <SidebarController />
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        !sidebarOpen && !isMobile ? 'ml-0' : ''
+        !isMobile ? (sidebarOpen ? 'ml-64' : 'ml-16') : 'ml-0'
       }`}>
-        <Header showMenuButton={!sidebarOpen} />
+        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
