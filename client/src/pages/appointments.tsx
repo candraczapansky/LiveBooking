@@ -1032,7 +1032,7 @@ const AppointmentsPage = () => {
       <div className="lg:ml-64 min-h-screen flex flex-col">
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-1 md:p-6 pb-safe-area-inset-bottom"
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 pb-safe-area-inset-bottom"
               style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
@@ -1044,9 +1044,10 @@ const AppointmentsPage = () => {
                   <div className="flex items-center space-x-2">
                     <Button
                       onClick={handleAddAppointment}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground min-h-[48px]"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground relative z-10 min-h-[44px] justify-center"
                       size="default"
                     >
+                      <PlusCircle className="mr-2 h-4 w-4" />
                       <span className="hidden sm:inline">New Appointment</span>
                       <span className="sm:hidden">New</span>
                     </Button>

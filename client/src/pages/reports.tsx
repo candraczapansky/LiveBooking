@@ -119,29 +119,29 @@ const getReportDescription = (reportId: string) => {
 // Landing Page Component
 const ReportsLandingPage = ({ onSelectReport }: { onSelectReport: (reportId: string) => void }) => {
   return (
-    <div className="space-y-0 md:space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Report Categories Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-1 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {reportCategories.map((category) => (
           <Card 
             key={category.id}
-            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group min-h-[100px] md:min-h-[160px]"
+            className="hover:shadow-lg transition-shadow duration-200 cursor-pointer group min-h-[120px] md:min-h-[160px]"
             onClick={() => onSelectReport(category.id)}
           >
-            <CardContent className="p-2 md:p-6">
+            <CardContent className="p-4 md:p-6">
               <div className="flex items-start justify-between h-full">
                 <div className="flex-1">
-                  <div className={`inline-flex p-1.5 md:p-3 rounded-lg ${category.bgColor} mb-2 md:mb-4`}>
-                    <category.icon className={`h-4 w-4 md:h-6 md:w-6 ${category.color}`} />
+                  <div className={`inline-flex p-2 md:p-3 rounded-lg ${category.bgColor} mb-3 md:mb-4`}>
+                    <category.icon className={`h-5 w-5 md:h-6 md:w-6 ${category.color}`} />
                   </div>
-                  <h3 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 md:mb-2 leading-tight">
+                  <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1 md:mb-2 leading-tight">
                     {category.title}
                   </h3>
-                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-2 md:mb-4 line-clamp-2">
+                  <p className="text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-3 md:mb-4 line-clamp-2">
                     {category.description}
                   </p>
                 </div>
-                <ChevronRight className="h-3 w-3 md:h-5 md:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 ml-2" />
+                <ChevronRight className="h-4 w-4 md:h-5 md:w-5 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors flex-shrink-0 ml-2" />
               </div>
               <div className="flex items-center text-xs md:text-sm text-primary group-hover:text-primary/80 transition-colors mt-auto">
                 View Report
@@ -240,67 +240,61 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const totalTransactions = filteredSales.length;
 
   return (
-    <div className="space-y-4 md:space-y-8">
-      {/* Enhanced Stats Cards with Better Visual Hierarchy */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mt-0">
-        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20">
+    <div className="space-y-4 md:space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <Card>
           <CardContent className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600 dark:text-green-400 mb-1">
-                  Total Revenue
-                </p>
-                <p className="text-2xl md:text-3xl font-bold text-green-700 dark:text-green-300">
-                  {formatPrice(totalRevenue)}
-                </p>
-                <p className="text-xs text-green-600/70 dark:text-green-400/70 mt-1">
-                  +12% from last period
-                </p>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="flex-shrink-0 bg-green-100 dark:bg-green-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
-                <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Revenue
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue)}
+                  </dd>
+                </dl>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+        <Card>
           <CardContent className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600 dark:text-blue-400 mb-1">
-                  Transactions
-                </p>
-                <p className="text-2xl md:text-3xl font-bold text-blue-700 dark:text-blue-300">
-                  {totalTransactions}
-                </p>
-                <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">
-                  {totalTransactions > 10 ? 'High volume' : 'Growing'}
-                </p>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="flex-shrink-0 bg-blue-100 dark:bg-blue-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
-                <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Transactions
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {totalTransactions}
+                  </dd>
+                </dl>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        <Card className="group hover:shadow-lg transition-all duration-300 border-0 bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/20 dark:to-violet-900/20">
+        <Card>
           <CardContent className="p-4 md:p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600 dark:text-purple-400 mb-1">
-                  Avg Transaction
-                </p>
-                <p className="text-2xl md:text-3xl font-bold text-purple-700 dark:text-purple-300">
-                  {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
-                </p>
-                <p className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
-                  Per transaction
-                </p>
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
-              <div className="flex-shrink-0 bg-purple-100 dark:bg-purple-800/50 rounded-xl p-3 group-hover:scale-110 transition-transform duration-300">
-                <BarChart2 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Avg Transaction
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
+                  </dd>
+                </dl>
               </div>
             </div>
           </CardContent>
@@ -319,7 +313,7 @@ const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: {
   const clients = (users as any[]).filter((user: any) => user.role === "client");
 
   return (
-    <div className="space-y-0 md:space-y-6">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Client Overview</CardTitle>
@@ -481,7 +475,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   console.log('Conversion Chart Data:', conversionData);
 
   return (
-    <div className="space-y-0 md:space-y-6">
+    <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -866,7 +860,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   }));
 
   return (
-    <div className="space-y-0 md:space-y-6">
+    <div className="space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -1160,7 +1154,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
   const stats = calculateStats();
 
   return (
-    <div className="space-y-0 md:space-y-6">
+    <div className="space-y-6">
       <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
         <Card className="md:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1327,18 +1321,20 @@ const ReportsPage = () => {
       }`}>
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-2 md:px-6 py-0 md:py-8">
+          <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
             {/* Header Section */}
-            <div className="mb-0 md:mb-8">
-              <div className="space-y-0 md:space-y-0">
+            <div className="mb-6 md:mb-8">
+              <div className="space-y-4 md:space-y-0">
                 <div className="flex items-start">
                   {selectedReport && (
                     <Button 
+                      variant="ghost" 
+                      size="sm" 
                       onClick={() => setSelectedReport(null)}
-                      className="mr-3 min-h-[44px] flex-shrink-0 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-2 shadow-md transition-all duration-300 hover:shadow-lg"
+                      className="mr-3 min-h-[44px] flex-shrink-0 hover:bg-primary/10"
                       style={{ 
-                        borderColor: 'hsl(var(--primary))',
-                        color: 'hsl(var(--primary))'
+                        backgroundColor: 'hsl(var(--primary))',
+                        color: 'hsl(var(--primary-foreground))'
                       }}
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1346,18 +1342,11 @@ const ReportsPage = () => {
                     </Button>
                   )}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      {selectedReport && (
-                        <div className="flex-shrink-0 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl p-2">
-                          <BarChart2 className="h-5 w-5 text-primary" />
-                        </div>
-                      )}
-                      <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent leading-tight">
-                        {selectedReport ? getReportTitle(selectedReport) : "Reports Dashboard"}
-                      </h1>
-                    </div>
-                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 leading-relaxed">
-                      {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business performance"}
+                    <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                      {selectedReport ? getReportTitle(selectedReport) : "Reports Dashboard"}
+                    </h1>
+                    <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                      {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business"}
                     </p>
                   </div>
                 </div>
@@ -1458,18 +1447,16 @@ const ReportsPage = () => {
             </div>
 
             {/* Content */}
-            <div className="mt-0 md:mt-8 -mb-0 md:mb-0 reports-content">
-              {selectedReport ? (
-                <SpecificReportView 
-                  reportType={selectedReport} 
-                  timePeriod={timePeriod}
-                  customStartDate={customStartDate}
-                  customEndDate={customEndDate}
-                />
-              ) : (
-                <ReportsLandingPage onSelectReport={setSelectedReport} />
-              )}
-            </div>
+            {selectedReport ? (
+              <SpecificReportView 
+                reportType={selectedReport} 
+                timePeriod={timePeriod}
+                customStartDate={customStartDate}
+                customEndDate={customEndDate}
+              />
+            ) : (
+              <ReportsLandingPage onSelectReport={setSelectedReport} />
+            )}
           </div>
         </main>
       </div>

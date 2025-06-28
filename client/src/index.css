@@ -716,183 +716,13 @@ body {
     padding: 0.75rem !important;
   }
   
-  /* Force all button text to center on mobile */
-  button {
-    text-align: center !important;
+  /* Exception for buttons that already have adequate padding */
+  button[class*="px-"], button[class*="py-"] {
+    padding: revert !important;
   }
   
-  button span {
-    text-align: center !important;
-    display: block !important;
-    width: 100% !important;
-  }
-
-  /* Optimize mobile layout spacing */
-  .container {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-  }
-  
-  /* Reduce card padding on mobile */
-  .card .card-content {
-    padding: 0.75rem !important;
-  }
-  
-  /* Optimize mobile margins and spacing */
-  .space-y-6 > * + * {
-    margin-top: 0.75rem !important;
-  }
-  
-  .space-y-4 > * + * {
-    margin-top: 0.5rem !important;
-  }
-  
-  /* Reduce grid gaps on mobile */
-  .grid {
-    gap: 0.75rem !important;
-  }
-  
-  /* Aggressively reduce main page padding on mobile */
-  main {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-  }
-  
-}
-
-/* Target specific mobile spacing issues */
-@media (max-width: 768px) {
-    .mb-3, .mb-1, .mb-0 {
-      margin-bottom: 0 !important;
-    }
-    
-    .space-y-4 > * + *, .space-y-3 > * + *, .space-y-2 > * + *, .space-y-1 > * + * {
-      margin-top: 0.125rem !important;
-    }
-    
-    .py-3, .py-1 {
-      padding-top: 0.25rem !important;
-      padding-bottom: 0.25rem !important;
-    }
-    
-    .px-3, .px-2 {
-      padding-left: 0.5rem !important;
-      padding-right: 0.5rem !important;
-    }
-    
-    /* Remove all gap spacing on mobile */
-    .gap-3, .gap-2, .gap-1 {
-      gap: 0.25rem !important;
-    }
-    
-    /* Compress main container */
-    main > div {
-      padding-top: 0.25rem !important;
-      padding-bottom: 0.25rem !important;
-    }
-    
-    /* Eliminate all card padding on mobile */
-    .card {
-      margin-bottom: 0.25rem !important;
-    }
-    
-    /* Remove header margins */
-    h1, h2, h3 {
-      margin-top: 0 !important;
-      margin-bottom: 0.25rem !important;
-    }
-    
-    /* Ultra-aggressive reports page spacing reduction */
-    .container.mx-auto {
-      padding-top: 0 !important;
-      padding-bottom: 0 !important;
-    }
-    
-    /* Eliminate main content padding */
-    main.flex-1 {
-      padding: 0 !important;
-    }
-    
-    /* Remove all space-y margins */
-    .space-y-1 > * + * {
-      margin-top: 0 !important;
-    }
-    
-    /* Compress report cards */
-    .space-y-1 {
-      gap: 0 !important;
-    }
-    
-    /* Aggressive Reports page content targeting */
-    .mt-0 {
-      margin-top: 0 !important;
-    }
-    
-    /* Remove any remaining spacing from Reports page elements */
-    [class*="container"] > div {
-      margin-top: 0 !important;
-      margin-bottom: 0 !important;
-    }
-    
-    /* Target specific Reports page spacing */
-    main > div > div {
-      padding-top: 0 !important;
-      margin-top: 0 !important;
-    }
-    
-    /* Target only the specific Reports page content spacing */
-    .reports-content {
-      margin-top: -3rem !important;
-      padding-top: 0 !important;
-    }
-    
-    /* Force all report components to have zero top spacing */
-    .reports-content > div {
-      margin-top: 0 !important;
-      padding-top: 0 !important;
-    }
-    
-    /* Target report cards and grids specifically */
-    .reports-content .grid {
-      margin-top: 0 !important;
-      padding-top: 0 !important;
-    }
-    
-    /* Ultra-aggressive mobile layout fix for reports */
-    .reports-content > div:first-child {
-      position: relative !important;
-      top: -2rem !important;
-    }
-    
-    /* Compress button spacing */
-    .min-h-\[44px\] {
-      min-height: 2.5rem !important;
-    }
-    
-    /* Ultra-compact mobile layout */
-    .container {
-      max-width: 100% !important;
-      padding-left: 0.25rem !important;
-      padding-right: 0.25rem !important;
-    }
-    
-    /* Force zero margins everywhere */
-    * {
-      margin-top: 0 !important;
-    }
-    
-    *:not(:first-child) {
-      margin-top: 0.125rem !important;
-    }
-}
-
-/* Exception for buttons that already have adequate padding */
-button[class*="px-"], button[class*="py-"] {
-  padding: revert !important;
-}
-
-/* Tables responsive handling */
-table {
+  /* Tables responsive handling */
+  table {
     display: block !important;
     overflow-x: auto !important;
     white-space: nowrap !important;
@@ -923,21 +753,22 @@ table {
     width: 100% !important;
   }
 
-/* Point of Sale specific mobile fixes */
-.flex[class*="h-screen"] {
-  min-height: 100vh !important;
-  height: auto !important;
-}
+  /* Point of Sale specific mobile fixes */
+  .flex[class*="h-screen"] {
+    min-height: 100vh !important;
+    height: auto !important;
+  }
 
-.flex[class*="h-full"] {
-  min-height: 0 !important;
-  height: auto !important;
-}
+  .flex[class*="h-full"] {
+    min-height: 0 !important;
+    height: auto !important;
+  }
 
-/* Ensure all pages can scroll properly */
-main {
-  min-height: calc(100vh - 4rem) !important;
-  overflow-y: auto !important;
+  /* Ensure all pages can scroll properly */
+  main {
+    min-height: calc(100vh - 4rem) !important;
+    overflow-y: auto !important;
+  }
 }
 
 :root {

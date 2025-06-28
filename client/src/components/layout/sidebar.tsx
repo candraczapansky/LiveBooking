@@ -32,13 +32,21 @@ type SidebarItemProps = {
   label: string;
   href: string;
   isActive: boolean;
+  isCollapsed: boolean;
 };
 
-const SidebarItem = ({ icon, label, href, isActive }: SidebarItemProps) => {
+const SidebarItem = ({ icon, label, href, isActive, isCollapsed }: SidebarItemProps) => {
   return (
-    <Link href={href} className={`sidebar-item ${isActive ? 'active' : ''}`} style={{ color: 'hsl(0 0% 0%)' }}>
-      <span className="w-5 h-5 mr-3 text-primary" style={{ color: 'hsl(330 81% 60%)' }}>{icon}</span>
-      <span style={{ color: 'hsl(0 0% 0%)' }}>{label}</span>
+    <Link 
+      href={href} 
+      className={`sidebar-item ${isActive ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`} 
+      style={{ color: 'hsl(0 0% 0%)' }}
+      title={isCollapsed ? label : undefined}
+    >
+      <span className={`w-5 h-5 text-primary ${isCollapsed ? 'mx-auto' : 'mr-3'}`} style={{ color: 'hsl(330 81% 60%)' }}>
+        {icon}
+      </span>
+      {!isCollapsed && <span style={{ color: 'hsl(0 0% 0%)' }}>{label}</span>}
     </Link>
   );
 };
@@ -57,9 +65,9 @@ const Sidebar = () => {
     return null;
   }
 
-  // For both mobile and desktop, show/hide based on isOpen state
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
-    isOpen ? "translate-x-0" : "-translate-x-full"
+  // For both mobile and desktop, show collapsed or expanded based on isOpen state
+  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
+    isOpen ? "w-64" : "w-16"
   }`;
 
   const navigationItems = [
@@ -95,12 +103,12 @@ const Sidebar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="mr-3 h-8 w-8"
+                className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
               >
                 <Menu className="h-5 w-5 text-gray-600 dark:text-gray-300" />
               </Button>
-              <h1 className="text-xl font-bold text-primary">BeautyBook</h1>
+              {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
             </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">
@@ -119,6 +127,7 @@ const Sidebar = () => {
                 label={item.label}
                 href={item.href}
                 isActive={location === item.href || (item.href === "/dashboard" && location === "/")}
+                isCollapsed={!isOpen}
               />
             ))}
           </div>
@@ -127,7 +136,7 @@ const Sidebar = () => {
         <div className="p-4 border-t border-sidebar-border">
           <Button 
             variant="ghost" 
-            className="text-sm font-medium text-destructive w-full min-h-[48px]"
+            className="flex items-center text-sm font-medium text-destructive w-full justify-center"
             onClick={() => {
               console.log("Sign out button clicked");
               console.log("Logout function:", logout);
@@ -138,8 +147,10 @@ const Sidebar = () => {
                 console.error("Logout function is not available");
               }
             }}
+            title={!isOpen ? "Sign Out" : undefined}
           >
-            Sign Out
+            <LogOut className={`w-5 h-5 ${isOpen ? 'mr-3' : ''}`} />
+            {isOpen && "Sign Out"}
           </Button>
         </div>
       </div>
