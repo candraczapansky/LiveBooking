@@ -360,7 +360,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate autoComplete="off">
+            {/* Anti-autofill hidden fields */}
+            <input type="text" style={{ display: 'none' }} tabIndex={-1} />
+            <input type="password" style={{ display: 'none' }} tabIndex={-1} />
             {/* Staff Profile Header */}
             {!staffId && (
               <div className="flex items-center space-x-2">
@@ -397,12 +400,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <FormControl>
                       <Input 
                         placeholder="John" 
-                        autoComplete="new-password"
+                        autoComplete="nope"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
+                        name="field_xyz_123"
                         {...field} 
                       />
                     </FormControl>
@@ -420,12 +424,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <FormControl>
                       <Input 
                         placeholder="Doe" 
-                        autoComplete="new-password"
+                        autoComplete="nope"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
+                        name="field_abc_456"
                         {...field} 
                       />
                     </FormControl>
@@ -448,12 +453,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                       <Input 
                         type="text" 
                         placeholder="Enter email address" 
-                        autoComplete="off"
+                        autoComplete="nope"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
+                        name="field_def_789"
                         {...field} 
                       />
                     </FormControl>
@@ -471,12 +477,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <FormControl>
                       <Input 
                         placeholder="(555) 123-4567" 
-                        autoComplete="new-password"
+                        autoComplete="nope"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
+                        name="field_ghi_101"
                         {...field} 
                       />
                     </FormControl>
