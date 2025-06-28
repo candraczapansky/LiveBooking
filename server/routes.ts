@@ -243,54 +243,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Map camelCase fields to snake_case database column names
-      const mappedData: any = {};
-      Object.keys(req.body).forEach(key => {
-        switch (key) {
-          case 'firstName':
-            mappedData.first_name = req.body[key];
-            break;
-          case 'lastName':
-            mappedData.last_name = req.body[key];
-            break;
-          case 'zipCode':
-            mappedData.zip_code = req.body[key];
-            break;
-          case 'profilePicture':
-            mappedData.profile_picture = req.body[key];
-            break;
-          case 'squareCustomerId':
-            mappedData.stripe_customer_id = req.body[key];
-            break;
-          case 'emailAccountManagement':
-            mappedData.email_account_management = req.body[key];
-            break;
-          case 'emailAppointmentReminders':
-            mappedData.email_appointment_reminders = req.body[key];
-            break;
-          case 'emailPromotions':
-            mappedData.email_promotions = req.body[key];
-            break;
-          case 'smsAccountManagement':
-            mappedData.sms_account_management = req.body[key];
-            break;
-          case 'smsAppointmentReminders':
-            mappedData.sms_appointment_reminders = req.body[key];
-            break;
-          case 'smsPromotions':
-            mappedData.sms_promotions = req.body[key];
-            break;
-          default:
-            // Fields that don't need mapping (email, phone, username, password, etc.)
-            mappedData[key] = req.body[key];
-            break;
-        }
-      });
-      
-      console.log("Mapped data for database:", JSON.stringify(mappedData, null, 2));
-      
       // Update user profile with all provided fields including communication preferences
-      const updatedUser = await storage.updateUser(userId, mappedData);
+      const updatedUser = await storage.updateUser(userId, req.body);
       
       console.log("User updated successfully:", JSON.stringify(updatedUser, null, 2));
       
@@ -321,54 +275,8 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Map camelCase fields to snake_case database column names
-      const mappedData: any = {};
-      Object.keys(req.body).forEach(key => {
-        switch (key) {
-          case 'firstName':
-            mappedData.first_name = req.body[key];
-            break;
-          case 'lastName':
-            mappedData.last_name = req.body[key];
-            break;
-          case 'zipCode':
-            mappedData.zip_code = req.body[key];
-            break;
-          case 'profilePicture':
-            mappedData.profile_picture = req.body[key];
-            break;
-          case 'squareCustomerId':
-            mappedData.stripe_customer_id = req.body[key];
-            break;
-          case 'emailAccountManagement':
-            mappedData.email_account_management = req.body[key];
-            break;
-          case 'emailAppointmentReminders':
-            mappedData.email_appointment_reminders = req.body[key];
-            break;
-          case 'emailPromotions':
-            mappedData.email_promotions = req.body[key];
-            break;
-          case 'smsAccountManagement':
-            mappedData.sms_account_management = req.body[key];
-            break;
-          case 'smsAppointmentReminders':
-            mappedData.sms_appointment_reminders = req.body[key];
-            break;
-          case 'smsPromotions':
-            mappedData.sms_promotions = req.body[key];
-            break;
-          default:
-            // Fields that don't need mapping (email, phone, username, password, etc.)
-            mappedData[key] = req.body[key];
-            break;
-        }
-      });
-      
-      console.log("PATCH - Mapped data for database:", JSON.stringify(mappedData, null, 2));
-      
       // Update user profile with all provided fields
-      const updatedUser = await storage.updateUser(userId, mappedData);
+      const updatedUser = await storage.updateUser(userId, req.body);
       
       console.log("PATCH - User updated successfully:", JSON.stringify(updatedUser, null, 2));
       

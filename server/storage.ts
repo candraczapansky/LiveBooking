@@ -580,11 +580,101 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
-    const [updatedUser] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
-    if (!updatedUser) {
+    // Build dynamic update query to handle field name mapping issues with Drizzle
+    const updateFields: string[] = [];
+    const values: any[] = [];
+    let paramIndex = 1;
+
+    // Map frontend field names to database column names
+    Object.keys(userData).forEach(key => {
+      const value = (userData as any)[key];
+      if (value !== undefined) {
+        switch (key) {
+          case 'firstName':
+            updateFields.push(`first_name = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'lastName':
+            updateFields.push(`last_name = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'zipCode':
+            updateFields.push(`zip_code = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'profilePicture':
+            updateFields.push(`profile_picture = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'squareCustomerId':
+            updateFields.push(`stripe_customer_id = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'emailAccountManagement':
+            updateFields.push(`email_account_management = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'emailAppointmentReminders':
+            updateFields.push(`email_appointment_reminders = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'emailPromotions':
+            updateFields.push(`email_promotions = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'smsAccountManagement':
+            updateFields.push(`sms_account_management = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'smsAppointmentReminders':
+            updateFields.push(`sms_appointment_reminders = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          case 'smsPromotions':
+            updateFields.push(`sms_promotions = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+          default:
+            // Fields that don't need mapping (email, phone, username, password, etc.)
+            updateFields.push(`${key} = $${paramIndex}`);
+            values.push(value);
+            paramIndex++;
+            break;
+        }
+      }
+    });
+
+    if (updateFields.length === 0) {
+      throw new Error('No fields to update');
+    }
+
+    // Add the WHERE clause parameter
+    values.push(id);
+    const whereClause = `$${paramIndex}`;
+
+    const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ${whereClause} RETURNING *`;
+    
+    console.log('Executing SQL:', updateQuery);
+    console.log('With values:', values);
+    
+    const result = await db.execute(sql.raw(updateQuery, values));
+    
+    if (!result.rows || result.rows.length === 0) {
       throw new Error('User not found');
     }
-    return updatedUser;
+    
+    return result.rows[0] as User;
   }
 
   // Service Category operations
