@@ -134,7 +134,7 @@ const StaffPageSimple = () => {
               <Input
                 type="search"
                 placeholder="Search staff by name, title, or email..."
-                className="pl-10 h-12 text-base w-full border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="pl-10 h-12 text-base w-full border-gray-300 focus:border-primary focus:ring-primary"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -168,7 +168,7 @@ const StaffPageSimple = () => {
                             className="w-full h-full object-cover rounded-full"
                           />
                         ) : (
-                          <AvatarFallback className="text-xl font-semibold bg-blue-100 text-blue-700">
+                          <AvatarFallback className="text-xl font-semibold bg-[hsl(var(--primary)/0.1)] text-primary">
                             {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
                           </AvatarFallback>
                         )}
@@ -195,7 +195,7 @@ const StaffPageSimple = () => {
                       <Button
                         variant="outline"
                         onClick={() => handleEditStaff(staffMember.id)}
-                        className="h-14 px-4 text-base font-medium border-2 border-blue-300 text-blue-700 hover:bg-blue-50 active:bg-blue-100 transition-colors"
+                        className="h-14 px-4 text-base font-medium border-2 border-primary text-primary hover:bg-[hsl(var(--primary)/0.1)] active:bg-[hsl(var(--primary)/0.2)] transition-colors"
                       >
                         <Edit className="w-5 h-5 mr-2" />
                         Edit
