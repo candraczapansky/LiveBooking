@@ -103,7 +103,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const formData = {
         title: staffData?.title || "",
         bio: staffData?.bio || "",
-        commissionRate: staffData?.commissionRate || 0,
+        commissionRate: staffData?.commissionType === 'commission' 
+          ? (staffData?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
+          : staffData?.commissionType === 'hourly' 
+            ? staffData?.hourlyRate || 0
+            : staffData?.commissionType === 'fixed' 
+              ? staffData?.fixedRate || 0
+              : 0,
         commissionType: staffData?.commissionType || "commission",
         firstName: staffData?.user?.firstName || "",
         lastName: staffData?.user?.lastName || "",
@@ -237,7 +243,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const staffUpdateData = {
         title: data.title,
         bio: data.bio,
-        commissionRate: data.commissionRate,
+        commissionType: data.commissionType,
+        commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
+        hourlyRate: data.commissionType === 'hourly' ? data.commissionRate : null,
+        fixedRate: data.commissionType === 'fixed' ? data.commissionRate : null,
         photoUrl: data.photo || null,
       };
 
