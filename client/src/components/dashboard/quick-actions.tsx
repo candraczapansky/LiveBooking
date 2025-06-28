@@ -11,13 +11,29 @@ const QuickActions = () => {
   const { toast } = useToast();
   const { user } = useContext(AuthContext);
 
+  // Fallback to localStorage if context user is null
+  const getCurrentUser = () => {
+    if (user) return user;
+    
+    try {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        return JSON.parse(storedUser);
+      }
+    } catch (error) {
+      console.error('Error parsing stored user:', error);
+    }
+    return null;
+  };
+
   const handleNewAppointment = () => {
-    console.log('New Appointment clicked, user:', user);
-    if (user?.role === 'admin' || user?.role === 'staff') {
+    const currentUser = getCurrentUser();
+    console.log('New Appointment clicked, user:', currentUser);
+    if (currentUser?.role === 'admin' || currentUser?.role === 'staff') {
       console.log('Navigating to appointments with new=true');
       navigate('/appointments?new=true');
     } else {
-      console.log('Permission denied for user role:', user?.role);
+      console.log('Permission denied for user role:', currentUser?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to create appointments.",
@@ -27,12 +43,13 @@ const QuickActions = () => {
   };
 
   const handleAddClient = () => {
-    console.log('Add Client clicked, user:', user);
-    if (user?.role === 'admin' || user?.role === 'staff') {
+    const currentUser = getCurrentUser();
+    console.log('Add Client clicked, user:', currentUser);
+    if (currentUser?.role === 'admin' || currentUser?.role === 'staff') {
       console.log('Navigating to clients with new=true');
       navigate('/clients?new=true');
     } else {
-      console.log('Permission denied for user role:', user?.role);
+      console.log('Permission denied for user role:', currentUser?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to add clients.",
@@ -42,12 +59,13 @@ const QuickActions = () => {
   };
 
   const handleSendPromotion = () => {
-    console.log('Send Promotion clicked, user:', user);
-    if (user?.role === 'admin') {
+    const currentUser = getCurrentUser();
+    console.log('Send Promotion clicked, user:', currentUser);
+    if (currentUser?.role === 'admin') {
       console.log('Navigating to marketing with new=true');
       navigate('/marketing?new=true');
     } else {
-      console.log('Permission denied for user role:', user?.role);
+      console.log('Permission denied for user role:', currentUser?.role);
       toast({
         title: "Permission Denied",
         description: "You don't have permission to send promotions.",
