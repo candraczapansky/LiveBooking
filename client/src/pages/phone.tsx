@@ -1,5 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { AuthContext } from "@/App";
+import { SidebarController } from "@/components/layout/sidebar";
+import { useSidebar } from "@/contexts/SidebarContext";
+import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +16,7 @@ import { Phone as PhoneIcon, PhoneCall, PhoneIncoming, PhoneOutgoing, Download, 
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface PhoneCallData {
   id: number;
@@ -53,6 +58,10 @@ interface CallAnalytics {
 }
 
 export default function PhonePage() {
+  useDocumentTitle("Phone System | BeautyBook");
+  const { user } = useContext(AuthContext);
+  const { isOpen: sidebarOpen } = useSidebar();
+  
   const [selectedCall, setSelectedCall] = useState<PhoneCallData | null>(null);
   const [outboundForm, setOutboundForm] = useState({
     toNumber: '',
@@ -178,7 +187,19 @@ export default function PhonePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
+      
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
+        <Header />
+        
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">
+          <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
+            <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -449,6 +470,10 @@ export default function PhonePage() {
           )}
         </CardContent>
       </Card>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
