@@ -1,5 +1,5 @@
 import { useContext, useState } from "react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation } from "wouter";
 import { AuthContext } from "@/App";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -231,6 +231,16 @@ const Login = () => {
                   </Button>
                 </form>
               </Form>
+              
+              <div className="mt-4 text-center">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-sm text-primary hover:text-primary/80"
+                >
+                  Forgot your password?
+                </Button>
+              </div>
             )}
             
             {activeTab === "register" && (

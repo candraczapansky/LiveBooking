@@ -10,6 +10,8 @@ import { useState, useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Services from "@/pages/services";
 import Clients from "@/pages/clients";
 import Staff from "@/pages/staff-simple";

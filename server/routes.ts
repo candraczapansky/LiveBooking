@@ -143,6 +143,156 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     return res.status(201).json(userWithoutPassword);
   });
 
+  // Password reset request
+  app.post("/api/forgot-password", async (req, res) => {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    try {
+      const user = await storage.getUserByEmail(email);
+      
+      if (!user) {
+        // Return success even if user doesn't exist to prevent email enumeration
+        return res.status(200).json({ 
+          success: true, 
+          message: "If an account with this email exists, you will receive password reset instructions." 
+        });
+      }
+
+      // Generate reset token (in production, use a proper secure token)
+      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+      await storage.setPasswordResetToken(user.id, resetToken, resetTokenExpiry);
+
+      // Create reset URL
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+
+      // Send password reset email
+      const emailParams = {
+        to: email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@beautybook.com',
+        subject: "Reset Your BeautyBook Password",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #9532b8;">BeautyBook</h1>
+              <h2 style="color: #333;">Password Reset Request</h2>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Hello ${user.firstName || 'there'},
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              You requested to reset your password for your BeautyBook account. 
+              Click the button below to create a new password:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${resetUrl}" 
+                 style="background-color: #9532b8; color: white; padding: 12px 30px; 
+                        text-decoration: none; border-radius: 5px; display: inline-block;">
+                Reset My Password
+              </a>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Or copy and paste this link into your browser:
+              <br>
+              <a href="${resetUrl}" style="color: #9532b8;">${resetUrl}</a>
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              This reset link will expire in 1 hour for security reasons.
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              If you didn't request this password reset, please ignore this email and your password will remain unchanged.
+            </p>
+            
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This email was sent from your BeautyBook salon management system.
+            </p>
+          </div>
+        `,
+        text: `
+Hello ${user.firstName || 'there'},
+
+You requested to reset your password for your BeautyBook account.
+
+Please visit the following link to reset your password:
+${resetUrl}
+
+This reset link will expire in 1 hour for security reasons.
+
+If you didn't request this password reset, please ignore this email and your password will remain unchanged.
+
+- BeautyBook Team
+        `
+      };
+
+      const emailSent = await sendEmail(emailParams);
+      
+      if (emailSent) {
+        res.status(200).json({ 
+          success: true, 
+          message: "If an account with this email exists, you will receive password reset instructions." 
+        });
+      } else {
+        res.status(500).json({ 
+          error: "Failed to send reset email. Please try again." 
+        });
+      }
+
+    } catch (error: any) {
+      console.error('Password reset request error:', error);
+      res.status(500).json({ 
+        error: "Something went wrong. Please try again." 
+      });
+    }
+  });
+
+  // Password reset confirmation
+  app.post("/api/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+    
+    if (!token || !newPassword) {
+      return res.status(400).json({ error: "Token and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters long" });
+    }
+
+    try {
+      const user = await storage.getUserByResetToken(token);
+      
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Update user's password and clear reset token
+      await storage.updateUser(user.id, { password: newPassword });
+      await storage.clearPasswordResetToken(user.id);
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Password has been reset successfully. You can now log in with your new password." 
+      });
+
+    } catch (error: any) {
+      console.error('Password reset error:', error);
+      res.status(500).json({ 
+        error: "Something went wrong. Please try again." 
+      });
+    }
+  });
+
   // Client registration route (without username/password)
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
     const { email } = req.body;
