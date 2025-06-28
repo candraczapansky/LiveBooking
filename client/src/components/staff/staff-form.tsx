@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { AntiAutofillInput } from "@/components/ui/anti-autofill-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Upload, X } from "lucide-react";
@@ -398,24 +399,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input 
-                        key={`firstName-${staffId}-${field.value}`}
+                      <AntiAutofillInput 
                         placeholder="John" 
-                        autoComplete="nope"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        name={`field_xyz_${Date.now()}`}
                         value={field.value || ''}
                         onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        readOnly={true}
-                        onFocus={(e) => {
-                          e.target.removeAttribute('readonly');
-                          e.target.readOnly = false;
-                        }}
                       />
                     </FormControl>
                     <FormMessage />
@@ -430,24 +417,10 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input 
-                        key={`lastName-${staffId}-${field.value}`}
+                      <AntiAutofillInput 
                         placeholder="Doe" 
-                        autoComplete="nope"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        name={`field_abc_${Date.now()}`}
                         value={field.value || ''}
                         onChange={field.onChange}
-                        onBlur={field.onBlur}
-                        readOnly={true}
-                        onFocus={(e) => {
-                          e.target.removeAttribute('readonly');
-                          e.target.readOnly = false;
-                        }}
                       />
                     </FormControl>
                     <FormMessage />
