@@ -207,9 +207,29 @@ function useAuth() {
 
     const hslColor = hexToHsl(primaryColor);
     
+    // Parse HSL values for hover calculation
+    const hslValues = hslColor.split(' ');
+    const h = parseInt(hslValues[0]);
+    const s = parseInt(hslValues[1]);
+    const l = parseInt(hslValues[2]);
+    
+    // Calculate hover color (slightly darker/lighter depending on lightness)
+    const hoverLightness = l > 50 ? l - 5 : l + 5;
+    const hoverColor = `${h} ${s}% ${hoverLightness}%`;
+    
     // Apply CSS custom properties
     root.style.setProperty('--primary', hslColor);
     root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%');
+    
+    // Apply button hover colors using the primary color
+    root.style.setProperty('--button-primary-hover', hoverColor);
+    root.style.setProperty('--button-outline-hover', hslColor);
+    
+    // Update other color properties to match
+    root.style.setProperty('--dropdown-selected', hslColor);
+    root.style.setProperty('--accent', hslColor);
+    root.style.setProperty('--sidebar-primary', hslColor);
+    root.style.setProperty('--sidebar-accent-foreground', hslColor);
     
     // Toggle dark mode class
     if (isDark) {

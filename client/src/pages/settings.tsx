@@ -140,7 +140,17 @@ export default function Settings() {
     
     const hsl = hexToHsl(savedPrimaryColor);
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
+    // Calculate and apply hover color on mount
+    const hoverLightness = hsl.l > 50 ? hsl.l - 5 : hsl.l + 5;
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hoverLightness}%`);
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
+    // Update other color properties
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--accent', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--sidebar-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--sidebar-accent-foreground', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
     const secondaryHsl = hexToHsl(savedSecondaryColor);
     document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
@@ -163,9 +173,23 @@ export default function Settings() {
     const hsl = hexToHsl(customColor);
     document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
+    // Calculate hover color (slightly darker/lighter depending on lightness)
+    const hoverLightness = hsl.l > 50 ? hsl.l - 5 : hsl.l + 5;
+    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hoverLightness}%`);
+    
+    // Update outline button hover color to use the primary color
+    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
     // Also update dropdown colors to match the primary color
     document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     document.documentElement.style.setProperty('--dropdown-selected-foreground', '210 40% 98%');
+    
+    // Update accent colors to match primary
+    document.documentElement.style.setProperty('--accent', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    
+    // Update sidebar colors to use primary color for active states
+    document.documentElement.style.setProperty('--sidebar-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    document.documentElement.style.setProperty('--sidebar-accent-foreground', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
     
     const secondaryHsl = hexToHsl(secondaryColor);
     document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
