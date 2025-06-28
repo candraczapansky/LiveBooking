@@ -65,6 +65,7 @@ const QuickActions = () => {
         <Button 
           onClick={handleNewAppointment}
           className="w-full flex items-center justify-center h-10 sm:h-auto"
+          variant="outline"
           size="sm"
         >
           <Plus className="h-4 w-4 mr-2" /> New Appointment
@@ -73,7 +74,7 @@ const QuickActions = () => {
         <Button 
           onClick={handleAddClient}
           className="w-full flex items-center justify-center h-10 sm:h-auto"
-          variant="secondary"
+          variant="outline"
           size="sm"
         >
           <UserPlus className="h-4 w-4 mr-2" /> Add Client
