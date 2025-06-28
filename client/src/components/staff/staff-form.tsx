@@ -269,6 +269,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const onSubmit = async (data: StaffFormValues) => {
     console.log("Form submission data:", data);
     console.log("Form errors:", form.formState.errors);
+    console.log("Current form values from watch:", form.getValues());
+    console.log("StaffData in state:", staffData);
     
     try {
       if (staffId) {
@@ -393,7 +395,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   <FormItem>
                     <FormLabel>First Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="John" {...field} />
+                      <Input 
+                        placeholder="John" 
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -407,7 +418,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   <FormItem>
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Doe" {...field} />
+                      <Input 
+                        placeholder="Doe" 
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -449,7 +469,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   <FormItem>
                     <FormLabel>Phone (Optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="(555) 123-4567" {...field} />
+                      <Input 
+                        placeholder="(555) 123-4567" 
+                        autoComplete="new-password"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
