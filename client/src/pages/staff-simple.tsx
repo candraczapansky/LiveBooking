@@ -17,7 +17,10 @@ type StaffMember = {
   userId: number;
   title: string;
   bio?: string;
-  commissionRate: number;
+  commissionType: string;
+  commissionRate?: number | null;
+  hourlyRate?: number | null;
+  fixedRate?: number | null;
   photoUrl?: string;
   user: {
     id: number;
@@ -67,6 +70,19 @@ const StaffPageSimple = () => {
     const first = firstName?.[0] || "";
     const last = lastName?.[0] || "";
     return (first + last).toUpperCase() || "?";
+  };
+
+  const formatPayRate = (staffMember: StaffMember) => {
+    switch (staffMember.commissionType) {
+      case 'commission':
+        return `${((staffMember.commissionRate || 0) * 100).toFixed(0)}% Commission`;
+      case 'hourly':
+        return `$${staffMember.hourlyRate || 0}/hour`;
+      case 'fixed':
+        return `$${staffMember.fixedRate || 0}/month`;
+      default:
+        return 'No rate set';
+    }
   };
 
   const handleAddStaff = () => {
@@ -185,7 +201,7 @@ const StaffPageSimple = () => {
                           {staffMember.user?.email}
                         </p>
                         <div className="inline-flex items-center px-2 py-1 rounded-full bg-[hsl(var(--primary)/0.1)] text-primary text-sm font-medium">
-                          Commission: {staffMember.commissionRate}%
+                          {formatPayRate(staffMember)}
                         </div>
                       </div>
                     </div>
