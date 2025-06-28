@@ -106,7 +106,9 @@ const Header = () => {
               <SimpleMobileMenu />
             </div>
             <div className="lg:hidden ml-2 sm:ml-3 truncate">
-              <h1 className="text-lg sm:text-xl font-bold text-primary truncate">BeautyBook</h1>
+              <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-primary truncate hover:opacity-80 transition-opacity cursor-pointer">
+                BeautyBook
+              </Link>
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
