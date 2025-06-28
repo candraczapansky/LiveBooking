@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
 import { AuthContext } from "@/App";
+import { apiRequest } from "@/lib/queryClient";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 
@@ -47,7 +48,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
-  const { user } = useContext(AuthContext);
+  const { user, updateUser } = useContext(AuthContext);
 
   // Theme states
   const [darkMode, setDarkMode] = useState(() => {
@@ -336,9 +337,15 @@ export default function Settings() {
   };
 
   const handleSaveProfile = () => {
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved successfully.",
+    console.log('handleSaveProfile called in main settings');
+    console.log('Current user:', user);
+    console.log('Current form values:', { firstName, lastName, email, phone });
+    
+    updateProfileMutation.mutate({
+      firstName,
+      lastName,
+      email,
+      phone
     });
   };
 
@@ -348,6 +355,73 @@ export default function Settings() {
       description: "Your appearance settings have been saved successfully.",
     });
   };
+
+  // Profile update mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profileData: { firstName: string; lastName: string; email: string; phone: string }) => {
+      const userId = user?.id;
+      
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+      
+      console.log('Settings page - Updating profile for user:', userId);
+      console.log('Profile data being sent:', profileData);
+      
+      const response = await apiRequest("PUT", `/api/users/${userId}`, profileData);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Profile update failed:', errorData);
+        throw new Error(errorData.error || 'Failed to update profile');
+      }
+      
+      const result = await response.json();
+      console.log('Profile update successful:', result);
+      return result;
+    },
+    onSuccess: (updatedUser) => {
+      console.log('Profile update success callback triggered');
+      console.log('Updated user data received:', updatedUser);
+      
+      // Update localStorage first to ensure data persistence
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('localStorage updated with new user data');
+      
+      // Update form fields to reflect the changes
+      setFirstName(updatedUser.firstName || '');
+      setLastName(updatedUser.lastName || '');
+      setEmail(updatedUser.email || '');
+      setPhone(updatedUser.phone || '');
+      
+      // Try to update context (might not work due to timing issues)
+      if (updateUser && typeof updateUser === 'function') {
+        console.log('Attempting to update user context');
+        updateUser(updatedUser);
+      } else {
+        console.log('Context updateUser not available, relying on localStorage');
+      }
+      
+      // Dispatch custom event to notify other components (like header) of user data update
+      window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+        detail: updatedUser 
+      }));
+      console.log('User data update event dispatched');
+      
+      toast({
+        title: "Profile updated",
+        description: "Your profile information has been saved successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Profile update error callback triggered:', error);
+      toast({
+        title: "Update failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Mutations
   const changePasswordMutation = useMutation({
@@ -468,13 +542,14 @@ export default function Settings() {
                   <Button 
                     onClick={handleSaveProfile} 
                     className="w-full md:w-auto"
+                    disabled={updateProfileMutation.isPending}
                     style={{ 
                       backgroundColor: customColor,
                       borderColor: customColor
                     }}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    Save Personal Information
+                    {updateProfileMutation.isPending ? "Saving..." : "Save Personal Information"}
                   </Button>
                 </CardContent>
               </Card>
