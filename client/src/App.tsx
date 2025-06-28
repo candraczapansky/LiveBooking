@@ -82,6 +82,8 @@ function Router() {
     return (
       <Switch>
         <Route path="/login" component={Login} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/booking" component={ClientBooking} />
         <Route path="/" component={Login} />
         <Route component={Login} />

@@ -187,60 +187,62 @@ const Login = () => {
             </div>
             
             {activeTab === "login" && (
-              <Form {...loginForm}>
-                <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
-                  <FormField
-                    control={loginForm.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="Enter your username" 
-                            className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={loginForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="password" 
-                            placeholder="••••••" 
-                            className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Login"}
+              <>
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
+                    <FormField
+                      control={loginForm.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter your username" 
+                              className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="password" 
+                              placeholder="••••••" 
+                              className="h-10 text-sm px-3 rounded-md border border-gray-300 focus:border-primary focus:shadow-[0_0_0_3px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
+                      {isLoading ? "Logging in..." : "Login"}
+                    </Button>
+                  </form>
+                </Form>
+                
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="ghost"
+                    onClick={() => navigate("/forgot-password")}
+                    className="text-sm text-primary hover:text-primary/80"
+                  >
+                    Forgot your password?
                   </Button>
-                </form>
-              </Form>
-              
-              <div className="mt-4 text-center">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate("/forgot-password")}
-                  className="text-sm text-primary hover:text-primary/80"
-                >
-                  Forgot your password?
-                </Button>
-              </div>
+                </div>
+              </>
             )}
             
             {activeTab === "register" && (
