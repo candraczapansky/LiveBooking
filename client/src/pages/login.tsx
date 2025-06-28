@@ -79,17 +79,29 @@ const Login = () => {
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // Use authentication context to properly set user data
-      login(userData);
-      
-      // Show success toast
-      toast({
-        title: "Login Successful",
-        description: "Welcome back to BeautyBook!",
-      });
-      
-      // Navigate to dashboard
-      navigate("/dashboard");
+      // Ensure login function exists before calling
+      if (login && typeof login === 'function') {
+        console.log("Calling login function from context");
+        login(userData);
+        
+        // Show success toast
+        toast({
+          title: "Login Successful",
+          description: "Welcome back to BeautyBook!",
+        });
+        
+        // Small delay to ensure context updates before navigation
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 100);
+      } else {
+        console.error("Login function not available from context");
+        toast({
+          title: "Login Error",
+          description: "Authentication context not properly initialized",
+          variant: "destructive",
+        });
+      }
       
     } catch (error: any) {
       console.error("Login error:", error);
