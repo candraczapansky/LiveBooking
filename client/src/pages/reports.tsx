@@ -240,7 +240,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const totalTransactions = filteredSales.length;
 
   return (
-    <div className="space-y-1 md:space-y-6">
+    <div className="space-y-0 md:space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-6">
         <Card>
           <CardContent className="p-2 md:p-6">
@@ -313,7 +313,7 @@ const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: {
   const clients = (users as any[]).filter((user: any) => user.role === "client");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-0 md:space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Client Overview</CardTitle>
@@ -475,7 +475,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   console.log('Conversion Chart Data:', conversionData);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-0 md:space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -860,7 +860,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-0 md:space-y-6">
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
