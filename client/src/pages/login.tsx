@@ -35,7 +35,10 @@ type RegisterValues = z.infer<typeof registerSchema>;
 const Login = () => {
   useDocumentTitle("Login | BeautyBook");
   const [, navigate] = useLocation();
-  const { login } = useContext(AuthContext);
+  const authContext = useContext(AuthContext);
+  const { login } = authContext;
+  
+  console.log("Login component - authContext:", authContext);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("login");
@@ -79,29 +82,17 @@ const Login = () => {
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // Ensure login function exists before calling
-      if (login && typeof login === 'function') {
-        console.log("Calling login function from context");
-        login(userData);
-        
-        // Show success toast
-        toast({
-          title: "Login Successful",
-          description: "Welcome back to BeautyBook!",
-        });
-        
-        // Small delay to ensure context updates before navigation
-        setTimeout(() => {
-          navigate("/dashboard");
-        }, 100);
-      } else {
-        console.error("Login function not available from context");
-        toast({
-          title: "Login Error",
-          description: "Authentication context not properly initialized",
-          variant: "destructive",
-        });
-      }
+      // Store user data directly in localStorage and redirect
+      localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Show success toast
+      toast({
+        title: "Login Successful", 
+        description: "Welcome back to BeautyBook!",
+      });
+      
+      // Force page reload to reinitialize auth context
+      window.location.href = "/dashboard";
       
     } catch (error: any) {
       console.error("Login error:", error);
