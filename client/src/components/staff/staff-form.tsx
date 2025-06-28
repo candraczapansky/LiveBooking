@@ -250,13 +250,19 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         photoUrl: data.photo || null,
       };
 
+      console.log("Sending PATCH request to:", `/api/staff/${staffId}`, "with data:", staffUpdateData);
       const staffResponse = await apiRequest("PATCH", `/api/staff/${staffId}`, staffUpdateData);
+      console.log("Staff update response status:", staffResponse.status);
+      
       if (!staffResponse.ok) {
         const errorData = await staffResponse.json();
+        console.error("Staff update failed with error:", errorData);
         throw new Error(errorData.error || "Failed to update staff member");
       }
 
-      return await staffResponse.json();
+      const updatedStaff = await staffResponse.json();
+      console.log("Staff update successful, returned data:", updatedStaff);
+      return updatedStaff;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
