@@ -800,6 +800,27 @@ body {
       margin-bottom: 0.25rem !important;
     }
     
+    /* Ultra-aggressive reports page spacing reduction */
+    .container.mx-auto {
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+    
+    /* Eliminate main content padding */
+    main.flex-1 {
+      padding: 0 !important;
+    }
+    
+    /* Remove all space-y margins */
+    .space-y-1 > * + * {
+      margin-top: 0 !important;
+    }
+    
+    /* Compress report cards */
+    .space-y-1 {
+      gap: 0 !important;
+    }
+    
     /* Compress button spacing */
     .min-h-\[44px\] {
       min-height: 2.5rem !important;
@@ -821,6 +842,7 @@ body {
       margin-top: 0.125rem !important;
     }
   }
+}
   
   /* Exception for buttons that already have adequate padding */
   button[class*="px-"], button[class*="py-"] {
