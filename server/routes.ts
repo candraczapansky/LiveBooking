@@ -43,6 +43,7 @@ import {
   deleteAutomationRule
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
+import { PayrollAutoSync } from "./payroll-auto-sync";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 
 // Custom schema for service with staff assignments
@@ -93,6 +94,10 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
+  // Initialize PayrollAutoSync system
+  const payrollAutoSync = new PayrollAutoSync(storage);
+  console.log('PayrollAutoSync system initialized');
+
   // Add middleware to log all requests
   app.use((req, res, next) => {
     if (req.method === 'PUT' && req.url.includes('/services/')) {
@@ -1487,6 +1492,11 @@ If you didn't request this password reset, please ignore this email and your pas
         appointmentId: appointmentId
       });
 
+      // Trigger automatic payroll sync for staff member
+      if (appointment.staffId) {
+        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
+      }
+
       // Create sales history record
       await createSalesHistoryRecord(payment, 'appointment');
 
@@ -1587,6 +1597,11 @@ If you didn't request this password reset, please ignore this email and your pas
         status: 'completed',
         appointmentId: appointmentId
       });
+
+      // Trigger automatic payroll sync for staff member
+      if (appointment.staffId) {
+        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
+      }
 
       res.json({ 
         success: true, 
