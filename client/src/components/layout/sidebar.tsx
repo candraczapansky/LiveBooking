@@ -124,11 +124,17 @@ const Sidebar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`hamburger-menu h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
+                className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
-                style={{ color: primaryColor }}
               >
-                <Menu className="h-5 w-5" />
+                <Menu 
+                  id="hamburger-menu-icon"
+                  className="h-5 w-5" 
+                  style={{ 
+                    color: primaryColor,
+                    fill: primaryColor
+                  }} 
+                />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
             </div>

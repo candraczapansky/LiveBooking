@@ -189,8 +189,9 @@ button svg {
 }
 
 /* Exception for hamburger menu - allow inline styles to override */
-.hamburger-menu svg {
+#hamburger-menu-icon {
   color: inherit !important;
+  fill: inherit !important;
 }
 
 /* Primary button icons should use primary-foreground color for contrast */
