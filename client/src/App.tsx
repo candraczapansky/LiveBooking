@@ -132,12 +132,30 @@ function useAuth() {
       try {
         const userData = JSON.parse(storedUser);
         console.log('Parsed user data:', userData);
-        setUser(userData);
-        setIsAuthenticated(true);
-        console.log('User context set successfully');
         
-        // Load and apply color preferences immediately after login
-        loadAndApplyColorPreferences(userData.id);
+        // Fetch fresh user data from database to ensure we have latest profile picture
+        fetchFreshUserData(userData.id).then((freshUserData) => {
+          if (freshUserData) {
+            console.log('Using fresh user data from database:', freshUserData);
+            setUser(freshUserData);
+            setIsAuthenticated(true);
+            // Update localStorage with fresh data
+            localStorage.setItem('user', JSON.stringify(freshUserData));
+            console.log('User context set with fresh data');
+            
+            // Load and apply color preferences immediately after login
+            loadAndApplyColorPreferences(freshUserData.id);
+          } else {
+            // Fallback to localStorage data if API fails
+            console.log('API failed, falling back to localStorage data');
+            setUser(userData);
+            setIsAuthenticated(true);
+            console.log('User context set from localStorage fallback');
+            
+            // Load and apply color preferences immediately after login
+            loadAndApplyColorPreferences(userData.id);
+          }
+        });
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
@@ -146,6 +164,26 @@ function useAuth() {
       console.log('No user data found in localStorage');
     }
   }, []);
+
+  // Function to fetch fresh user data from database
+  const fetchFreshUserData = async (userId: number) => {
+    try {
+      console.log(`Fetching fresh user data for user ${userId}`);
+      const response = await fetch(`/api/users/${userId}`);
+      
+      if (!response.ok) {
+        console.error('Failed to fetch fresh user data');
+        return null;
+      }
+      
+      const freshUserData = await response.json();
+      console.log('Fresh user data fetched successfully');
+      return freshUserData;
+    } catch (error) {
+      console.error('Error fetching fresh user data:', error);
+      return null;
+    }
+  };
 
   // Function to load and apply color preferences
   const loadAndApplyColorPreferences = async (userId: number) => {
