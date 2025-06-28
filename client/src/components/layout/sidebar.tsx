@@ -144,8 +144,9 @@ const Sidebar = () => {
                 onClick={toggleSidebar}
               >
                 <Menu 
-                  ref={hamburgerRef}
+                  data-hamburger="true"
                   className="h-5 w-5" 
+                  style={{ color: primaryColor }}
                 />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}

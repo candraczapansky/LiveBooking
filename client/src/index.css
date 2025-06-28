@@ -182,16 +182,10 @@ input.force-border-normal[aria-invalid="false"] {
 
 /* Button Icons are always enabled */
 
-/* Button Icon Colors - use custom text color from settings */
-button svg {
+/* Button Icon Colors - use custom text color from settings, except hamburger menu */
+button svg:not([data-hamburger]) {
   color: var(--text-primary) !important;
   fill: currentColor !important;
-}
-
-/* Exception for hamburger menu - allow inline styles to override */
-#hamburger-menu-icon {
-  color: inherit !important;
-  fill: inherit !important;
 }
 
 /* Primary button icons should use primary-foreground color for contrast */
