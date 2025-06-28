@@ -258,6 +258,38 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     }
   });
 
+  // PATCH route for user updates (used by staff form)
+  app.patch("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    console.log("PATCH - Updating user with data:", JSON.stringify(req.body, null, 2));
+    
+    try {
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Update user profile with all provided fields
+      const updatedUser = await storage.updateUser(userId, req.body);
+      
+      console.log("PATCH - User updated successfully:", JSON.stringify(updatedUser, null, 2));
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = updatedUser;
+      
+      return res.status(200).json(userWithoutPassword);
+    } catch (error) {
+      console.error("PATCH - Error updating user profile:", error);
+      return res.status(500).json({ error: "Failed to update user profile" });
+    }
+  });
+
   // User Color Preferences routes
   app.get("/api/users/:id/color-preferences", async (req, res) => {
     const userId = parseInt(req.params.id);
