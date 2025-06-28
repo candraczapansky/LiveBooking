@@ -42,6 +42,8 @@ import {
   updateAutomationRule,
   deleteAutomationRule
 } from "./automation-triggers";
+import { PhoneService } from "./phone-service";
+import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -3757,6 +3759,140 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
     } catch (error) {
       console.error("Error deleting sales history:", error);
       res.status(500).json({ error: "Failed to delete sales history" });
+    }
+  });
+
+  // Phone Service API Routes
+  
+  // Twilio webhook for incoming calls
+  app.post("/api/phone/incoming", async (req, res) => {
+    try {
+      const { CallSid, From, To } = req.body;
+      const result = await PhoneService.handleIncomingCall(CallSid, From, To);
+      
+      res.set('Content-Type', 'text/xml');
+      res.send(result.twiml);
+    } catch (error) {
+      console.error("Error handling incoming call:", error);
+      res.status(500).send('<Response><Say>Sorry, we are experiencing technical difficulties.</Say></Response>');
+    }
+  });
+
+  // Twilio webhook for call status updates
+  app.post("/api/phone/call-status", async (req, res) => {
+    try {
+      const { CallSid, CallStatus, CallDuration } = req.body;
+      await PhoneService.updateCallStatus(CallSid, CallStatus, CallDuration ? parseInt(CallDuration) : undefined);
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error updating call status:", error);
+      res.sendStatus(500);
+    }
+  });
+
+  // Twilio webhook for recording status
+  app.post("/api/phone/recording-status", async (req, res) => {
+    try {
+      const { CallSid, RecordingSid, RecordingUrl, RecordingDuration } = req.body;
+      await PhoneService.saveCallRecording(
+        CallSid, 
+        RecordingSid, 
+        RecordingUrl, 
+        RecordingDuration ? parseInt(RecordingDuration) : undefined
+      );
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Error saving call recording:", error);
+      res.sendStatus(500);
+    }
+  });
+
+  // Make outbound call
+  app.post("/api/phone/outbound", async (req, res) => {
+    try {
+      const { toNumber, staffId, userId, appointmentId, purpose } = req.body;
+      
+      if (!toNumber || !staffId) {
+        return res.status(400).json({ error: "Phone number and staff ID are required" });
+      }
+
+      const call = await PhoneService.makeOutboundCall(toNumber, staffId, userId, appointmentId, purpose);
+      res.json(call);
+    } catch (error) {
+      console.error("Error making outbound call:", error);
+      res.status(500).json({ error: "Failed to make outbound call" });
+    }
+  });
+
+  // Get call history for user
+  app.get("/api/phone/history/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (!userId) {
+        return res.status(400).json({ error: "Valid user ID is required" });
+      }
+
+      const callHistory = await PhoneService.getCallHistoryForUser(userId);
+      res.json(callHistory);
+    } catch (error) {
+      console.error("Error fetching call history:", error);
+      res.status(500).json({ error: "Failed to fetch call history" });
+    }
+  });
+
+  // Get recent calls for dashboard
+  app.get("/api/phone/recent", async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const recentCalls = await PhoneService.getRecentCalls(limit);
+      res.json(recentCalls);
+    } catch (error) {
+      console.error("Error fetching recent calls:", error);
+      res.status(500).json({ error: "Failed to fetch recent calls" });
+    }
+  });
+
+  // Add notes to call
+  app.put("/api/phone/notes/:callId", async (req, res) => {
+    try {
+      const callId = parseInt(req.params.callId);
+      const { notes, staffId } = req.body;
+      
+      if (!callId || !notes || !staffId) {
+        return res.status(400).json({ error: "Call ID, notes, and staff ID are required" });
+      }
+
+      await PhoneService.addCallNotes(callId, notes, staffId);
+      res.json({ message: "Notes added successfully" });
+    } catch (error) {
+      console.error("Error adding call notes:", error);
+      res.status(500).json({ error: "Failed to add call notes" });
+    }
+  });
+
+  // Get call analytics
+  app.get("/api/phone/analytics", async (req, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+      
+      const analytics = await PhoneService.getCallAnalytics(startDate, endDate);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error generating call analytics:", error);
+      res.status(500).json({ error: "Failed to generate call analytics" });
+    }
+  });
+
+  // Download call recording
+  app.get("/api/phone/recording/:recordingSid", async (req, res) => {
+    try {
+      const { recordingSid } = req.params;
+      const downloadUrl = await PhoneService.getRecordingDownloadUrl(recordingSid);
+      res.redirect(downloadUrl);
+    } catch (error) {
+      console.error("Error downloading recording:", error);
+      res.status(500).json({ error: "Failed to download recording" });
     }
   });
 

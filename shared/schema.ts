@@ -483,6 +483,59 @@ export type InsertMarketingCampaign = z.infer<typeof insertMarketingCampaignSche
 export type MarketingCampaignRecipient = typeof marketingCampaignRecipients.$inferSelect;
 export type InsertMarketingCampaignRecipient = z.infer<typeof insertMarketingCampaignRecipientSchema>;
 
+// Phone calls schema
+export const phoneCalls = pgTable("phone_calls", {
+  id: serial("id").primaryKey(),
+  twilioCallSid: text("twilio_call_sid").notNull().unique(),
+  fromNumber: text("from_number").notNull(),
+  toNumber: text("to_number").notNull(),
+  direction: text("direction").notNull(), // inbound, outbound
+  status: text("status").notNull(), // queued, ringing, in-progress, completed, busy, failed, no-answer, canceled
+  duration: integer("duration"), // Call duration in seconds
+  price: text("price"), // Call cost from Twilio
+  priceUnit: text("price_unit"), // Currency unit (USD)
+  userId: integer("user_id"), // Associated client/user account
+  staffId: integer("staff_id"), // Staff member who made/received the call
+  appointmentId: integer("appointment_id"), // Related appointment if applicable
+  notes: text("notes"), // Call notes from staff
+  purpose: text("purpose"), // Call purpose: appointment_booking, follow_up, consultation, support, sales
+  createdAt: timestamp("created_at").defaultNow(),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+});
+
+// Call recordings schema
+export const callRecordings = pgTable("call_recordings", {
+  id: serial("id").primaryKey(),
+  phoneCallId: integer("phone_call_id").notNull(),
+  twilioRecordingSid: text("twilio_recording_sid").notNull().unique(),
+  recordingUrl: text("recording_url").notNull(),
+  duration: integer("duration"), // Recording duration in seconds
+  fileSize: integer("file_size"), // File size in bytes
+  format: text("format").default("mp3"), // Audio format
+  channels: integer("channels").default(1), // Number of audio channels
+  status: text("status").notNull(), // processing, completed, failed
+  transcription: text("transcription"), // AI transcription of the call
+  transcriptionStatus: text("transcription_status"), // pending, completed, failed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPhoneCallSchema = createInsertSchema(phoneCalls).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertCallRecordingSchema = createInsertSchema(callRecordings).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PhoneCall = typeof phoneCalls.$inferSelect;
+export type InsertPhoneCall = z.infer<typeof insertPhoneCallSchema>;
+
+export type CallRecording = typeof callRecordings.$inferSelect;
+export type InsertCallRecording = z.infer<typeof insertCallRecordingSchema>;
+
 // Promo codes schema
 export const promoCodes = pgTable("promo_codes", {
   id: serial("id").primaryKey(),
