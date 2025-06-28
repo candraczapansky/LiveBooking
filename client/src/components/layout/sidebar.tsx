@@ -62,10 +62,13 @@ const Sidebar = () => {
     const loadUserColor = async () => {
       if (user?.id) {
         try {
+          console.log('Loading color preferences for hamburger menu');
           const response = await fetch(`/api/users/${user.id}/color-preferences`);
           if (response.ok) {
             const colorPrefs = await response.json();
+            console.log('Color preferences loaded:', colorPrefs);
             if (colorPrefs.primaryColor) {
+              console.log('Setting primary color to:', colorPrefs.primaryColor);
               setPrimaryColor(colorPrefs.primaryColor);
             }
           }
@@ -121,10 +124,11 @@ const Sidebar = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
+                className={`hamburger-menu h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
+                style={{ color: primaryColor }}
               >
-                <Menu className="h-5 w-5" style={{ color: primaryColor }} />
+                <Menu className="h-5 w-5" />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
             </div>
