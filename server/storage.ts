@@ -580,101 +580,104 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
-    // Build dynamic update query to handle field name mapping issues with Drizzle
-    const updateFields: string[] = [];
-    const values: any[] = [];
-    let paramIndex = 1;
-
-    // Map frontend field names to database column names
-    Object.keys(userData).forEach(key => {
-      const value = (userData as any)[key];
-      if (value !== undefined) {
-        switch (key) {
-          case 'firstName':
-            updateFields.push(`first_name = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'lastName':
-            updateFields.push(`last_name = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'zipCode':
-            updateFields.push(`zip_code = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'profilePicture':
-            updateFields.push(`profile_picture = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'squareCustomerId':
-            updateFields.push(`stripe_customer_id = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'emailAccountManagement':
-            updateFields.push(`email_account_management = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'emailAppointmentReminders':
-            updateFields.push(`email_appointment_reminders = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'emailPromotions':
-            updateFields.push(`email_promotions = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'smsAccountManagement':
-            updateFields.push(`sms_account_management = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'smsAppointmentReminders':
-            updateFields.push(`sms_appointment_reminders = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          case 'smsPromotions':
-            updateFields.push(`sms_promotions = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-          default:
-            // Fields that don't need mapping (email, phone, username, password, etc.)
-            updateFields.push(`${key} = $${paramIndex}`);
-            values.push(value);
-            paramIndex++;
-            break;
-        }
+    try {
+      const [updatedUser] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
+      if (!updatedUser) {
+        throw new Error('User not found');
       }
-    });
+      return updatedUser;
+    } catch (error) {
+      console.error('Drizzle update failed, trying direct SQL approach:', error);
+      
+      // Fallback to direct SQL for field mapping issues
+      const updateFields: string[] = [];
+      const values: any[] = [];
 
-    if (updateFields.length === 0) {
-      throw new Error('No fields to update');
+      // Map frontend field names to database column names
+      Object.keys(userData).forEach(key => {
+        const value = (userData as any)[key];
+        if (value !== undefined) {
+          switch (key) {
+            case 'firstName':
+              updateFields.push('first_name = ?');
+              values.push(value);
+              break;
+            case 'lastName':
+              updateFields.push('last_name = ?');
+              values.push(value);
+              break;
+            case 'zipCode':
+              updateFields.push('zip_code = ?');
+              values.push(value);
+              break;
+            case 'profilePicture':
+              updateFields.push('profile_picture = ?');
+              values.push(value);
+              break;
+            case 'squareCustomerId':
+              updateFields.push('stripe_customer_id = ?');
+              values.push(value);
+              break;
+            case 'emailAccountManagement':
+              updateFields.push('email_account_management = ?');
+              values.push(value);
+              break;
+            case 'emailAppointmentReminders':
+              updateFields.push('email_appointment_reminders = ?');
+              values.push(value);
+              break;
+            case 'emailPromotions':
+              updateFields.push('email_promotions = ?');
+              values.push(value);
+              break;
+            case 'smsAccountManagement':
+              updateFields.push('sms_account_management = ?');
+              values.push(value);
+              break;
+            case 'smsAppointmentReminders':
+              updateFields.push('sms_appointment_reminders = ?');
+              values.push(value);
+              break;
+            case 'smsPromotions':
+              updateFields.push('sms_promotions = ?');
+              values.push(value);
+              break;
+            default:
+              // Fields that don't need mapping (email, phone, username, password, etc.)
+              updateFields.push(`${key} = ?`);
+              values.push(value);
+              break;
+          }
+        }
+      });
+
+      if (updateFields.length === 0) {
+        throw new Error('No fields to update');
+      }
+
+      values.push(id);
+      const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ? RETURNING *`;
+      
+      console.log('Executing fallback SQL:', updateQuery);
+      console.log('With values:', values);
+      
+      // Use template literal SQL 
+      let sqlQuery = updateQuery;
+      values.forEach((value, index) => {
+        sqlQuery = sqlQuery.replace('?', `$${index + 1}`);
+      });
+      
+      console.log('Final SQL Query:', sqlQuery);
+      
+      // Use the underlying neon client directly for parameterized queries
+      const result = await (db as any).execute(sqlQuery, values);
+      
+      if (!result.rows || result.rows.length === 0) {
+        throw new Error('User not found');
+      }
+      
+      return result.rows[0] as User;
     }
-
-    // Add the WHERE clause parameter
-    values.push(id);
-    const whereClause = `$${paramIndex}`;
-
-    const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = ${whereClause} RETURNING *`;
-    
-    console.log('Executing SQL:', updateQuery);
-    console.log('With values:', values);
-    
-    const result = await db.execute(sql.raw(updateQuery, values));
-    
-    if (!result.rows || result.rows.length === 0) {
-      throw new Error('User not found');
-    }
-    
-    return result.rows[0] as User;
   }
 
   // Service Category operations
