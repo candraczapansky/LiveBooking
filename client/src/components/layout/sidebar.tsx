@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/App";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -56,20 +56,26 @@ const Sidebar = () => {
   const [location, setLocation] = useLocation();
   const { user, logout } = useContext(AuthContext);
   const [primaryColor, setPrimaryColor] = useState('#d38301');
+  const hamburgerRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
     // Load user's color preferences
     const loadUserColor = async () => {
       if (user?.id) {
         try {
-          console.log('Loading color preferences for hamburger menu');
           const response = await fetch(`/api/users/${user.id}/color-preferences`);
           if (response.ok) {
             const colorPrefs = await response.json();
-            console.log('Color preferences loaded:', colorPrefs);
             if (colorPrefs.primaryColor) {
-              console.log('Setting primary color to:', colorPrefs.primaryColor);
               setPrimaryColor(colorPrefs.primaryColor);
+              
+              // Force color update via DOM manipulation
+              if (hamburgerRef.current) {
+                hamburgerRef.current.style.color = colorPrefs.primaryColor;
+                hamburgerRef.current.style.fill = colorPrefs.primaryColor;
+                hamburgerRef.current.style.setProperty('color', colorPrefs.primaryColor, 'important');
+                hamburgerRef.current.style.setProperty('fill', colorPrefs.primaryColor, 'important');
+              }
             }
           }
         } catch (error) {
@@ -79,7 +85,17 @@ const Sidebar = () => {
     };
     
     loadUserColor();
-  }, [user?.id, isOpen, isMobile]);
+  }, [user?.id]);
+
+  // Also update color when primaryColor state changes
+  useEffect(() => {
+    if (hamburgerRef.current && primaryColor) {
+      hamburgerRef.current.style.color = primaryColor;
+      hamburgerRef.current.style.fill = primaryColor;
+      hamburgerRef.current.style.setProperty('color', primaryColor, 'important');
+      hamburgerRef.current.style.setProperty('fill', primaryColor, 'important');
+    }
+  }, [primaryColor]);
 
   // Don't render original sidebar on mobile - SimpleMobileMenu handles mobile navigation
   if (isMobile) {
@@ -128,12 +144,8 @@ const Sidebar = () => {
                 onClick={toggleSidebar}
               >
                 <Menu 
-                  id="hamburger-menu-icon"
+                  ref={hamburgerRef}
                   className="h-5 w-5" 
-                  style={{ 
-                    color: primaryColor,
-                    fill: primaryColor
-                  }} 
                 />
               </Button>
               {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
