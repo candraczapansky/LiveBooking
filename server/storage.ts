@@ -35,9 +35,13 @@ export interface IStorage {
   // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User>;
+  setPasswordResetToken(userId: number, token: string, expiry: Date): Promise<void>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  clearPasswordResetToken(userId: number): Promise<void>;
 
   // Service Category operations
   createServiceCategory(category: InsertServiceCategory): Promise<ServiceCategory>;
@@ -678,6 +682,39 @@ export class DatabaseStorage implements IStorage {
       
       return result.rows[0] as User;
     }
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async setPasswordResetToken(userId: number, token: string, expiry: Date): Promise<void> {
+    await db.update(users)
+      .set({ 
+        resetToken: token, 
+        resetTokenExpiry: expiry 
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(
+      and(
+        eq(users.resetToken, token),
+        gte(users.resetTokenExpiry, new Date())
+      )
+    );
+    return user;
+  }
+
+  async clearPasswordResetToken(userId: number): Promise<void> {
+    await db.update(users)
+      .set({ 
+        resetToken: null, 
+        resetTokenExpiry: null 
+      })
+      .where(eq(users.id, userId));
   }
 
   // Service Category operations

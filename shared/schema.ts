@@ -18,6 +18,9 @@ export const users = pgTable("users", {
   zipCode: text("zip_code"),
   profilePicture: text("profile_picture"), // Base64 encoded image data
   squareCustomerId: text("stripe_customer_id"),
+  // Password reset fields
+  resetToken: text("reset_token"),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
   // Communication preferences
   emailAccountManagement: boolean("email_account_management").default(true),
   emailAppointmentReminders: boolean("email_appointment_reminders").default(true),
