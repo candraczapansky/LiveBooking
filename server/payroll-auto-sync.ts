@@ -40,8 +40,7 @@ class PayrollAutoSync {
 
     try {
       // Get staff information
-      const staff = await this.storage.getStaff();
-      const targetStaff = staff.find(s => s.id === staffId);
+      const targetStaff = await this.storage.getStaff(staffId);
       
       if (!targetStaff) {
         console.log(`[PayrollAutoSync] Staff ${staffId} not found`);
@@ -73,18 +72,17 @@ class PayrollAutoSync {
   // Prepare comprehensive payroll data for sync
   private async preparePayrollData(staffId: number, monthStart: Date, monthEnd: Date) {
     // Get staff details
-    const staff = await this.storage.getStaff();
-    const targetStaff = staff.find(s => s.id === staffId);
+    const targetStaff = await this.storage.getStaff(staffId);
     
     if (!targetStaff) {
       throw new Error(`Staff ${staffId} not found`);
     }
 
     // Get staff earnings for the month
-    const staffEarnings = await this.storage.getStaffEarnings(staffId, monthStart);
+    const staffEarnings = await this.storage.getStaffEarnings(staffId);
     
     // Get time clock entries
-    const staffTimeEntries = await this.storage.getTimeClockEntriesByStaffId(staffId, monthStart, monthEnd);
+    const staffTimeEntries = await this.storage.getTimeClockEntriesByStaffId(staffId);
 
     // Calculate totals
     const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
@@ -92,11 +90,11 @@ class PayrollAutoSync {
     const totalServices = staffEarnings.length;
 
     // Get appointments for additional context
-    const appointments = await this.storage.getAppointments();
+    const appointments = await this.storage.getAllAppointments();
     const staffAppointments = appointments.filter((apt: any) => 
       apt.staffId === staffId && 
-      new Date(apt.appointmentDate) >= monthStart && 
-      new Date(apt.appointmentDate) <= monthEnd
+      new Date(apt.startTime) >= monthStart && 
+      new Date(apt.startTime) <= monthEnd
     );
 
     const totalRevenue = staffAppointments.reduce((sum: number, apt: any) => sum + (apt.totalPrice || 0), 0);
