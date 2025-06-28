@@ -191,32 +191,37 @@ export default function SettingsMobile() {
             if (response.ok) {
               console.log('Profile picture saved to database successfully');
               
-              console.log('updateUser function available:', !!updateUser);
-              console.log('Profile picture to save:', base64String.substring(0, 100) + '...');
+              // Clear all cached data and force fresh authentication
+              localStorage.removeItem('user');
+              localStorage.removeItem('profilePicture');
               
-              // Update auth context with new profile picture
-              if (updateUser) {
-                updateUser({ profilePicture: base64String });
-                console.log('Updated auth context with new profile picture');
+              // Get fresh user data from database
+              const freshUserResponse = await fetch(`/api/users/${userId}`);
+              if (freshUserResponse.ok) {
+                const freshUserData = await freshUserResponse.json();
+                console.log('Fetched fresh user data after profile picture update:', freshUserData);
                 
-                // Verify the update worked by checking user context
-                console.log('User context after updateUser call:', user);
+                // Update localStorage and auth context with fresh data
+                localStorage.setItem('user', JSON.stringify(freshUserData));
+                
+                if (updateUser) {
+                  updateUser(freshUserData);
+                  console.log('Updated auth context with fresh user data');
+                } else {
+                  console.log('updateUser function not available');
+                }
+                
+                // Dispatch custom event to notify other components
+                window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+                  detail: freshUserData
+                }));
               } else {
-                console.log('updateUser function not available, using fallback');
-                // Fallback: Update localStorage directly if context is not available
-                const currentUser = localStorage.getItem('user');
-                if (currentUser) {
-                  const userData = JSON.parse(currentUser);
-                  userData.profilePicture = base64String;
-                  localStorage.setItem('user', JSON.stringify(userData));
-                  console.log('Updated user data in localStorage with new profile picture (fallback)');
+                console.error('Failed to fetch fresh user data after profile picture update');
+                // Fallback to original approach
+                if (updateUser) {
+                  updateUser({ profilePicture: base64String });
                 }
               }
-              
-              // Dispatch custom event to notify other components (like header)
-              window.dispatchEvent(new CustomEvent('userDataUpdated', { 
-                detail: { profilePicture: base64String }
-              }));
             } else {
               console.error('Failed to save profile picture to database');
             }
