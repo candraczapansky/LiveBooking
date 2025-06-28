@@ -3479,6 +3479,26 @@ If you didn't request this password reset, please ignore this email and your pas
   });
 
   // Payroll Data Sync endpoint - sends payroll data to external front-end
+  // Test automatic payroll sync trigger
+  app.post("/api/test-auto-sync/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      console.log(`[TEST] Manual trigger for automatic payroll sync - Staff ID: ${staffId}`);
+      
+      // Trigger the automatic sync
+      await payrollAutoSync.triggerPayrollSync(staffId, 'manual');
+      
+      res.json({
+        success: true,
+        message: `Automatic payroll sync triggered for staff ${staffId}`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('[TEST] Auto-sync trigger error:', error);
+      res.status(500).json({ error: "Error triggering automatic sync: " + error.message });
+    }
+  });
+
   app.post("/api/payroll-sync", async (req, res) => {
     try {
       const { staffId, month } = req.body;
