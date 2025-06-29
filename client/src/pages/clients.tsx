@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useLocation } from "wouter";
+// Payment processing imports removed - using Square integration
 
 import {
   Table,
