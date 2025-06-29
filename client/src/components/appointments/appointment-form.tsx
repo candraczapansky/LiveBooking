@@ -244,12 +244,20 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       
       console.log('Appointment creation error:', { error, errorData, errorMessage, isConflict });
       
+      // Force show toast - testing visibility
       toast({
         title: isConflict ? "⚠️ Scheduling Conflict" : "❌ Error",
         description: errorMessage,
         variant: "destructive",
         duration: isConflict ? 10000 : 5000, // Show conflict messages even longer
       });
+      
+      // Also try alert as backup to confirm the error is being triggered
+      if (isConflict) {
+        setTimeout(() => {
+          alert(`CONFLICT DETECTED: ${errorMessage}`);
+        }, 100);
+      }
     },
   });
 
