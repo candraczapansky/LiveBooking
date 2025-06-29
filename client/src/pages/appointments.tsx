@@ -4,6 +4,7 @@ import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSidebar } from "@/contexts/SidebarContext";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentForm from "@/components/appointments/appointment-form";
 import AppointmentCheckout from "@/components/appointments/appointment-checkout";
@@ -53,26 +54,13 @@ const AppointmentsPage = () => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { isOpen: sidebarOpen } = useSidebar();
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
   const [zoomLevel, setZoomLevel] = useState(1);
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
-
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    checkSidebarState();
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
 
   // Handle quick action navigation
   useEffect(() => {
@@ -1088,7 +1076,9 @@ const AppointmentsPage = () => {
         <div className="hidden lg:block">
           <SidebarController />
         </div>
-        <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+          sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+        }`}>
           <Header />
           <main className="flex-1 overflow-auto p-4">
             <div className="animate-pulse">
@@ -1111,7 +1101,9 @@ const AppointmentsPage = () => {
         <SidebarController />
       </div>
       
-      <div className="lg:ml-64 min-h-screen flex flex-col">
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 pb-safe-area-inset-bottom"

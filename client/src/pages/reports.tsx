@@ -1330,7 +1330,7 @@ const ReportsPage = () => {
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? "ml-64" : "ml-0"
+        sidebarOpen ? "ml-64" : "ml-16"
       }`}>
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
