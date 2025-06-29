@@ -346,16 +346,22 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // Create sample service categories
-    this.createServiceCategory({
-      name: 'Hair Services',
-      description: 'Professional hair styling, cutting, and coloring services'
-    });
+    // Create sample service categories only if they don't exist
+    const existingCategories = await this.getAllServiceCategories();
+    
+    if (!existingCategories.find(c => c.name === 'Hair Services')) {
+      this.createServiceCategory({
+        name: 'Hair Services',
+        description: 'Professional hair styling, cutting, and coloring services'
+      });
+    }
 
-    this.createServiceCategory({
-      name: 'Facial Treatments',
-      description: 'Skincare and facial rejuvenation treatments'
-    });
+    if (!existingCategories.find(c => c.name === 'Facial Treatments')) {
+      this.createServiceCategory({
+        name: 'Facial Treatments',
+        description: 'Skincare and facial rejuvenation treatments'
+      });
+    }
 
     // Create sample rooms
     this.createRoom({
@@ -464,42 +470,50 @@ export class DatabaseStorage implements IStorage {
       }
     });
 
-    // Create sample services
-    this.createService({
-      name: 'Women\'s Haircut & Style',
-      description: 'Professional haircut with wash, cut, and styling',
-      duration: 60,
-      price: 85.00,
-      categoryId: 1, // Hair Services category
-      roomId: 3, // Styling Station Area
-      bufferTimeBefore: 10,
-      bufferTimeAfter: 10,
-      color: '#FF6B9D'
-    });
+    // Create sample services only if they don't exist
+    const existingServices = await this.getAllServices();
+    
+    if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style')) {
+      this.createService({
+        name: 'Women\'s Haircut & Style',
+        description: 'Professional haircut with wash, cut, and styling',
+        duration: 60,
+        price: 85.00,
+        categoryId: 1, // Hair Services category
+        roomId: 3, // Styling Station Area
+        bufferTimeBefore: 10,
+        bufferTimeAfter: 10,
+        color: '#FF6B9D'
+      });
+    }
 
-    this.createService({
-      name: 'Color & Highlights',
-      description: 'Full color service with highlights and toning',
-      duration: 120,
-      price: 150.00,
-      categoryId: 1, // Hair Services category
-      roomId: 3, // Styling Station Area
-      bufferTimeBefore: 15,
-      bufferTimeAfter: 15,
-      color: '#8B5CF6'
-    });
+    if (!existingServices.find(s => s.name === 'Color & Highlights')) {
+      this.createService({
+        name: 'Color & Highlights',
+        description: 'Full color service with highlights and toning',
+        duration: 120,
+        price: 150.00,
+        categoryId: 1, // Hair Services category
+        roomId: 3, // Styling Station Area
+        bufferTimeBefore: 15,
+        bufferTimeAfter: 15,
+        color: '#8B5CF6'
+      });
+    }
 
-    this.createService({
-      name: 'Deep Cleansing Facial',
-      description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
-      duration: 90,
-      price: 95.00,
-      categoryId: 2, // Facial Treatments category
-      roomId: 1, // Treatment Room 1
-      bufferTimeBefore: 10,
-      bufferTimeAfter: 10,
-      color: '#10B981'
-    });
+    if (!existingServices.find(s => s.name === 'Deep Cleansing Facial')) {
+      this.createService({
+        name: 'Deep Cleansing Facial',
+        description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
+        duration: 90,
+        price: 95.00,
+        categoryId: 2, // Facial Treatments category
+        roomId: 1, // Treatment Room 1
+        bufferTimeBefore: 10,
+        bufferTimeAfter: 10,
+        color: '#10B981'
+      });
+    }
 
     // Assign services to staff member
     this.assignServiceToStaff({
