@@ -13,6 +13,22 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### June 29, 2025 - Service Duplication Fix and Complete UI Outlined Button Styling
+
+- **Fixed critical service duplication issue:**
+  - Root cause identified: DatabaseStorage initialization method was creating sample services every time without existence checks
+  - Disabled automatic sample data creation (`initializeSampleData()`) that was re-adding deleted services
+  - Added existence checks for sample services, categories, rooms, and devices to prevent duplicates
+  - Services now stay deleted permanently without being re-added by system initialization
+  - Database operations work correctly with proper persistence and no unwanted sample data recreation
+
+- **Completed consistent outlined button styling throughout application:**
+  - Updated Badge component to use outlined style with colored borders and transparent backgrounds
+  - Fixed "Add Category" and "Add Service" buttons to use consistent outlined design with proper icons
+  - Removed all solid background styling from buttons and badges
+  - Applied unified visual design language across all interactive elements
+  - Enhanced button accessibility with proper icon placement and consistent hover effects
+
 ### June 23, 2025 - UI Theming, Data Persistence, Complete Email Marketing System, and Automation Calendar Integration
 - Added comprehensive text color editing capabilities to the appearance settings
 - Implemented primary and secondary text color controls with live preview

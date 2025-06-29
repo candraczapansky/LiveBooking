@@ -327,8 +327,8 @@ export class DatabaseStorage implements IStorage {
     this.currentMarketingCampaignRecipientId = 1;
     this.currentEmailUnsubscribeId = 1;
 
-    // Initialize with sample data for demo purposes
-    this.initializeSampleData();
+    // Initialize with sample data for demo purposes - DISABLED to prevent service duplication
+    // this.initializeSampleData();
   }
 
   private async initializeSampleData() {

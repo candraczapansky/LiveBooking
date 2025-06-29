@@ -65,9 +65,11 @@ const ServicesPage = () => {
               </div>
               <div className="mt-4 sm:mt-0 flex gap-2">
                 <Button variant="outline" onClick={() => setIsCategoryFormOpen(true)} className="flex items-center justify-center">
+                  <FolderPlus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
-                <Button onClick={() => setIsServiceFormOpen(true)} className="flex items-center justify-center">
+                <Button variant="default" onClick={() => setIsServiceFormOpen(true)} className="flex items-center justify-center">
+                  <PlusCircle className="h-4 w-4 mr-2" />
                   Add Service
                 </Button>
               </div>
