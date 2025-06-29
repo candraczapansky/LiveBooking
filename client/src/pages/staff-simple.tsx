@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash2, PlusCircle, Search } from "lucide-react";
+import { Edit, Trash2, PlusCircle, Search, Briefcase } from "lucide-react";
 import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import StaffForm from "@/components/staff/staff-form";
@@ -29,6 +30,56 @@ type StaffMember = {
     email: string;
     phone?: string;
   };
+};
+
+// Component to display assigned services for a staff member
+const StaffServices = ({ staffId }: { staffId: number }) => {
+  const { data: services, isLoading } = useQuery({
+    queryKey: ['/api/staff', staffId, 'services'],
+    queryFn: async () => {
+      const response = await fetch(`/api/staff/${staffId}/services`);
+      if (!response.ok) throw new Error('Failed to fetch services');
+      return response.json();
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Briefcase className="w-4 h-4 text-gray-400" />
+        <span className="text-sm text-gray-500">Loading services...</span>
+      </div>
+    );
+  }
+
+  if (!services || services.length === 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <Briefcase className="w-4 h-4 text-gray-400" />
+        <span className="text-sm text-gray-500">No services assigned</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Briefcase className="w-4 h-4 text-primary" />
+        <span className="text-sm font-medium text-gray-700">Assigned Services:</span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {services.map((service: any) => (
+          <Badge 
+            key={service.id} 
+            variant="outline" 
+            className="text-xs border-primary/30 text-primary"
+          >
+            {service.name}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 const StaffPageSimple = () => {
@@ -204,6 +255,11 @@ const StaffPageSimple = () => {
                           {formatPayRate(staffMember)}
                         </div>
                       </div>
+                    </div>
+                    
+                    {/* Assigned Services Section */}
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <StaffServices staffId={staffMember.id} />
                     </div>
                     
                     {/* Action buttons - optimized for mobile touch */}

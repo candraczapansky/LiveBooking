@@ -275,7 +275,7 @@ export class DatabaseStorage implements IStorage {
   private currentDeviceId: number;
   private currentServiceId: number;
   private currentStaffId: number;
-  private currentStaffServiceId: number;
+
   private currentAppointmentId: number;
   private currentMembershipId: number;
   private currentClientMembershipId: number;
@@ -295,7 +295,7 @@ export class DatabaseStorage implements IStorage {
     this.devices = new Map();
     this.services = new Map();
     this.staff = new Map();
-    this.staffServices = new Map();
+
     this.appointments = new Map();
     this.memberships = new Map();
     this.clientMemberships = new Map();
@@ -314,7 +314,7 @@ export class DatabaseStorage implements IStorage {
     this.currentDeviceId = 1;
     this.currentServiceId = 1;
     this.currentStaffId = 1;
-    this.currentStaffServiceId = 1;
+
     this.currentAppointmentId = 1;
     this.currentMembershipId = 1;
     this.currentClientMembershipId = 1;
