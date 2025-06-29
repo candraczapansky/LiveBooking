@@ -264,26 +264,26 @@ export async function triggerAutomations(
 }
 
 // Specific trigger functions
-export async function triggerBookingConfirmation(appointmentData: any, storage: DatabaseStorage) {
+export async function triggerBookingConfirmation(appointmentData: any, storage: IStorage) {
   await triggerAutomations('booking_confirmation', appointmentData, storage);
 }
 
-export async function triggerAppointmentReminder(appointmentData: any, storage: DatabaseStorage) {
+export async function triggerAppointmentReminder(appointmentData: any, storage: IStorage) {
   await triggerAutomations('appointment_reminder', appointmentData, storage);
 }
 
-export async function triggerFollowUp(appointmentData: any, storage: DatabaseStorage) {
+export async function triggerFollowUp(appointmentData: any, storage: IStorage) {
   await triggerAutomations('follow_up', appointmentData, storage);
 }
 
-export async function triggerCancellation(appointmentData: any, storage: DatabaseStorage) {
+export async function triggerCancellation(appointmentData: any, storage: IStorage) {
   await triggerAutomations('cancellation', appointmentData, storage);
 }
 
-export async function triggerNoShow(appointmentData: any, storage: DatabaseStorage) {
+export async function triggerNoShow(appointmentData: any, storage: IStorage) {
   await triggerAutomations('no_show', appointmentData, storage);
 }
 
-export async function triggerCustomAutomation(appointmentData: any, storage: DatabaseStorage, customTriggerName: string) {
+export async function triggerCustomAutomation(appointmentData: any, storage: IStorage, customTriggerName: string) {
   await triggerAutomations('custom', appointmentData, storage, customTriggerName);
 }

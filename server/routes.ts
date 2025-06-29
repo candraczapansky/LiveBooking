@@ -68,7 +68,6 @@ const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareE
 
 // Initialize Square client with production configuration
 const squareClient = new SquareClient({
-  accessToken: squareAccessToken,
   environment: squareEnvironment,
 });
 
