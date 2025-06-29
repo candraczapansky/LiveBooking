@@ -13,7 +13,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### June 29, 2025 - Service Duplication Fix and Complete UI Outlined Button Styling
+### June 29, 2025 - Service Duplication Fix, Complete UI Outlined Button Styling, and Staff-Centric Booking Workflow Implementation
 
 - **Fixed critical service duplication issue:**
   - Root cause identified: DatabaseStorage initialization method was creating sample services every time without existence checks
@@ -28,6 +28,17 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Removed all solid background styling from buttons and badges
   - Applied unified visual design language across all interactive elements
   - Enhanced button accessibility with proper icon placement and consistent hover effects
+
+- **Successfully implemented staff-centric booking workflow:**
+  - Reordered appointment form to prioritize staff member selection before service selection
+  - Added dynamic service filtering based on selected staff member using `/api/staff/:staffId/services` endpoint
+  - Service dropdown now only shows services assigned to the selected staff member
+  - Services with no staff assignments are no longer bookable in appointment creation
+  - Added automatic service selection clearing when staff member changes
+  - Enhanced user experience with helpful placeholder text and informative messages
+  - Added validation to disable service selection until staff member is chosen
+  - System now enforces business rule: staff must be selected first, then only their assigned services appear
+  - Appointment booking workflow prevents scheduling services that staff members cannot perform
 
 ### June 23, 2025 - UI Theming, Data Persistence, Complete Email Marketing System, and Automation Calendar Integration
 - Added comprehensive text color editing capabilities to the appearance settings
