@@ -116,7 +116,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     },
-    enabled: open
+    enabled: open,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: true,
+    refetchOnWindowFocus: true
   });
   
   // Get staff
@@ -185,7 +188,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     }
   }, [appointment, appointmentId]);
 
-  // Reset form when closing
+  // Reset form when closing and invalidate cache when opening
   useEffect(() => {
     if (!open) {
       form.reset({
@@ -197,8 +200,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
         notes: "",
         sendReminder: true,
       });
+    } else {
+      // Invalidate services cache when opening to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
-  }, [open, selectedDate]);
+  }, [open, selectedDate, queryClient]);
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
