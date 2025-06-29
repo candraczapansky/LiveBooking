@@ -256,6 +256,18 @@ export class DatabaseStorage implements IStorage {
     // PostgreSQL storage - no in-memory structures needed
     // Initialize with sample data for demo purposes - DISABLED to prevent service duplication
     // this.initializeSampleData();
+    this.initializeConnection();
+  }
+
+  private async initializeConnection() {
+    try {
+      // Test database connection
+      await db.select().from(users).limit(1);
+      console.log('Database connection established successfully');
+    } catch (error) {
+      console.error('Database connection failed:', error);
+      // Don't throw error to prevent server startup failure
+    }
   }
 
   private async initializeSampleData() {
