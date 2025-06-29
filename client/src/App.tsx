@@ -5,6 +5,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { Toaster } from "@/components/ui/toaster";
 
 import { useState, useEffect } from "react";
 import NotFound from "@/pages/not-found";
@@ -348,6 +349,7 @@ function App() {
         <TooltipProvider>
           <SidebarProvider>
             <Router />
+            <Toaster />
           </SidebarProvider>
         </TooltipProvider>
       </QueryClientProvider>
