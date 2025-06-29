@@ -250,6 +250,103 @@ input:not([type="submit"]):not([type="button"]):not([type="reset"]):focus {
   box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
 }
 
+/* Select Dropdown Outlined Styling - Override solid highlighting */
+[data-radix-select-item] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-radix-select-item][data-highlighted] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+[data-radix-select-item][data-state="checked"] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* More specific selectors for different contexts */
+[data-radix-select-content] > [data-radix-select-viewport] > [data-radix-select-item] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+}
+
+[data-radix-select-content] > [data-radix-select-viewport] > [data-radix-select-item][data-highlighted] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* Fallback with class selectors */
+.select-item,
+.radix-select-item {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+}
+
+.select-item[data-highlighted],
+.radix-select-item[data-highlighted] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* More aggressive targeting for Select dropdown items */
+[role="option"] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+}
+
+[role="option"]:hover,
+[role="option"][data-highlighted],
+[role="option"][aria-selected="true"] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* Even more specific targeting */
+[data-radix-popper-content] [role="option"] {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+}
+
+[data-radix-popper-content] [role="option"]:hover,
+[data-radix-popper-content] [role="option"][data-highlighted] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
+/* Target by class names from shadcn/ui */
+.relative.flex.w-full.cursor-default.select-none.items-center {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+}
+
+.relative.flex.w-full.cursor-default.select-none.items-center:hover,
+.relative.flex.w-full.cursor-default.select-none.items-center[data-highlighted] {
+  background-color: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
+  color: hsl(var(--primary)) !important;
+}
+
 
 
 /* Perfect circle profile picture */
