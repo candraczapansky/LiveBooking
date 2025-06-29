@@ -431,15 +431,16 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
 
   // Prepare chart data with comprehensive validation
   const topServicesData = serviceMetrics.slice(0, 8).map(service => {
-    const revenue = Number(service.totalRevenue);
-    const bookings = Number(service.totalBookings);
-    const cashedOut = Number(service.totalCashedOut);
+    // Extra safety: ensure all values are valid numbers before processing
+    const revenue = Number(service.totalRevenue) || 0;
+    const bookings = Number(service.totalBookings) || 0;
+    const cashedOut = Number(service.totalCashedOut) || 0;
     
     const chartItem = {
-      name: service.name || 'Unknown Service',
-      revenue: Number.isFinite(revenue) && revenue >= 0 ? revenue : 0,
-      bookings: Number.isFinite(bookings) && bookings >= 0 ? bookings : 0,
-      cashedOut: Number.isFinite(cashedOut) && cashedOut >= 0 ? cashedOut : 0
+      name: (service.name || 'Unknown Service').toString(),
+      revenue: Math.max(0, Math.round(revenue * 100) / 100), // Round to 2 decimal places, ensure positive
+      bookings: Math.max(0, Math.floor(bookings)), // Ensure positive integer
+      cashedOut: Math.max(0, Math.floor(cashedOut)) // Ensure positive integer
     };
     
     // Debug log any invalid chart data
@@ -448,18 +449,33 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
     }
     
     return chartItem;
-  }).filter(item => Number.isFinite(item.revenue) && Number.isFinite(item.bookings) && Number.isFinite(item.cashedOut));
+  }).filter(item => {
+    // Strict filtering to ensure no NaN, Infinity, or negative values
+    return Number.isFinite(item.revenue) && 
+           Number.isFinite(item.bookings) && 
+           Number.isFinite(item.cashedOut) &&
+           item.revenue >= 0 &&
+           item.bookings >= 0 &&
+           item.cashedOut >= 0;
+  });
 
   const conversionData = serviceMetrics.filter(s => s.totalBookings > 0).slice(0, 10).map(service => {
-    const conversionRate = Number(service.conversionRate);
-    const bookings = Number(service.totalBookings);
-    const cashedOut = Number(service.totalCashedOut);
+    // Extra safety: ensure all values are valid numbers before processing
+    const conversionRate = Number(service.conversionRate) || 0;
+    const bookings = Number(service.totalBookings) || 0;
+    const cashedOut = Number(service.totalCashedOut) || 0;
+    
+    // Sanitize conversion rate calculation to prevent NaN
+    let safeConversionRate = 0;
+    if (Number.isFinite(conversionRate) && conversionRate >= 0 && conversionRate <= 100) {
+      safeConversionRate = Math.round(conversionRate * 100) / 100; // Round to 2 decimal places
+    }
     
     const chartItem = {
-      name: service.name || 'Unknown Service',
-      conversionRate: Number.isFinite(conversionRate) && conversionRate >= 0 ? Math.min(Math.round(conversionRate), 100) : 0,
-      bookings: Number.isFinite(bookings) && bookings >= 0 ? bookings : 0,
-      cashedOut: Number.isFinite(cashedOut) && cashedOut >= 0 ? cashedOut : 0
+      name: (service.name || 'Unknown Service').toString(),
+      conversionRate: safeConversionRate,
+      bookings: Math.max(0, Math.floor(bookings)), // Ensure positive integer
+      cashedOut: Math.max(0, Math.floor(cashedOut)) // Ensure positive integer
     };
     
     // Debug log any invalid chart data
@@ -468,7 +484,15 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
     }
     
     return chartItem;
-  }).filter(item => Number.isFinite(item.conversionRate) && Number.isFinite(item.bookings) && Number.isFinite(item.cashedOut));
+  }).filter(item => {
+    // Strict filtering to ensure no NaN, Infinity, or negative values
+    return Number.isFinite(item.conversionRate) && 
+           Number.isFinite(item.bookings) && 
+           Number.isFinite(item.cashedOut) &&
+           item.conversionRate >= 0 &&
+           item.bookings >= 0 &&
+           item.cashedOut >= 0;
+  });
 
   // Final debug check
   console.log('Top Services Chart Data:', topServicesData);
