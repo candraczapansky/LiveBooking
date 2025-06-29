@@ -1759,19 +1759,17 @@ export class DatabaseStorage implements IStorage {
 
   async getStaffEarnings(staffId: number, month?: Date): Promise<any[]> {
     try {
-      let query = db.select().from(staffEarnings).where(eq(staffEarnings.staffId, staffId));
-      
       if (month) {
         const startOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
         const endOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-        query = query.where(and(
+        return await db.select().from(staffEarnings).where(and(
           eq(staffEarnings.staffId, staffId),
           gte(staffEarnings.earningsDate, startOfMonth),
           lte(staffEarnings.earningsDate, endOfMonth)
         ));
+      } else {
+        return await db.select().from(staffEarnings).where(eq(staffEarnings.staffId, staffId));
       }
-      
-      return await query;
     } catch (error) {
       console.error('Error getting staff earnings:', error);
       return [];
