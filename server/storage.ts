@@ -739,7 +739,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getServiceCategory(id: number): Promise<ServiceCategory | undefined> {
-    return this.serviceCategories.get(id);
+    const [category] = await db.select().from(serviceCategories).where(eq(serviceCategories.id, id));
+    return category;
   }
 
   async getAllServiceCategories(): Promise<ServiceCategory[]> {
@@ -747,17 +748,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateServiceCategory(id: number, categoryData: Partial<InsertServiceCategory>): Promise<ServiceCategory> {
-    const category = await this.getServiceCategory(id);
-    if (!category) {
+    const [updatedCategory] = await db
+      .update(serviceCategories)
+      .set(categoryData)
+      .where(eq(serviceCategories.id, id))
+      .returning();
+    if (!updatedCategory) {
       throw new Error('Service category not found');
     }
-    const updatedCategory = { ...category, ...categoryData };
-    this.serviceCategories.set(id, updatedCategory);
     return updatedCategory;
   }
 
   async deleteServiceCategory(id: number): Promise<boolean> {
-    return this.serviceCategories.delete(id);
+    const result = await db.delete(serviceCategories).where(eq(serviceCategories.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Room operations
