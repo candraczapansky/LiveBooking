@@ -1416,7 +1416,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
     // Handle date conversion for sendDate if it's a string
-    const processedData = { ...campaignData };
+    const processedData: any = { ...campaignData };
     if (processedData.sendDate && typeof processedData.sendDate === 'string') {
       processedData.sendDate = new Date(processedData.sendDate);
     }

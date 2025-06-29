@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import type { IStorage } from "./storage";
 import { z } from "zod";
@@ -68,9 +68,7 @@ const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareE
 
 // Initialize Square client with production configuration
 const squareClient = new SquareClient({
-  bearerAuthCredentials: {
-    accessToken: squareAccessToken,
-  },
+  accessToken: squareAccessToken,
   environment: squareEnvironment,
 });
 
@@ -80,7 +78,7 @@ console.log('Square client initialized for environment:', squareEnvironment === 
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
-  return (req: Request, res: Response, next: Function) => {
+  return (req: Request, res: Response, next: NextFunction) => {
     try {
       console.log("Validating body with schema:", JSON.stringify(req.body, null, 2));
       req.body = schema.parse(req.body);
@@ -99,7 +97,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
   console.log('PayrollAutoSync system initialized');
 
   // Add middleware to log all requests
-  app.use((req, res, next) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.method === 'PUT' && req.url.includes('/services/')) {
       console.log(`PUT request received: ${req.method} ${req.url}`);
       console.log('Request body:', JSON.stringify(req.body, null, 2));
