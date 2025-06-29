@@ -13,7 +13,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, and Appointment Payment Amount Fix
+### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, and Complete Appointment Payment Amount Fix
 
 - **Successfully resolved SMS marketing campaign issues and verified functionality:**
   - Fixed all database storage methods for marketing campaign recipients and email unsubscribes
@@ -52,14 +52,16 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - All back buttons now use transparent backgrounds with colored borders matching app theme
   - Enhanced visual consistency across navigation elements throughout the application
 
-- **Fixed critical appointment payment amount calculation issue:**
-  - Root cause identified: New appointments were created without setting totalAmount from service price
+- **Completely fixed appointment payment amount calculation and display issues:**
+  - Root cause identified: Frontend payment calculations were using service price instead of stored totalAmount
   - Fixed appointment creation API to automatically calculate and store totalAmount from service.price
-  - Updated cash payment processing to calculate amount from service price when totalAmount is missing
-  - Enhanced gift card payment processing with same fallback calculation logic
-  - Existing appointments now automatically get their totalAmount updated during payment processing
-  - Payment checkout dialogs now display correct service amounts instead of $0.00
-  - All payment methods (cash, credit card, gift card) now handle both new and existing appointments correctly
+  - Updated both appointments page and appointment form to prioritize appointment.totalAmount over service price
+  - Fixed appointment form payment section to display correct amount using totalAmount field
+  - Enhanced checkout component data preparation to use totalAmount when available
+  - Updated cash and gift card payment processing with fallback calculation from service price
+  - All payment checkout dialogs now display correct service amounts (e.g., $160.00) instead of $0.00
+  - Payment system handles both new appointments (with totalAmount) and legacy appointments (calculated from service price)
+  - Verified fix working for all payment methods: cash, credit card, and gift card payments
 
 ### June 29, 2025 - PayrollAutoSync System Fix and Service Duplication Resolution
 

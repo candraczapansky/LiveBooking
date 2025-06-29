@@ -652,7 +652,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <span className="text-sm text-muted-foreground">Amount: {formatPrice(selectedService?.price || 0)}</span>
+                        <span className="text-sm text-muted-foreground">Amount: {formatPrice(appointment.totalAmount || selectedService?.price || 0)}</span>
                         <Button
                           type="button"
                           onClick={() => {
