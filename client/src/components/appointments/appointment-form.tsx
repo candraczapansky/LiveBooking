@@ -109,17 +109,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   });
   
   // Get services
-  const { data: services, isLoading: isLoadingServices } = useQuery({
+  const { data: services = [], isLoading: isLoadingServices } = useQuery({
     queryKey: ['/api/services'],
     queryFn: async () => {
-      const response = await fetch('/api/services');
+      const response = await fetch('/api/services?' + new Date().getTime()); // Add timestamp to prevent caching
       if (!response.ok) throw new Error('Failed to fetch services');
-      return response.json();
+      const data = await response.json();
+      console.log('Fresh services data loaded:', data);
+      return data;
     },
     enabled: open,
     staleTime: 0, // Always fetch fresh data
-    refetchOnMount: true,
-    refetchOnWindowFocus: true
+    gcTime: 0, // Don't cache data
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    retry: false // Don't retry on failure
   });
   
   // Get staff
