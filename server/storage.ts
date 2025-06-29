@@ -1729,22 +1729,7 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
-  async getUsersByAudience(audience: string): Promise<User[]> {
-    const allUsers = await this.getAllUsers();
-    
-    switch (audience) {
-      case 'all_clients':
-        return allUsers.filter(user => user.role === 'client');
-      case 'regular_clients':
-        return allUsers.filter(user => user.role === 'client');
-      case 'new_clients':
-        return allUsers.filter(user => user.role === 'client');
-      case 'vip_clients':
-        return allUsers.filter(user => user.role === 'client');
-      default:
-        return allUsers.filter(user => user.role === 'client');
-    }
-  }
+
 
   // Staff Earnings operations
   async createStaffEarnings(earnings: any): Promise<any> {

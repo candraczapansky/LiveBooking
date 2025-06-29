@@ -1,6 +1,6 @@
-import { sendEmail } from './email.js';
-import { sendSMS } from './sms.js';
-import type { DatabaseStorage } from './storage.js';
+import { sendEmail } from './email';
+import { sendSMS } from './sms';
+import type { IStorage } from './storage';
 
 export interface AutomationRule {
   id: number;
@@ -162,7 +162,7 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
 export async function triggerAutomations(
   trigger: AutomationRule['trigger'],
   appointmentData: any,
-  storage: DatabaseStorage,
+  storage: IStorage,
   customTriggerName?: string
 ) {
   console.log(`Triggering automations for: ${trigger}`, { appointmentData, customTriggerName });
