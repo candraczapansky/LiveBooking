@@ -91,17 +91,26 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
-  // Initialize PayrollAutoSync system
-  const payrollAutoSync = new PayrollAutoSync(storage);
-  console.log('PayrollAutoSync system initialized');
-
-  // Add middleware to log all requests
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === 'PUT' && req.url.includes('/services/')) {
-      console.log(`PUT request received: ${req.method} ${req.url}`);
-      console.log('Request body:', JSON.stringify(req.body, null, 2));
+  // Temporarily disable PayrollAutoSync to isolate the crash issue
+  const payrollAutoSync = {
+    triggerPayrollSync: async () => {
+      console.log('PayrollAutoSync temporarily disabled for debugging');
     }
-    next();
+  } as any;
+  console.log('PayrollAutoSync system disabled for debugging');
+
+  // Add middleware to log all requests and catch errors
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.method === 'PUT' && req.url.includes('/services/')) {
+        console.log(`PUT request received: ${req.method} ${req.url}`);
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+      }
+      next();
+    } catch (error) {
+      console.error('Error in middleware:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
   });
 
   // Auth routes
