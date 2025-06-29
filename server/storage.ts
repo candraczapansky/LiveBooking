@@ -103,6 +103,7 @@ export interface IStorage {
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
+  getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]>;
   updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment>;
   deleteAppointment(id: number): Promise<boolean>;
 
@@ -250,83 +251,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private users: Map<number, User>;
-  private serviceCategories: Map<number, ServiceCategory>;
-  private rooms: Map<number, Room>;
-  private devices: Map<number, Device>;
-  private services: Map<number, Service>;
-  private staff: Map<number, Staff>;
-
-  private appointments: Map<number, Appointment>;
-  private memberships: Map<number, Membership>;
-  private clientMemberships: Map<number, ClientMembership>;
-  private payments: Map<number, Payment>;
-  private savedPaymentMethods: Map<number, SavedPaymentMethod>;
-  private giftCards: Map<number, GiftCard>;
-  private giftCardTransactions: Map<number, GiftCardTransaction>;
-  private savedGiftCards: Map<number, SavedGiftCard>;
-  private marketingCampaigns: Map<number, MarketingCampaign>;
-  private marketingCampaignRecipients: Map<number, MarketingCampaignRecipient>;
-  private emailUnsubscribes: Map<number, EmailUnsubscribe>;
-
-  private currentUserId: number;
-  private currentServiceCategoryId: number;
-  private currentRoomId: number;
-  private currentDeviceId: number;
-  private currentServiceId: number;
-  private currentStaffId: number;
-
-  private currentAppointmentId: number;
-  private currentMembershipId: number;
-  private currentClientMembershipId: number;
-  private currentPaymentId: number;
-  private currentSavedPaymentMethodId: number;
-  private currentGiftCardId: number;
-  private currentGiftCardTransactionId: number;
-  private currentSavedGiftCardId: number;
-  private currentMarketingCampaignId: number;
-  private currentMarketingCampaignRecipientId: number;
-  private currentEmailUnsubscribeId: number;
-
   constructor() {
-    this.users = new Map();
-    this.serviceCategories = new Map();
-    this.rooms = new Map();
-    this.devices = new Map();
-    this.services = new Map();
-    this.staff = new Map();
-
-    this.appointments = new Map();
-    this.memberships = new Map();
-    this.clientMemberships = new Map();
-    this.payments = new Map();
-    this.savedPaymentMethods = new Map();
-    this.giftCards = new Map();
-    this.giftCardTransactions = new Map();
-    this.savedGiftCards = new Map();
-    this.marketingCampaigns = new Map();
-    this.marketingCampaignRecipients = new Map();
-    this.emailUnsubscribes = new Map();
-
-    this.currentUserId = 1;
-    this.currentServiceCategoryId = 1;
-    this.currentRoomId = 1;
-    this.currentDeviceId = 1;
-    this.currentServiceId = 1;
-    this.currentStaffId = 1;
-
-    this.currentAppointmentId = 1;
-    this.currentMembershipId = 1;
-    this.currentClientMembershipId = 1;
-    this.currentPaymentId = 1;
-    this.currentSavedPaymentMethodId = 1;
-    this.currentGiftCardId = 1;
-    this.currentGiftCardTransactionId = 1;
-    this.currentSavedGiftCardId = 1;
-    this.currentMarketingCampaignId = 1;
-    this.currentMarketingCampaignRecipientId = 1;
-    this.currentEmailUnsubscribeId = 1;
-
+    // PostgreSQL storage - no in-memory structures needed
     // Initialize with sample data for demo purposes - DISABLED to prevent service duplication
     // this.initializeSampleData();
   }
@@ -1069,6 +995,15 @@ export class DatabaseStorage implements IStorage {
       and(
         gte(appointments.startTime, startOfDay),
         lte(appointments.startTime, endOfDay)
+      )
+    ).orderBy(appointments.startTime);
+  }
+
+  async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]> {
+    return await db.select().from(appointments).where(
+      and(
+        gte(appointments.startTime, startDate),
+        lte(appointments.startTime, endDate)
       )
     ).orderBy(appointments.startTime);
   }
