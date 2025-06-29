@@ -92,8 +92,8 @@ function validateBody<T>(schema: z.ZodType<T>) {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
   // Initialize PayrollAutoSync system
-  const payrollAutoSync = new PayrollAutoSync(storage);
-  console.log('PayrollAutoSync system initialized');
+  // const payrollAutoSync = new PayrollAutoSync(storage);
+  // console.log('PayrollAutoSync system initialized');
 
   // Add middleware to log all requests
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -3505,11 +3505,11 @@ If you didn't request this password reset, please ignore this email and your pas
       console.log(`[TEST] Manual trigger for automatic payroll sync - Staff ID: ${staffId}`);
       
       // Trigger the automatic sync
-      await payrollAutoSync.triggerPayrollSync(staffId, 'manual');
+      // await payrollAutoSync.triggerPayrollSync(staffId, 'manual');
       
       res.json({
         success: true,
-        message: `Automatic payroll sync triggered for staff ${staffId}`,
+        message: `Automatic payroll sync triggered for staff ${staffId} (temporarily disabled)`,
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
