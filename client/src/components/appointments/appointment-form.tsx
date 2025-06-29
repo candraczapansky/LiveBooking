@@ -237,13 +237,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;
-      const errorMessage = error.response?.data?.message || error.message || "Failed to create appointment.";
+      const errorData = error.response?.data;
+      
+      // Try different possible error message fields
+      const errorMessage = errorData?.message || errorData?.error || error.message || "Failed to create appointment.";
+      
+      console.log('Appointment creation error:', { error, errorData, errorMessage, isConflict });
       
       toast({
-        title: isConflict ? "⚠️ Scheduling Conflict" : "Error",
+        title: isConflict ? "⚠️ Scheduling Conflict" : "❌ Error",
         description: errorMessage,
         variant: "destructive",
-        duration: isConflict ? 8000 : 5000, // Show conflict messages longer
+        duration: isConflict ? 10000 : 5000, // Show conflict messages even longer
       });
     },
   });
@@ -284,13 +289,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;
-      const errorMessage = error.response?.data?.message || error.message || "Failed to update appointment.";
+      const errorData = error.response?.data;
+      
+      // Try different possible error message fields
+      const errorMessage = errorData?.message || errorData?.error || error.message || "Failed to update appointment.";
+      
+      console.log('Appointment update error:', { error, errorData, errorMessage, isConflict });
       
       toast({
-        title: isConflict ? "⚠️ Scheduling Conflict" : "Error", 
+        title: isConflict ? "⚠️ Scheduling Conflict" : "❌ Error", 
         description: errorMessage,
         variant: "destructive",
-        duration: isConflict ? 8000 : 5000, // Show conflict messages longer
+        duration: isConflict ? 10000 : 5000, // Show conflict messages even longer
       });
     },
   });

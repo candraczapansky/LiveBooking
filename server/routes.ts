@@ -1041,7 +1041,7 @@ If you didn't request this password reset, please ignore this email and your pas
     const newStart = new Date(startTime);
     const newEnd = new Date(endTime);
     
-    const hasOverlap = existingAppointments.some(appointment => {
+    const conflictingAppointment = existingAppointments.find(appointment => {
       const existingStart = new Date(appointment.startTime);
       const existingEnd = new Date(appointment.endTime);
       
@@ -1049,10 +1049,21 @@ If you didn't request this password reset, please ignore this email and your pas
       return newStart < existingEnd && newEnd > existingStart;
     });
     
-    if (hasOverlap) {
+    if (conflictingAppointment) {
+      const conflictStart = new Date(conflictingAppointment.startTime).toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      const conflictEnd = new Date(conflictingAppointment.endTime).toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+      
       return res.status(409).json({ 
-        error: "Appointment conflicts with existing booking", 
-        message: "The selected time slot overlaps with an existing appointment for this staff member. Please choose a different time."
+        error: "Scheduling Conflict",
+        message: `This time slot conflicts with an existing appointment (${conflictStart} - ${conflictEnd}). Please choose a different time slot.`
       });
     }
     
@@ -1175,7 +1186,7 @@ If you didn't request this password reset, please ignore this email and your pas
         const newStart = new Date(startTime);
         const newEnd = new Date(endTime);
         
-        const hasOverlap = staffAppointments.some(appointment => {
+        const conflictingAppointment = staffAppointments.find(appointment => {
           // Skip checking against the current appointment being updated
           if (appointment.id === id) return false;
           
@@ -1186,10 +1197,21 @@ If you didn't request this password reset, please ignore this email and your pas
           return newStart < existingEnd && newEnd > existingStart;
         });
         
-        if (hasOverlap) {
+        if (conflictingAppointment) {
+          const conflictStart = new Date(conflictingAppointment.startTime).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+          const conflictEnd = new Date(conflictingAppointment.endTime).toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit', 
+            hour12: true 
+          });
+          
           return res.status(409).json({ 
-            error: "Appointment conflicts with existing booking", 
-            message: "The updated time slot overlaps with an existing appointment for this staff member. Please choose a different time."
+            error: "Scheduling Conflict",
+            message: `The updated time slot conflicts with an existing appointment (${conflictStart} - ${conflictEnd}). Please choose a different time slot.`
           });
         }
       }
