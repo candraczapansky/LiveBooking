@@ -129,9 +129,12 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         fetch(`/api/services/${serviceId}/staff`).then(res => res.json())
       ])
         .then(([serviceData, staffData]) => {
-          // The API returns staffServiceId, not regular staff records
-          // For now, set assignedStaff to empty array to allow form to work
-          const assignedStaff: any[] = [];
+          // Transform staff data to match form requirements
+          const assignedStaff = staffData.map((staff: any) => ({
+            staffId: staff.id,
+            customRate: staff.customRate || undefined,
+            customCommissionRate: staff.customCommissionRate || undefined,
+          }));
           
           form.reset({
             name: serviceData.name,

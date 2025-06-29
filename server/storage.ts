@@ -256,7 +256,7 @@ export class DatabaseStorage implements IStorage {
   private devices: Map<number, Device>;
   private services: Map<number, Service>;
   private staff: Map<number, Staff>;
-  private staffServices: Map<number, StaffService>;
+
   private appointments: Map<number, Appointment>;
   private memberships: Map<number, Membership>;
   private clientMemberships: Map<number, ClientMembership>;
@@ -930,57 +930,73 @@ export class DatabaseStorage implements IStorage {
 
   // Staff Service operations
   async assignServiceToStaff(staffService: InsertStaffService): Promise<StaffService> {
-    const id = this.currentStaffServiceId++;
-    const newStaffService: StaffService = { 
-      ...staffService, 
-      id,
-      customRate: staffService.customRate || null,
-      customCommissionRate: staffService.customCommissionRate || null
-    };
-    this.staffServices.set(id, newStaffService);
-    return newStaffService;
+    try {
+      const [newStaffService] = await db.insert(staffServices).values(staffService).returning();
+      return newStaffService;
+    } catch (error) {
+      console.error('Error assigning service to staff:', error);
+      throw error;
+    }
   }
 
   async getStaffServices(staffId: number): Promise<StaffService[]> {
-    return Array.from(this.staffServices.values()).filter(
-      (staffService) => staffService.staffId === staffId
-    );
+    try {
+      return await db.select().from(staffServices).where(eq(staffServices.staffId, staffId));
+    } catch (error) {
+      console.error('Error getting staff services:', error);
+      return [];
+    }
   }
 
   async getStaffServicesByService(serviceId: number): Promise<StaffService[]> {
-    return Array.from(this.staffServices.values()).filter(
-      (staffService) => staffService.serviceId === serviceId
-    );
+    try {
+      return await db.select().from(staffServices).where(eq(staffServices.serviceId, serviceId));
+    } catch (error) {
+      console.error('Error getting staff services by service:', error);
+      return [];
+    }
   }
 
   async getStaffServiceById(id: number): Promise<StaffService | undefined> {
-    return this.staffServices.get(id);
+    try {
+      const [staffService] = await db.select().from(staffServices).where(eq(staffServices.id, id));
+      return staffService;
+    } catch (error) {
+      console.error('Error getting staff service by id:', error);
+      return undefined;
+    }
   }
 
   async updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService> {
-    const existingStaffService = this.staffServices.get(id);
-    if (!existingStaffService) {
-      throw new Error("Staff service not found");
+    try {
+      const [updatedStaffService] = await db
+        .update(staffServices)
+        .set(data)
+        .where(eq(staffServices.id, id))
+        .returning();
+      
+      if (!updatedStaffService) {
+        throw new Error("Staff service not found");
+      }
+      
+      return updatedStaffService;
+    } catch (error) {
+      console.error('Error updating staff service:', error);
+      throw error;
     }
-
-    const updatedStaffService: StaffService = {
-      ...existingStaffService,
-      ...data,
-    };
-
-    this.staffServices.set(id, updatedStaffService);
-    return updatedStaffService;
   }
 
   async removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean> {
-    const staffServiceToRemove = Array.from(this.staffServices.values()).find(
-      (staffService) => staffService.staffId === staffId && staffService.serviceId === serviceId
-    );
-
-    if (staffServiceToRemove) {
-      return this.staffServices.delete(staffServiceToRemove.id);
+    try {
+      const result = await db
+        .delete(staffServices)
+        .where(and(eq(staffServices.staffId, staffId), eq(staffServices.serviceId, serviceId)));
+      
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error removing service from staff:', error);
+      return false;
     }
-    return false;
   }
 
   // Appointment operations
