@@ -821,8 +821,13 @@ If you didn't request this password reset, please ignore this email and your pas
   
   // Staff Services routes
   app.get("/api/staff-services", async (req, res) => {
-    const allStaffServices = Array.from((storage as any).staffServices.values());
-    return res.status(200).json(allStaffServices);
+    try {
+      const allStaffServices = await storage.getAllStaffServices();
+      return res.status(200).json(allStaffServices);
+    } catch (error: any) {
+      console.error('Error fetching all staff services:', error);
+      return res.status(500).json({ error: "Failed to fetch staff services: " + error.message });
+    }
   });
 
   app.post("/api/staff-services", validateBody(staffServiceWithRatesSchema), async (req, res) => {
