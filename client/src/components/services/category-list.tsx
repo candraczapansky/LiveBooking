@@ -230,7 +230,7 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
               categories?.map((category: ServiceCategory) => (
                 <div 
                   key={category.id} 
-                  className={`px-4 py-3 ${selectedCategoryId === category.id ? 'bg-primary bg-opacity-10 border-l-4 border-primary' : ''}`}
+                  className={`px-4 py-3 ${selectedCategoryId === category.id ? 'border border-primary bg-transparent rounded-md mx-2' : 'mx-2'}`}
                 >
                   <div className="flex items-center justify-between">
                     <span 
