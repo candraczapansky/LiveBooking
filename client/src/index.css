@@ -188,24 +188,6 @@ button svg:not([data-hamburger]) {
   fill: currentColor !important;
 }
 
-/* Primary button icons should use primary-foreground color for contrast */
-button[class*="bg-primary"] svg,
-.bg-primary svg {
-  color: hsl(var(--primary-foreground)) !important;
-}
-
-/* Secondary button icons should use primary-foreground color for contrast */
-button[class*="bg-secondary"] svg,
-.bg-secondary svg {
-  color: hsl(var(--secondary-foreground)) !important;
-}
-
-/* Outline button icons use custom text color */
-button[class*="variant-outline"] svg,
-.variant-outline svg {
-  color: var(--text-primary) !important;
-}
-
 .force-border-normal:focus,
 input.force-border-normal:focus,
 input.force-border-normal:focus:invalid,
