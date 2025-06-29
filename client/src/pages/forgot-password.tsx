@@ -94,7 +94,7 @@ const ForgotPassword = () => {
                     Try Different Email
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="default"
                     onClick={() => navigate("/login")}
                     className="w-full flex items-center gap-2"
                   >

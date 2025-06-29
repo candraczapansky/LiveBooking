@@ -126,7 +126,7 @@ const ResetPassword = () => {
                     Request New Reset Link
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="default"
                     onClick={() => navigate("/login")}
                     className="w-full"
                   >

@@ -81,7 +81,7 @@ export default function StaffScheduleDetailPage() {
         <div className="text-center py-8">
           <h1 className="text-2xl font-bold mb-4">Staff Member Not Found</h1>
           <Link href="/staff-schedule">
-            <Button>
+            <Button variant="default">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Staff Schedule
             </Button>

@@ -1352,14 +1352,10 @@ const ReportsPage = () => {
                 <div className="flex items-start">
                   {selectedReport && (
                     <Button 
-                      variant="ghost" 
+                      variant="default" 
                       size="sm" 
                       onClick={() => setSelectedReport(null)}
-                      className="mr-3 min-h-[44px] flex-shrink-0 hover:bg-primary/10"
-                      style={{ 
-                        backgroundColor: 'hsl(var(--primary))',
-                        color: 'hsl(var(--primary-foreground))'
-                      }}
+                      className="mr-3 min-h-[44px] flex-shrink-0"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back
