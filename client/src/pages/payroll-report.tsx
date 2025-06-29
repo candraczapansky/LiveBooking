@@ -53,9 +53,19 @@ export default function PayrollReport() {
   });
 
   // Fetch users to get staff member names
-  const { data: users } = useQuery({
+  const { data: users, refetch: refetchUsers } = useQuery({
     queryKey: ['/api/users'],
   });
+
+  // Refresh all data to get latest user information
+  const refreshData = async () => {
+    await Promise.all([
+      refetchUsers(),
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] })
+    ]);
+  };
 
   // Fetch staff services (to get custom rates)
   const { data: staffServices } = useQuery({
@@ -419,10 +429,21 @@ export default function PayrollReport() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            Report Filters
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Report Filters
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={refreshData}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh Data
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

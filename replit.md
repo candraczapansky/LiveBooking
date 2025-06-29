@@ -52,7 +52,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automated email/SMS delivery with dynamic template variable replacement
   - System now automatically sends appropriate communications based on appointment lifecycle events
 
-### June 28, 2025 - Complete UI Color Theming Implementation, Browser Autofill Investigation, User Profile Database Update Resolution, Forgot Password Feature, and Payroll Sync Enhancement
+### June 28, 2025 - Complete UI Color Theming Implementation, Browser Autofill Investigation, User Profile Database Update Resolution, Forgot Password Feature, Payroll Sync Enhancement, and Appointment Data Persistence Fix
 
 - **Implemented complete forgot password functionality:**
   - Added resetToken and resetTokenExpiry fields to users database schema
@@ -78,6 +78,20 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automatic sync functionality ready for production once SalonStaffDashboard URL is accessible
   - Comprehensive logging shows attempted URLs and connection status for debugging
   - Real-time sync ensures external dashboard always has up-to-date payroll information
+
+- **Fixed critical appointment data persistence issue:**
+  - Resolved appointment data loss by migrating all appointment operations from in-memory storage to PostgreSQL database
+  - Updated createAppointment, updateAppointment, deleteAppointment, and getAllAppointments methods to use database queries
+  - Added comprehensive appointment history tracking for all create, update, and delete operations
+  - Fixed /api/appointments route to use database storage instead of memory Maps, preventing data loss on server restarts
+  - All appointment data now persists permanently across system changes and server restarts
+
+- **Fixed payroll report staff name display issues:**
+  - Added automatic cache invalidation for user data when staff information is updated
+  - Implemented manual "Refresh Data" button in payroll report for immediate data refresh
+  - Updated both create and update staff mutations to invalidate users cache alongside staff cache
+  - Payroll reports now consistently display current staff member names after updates
+  - System ensures payroll data synchronization with latest staff information
 
 ### June 28, 2025 - Complete UI Color Theming Implementation, Browser Autofill Investigation, and User Profile Database Update Resolution
 
