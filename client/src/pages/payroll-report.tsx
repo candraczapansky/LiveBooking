@@ -13,8 +13,8 @@ import { apiRequest } from "@/lib/queryClient";
 
 interface PayrollReportProps {
   timePeriod: string;
-  customStartDate: Date | null;
-  customEndDate: Date | null;
+  customStartDate?: string;
+  customEndDate?: string;
 }
 
 interface PayrollData {
@@ -121,8 +121,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     let rangeEnd: Date;
 
     if (timePeriod === 'custom' && customStartDate && customEndDate) {
-      rangeStart = startOfDay(customStartDate);
-      rangeEnd = endOfDay(customEndDate);
+      rangeStart = startOfDay(new Date(customStartDate));
+      rangeEnd = endOfDay(new Date(customEndDate));
     } else {
       // Use month selection as fallback
       rangeStart = startOfMonth(selectedMonth);
@@ -235,7 +235,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         appointments: staffAppointments,
       };
     });
-  }, [staff, users, services, appointments, staffServices, selectedMonth]);
+  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate]);
 
   // Filter by selected staff member
   const filteredPayrollData = selectedStaff === "all" 
@@ -394,7 +394,11 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Payroll Report</h2>
           <p className="text-muted-foreground">
-            Track staff earnings and commission for {format(selectedMonth, 'MMMM yyyy')}
+            {timePeriod === 'custom' && customStartDate && customEndDate ? (
+              `Track staff earnings and commission from ${format(new Date(customStartDate), 'MMM dd, yyyy')} to ${format(new Date(customEndDate), 'MMM dd, yyyy')}`
+            ) : (
+              `Track staff earnings and commission for ${format(selectedMonth, 'MMMM yyyy')}`
+            )}
           </p>
         </div>
         
