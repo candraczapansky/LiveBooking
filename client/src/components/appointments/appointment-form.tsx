@@ -457,14 +457,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {services?.map((service: any) => {
-                            console.log('Rendering service in dropdown:', service);
-                            return (
-                              <SelectItem key={service.id} value={service.id.toString()}>
-                                {service.name} - {formatPrice(service.price)}
-                              </SelectItem>
-                            );
-                          })}
+                          {services?.filter((service: any) => service && service.id && service.name)
+                            .map((service: any) => {
+                              console.log('Rendering service in dropdown:', service);
+                              return (
+                                <SelectItem key={service.id} value={service.id.toString()}>
+                                  {service.name} - {formatPrice(service.price)}
+                                </SelectItem>
+                              );
+                            })}
                         </SelectContent>
                       </Select>
                     </FormControl>
