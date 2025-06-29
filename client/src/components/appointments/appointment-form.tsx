@@ -721,7 +721,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
             })(),
             startTime: new Date(appointment.startTime),
             endTime: new Date(appointment.endTime),
-            amount: (() => {
+            amount: appointment.totalAmount || (() => {
               const service = services.find((s: any) => s.id === appointment.serviceId);
               return service?.price || 0;
             })(),

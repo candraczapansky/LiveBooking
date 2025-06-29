@@ -226,6 +226,9 @@ const AppointmentsPage = () => {
     const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
     const client = users?.find((u: any) => u.id === appointment.clientId);
     
+    // Use totalAmount from appointment if available, otherwise fallback to service price
+    const paymentAmount = appointment.totalAmount || service?.price || 0;
+    
     const checkoutData = {
       id: appointment.id,
       clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
@@ -233,7 +236,7 @@ const AppointmentsPage = () => {
       staffName: staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff',
       startTime: new Date(appointment.startTime),
       endTime: new Date(appointment.endTime),
-      amount: service?.price || 0,
+      amount: paymentAmount,
       status: appointment.status,
       paymentStatus: appointment.paymentStatus || 'unpaid'
     };
