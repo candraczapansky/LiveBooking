@@ -1348,7 +1348,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMarketingCampaign(id: number): Promise<boolean> {
     const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Marketing Campaign Recipient operations
@@ -1520,13 +1520,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]> {
-    return Array.from(this.emailUnsubscribes.values());
+    return await db.select().from(emailUnsubscribes);
   }
 
   async isUserUnsubscribed(email: string): Promise<boolean> {
-    return Array.from(this.emailUnsubscribes.values()).some(
-      unsubscribe => unsubscribe.email === email
-    );
+    const [result] = await db.select().from(emailUnsubscribes).where(eq(emailUnsubscribes.email, email));
+    return !!result;
   }
 
   // Product operations
