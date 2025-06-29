@@ -1347,15 +1347,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteMarketingCampaign(id: number): Promise<boolean> {
-    return this.marketingCampaigns.delete(id);
+    const result = await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+    return result.rowCount > 0;
   }
 
   // Marketing Campaign Recipient operations
   async createMarketingCampaignRecipient(recipient: InsertMarketingCampaignRecipient): Promise<MarketingCampaignRecipient> {
-    const id = this.currentMarketingCampaignRecipientId++;
     const trackingToken = this.generateTrackingToken();
-    const newRecipient: MarketingCampaignRecipient = {
-      id,
+    const newRecipient = {
       campaignId: recipient.campaignId,
       userId: recipient.userId,
       status: recipient.status || "pending",
@@ -1367,8 +1366,9 @@ export class DatabaseStorage implements IStorage {
       trackingToken,
       errorMessage: recipient.errorMessage || null,
     };
-    this.marketingCampaignRecipients.set(id, newRecipient);
-    return newRecipient;
+    
+    const [created] = await db.insert(marketingCampaignRecipients).values(newRecipient).returning();
+    return created;
   }
 
   private generateTrackingToken(): string {
@@ -1376,26 +1376,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined> {
-    return this.marketingCampaignRecipients.get(id);
+    const [result] = await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.id, id));
+    return result;
   }
 
   async getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]> {
-    return Array.from(this.marketingCampaignRecipients.values()).filter(
-      recipient => recipient.campaignId === campaignId
-    );
+    return await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.campaignId, campaignId));
   }
 
   async updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient> {
-    const existingRecipient = this.marketingCampaignRecipients.get(id);
-    if (!existingRecipient) {
+    const [updatedRecipient] = await db.update(marketingCampaignRecipients)
+      .set(data)
+      .where(eq(marketingCampaignRecipients.id, id))
+      .returning();
+    
+    if (!updatedRecipient) {
       throw new Error(`Marketing campaign recipient with id ${id} not found`);
     }
-
-    const updatedRecipient: MarketingCampaignRecipient = {
-      ...existingRecipient,
-      ...data,
-    };
-    this.marketingCampaignRecipients.set(id, updatedRecipient);
+    
     return updatedRecipient;
   }
 
@@ -1498,15 +1496,12 @@ export class DatabaseStorage implements IStorage {
 
   // Email tracking methods
   async getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined> {
-    return Array.from(this.marketingCampaignRecipients.values()).find(
-      recipient => recipient.trackingToken === token
-    );
+    const [result] = await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.trackingToken, token));
+    return result;
   }
 
   async createEmailUnsubscribe(unsubscribe: InsertEmailUnsubscribe): Promise<EmailUnsubscribe> {
-    const id = this.currentEmailUnsubscribeId++;
-    const newUnsubscribe: EmailUnsubscribe = {
-      id,
+    const newUnsubscribe = {
       userId: unsubscribe.userId,
       email: unsubscribe.email,
       unsubscribedAt: new Date(),
@@ -1514,14 +1509,14 @@ export class DatabaseStorage implements IStorage {
       reason: unsubscribe.reason || null,
       ipAddress: unsubscribe.ipAddress || null,
     };
-    this.emailUnsubscribes.set(id, newUnsubscribe);
-    return newUnsubscribe;
+    
+    const [created] = await db.insert(emailUnsubscribes).values(newUnsubscribe).returning();
+    return created;
   }
 
   async getEmailUnsubscribe(userId: number): Promise<EmailUnsubscribe | undefined> {
-    return Array.from(this.emailUnsubscribes.values()).find(
-      unsubscribe => unsubscribe.userId === userId
-    );
+    const [result] = await db.select().from(emailUnsubscribes).where(eq(emailUnsubscribes.userId, userId));
+    return result;
   }
 
   async getAllEmailUnsubscribes(): Promise<EmailUnsubscribe[]> {
