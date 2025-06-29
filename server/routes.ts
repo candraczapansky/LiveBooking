@@ -1066,7 +1066,19 @@ If you didn't request this password reset, please ignore this email and your pas
       });
     }
     
-    const newAppointment = await storage.createAppointment(req.body);
+    // Get service details to calculate total amount
+    const service = await storage.getService(req.body.serviceId);
+    if (!service) {
+      return res.status(404).json({ error: "Service not found" });
+    }
+    
+    // Create appointment data with calculated total amount
+    const appointmentData = {
+      ...req.body,
+      totalAmount: service.price // Set totalAmount from service price
+    };
+    
+    const newAppointment = await storage.createAppointment(appointmentData);
     
     // Create appointment history record for creation
     try {
@@ -1498,16 +1510,30 @@ If you didn't request this password reset, please ignore this email and your pas
         return res.status(404).json({ error: "Appointment not found" });
       }
 
-      // Update appointment status to paid
-      await storage.updateAppointment(appointmentId, {
-        status: 'confirmed',
-        paymentStatus: 'paid'
-      });
+      // Calculate payment amount - use totalAmount if set, otherwise get from service price
+      let paymentAmount = appointment.totalAmount;
+      if (!paymentAmount) {
+        const service = await storage.getService(appointment.serviceId);
+        paymentAmount = service?.price || 0;
+        
+        // Update the appointment with the correct totalAmount for future use
+        await storage.updateAppointment(appointmentId, {
+          status: 'confirmed',
+          paymentStatus: 'paid',
+          totalAmount: paymentAmount
+        });
+      } else {
+        // Update appointment status to paid
+        await storage.updateAppointment(appointmentId, {
+          status: 'confirmed',
+          paymentStatus: 'paid'
+        });
+      }
 
       // Create payment record for cash payment
       const payment = await storage.createPayment({
         clientId: appointment.clientId,
-        amount: appointment.totalAmount || 0,
+        amount: paymentAmount,
         method: 'cash',
         status: 'completed',
         appointmentId: appointmentId
@@ -1579,8 +1605,14 @@ If you didn't request this password reset, please ignore this email and your pas
         return res.status(400).json({ error: "Gift card has expired" });
       }
 
+      // Calculate payment amount - use totalAmount if set, otherwise get from service price
+      let appointmentAmount = appointment.totalAmount;
+      if (!appointmentAmount) {
+        const service = await storage.getService(appointment.serviceId);
+        appointmentAmount = service?.price || 0;
+      }
+
       // Check if gift card has sufficient balance
-      const appointmentAmount = appointment.totalAmount || 0;
       if (giftCard.currentBalance < appointmentAmount) {
         return res.status(400).json({ 
           error: `Insufficient gift card balance. Available: $${giftCard.currentBalance.toFixed(2)}, Required: $${appointmentAmount.toFixed(2)}` 
@@ -1604,11 +1636,18 @@ If you didn't request this password reset, please ignore this email and your pas
         notes: `Payment for appointment #${appointmentId}`
       });
 
-      // Update appointment status to paid
-      await storage.updateAppointment(appointmentId, {
+      // Update appointment status to paid and set totalAmount if missing
+      const updateData: any = {
         status: 'confirmed',
         paymentStatus: 'paid'
-      });
+      };
+      
+      // If appointment didn't have totalAmount set, update it for future use
+      if (!appointment.totalAmount) {
+        updateData.totalAmount = appointmentAmount;
+      }
+      
+      await storage.updateAppointment(appointmentId, updateData);
 
       // Create payment record for gift card payment
       await storage.createPayment({

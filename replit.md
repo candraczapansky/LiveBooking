@@ -13,7 +13,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, and Consistent Back Button Styling
+### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, and Appointment Payment Amount Fix
 
 - **Successfully resolved SMS marketing campaign issues and verified functionality:**
   - Fixed all database storage methods for marketing campaign recipients and email unsubscribes
@@ -51,6 +51,15 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Removed inline styling that overrode the application's unified design system
   - All back buttons now use transparent backgrounds with colored borders matching app theme
   - Enhanced visual consistency across navigation elements throughout the application
+
+- **Fixed critical appointment payment amount calculation issue:**
+  - Root cause identified: New appointments were created without setting totalAmount from service price
+  - Fixed appointment creation API to automatically calculate and store totalAmount from service.price
+  - Updated cash payment processing to calculate amount from service price when totalAmount is missing
+  - Enhanced gift card payment processing with same fallback calculation logic
+  - Existing appointments now automatically get their totalAmount updated during payment processing
+  - Payment checkout dialogs now display correct service amounts instead of $0.00
+  - All payment methods (cash, credit card, gift card) now handle both new and existing appointments correctly
 
 ### June 29, 2025 - PayrollAutoSync System Fix and Service Duplication Resolution
 
