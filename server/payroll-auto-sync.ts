@@ -78,6 +78,9 @@ class PayrollAutoSync {
       throw new Error(`Staff ${staffId} not found`);
     }
 
+    // Get user details for the staff member
+    const staffUser = await this.storage.getUser(targetStaff.userId);
+
     // Get staff earnings for the month
     const staffEarnings = await this.storage.getStaffEarnings(staffId);
     
@@ -102,8 +105,8 @@ class PayrollAutoSync {
     return {
       staffId,
       userId: targetStaff.userId,
-      staffName: `${targetStaff.user?.firstName || ''} ${targetStaff.user?.lastName || ''}`.trim(),
-      email: targetStaff.user?.email || '',
+      staffName: `${staffUser?.firstName || ''} ${staffUser?.lastName || ''}`.trim(),
+      email: staffUser?.email || '',
       title: targetStaff.title,
       commissionType: targetStaff.commissionType,
       baseCommissionRate: targetStaff.commissionRate || 0,
