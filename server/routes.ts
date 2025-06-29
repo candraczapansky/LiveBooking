@@ -3733,7 +3733,12 @@ If you didn't request this password reset, please ignore this email and your pas
       const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
       
       // Get time clock entries
-      const staffTimeEntries = await storage.getTimeClockEntriesByStaffId(staffId, monthStart, monthEnd);
+      const allTimeEntries = await storage.getTimeClockEntriesByStaffId(staffId);
+      const staffTimeEntries = allTimeEntries.filter((entry: any) => {
+        if (!entry.clockInTime) return false;
+        const entryDate = new Date(entry.clockInTime);
+        return entryDate >= monthStart && entryDate <= monthEnd;
+      });
 
       // Calculate totals
       const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
