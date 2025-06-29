@@ -92,8 +92,8 @@ function validateBody<T>(schema: z.ZodType<T>) {
 
 export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
   // Initialize PayrollAutoSync system
-  // const payrollAutoSync = new PayrollAutoSync(storage);
-  // console.log('PayrollAutoSync system initialized');
+  const payrollAutoSync = new PayrollAutoSync(storage);
+  console.log('PayrollAutoSync system initialized');
 
   // Add middleware to log all requests
   app.use((req: Request, res: Response, next: NextFunction) => {

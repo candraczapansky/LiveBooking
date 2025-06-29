@@ -720,32 +720,30 @@ export class DatabaseStorage implements IStorage {
 
   // Device operations
   async createDevice(device: InsertDevice): Promise<Device> {
-    const id = this.currentDeviceId++;
-    const newDevice = { ...device, id } as Device;
-    this.devices.set(id, newDevice);
+    const [newDevice] = await db.insert(devices).values(device).returning();
     return newDevice;
   }
 
   async getDevice(id: number): Promise<Device | undefined> {
-    return this.devices.get(id);
+    const result = await db.select().from(devices).where(eq(devices.id, id));
+    return result[0];
   }
 
   async getAllDevices(): Promise<Device[]> {
-    return Array.from(this.devices.values());
+    return await db.select().from(devices);
   }
 
   async updateDevice(id: number, deviceData: Partial<InsertDevice>): Promise<Device> {
-    const existingDevice = this.devices.get(id);
-    if (!existingDevice) {
+    const [updatedDevice] = await db.update(devices).set(deviceData).where(eq(devices.id, id)).returning();
+    if (!updatedDevice) {
       throw new Error(`Device with id ${id} not found`);
     }
-    const updatedDevice: Device = { ...existingDevice, ...deviceData };
-    this.devices.set(id, updatedDevice);
     return updatedDevice;
   }
 
   async deleteDevice(id: number): Promise<boolean> {
-    return this.devices.delete(id);
+    const result = await db.delete(devices).where(eq(devices.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Service operations
@@ -1091,158 +1089,126 @@ export class DatabaseStorage implements IStorage {
 
   // Membership operations
   async createMembership(membership: InsertMembership): Promise<Membership> {
-    const id = this.currentMembershipId++;
-    const newMembership = { ...membership, id } as Membership;
-    this.memberships.set(id, newMembership);
+    const [newMembership] = await db.insert(memberships).values(membership).returning();
     return newMembership;
   }
 
   async getMembership(id: number): Promise<Membership | undefined> {
-    return this.memberships.get(id);
+    const result = await db.select().from(memberships).where(eq(memberships.id, id));
+    return result[0];
   }
 
   async getAllMemberships(): Promise<Membership[]> {
-    return Array.from(this.memberships.values());
+    return await db.select().from(memberships);
   }
 
   async updateMembership(id: number, membershipData: Partial<InsertMembership>): Promise<Membership> {
-    const membership = await this.getMembership(id);
-    if (!membership) {
+    const [updatedMembership] = await db.update(memberships).set(membershipData).where(eq(memberships.id, id)).returning();
+    if (!updatedMembership) {
       throw new Error('Membership not found');
     }
-    const updatedMembership = { ...membership, ...membershipData };
-    this.memberships.set(id, updatedMembership);
     return updatedMembership;
   }
 
   async deleteMembership(id: number): Promise<boolean> {
-    return this.memberships.delete(id);
+    const result = await db.delete(memberships).where(eq(memberships.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Client Membership operations
   async createClientMembership(clientMembership: InsertClientMembership): Promise<ClientMembership> {
-    const id = this.currentClientMembershipId++;
-    const newClientMembership = { ...clientMembership, id } as ClientMembership;
-    this.clientMemberships.set(id, newClientMembership);
+    const [newClientMembership] = await db.insert(clientMemberships).values(clientMembership).returning();
     return newClientMembership;
   }
 
   async getClientMembership(id: number): Promise<ClientMembership | undefined> {
-    return this.clientMemberships.get(id);
+    const result = await db.select().from(clientMemberships).where(eq(clientMemberships.id, id));
+    return result[0];
   }
 
   async getClientMembershipsByClient(clientId: number): Promise<ClientMembership[]> {
-    return Array.from(this.clientMemberships.values()).filter(
-      (clientMembership) => clientMembership.clientId === clientId
-    );
+    return await db.select().from(clientMemberships).where(eq(clientMemberships.clientId, clientId));
   }
 
   async updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership> {
-    const clientMembership = await this.getClientMembership(id);
-    if (!clientMembership) {
+    const [updatedClientMembership] = await db.update(clientMemberships).set(data).where(eq(clientMemberships.id, id)).returning();
+    if (!updatedClientMembership) {
       throw new Error('Client membership not found');
     }
-    const updatedClientMembership = { ...clientMembership, ...data };
-    this.clientMemberships.set(id, updatedClientMembership);
     return updatedClientMembership;
   }
 
   async deleteClientMembership(id: number): Promise<boolean> {
-    return this.clientMemberships.delete(id);
+    const result = await db.delete(clientMemberships).where(eq(clientMemberships.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Payment operations
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const id = this.currentPaymentId++;
-    // @ts-ignore - Type assertion for demo data
-    const newPayment = { ...payment, id, createdAt: new Date() } as Payment;
-    this.payments.set(id, newPayment);
+    const [newPayment] = await db.insert(payments).values(payment).returning();
     return newPayment;
   }
 
   async getPayment(id: number): Promise<Payment | undefined> {
-    return this.payments.get(id);
+    const result = await db.select().from(payments).where(eq(payments.id, id));
+    return result[0];
   }
 
   async getPaymentsByClient(clientId: number): Promise<Payment[]> {
-    // Get all client's appointments
-    const clientAppointments = await this.getAppointmentsByClient(clientId);
-    const appointmentIds = clientAppointments.map(appointment => appointment.id);
-    
-    // Get all client's memberships
-    const clientMemberships = await this.getClientMembershipsByClient(clientId);
-    const membershipIds = clientMemberships.map(membership => membership.id);
-    
-    // Get payments related to appointments or memberships
-    return Array.from(this.payments.values()).filter(
-      (payment) => 
-        (payment.appointmentId && appointmentIds.includes(payment.appointmentId)) ||
-        (payment.clientMembershipId && membershipIds.includes(payment.clientMembershipId))
-    );
+    return await db.select().from(payments).where(eq(payments.clientId, clientId));
   }
 
   async getAllPayments(): Promise<Payment[]> {
-    return Array.from(this.payments.values());
+    return await db.select().from(payments);
   }
 
   async updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment> {
-    const payment = await this.getPayment(id);
-    if (!payment) {
+    const [updatedPayment] = await db.update(payments).set(paymentData).where(eq(payments.id, id)).returning();
+    if (!updatedPayment) {
       throw new Error('Payment not found');
     }
-    const updatedPayment = { ...payment, ...paymentData };
-    this.payments.set(id, updatedPayment);
     return updatedPayment;
   }
 
   // Saved Payment Methods operations
   async createSavedPaymentMethod(paymentMethod: InsertSavedPaymentMethod): Promise<SavedPaymentMethod> {
-    const id = this.currentSavedPaymentMethodId++;
-    const savedMethod: SavedPaymentMethod = {
-      id,
-      ...paymentMethod,
-      isDefault: paymentMethod.isDefault || false,
-      createdAt: new Date()
-    };
-    this.savedPaymentMethods.set(id, savedMethod);
-    return savedMethod;
+    const [newPaymentMethod] = await db.insert(savedPaymentMethods).values(paymentMethod).returning();
+    return newPaymentMethod;
   }
 
   async getSavedPaymentMethod(id: number): Promise<SavedPaymentMethod | undefined> {
-    return this.savedPaymentMethods.get(id);
+    const result = await db.select().from(savedPaymentMethods).where(eq(savedPaymentMethods.id, id));
+    return result[0];
   }
 
   async getSavedPaymentMethodsByClient(clientId: number): Promise<SavedPaymentMethod[]> {
-    return Array.from(this.savedPaymentMethods.values()).filter(
-      method => method.clientId === clientId
-    );
+    return await db.select().from(savedPaymentMethods).where(eq(savedPaymentMethods.clientId, clientId));
   }
 
   async updateSavedPaymentMethod(id: number, data: Partial<InsertSavedPaymentMethod>): Promise<SavedPaymentMethod> {
-    const method = await this.getSavedPaymentMethod(id);
-    if (!method) {
+    const [updatedMethod] = await db.update(savedPaymentMethods).set(data).where(eq(savedPaymentMethods.id, id)).returning();
+    if (!updatedMethod) {
       throw new Error('Saved payment method not found');
     }
-    const updatedMethod = { ...method, ...data };
-    this.savedPaymentMethods.set(id, updatedMethod);
     return updatedMethod;
   }
 
   async deleteSavedPaymentMethod(id: number): Promise<boolean> {
-    return this.savedPaymentMethods.delete(id);
+    const result = await db.delete(savedPaymentMethods).where(eq(savedPaymentMethods.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   async setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean> {
     // First, remove default status from all other payment methods for this client
-    const clientMethods = await this.getSavedPaymentMethodsByClient(clientId);
-    for (const method of clientMethods) {
-      if (method.isDefault) {
-        await this.updateSavedPaymentMethod(method.id, { isDefault: false });
-      }
-    }
+    await db.update(savedPaymentMethods)
+      .set({ isDefault: false })
+      .where(and(eq(savedPaymentMethods.clientId, clientId), eq(savedPaymentMethods.isDefault, true)));
     
     // Set the specified method as default
-    await this.updateSavedPaymentMethod(paymentMethodId, { isDefault: true });
+    await db.update(savedPaymentMethods)
+      .set({ isDefault: true })
+      .where(eq(savedPaymentMethods.id, paymentMethodId));
+    
     return true;
   }
 
