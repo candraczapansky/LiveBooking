@@ -1513,7 +1513,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
       // Trigger automatic payroll sync for staff member
       if (appointment.staffId) {
-        // payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
+        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
       }
 
       // Create sales history record
@@ -1619,7 +1619,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
       // Trigger automatic payroll sync for staff member
       if (appointment.staffId) {
-        // payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
+        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
       }
 
       res.json({ 
