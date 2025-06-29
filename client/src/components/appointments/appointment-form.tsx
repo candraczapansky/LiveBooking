@@ -108,9 +108,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     },
   });
   
-  // Get services
+  // Get services with dynamic key to force refresh
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
-    queryKey: ['/api/services'],
+    queryKey: ['/api/services', open ? new Date().getTime() : 'closed'],
     queryFn: async () => {
       const response = await fetch('/api/services?' + new Date().getTime()); // Add timestamp to prevent caching
       if (!response.ok) throw new Error('Failed to fetch services');
@@ -416,11 +416,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                           <SelectValue placeholder="Select a service" />
                         </SelectTrigger>
                         <SelectContent>
-                          {services?.map((service: any) => (
-                            <SelectItem key={service.id} value={service.id.toString()}>
-                              {service.name} - {formatPrice(service.price)}
-                            </SelectItem>
-                          ))}
+                          {services?.map((service: any) => {
+                            console.log('Rendering service in dropdown:', service);
+                            return (
+                              <SelectItem key={service.id} value={service.id.toString()}>
+                                {service.name} - {formatPrice(service.price)}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </FormControl>
