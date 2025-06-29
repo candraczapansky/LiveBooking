@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useLocation } from "wouter";
-// Payment processing imports removed - using Square integration
+
 
 import {
   Table,
@@ -209,28 +209,14 @@ const ClientsPage = () => {
       const newClient = await response.json();
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       
-      // If payment method section is shown and we're adding a payment method, proceed
-      if (showPaymentSection && isAddingPaymentMethod) {
-        setClientDetail(newClient);
-        setViewMode('detail');
-        setIsAddDialogOpen(false);
-        addForm.reset();
-        setShowPaymentSection(false);
-        setIsAddingPaymentMethod(false);
-        toast({
-          title: "Success",
-          description: "Client created successfully. You can now add payment methods.",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: "Client created successfully",
-        });
-        addForm.reset();
-        setIsAddDialogOpen(false);
-        setShowPaymentSection(false);
-        setIsAddingPaymentMethod(false);
-      }
+      toast({
+        title: "Success",
+        description: "Client created successfully",
+      });
+      addForm.reset();
+      setIsAddDialogOpen(false);
+      setShowPaymentSection(false);
+      setIsAddingPaymentMethod(false);
     },
     onError: (error) => {
       toast({
@@ -287,14 +273,7 @@ const ClientsPage = () => {
   });
 
   const handleAddClient = async (values: ClientFormValues) => {
-    // If payment method is selected, we need to handle both client creation and payment setup
-    if (isAddingPaymentMethod) {
-      // Create client first, then handle payment method in the success callback
-      createClientMutation.mutate(values);
-    } else {
-      // Regular client creation without payment method
-      createClientMutation.mutate(values);
-    }
+    createClientMutation.mutate(values);
   };
 
   const handleEditClient = (values: ClientFormValues) => {
@@ -1064,33 +1043,11 @@ const ClientsPage = () => {
                       </Button>
                       
                       {isAddingPaymentMethod && (
-                        <Elements stripe={stripePromise}>
-                          <div className="space-y-4 border-t pt-4">
-                            <div className="text-sm font-medium">Payment Card Information</div>
-                            <div className="p-3 border rounded-lg bg-white dark:bg-gray-700">
-                              <CardElement
-                                options={{
-                                  style: {
-                                    base: {
-                                      fontSize: '16px',
-                                      color: '#424770',
-                                      '::placeholder': {
-                                        color: '#aab7c4',
-                                      },
-                                      iconColor: '#666EE8',
-                                    },
-                                    invalid: {
-                                      color: '#9e2146',
-                                    },
-                                  },
-                                }}
-                              />
-                            </div>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">
-                              The card will be saved securely using Stripe after the client is created.
-                            </p>
+                        <div className="space-y-4 border-t pt-4">
+                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                            Payment methods can be added after client creation using Square integration
                           </div>
-                        </Elements>
+                        </div>
                       )}
                     </div>
                   </div>
