@@ -13,6 +13,27 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### June 29, 2025 - Server Crash Fix and Complete Payroll Report Rebuild
+
+- **Fixed critical server crashes and completely rebuilt payroll report system:**
+  - Root cause identified: Faulty middleware in routes.ts was causing uncaught exceptions on line 109
+  - Removed problematic try-catch middleware that was interfering with request processing
+  - Simplified request logging middleware to prevent crashes during debugging
+  - Fixed duplicate schema imports that were causing "multiple exports with the same name" errors
+  - Removed duplicate phoneCalls and callRecordings schema definitions from shared/schema.ts
+  - Server now runs stably without crashes during normal operations
+
+- **Complete Payroll Report Page Rebuild:**
+  - Built entirely new payroll report implementation from scratch to resolve persistent issues
+  - Added proper TypeScript interfaces for StaffMember, User, Service, and Appointment data
+  - Implemented clean data loading with proper error handling and loading states
+  - Fixed payroll calculation logic for all commission types (commission, hourly, fixed, hourly_plus_commission)
+  - Added comprehensive data refresh functionality with query invalidation
+  - Enhanced UI with responsive design, summary cards, and clean table layout
+  - Maintained all original features: save to history, sync to external system, staff filtering
+  - Implemented proper currency formatting and loading indicators
+  - Fixed data persistence and calculation accuracy issues
+
 ### June 29, 2025 - PayrollAutoSync System Fix and Service Duplication Resolution
 
 - **Successfully fixed critical PayrollAutoSync initialization error:**

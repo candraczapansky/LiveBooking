@@ -99,20 +99,12 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
   } as any;
   console.log('PayrollAutoSync system disabled for debugging');
 
-  // Add middleware to log all requests and catch errors
+  // Simple request logging middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (req.method === 'PUT' && req.url.includes('/services/')) {
-        console.log(`PUT request received: ${req.method} ${req.url}`);
-        console.log('Request body:', JSON.stringify(req.body, null, 2));
-      }
-      next();
-    } catch (error) {
-      console.error('Error in middleware:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Internal server error' });
-      }
+    if (req.method === 'PUT' && req.url.includes('/services/')) {
+      console.log(`PUT request received: ${req.method} ${req.url}`);
     }
+    next();
   });
 
   // Auth routes
