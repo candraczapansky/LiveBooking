@@ -809,15 +809,9 @@ const AppointmentsPage = () => {
               {/* Day Columns */}
               {weekDays.map((day, dayIndex) => (
                 <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                  {/* Day appointments for this time slot */}
+                  {/* Day appointments that start in this time slot */}
                   {appointments?.filter((appointment: any) => {
                     const appointmentDate = new Date(appointment.startTime);
-                    const appointmentTime = appointmentDate.toLocaleTimeString('en-US', { 
-                      hour: 'numeric', 
-                      minute: '2-digit',
-                      hour12: true
-                    });
-                    
                     const dayStr = day.getFullYear() + '-' + 
                       String(day.getMonth() + 1).padStart(2, '0') + '-' + 
                       String(day.getDate()).padStart(2, '0');
@@ -825,7 +819,20 @@ const AppointmentsPage = () => {
                       String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
                       String(appointmentDate.getDate()).padStart(2, '0');
                     
-                    return appointmentDateStr === dayStr && appointmentTime === timeSlot;
+                    // Only show appointments that START in this time slot
+                    const appointmentHour = appointmentDate.getHours();
+                    const appointmentMinute = appointmentDate.getMinutes();
+                    
+                    // Parse the current time slot
+                    const [timeStr, period] = timeSlot.split(' ');
+                    const [slotHours, slotMinutes] = timeStr.split(':');
+                    let slotHour = parseInt(slotHours);
+                    if (period === 'PM' && slotHour !== 12) slotHour += 12;
+                    if (period === 'AM' && slotHour === 12) slotHour = 0;
+                    
+                    return appointmentDateStr === dayStr && 
+                           appointmentHour === slotHour && 
+                           appointmentMinute === parseInt(slotMinutes);
                   }).map((appointment: any, index: number) => {
                     const endTime = new Date(appointment.endTime);
                     const startTime = new Date(appointment.startTime);
@@ -837,7 +844,7 @@ const AppointmentsPage = () => {
 
                     return (
                       <div
-                        key={index}
+                        key={appointment.id}
                         className={`absolute inset-x-1 bg-primary/90 text-white rounded p-1 text-xs cursor-pointer hover:bg-primary z-10 ${
                           appointment.paymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : ''
                         }`}
