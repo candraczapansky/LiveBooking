@@ -734,9 +734,7 @@ export class DatabaseStorage implements IStorage {
 
   // Service Category operations
   async createServiceCategory(category: InsertServiceCategory): Promise<ServiceCategory> {
-    const id = this.currentServiceCategoryId++;
-    const newCategory = { ...category, id } as ServiceCategory;
-    this.serviceCategories.set(id, newCategory);
+    const [newCategory] = await db.insert(serviceCategories).values(category).returning();
     return newCategory;
   }
 
@@ -745,7 +743,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllServiceCategories(): Promise<ServiceCategory[]> {
-    return Array.from(this.serviceCategories.values());
+    return await db.select().from(serviceCategories);
   }
 
   async updateServiceCategory(id: number, categoryData: Partial<InsertServiceCategory>): Promise<ServiceCategory> {
