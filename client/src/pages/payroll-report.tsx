@@ -241,12 +241,14 @@ export default function PayrollReport() {
     });
 
     return (staff as any[]).map((staffMember: any) => {
-      const user = (users as any[]).find((u: any) => u.id === staffMember.userId);
+      // Staff API now includes user data directly in the staff object
+      const user = staffMember.user || (users as any[]).find((u: any) => u.id === staffMember.userId);
       const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown';
       
       // Debug logging for staff member 42
       if (staffMember.id === 42) {
         console.log('Debug - Staff Member 42:', staffMember);
+        console.log('Debug - Staff User Data:', staffMember.user);
         console.log('Debug - Found User:', user);
         console.log('Debug - Staff Name:', staffName);
       }
@@ -350,7 +352,8 @@ export default function PayrollReport() {
     const monthEnd = endOfMonth(selectedMonth);
 
     return (staff as any[]).map((staffMember: any) => {
-      const user = (users as any[]).find((u: any) => u.id === staffMember.userId);
+      // Staff API now includes user data directly in the staff object
+      const user = staffMember.user || (users as any[]).find((u: any) => u.id === staffMember.userId);
       const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown';
 
       // Get earnings for this staff member in the selected month
