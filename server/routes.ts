@@ -2316,20 +2316,13 @@ If you didn't request this password reset, please ignore this email and your pas
       // Filter recipients based on campaign type
       let validRecipients: any[] = [];
       if (campaign.type === 'sms') {
-        // Filter for users with valid phone numbers
-        console.log('Filtering SMS recipients from total recipients:', recipients.length);
+        // Filter for users with valid phone numbers (excludes test/placeholder numbers)
         validRecipients = recipients.filter(user => {
-          if (!user.phone) {
-            console.log(`User ${user.id} has no phone number`);
-            return false;
-          }
+          if (!user.phone) return false;
           // Check if phone number is valid (not a placeholder like "555XXXX")
           const cleanPhone = user.phone.replace(/\D/g, '');
-          const isValid = cleanPhone.length >= 10 && !user.phone.includes('X') && !user.phone.includes('x') && !user.phone.includes('555');
-          console.log(`User ${user.id} phone: ${user.phone}, clean: ${cleanPhone}, valid: ${isValid}`);
-          return isValid;
+          return cleanPhone.length >= 10 && !user.phone.includes('X') && !user.phone.includes('x') && !user.phone.includes('555');
         });
-        console.log('Valid SMS recipients found:', validRecipients.length);
         if (validRecipients.length === 0) {
           return res.status(400).json({ 
             error: "No recipients have valid phone numbers. Phone numbers must be real numbers, not placeholders." 
@@ -2361,9 +2354,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
           if (campaign.type === 'sms') {
             // Send SMS
-            console.log(`Attempting to send SMS to ${recipient.phone} for user ${recipient.id}`);
             const smsResult = await sendSMS(recipient.phone!, campaign.content);
-            console.log(`SMS result for ${recipient.phone}:`, smsResult);
             success = smsResult.success;
             errorMessage = smsResult.error || '';
           } else if (campaign.type === 'email') {
