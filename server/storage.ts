@@ -692,32 +692,30 @@ export class DatabaseStorage implements IStorage {
 
   // Room operations
   async createRoom(room: InsertRoom): Promise<Room> {
-    const id = this.currentRoomId++;
-    const newRoom = { ...room, id } as Room;
-    this.rooms.set(id, newRoom);
+    const [newRoom] = await db.insert(rooms).values(room).returning();
     return newRoom;
   }
 
   async getRoom(id: number): Promise<Room | undefined> {
-    return this.rooms.get(id);
+    const result = await db.select().from(rooms).where(eq(rooms.id, id));
+    return result[0];
   }
 
   async getAllRooms(): Promise<Room[]> {
-    return Array.from(this.rooms.values());
+    return await db.select().from(rooms);
   }
 
   async updateRoom(id: number, roomData: Partial<InsertRoom>): Promise<Room> {
-    const existingRoom = this.rooms.get(id);
-    if (!existingRoom) {
+    const [updatedRoom] = await db.update(rooms).set(roomData).where(eq(rooms.id, id)).returning();
+    if (!updatedRoom) {
       throw new Error("Room not found");
     }
-    const updatedRoom: Room = { ...existingRoom, ...roomData };
-    this.rooms.set(id, updatedRoom);
     return updatedRoom;
   }
 
   async deleteRoom(id: number): Promise<boolean> {
-    return this.rooms.delete(id);
+    const result = await db.delete(rooms).where(eq(rooms.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // Device operations
