@@ -99,13 +99,7 @@ export async function registerRoutes(app: Express, storage: IStorage): Promise<S
   } as any;
   console.log('PayrollAutoSync system disabled for debugging');
 
-  // Simple request logging middleware
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === 'PUT' && req.url.includes('/services/')) {
-      console.log(`PUT request received: ${req.method} ${req.url}`);
-    }
-    next();
-  });
+  // Simple request logging middleware (removed problematic middleware)
 
   // Auth routes
   app.post("/api/login", async (req, res) => {
