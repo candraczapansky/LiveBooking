@@ -764,6 +764,8 @@ export const insertSalesHistorySchema = createInsertSchema(salesHistory).omit({
 export type SalesHistory = typeof salesHistory.$inferSelect;
 export type InsertSalesHistory = z.infer<typeof insertSalesHistorySchema>;
 
+
+
 // Type definitions
 export type AppointmentHistory = typeof appointmentHistory.$inferSelect;
 export type InsertAppointmentHistory = z.infer<typeof insertAppointmentHistorySchema>;
