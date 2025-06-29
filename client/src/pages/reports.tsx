@@ -179,7 +179,7 @@ const SpecificReportView = ({
     case "staff":
       return <StaffReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "payroll":
-      return <PayrollReport />;
+      return <PayrollReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "timeclock":
       return <TimeClockReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     default:

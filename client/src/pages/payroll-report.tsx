@@ -7,9 +7,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2 } from "lucide-react";
-import { format, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+
+interface PayrollReportProps {
+  timePeriod: string;
+  customStartDate: Date | null;
+  customEndDate: Date | null;
+}
 
 interface PayrollData {
   staffId: number;
@@ -60,7 +66,7 @@ interface Appointment {
   startTime: string;
 }
 
-export default function PayrollReport() {
+export default function PayrollReport({ timePeriod, customStartDate, customEndDate }: PayrollReportProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedStaff, setSelectedStaff] = useState<string>("all");
   const [syncing, setSyncing] = useState<number | null>(null);
@@ -110,13 +116,23 @@ export default function PayrollReport() {
   const payrollData = useMemo((): PayrollData[] => {
     if (!staff || !users || !services || !appointments) return [];
 
-    const monthStart = startOfMonth(selectedMonth);
-    const monthEnd = endOfMonth(selectedMonth);
+    // Determine date range based on timePeriod and custom dates
+    let rangeStart: Date;
+    let rangeEnd: Date;
 
-    // Filter appointments for the selected month and completed/paid status
-    const monthlyAppointments = appointments.filter((apt) => {
+    if (timePeriod === 'custom' && customStartDate && customEndDate) {
+      rangeStart = startOfDay(customStartDate);
+      rangeEnd = endOfDay(customEndDate);
+    } else {
+      // Use month selection as fallback
+      rangeStart = startOfMonth(selectedMonth);
+      rangeEnd = endOfMonth(selectedMonth);
+    }
+
+    // Filter appointments for the selected date range and completed/paid status
+    const filteredAppointments = appointments.filter((apt) => {
       const aptDate = new Date(apt.startTime);
-      return isWithinInterval(aptDate, { start: monthStart, end: monthEnd }) && 
+      return isWithinInterval(aptDate, { start: rangeStart, end: rangeEnd }) && 
              (apt.status === 'completed' || apt.paymentStatus === 'paid');
     });
 
@@ -126,7 +142,7 @@ export default function PayrollReport() {
       const staffName = user ? `${user.firstName} ${user.lastName}` : 'Unknown Staff';
 
       // Get appointments for this staff member
-      const staffAppointments = monthlyAppointments.filter((apt) => apt.staffId === staffMember.id);
+      const staffAppointments = filteredAppointments.filter((apt) => apt.staffId === staffMember.id);
 
       let totalRevenue = 0;
       let totalCommission = 0;
