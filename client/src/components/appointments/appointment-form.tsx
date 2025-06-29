@@ -47,8 +47,8 @@ import { cn, formatPrice } from "@/lib/utils";
 
 // Define the form schema
 const appointmentFormSchema = z.object({
-  serviceId: z.string().min(1, "Service is required"),
   staffId: z.string().min(1, "Staff member is required"),
+  serviceId: z.string().min(1, "Service is required"),
   clientId: z.string().min(1, "Client is required"),
   date: z.date({
     required_error: "Date is required",
@@ -98,20 +98,30 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
     defaultValues: {
-      serviceId: "",
       staffId: "",
+      serviceId: "",
       clientId: "",
       date: selectedDate || new Date(),
       time: "10:00",
       notes: "",
-      sendReminder: true,
     },
   });
   
-  // Get services
+  // Watch selected staff to filter services
+  const selectedStaffId = form.watch("staffId");
+  
+  // Get services for selected staff (staff-centric workflow)
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
-    queryKey: ['/api/services'],
-    enabled: open,
+    queryKey: ['/api/staff', selectedStaffId, 'services'],
+    queryFn: async () => {
+      if (!selectedStaffId) return [];
+      const response = await fetch(`/api/staff/${selectedStaffId}/services`);
+      if (!response.ok) throw new Error('Failed to fetch services for staff');
+      const data = await response.json();
+      // Extract the service objects from the staff-service relationship
+      return data.map((item: any) => item.service || item);
+    },
+    enabled: open && !!selectedStaffId,
   });
   
   // Get staff
@@ -169,13 +179,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       const appointmentTime = format(appointmentDate, 'HH:mm');
       
       form.reset({
-        serviceId: appointment.serviceId?.toString() || "",
         staffId: appointment.staffId?.toString() || "",
+        serviceId: appointment.serviceId?.toString() || "",
         clientId: appointment.clientId?.toString() || "",
         date: appointmentDate,
         time: appointmentTime,
         notes: appointment.notes || "",
-        sendReminder: true,
       });
     }
   }, [appointment, appointmentId]);
@@ -184,13 +193,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   useEffect(() => {
     if (!open) {
       form.reset({
-        serviceId: "",
         staffId: "",
+        serviceId: "",
         clientId: "",
         date: selectedDate || new Date(),
         time: "10:00",
         notes: "",
-        sendReminder: true,
       });
     } else {
       // Invalidate services cache when opening to ensure fresh data
@@ -387,40 +395,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               
-              {/* Service Selection */}
-              <FormField
-                control={form.control}
-                name="serviceId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Service</FormLabel>
-                    <FormControl>
-                      <Select 
-                        disabled={isLoading || isLoadingServices} 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {services?.map((service: any) => {
-                            console.log('Rendering service in dropdown:', service);
-                            return (
-                              <SelectItem key={service.id} value={service.id.toString()}>
-                                {service.name} - {formatPrice(service.price)}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Staff Selection */}
+              {/* Staff Selection - Must be first in staff-centric workflow */}
               <FormField
                 control={form.control}
                 name="staffId"
@@ -430,11 +405,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                     <FormControl>
                       <Select 
                         disabled={isLoading || isLoadingStaff} 
-                        onValueChange={field.onChange} 
+                        onValueChange={(value) => {
+                          field.onChange(value);
+                          // Clear service selection when staff changes
+                          form.setValue("serviceId", "");
+                        }} 
                         value={field.value}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a staff member" />
+                          <SelectValue placeholder="Select a staff member first" />
                         </SelectTrigger>
                         <SelectContent>
                           {staff?.map((staffMember: any) => {
@@ -448,6 +427,57 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                         </SelectContent>
                       </Select>
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Service Selection - Only shows services assigned to selected staff */}
+              <FormField
+                control={form.control}
+                name="serviceId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service</FormLabel>
+                    <FormControl>
+                      <Select 
+                        disabled={isLoading || isLoadingServices || !selectedStaffId} 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue 
+                            placeholder={
+                              !selectedStaffId 
+                                ? "Select a staff member first" 
+                                : services?.length === 0 
+                                  ? "No services assigned to this staff member"
+                                  : "Select a service"
+                            } 
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {services?.map((service: any) => {
+                            console.log('Rendering service in dropdown:', service);
+                            return (
+                              <SelectItem key={service.id} value={service.id.toString()}>
+                                {service.name} - {formatPrice(service.price)}
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    {!selectedStaffId && (
+                      <FormDescription className="text-muted-foreground">
+                        Please select a staff member first to see available services
+                      </FormDescription>
+                    )}
+                    {selectedStaffId && services?.length === 0 && (
+                      <FormDescription className="text-muted-foreground">
+                        This staff member has no services assigned. Please assign services in the Services page.
+                      </FormDescription>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
