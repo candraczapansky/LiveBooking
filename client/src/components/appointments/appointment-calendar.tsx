@@ -40,6 +40,7 @@ type Appointment = {
     name: string;
     duration: number;
     price: number;
+    color?: string;
   };
   staff: {
     user: {
@@ -66,8 +67,9 @@ const statusColors = {
 };
 
 const getAppointmentBadgeColor = (appointment: Appointment) => {
-  // Always use status color regardless of payment status
-  return statusColors[appointment.status];
+  // Use service color if available, otherwise default to gray
+  const serviceColor = appointment.service?.color || '#6b7280';
+  return '';
 };
 
 const getAppointmentBadgeText = (appointment: Appointment) => {
@@ -278,8 +280,12 @@ const AppointmentCalendar = ({
                       <TableCell>{appointment.service.name}</TableCell>
                       <TableCell>
                         <Badge 
-                          className={getAppointmentBadgeColor(appointment)}
                           variant="outline"
+                          style={{
+                            backgroundColor: (appointment.service?.color || '#6b7280') + '20',
+                            borderColor: appointment.service?.color || '#6b7280',
+                            color: appointment.service?.color || '#6b7280'
+                          }}
                         >
                           {getAppointmentBadgeText(appointment)}
                         </Badge>
