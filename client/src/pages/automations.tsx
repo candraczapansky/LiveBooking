@@ -233,9 +233,15 @@ export default function Automations() {
       customTriggerName: data.trigger === "custom" ? data.customTriggerName : undefined
     };
 
-    createRuleMutation.mutate(ruleData);
+    if (editingRule && editingRule.type === 'email') {
+      updateRuleMutation.mutate({ id: editingRule.id, ruleData });
+    } else {
+      createRuleMutation.mutate(ruleData);
+    }
+    
     setIsEmailDialogOpen(false);
     setSelectedEmailTrigger("");
+    setEditingRule(null);
     emailForm.reset();
   };
 
@@ -406,9 +412,14 @@ export default function Automations() {
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Create Email Automation Rule</DialogTitle>
+                        <DialogTitle>
+                          {editingRule && editingRule.type === 'email' ? 'Edit Email Automation Rule' : 'Create Email Automation Rule'}
+                        </DialogTitle>
                         <DialogDescription>
-                          Set up automated email communications to be sent to clients based on specific triggers.
+                          {editingRule && editingRule.type === 'email' 
+                            ? 'Update your automated email communication settings.' 
+                            : 'Set up automated email communications to be sent to clients based on specific triggers.'
+                          }
                         </DialogDescription>
                       </DialogHeader>
                       <Form {...emailForm}>
@@ -570,8 +581,11 @@ export default function Automations() {
                             <Button type="button" variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
                               Cancel
                             </Button>
-                            <Button type="submit" disabled={createRuleMutation.isPending}>
-                              {createRuleMutation.isPending ? "Creating..." : "Create Email Rule"}
+                            <Button type="submit" disabled={createRuleMutation.isPending || updateRuleMutation.isPending}>
+                              {(createRuleMutation.isPending || updateRuleMutation.isPending) 
+                                ? (editingRule && editingRule.type === 'email' ? "Updating..." : "Creating...")
+                                : (editingRule && editingRule.type === 'email' ? "Update Email Rule" : "Create Email Rule")
+                              }
                             </Button>
                           </DialogFooter>
                         </form>
@@ -664,9 +678,14 @@ export default function Automations() {
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
-                        <DialogTitle>Create SMS Automation Rule</DialogTitle>
+                        <DialogTitle>
+                          {editingRule && editingRule.type === 'sms' ? 'Edit SMS Automation Rule' : 'Create SMS Automation Rule'}
+                        </DialogTitle>
                         <DialogDescription>
-                          Set up automated SMS communications to be sent to clients based on specific triggers.
+                          {editingRule && editingRule.type === 'sms' 
+                            ? 'Update your automated SMS communication settings.' 
+                            : 'Set up automated SMS communications to be sent to clients based on specific triggers.'
+                          }
                         </DialogDescription>
                       </DialogHeader>
                       <Form {...smsForm}>
@@ -840,15 +859,18 @@ export default function Automations() {
                             </Button>
                             <Button 
                               type="submit" 
-                              disabled={createRuleMutation.isPending}
+                              disabled={createRuleMutation.isPending || updateRuleMutation.isPending}
                               onClick={() => {
-                                console.log('Create SMS Rule button clicked');
+                                console.log('SMS Rule button clicked');
                                 console.log('Form state:', smsForm.formState);
                                 console.log('Form errors:', smsForm.formState.errors);
                                 console.log('Form values:', smsForm.getValues());
                               }}
                             >
-                              {createRuleMutation.isPending ? "Creating..." : "Create SMS Rule"}
+                              {(createRuleMutation.isPending || updateRuleMutation.isPending) 
+                                ? (editingRule && editingRule.type === 'sms' ? "Updating..." : "Creating...")
+                                : (editingRule && editingRule.type === 'sms' ? "Update SMS Rule" : "Create SMS Rule")
+                              }
                             </Button>
                           </DialogFooter>
                         </form>
