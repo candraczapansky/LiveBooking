@@ -66,21 +66,15 @@ const statusColors = {
 };
 
 const getAppointmentBadgeColor = (appointment: Appointment) => {
-  // If payment is complete, always show green
-  if (appointment.paymentStatus === 'paid') {
-    return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100";
-  }
-  // Otherwise use status color
+  // Always use status color regardless of payment status
   return statusColors[appointment.status];
 };
 
 const getAppointmentBadgeText = (appointment: Appointment) => {
-  // If payment is complete, show "Paid"
-  if (appointment.paymentStatus === 'paid') {
-    return "Paid";
-  }
-  // Otherwise show status
-  return appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
+  // Show status, with payment indicator if paid
+  const status = appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1);
+  const isPaid = appointment.paymentStatus === 'paid';
+  return isPaid ? `${status} (Paid)` : status;
 };
 
 const AppointmentCalendar = ({

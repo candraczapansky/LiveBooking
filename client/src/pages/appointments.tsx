@@ -631,11 +631,11 @@ const AppointmentsPage = () => {
               const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
 
-              // Check if appointment is paid and set colors accordingly
+              // Always use service colors, regardless of payment status
               const isPaid = appointment.paymentStatus === 'paid';
               const serviceColor = appointment.service?.color || '#6b7280';
-              const backgroundColor = isPaid ? '#10b981' : serviceColor; // Green for paid, service color for unpaid
-              const borderColor = isPaid ? '#059669' : serviceColor; // Darker green border for paid
+              const backgroundColor = serviceColor; // Always use service color
+              const borderColor = serviceColor; // Always use service color for border
               
               const isServiceColorLight = (color: string) => {
                 const hex = color.replace('#', '');
@@ -664,7 +664,7 @@ const AppointmentsPage = () => {
                     ...appointmentStyle,
                     backgroundColor: backgroundColor,
                     borderLeftColor: borderColor,
-                    color: isPaid ? '#ffffff' : (isServiceColorLight(serviceColor) ? '#000000' : '#ffffff'),
+                    color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
                     opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
                   }}
                 >
@@ -848,10 +848,10 @@ const AppointmentsPage = () => {
                     return (
                       <div
                         key={appointment.id}
-                        className={`absolute inset-x-1 bg-primary/90 text-white rounded p-1 text-xs cursor-pointer hover:bg-primary z-10 ${
-                          appointment.paymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' : ''
-                        }`}
-                        style={{ 
+                        className="absolute inset-x-1 text-white rounded p-1 text-xs cursor-pointer z-10"
+                        style={{
+                          backgroundColor: appointment.service?.color || '#6b7280',
+                          color: isServiceColorLight(appointment.service?.color || '#6b7280') ? '#000000' : '#ffffff',
                           height: `${heightInSlots * 60 - 4}px`,
                           top: '2px'
                         }}
@@ -971,11 +971,10 @@ const AppointmentsPage = () => {
                       {dayAppointments.slice(0, 2).map((appointment: any, i: number) => (
                         <div 
                           key={i}
-                          className={`w-2 h-2 rounded-full ${
-                            appointment.paymentStatus === 'paid' 
-                              ? 'bg-green-500' 
-                              : 'bg-primary'
-                          }`}
+                          className="w-2 h-2 rounded-full"
+                          style={{
+                            backgroundColor: appointment.service?.color || '#6b7280'
+                          }}
                         />
                       ))}
                       {dayAppointments.length > 2 && (
@@ -1055,11 +1054,11 @@ const AppointmentsPage = () => {
                       return (
                         <div 
                           key={i}
-                          className={`text-xs p-1 rounded ${
-                            appointment.paymentStatus === 'paid' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' 
-                              : 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground'
-                          } truncate`}
+                          className="text-xs p-1 rounded truncate"
+                          style={{
+                            backgroundColor: appointment.service?.color + '20' || '#6b728020',
+                            color: appointment.service?.color || '#6b7280'
+                          }}
                         >
                           {timeString} {appointment.service?.name}
                         </div>
