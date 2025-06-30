@@ -634,14 +634,15 @@ export default function Automations() {
                               name="trigger"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Trigger</FormLabel>
+                                  <FormLabel>Trigger <span className="text-red-500">*</span></FormLabel>
                                   <Select onValueChange={(value) => {
+                                    console.log('Trigger selected:', value);
                                     field.onChange(value);
                                     setSelectedSMSTrigger(value);
                                   }} value={field.value}>
                                     <FormControl>
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="Custom Trigger" />
+                                      <SelectTrigger className={smsForm.formState.errors.trigger ? "border-red-500" : ""}>
+                                        <SelectValue placeholder="Select a trigger" />
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
@@ -653,6 +654,11 @@ export default function Automations() {
                                     </SelectContent>
                                   </Select>
                                   <FormMessage />
+                                  {smsForm.formState.errors.trigger && (
+                                    <p className="text-red-500 text-sm mt-1">
+                                      Please select a trigger for your SMS automation
+                                    </p>
+                                  )}
                                 </FormItem>
                               )}
                             />
