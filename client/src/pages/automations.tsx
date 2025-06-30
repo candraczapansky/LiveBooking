@@ -754,7 +754,34 @@ export default function Automations() {
                             <Button type="button" variant="outline" onClick={() => setIsSMSDialogOpen(false)}>
                               Cancel
                             </Button>
-                            <Button type="submit" disabled={createRuleMutation.isPending}>
+                            <Button 
+                              type="button" 
+                              variant="outline"
+                              onClick={() => {
+                                console.log('Testing API directly...');
+                                const testData = {
+                                  name: "Test SMS Rule",
+                                  type: "sms" as const,
+                                  trigger: "booking_confirmation",
+                                  timing: "immediately",
+                                  template: "Test message",
+                                  active: true
+                                };
+                                createRuleMutation.mutate(testData);
+                              }}
+                            >
+                              Test API
+                            </Button>
+                            <Button 
+                              type="submit" 
+                              disabled={createRuleMutation.isPending}
+                              onClick={() => {
+                                console.log('Create SMS Rule button clicked');
+                                console.log('Form state:', smsForm.formState);
+                                console.log('Form errors:', smsForm.formState.errors);
+                                console.log('Form values:', smsForm.getValues());
+                              }}
+                            >
                               {createRuleMutation.isPending ? "Creating..." : "Create SMS Rule"}
                             </Button>
                           </DialogFooter>
