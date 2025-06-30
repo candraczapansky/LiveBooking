@@ -246,6 +246,12 @@ export const clientMemberships = pgTable("client_memberships", {
   endDate: timestamp("end_date").notNull(),
   active: boolean("active").notNull().default(true),
   squareSubscriptionId: text("square_subscription_id"),
+  // Auto-renewal fields
+  autoRenew: boolean("auto_renew").notNull().default(false),
+  renewalDate: integer("renewal_date"), // Day of month (1-31) for billing
+  lastRenewalAttempt: timestamp("last_renewal_attempt"),
+  renewalFailureCount: integer("renewal_failure_count").default(0),
+  paymentMethodId: text("payment_method_id"), // Stored payment method for auto-renewal
 });
 
 export const insertClientMembershipSchema = createInsertSchema(clientMemberships).omit({

@@ -13,7 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Search, Users, UserPlus, CreditCard, Receipt, Check, X, Mail, Phone, DollarSign } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, Users, UserPlus, CreditCard, Receipt, Check, X, Mail, Phone, DollarSign, Calendar, RefreshCw } from "lucide-react";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -217,6 +219,8 @@ export default function MembershipSubscriptionDialog({
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [manualEmail, setManualEmail] = useState("");
   const [manualPhone, setManualPhone] = useState("");
+  const [autoRenew, setAutoRenew] = useState(false);
+  const [renewalDate, setRenewalDate] = useState<string>("1");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

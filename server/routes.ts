@@ -3440,14 +3440,16 @@ Thank you for choosing Glo Head Spa!
               </div>
               
               <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
+                ${receiptData.subtotal ? `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                   <span>Subtotal:</span>
                   <span>$${receiptData.subtotal.toFixed(2)}</span>
-                </div>
+                </div>` : ''}
+                ${receiptData.tax ? `
                 <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                   <span>Tax:</span>
                   <span>$${receiptData.tax.toFixed(2)}</span>
-                </div>
+                </div>` : ''}
                 <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; border-top: 2px solid #e91e63; padding-top: 10px; margin-top: 10px;">
                   <span>Total:</span>
                   <span>$${receiptData.total.toFixed(2)}</span>
