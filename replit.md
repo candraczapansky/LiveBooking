@@ -13,6 +13,21 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, Complete Appointment Payment Amount Fix, and Database Connection Resolution
+
+- **Successfully resolved critical database connection issues:**
+  - Fixed Neon database connection termination errors by switching from Pool to direct neon client
+  - Changed from neon-serverless to neon-http adapter for better compatibility with Drizzle ORM
+  - Added comprehensive error handling to prevent server crashes during database operations
+  - Server now runs stably with proper database connectivity established
+  - All API endpoints functioning correctly with persistent database connections
+
+- **Fixed payroll report calculation accuracy:**
+  - Updated payroll report to only calculate earnings from paid appointments
+  - Changed filter logic from "completed OR paid" to "paid only" for accurate commission calculations
+  - Payroll calculations now reflect actual revenue received rather than potential earnings
+  - Staff earnings are based solely on services that have been paid for by clients
+
 ### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, and Complete Appointment Payment Amount Fix
 
 - **Successfully resolved SMS marketing campaign issues and verified functionality:**

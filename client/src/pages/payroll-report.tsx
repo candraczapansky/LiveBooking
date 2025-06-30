@@ -129,11 +129,11 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       rangeEnd = endOfMonth(selectedMonth);
     }
 
-    // Filter appointments for the selected date range and completed/paid status
+    // Filter appointments for the selected date range and paid status only
     const filteredAppointments = appointments.filter((apt) => {
       const aptDate = new Date(apt.startTime);
       return isWithinInterval(aptDate, { start: rangeStart, end: rangeEnd }) && 
-             (apt.status === 'completed' || apt.paymentStatus === 'paid');
+             apt.paymentStatus === 'paid';
     });
 
     return staff.map((staffMember) => {
