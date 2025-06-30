@@ -811,9 +811,9 @@ const AppointmentsPage = () => {
               
               {/* Day Columns */}
               {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-                  {/* Day appointments that start in this time slot */}
-                  {appointments?.filter((appointment: any) => {
+                <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" style={{ height: '60px' }}>
+                  {/* Show appointments for this day only on the first time slot (8:00 AM) to avoid duplicates */}
+                  {timeIndex === 0 && appointments?.filter((appointment: any) => {
                     const appointmentDate = new Date(appointment.startTime);
                     const dayStr = day.getFullYear() + '-' + 
                       String(day.getMonth() + 1).padStart(2, '0') + '-' + 
@@ -822,25 +822,28 @@ const AppointmentsPage = () => {
                       String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
                       String(appointmentDate.getDate()).padStart(2, '0');
                     
-                    // Only show appointments that START in this time slot
+                    return appointmentDateStr === dayStr;
+                  }).map((appointment: any, index: number) => {
+                    const appointmentDate = new Date(appointment.startTime);
+                    const endTime = new Date(appointment.endTime);
+                    const duration = Math.round((endTime.getTime() - appointmentDate.getTime()) / (1000 * 60));
+                    
+                    // Calculate position relative to 8:00 AM start
                     const appointmentHour = appointmentDate.getHours();
                     const appointmentMinute = appointmentDate.getMinutes();
                     
-                    // Parse the current time slot
-                    const [timeStr, period] = timeSlot.split(' ');
-                    const [slotHours, slotMinutes] = timeStr.split(':');
-                    let slotHour = parseInt(slotHours);
-                    if (period === 'PM' && slotHour !== 12) slotHour += 12;
-                    if (period === 'AM' && slotHour === 12) slotHour = 0;
+                    // Skip appointments outside business hours (8 AM to 10 PM)
+                    if (appointmentHour < 8 || appointmentHour >= 22) {
+                      return null;
+                    }
                     
-                    return appointmentDateStr === dayStr && 
-                           appointmentHour === slotHour && 
-                           appointmentMinute === parseInt(slotMinutes);
-                  }).map((appointment: any, index: number) => {
-                    const endTime = new Date(appointment.endTime);
-                    const startTime = new Date(appointment.startTime);
-                    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
-                    const heightInSlots = Math.max(1, Math.round(duration / 30));
+                    // Calculate top position based on minutes from 8:00 AM
+                    const totalMinutesFromStart = (appointmentHour - 8) * 60 + appointmentMinute;
+                    const topPosition = (totalMinutesFromStart / 30) * 60; // 60px per 30-minute slot
+                    
+                    // Calculate height based on duration
+                    const heightInPixels = Math.max(30, (duration / 30) * 60); // Minimum 30px height
+                    
                     const staffName = appointment.staff?.user ? 
                       `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
                       'Unknown Staff';
@@ -852,8 +855,8 @@ const AppointmentsPage = () => {
                         style={{
                           backgroundColor: appointment.service?.color || '#6b7280',
                           color: '#ffffff',
-                          height: `${heightInSlots * 60 - 4}px`,
-                          top: '2px'
+                          height: `${heightInPixels - 4}px`,
+                          top: `${topPosition + 2}px`
                         }}
                         onClick={() => handleAppointmentClick(appointment.id)}
                       >
