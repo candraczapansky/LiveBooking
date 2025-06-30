@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
 import MembershipForm from "@/components/memberships/membership-form";
+import SubscriberDialog from "@/components/memberships/subscriber-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {

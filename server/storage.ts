@@ -124,6 +124,8 @@ export interface IStorage {
   createClientMembership(clientMembership: InsertClientMembership): Promise<ClientMembership>;
   getClientMembership(id: number): Promise<ClientMembership | undefined>;
   getClientMembershipsByClient(clientId: number): Promise<ClientMembership[]>;
+  getAllClientMemberships(): Promise<ClientMembership[]>;
+  getClientMembershipsByMembership(membershipId: number): Promise<ClientMembership[]>;
   updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership>;
   deleteClientMembership(id: number): Promise<boolean>;
 
@@ -1150,6 +1152,14 @@ export class DatabaseStorage implements IStorage {
 
   async getClientMembershipsByClient(clientId: number): Promise<ClientMembership[]> {
     return await db.select().from(clientMemberships).where(eq(clientMemberships.clientId, clientId));
+  }
+
+  async getAllClientMemberships(): Promise<ClientMembership[]> {
+    return await db.select().from(clientMemberships);
+  }
+
+  async getClientMembershipsByMembership(membershipId: number): Promise<ClientMembership[]> {
+    return await db.select().from(clientMemberships).where(eq(clientMemberships.membershipId, membershipId));
   }
 
   async updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership> {

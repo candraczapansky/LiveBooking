@@ -1378,21 +1378,30 @@ If you didn't request this password reset, please ignore this email and your pas
   
   // Client Memberships routes
   app.get("/api/client-memberships", async (req, res) => {
-    const { clientId } = req.query;
+    const { clientId, membershipId } = req.query;
     
-    if (!clientId) {
-      return res.status(400).json({ error: "Client ID is required" });
+    let clientMemberships;
+    
+    if (clientId) {
+      // Get memberships for a specific client
+      clientMemberships = await storage.getClientMembershipsByClient(parseInt(clientId as string));
+    } else if (membershipId) {
+      // Get all subscribers for a specific membership
+      clientMemberships = await storage.getClientMembershipsByMembership(parseInt(membershipId as string));
+    } else {
+      // Get all client memberships
+      clientMemberships = await storage.getAllClientMemberships();
     }
     
-    const clientMemberships = await storage.getClientMembershipsByClient(parseInt(clientId as string));
-    
-    // Get detailed membership information
+    // Get detailed membership and client information
     const detailedMemberships = await Promise.all(
       clientMemberships.map(async (clientMembership) => {
         const membership = await storage.getMembership(clientMembership.membershipId);
+        const client = await storage.getUser(clientMembership.clientId);
         return {
           ...clientMembership,
-          membership
+          membership,
+          client
         };
       })
     );
