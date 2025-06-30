@@ -123,10 +123,19 @@ export default function MembershipSubscriptionDialog({
   // Initialize Square payment when payment step is shown
   useEffect(() => {
     if (step === 'payment' && !cardElement) {
-      // Add a small delay to ensure DOM element is rendered
-      setTimeout(() => {
-        initializeSquarePayment();
-      }, 100);
+      // Use polling to wait for element to be ready
+      const tryInitialize = () => {
+        const element = document.querySelector('#square-card-membership-new');
+        if (element) {
+          initializeSquarePayment();
+        } else {
+          // Retry after 100ms if element not found
+          setTimeout(tryInitialize, 100);
+        }
+      };
+      
+      // Start polling after initial delay
+      setTimeout(tryInitialize, 200);
     }
   }, [step]);
 
