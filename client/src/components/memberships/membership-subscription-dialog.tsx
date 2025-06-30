@@ -268,79 +268,48 @@ export default function MembershipSubscriptionDialog({
       setPaymentResult(null);
       setReceiptEmail("");
       setReceiptPhone("");
-      setCardElement(null);
-      setPaymentError(null);
-      setIsPaymentLoading(false);
     }
   }, [open]);
 
-  // Initialize Square payment when payment step is shown
-  useEffect(() => {
-    if (step === 'payment' && !cardElement) {
-      console.log("Payment step activated, initializing Square payment...");
-      
-      // Multiple strategies to ensure element exists
-      const waitForElement = () => {
-        return new Promise<HTMLElement>((resolve, reject) => {
-          let attempts = 0;
-          const maxAttempts = 50; // 5 seconds max
-          
-          const checkElement = () => {
-            attempts++;
-            const element = document.querySelector('#square-card-membership-new') as HTMLElement;
-            
-            console.log(`Attempt ${attempts}: Element found =`, !!element);
-            if (element) {
-              console.log("Element details:", {
-                id: element.id,
-                clientHeight: element.clientHeight,
-                clientWidth: element.clientWidth,
-                offsetHeight: element.offsetHeight,
-                offsetWidth: element.offsetWidth,
-                isConnected: element.isConnected
-              });
-            }
-            
-            if (element && element.isConnected && element.offsetHeight > 0) {
-              resolve(element);
-              return;
-            }
-            
-            if (attempts >= maxAttempts) {
-              reject(new Error(`Element not found after ${maxAttempts} attempts`));
-              return;
-            }
-            
-            // Try again in 100ms
-            setTimeout(checkElement, 100);
-          };
-          
-          checkElement();
-        });
-      };
+  const handlePaymentSuccess = async () => {
+    try {
+      // Process membership subscription
+      const subscriptionResponse = await apiRequest("POST", "/api/client-memberships", {
+        clientId: selectedClient?.id,
+        membershipId: membership?.id,
+        status: 'active'
+      });
 
-      // Wait for element and then initialize
-      waitForElement()
-        .then((element) => {
-          console.log("Element confirmed ready, initializing Square payment...");
-          // Double-check one more time and then initialize
-          setTimeout(() => {
-            const finalCheck = document.querySelector('#square-card-membership-new');
-            if (finalCheck) {
-              console.log("Final check passed, calling initializeSquarePayment");
-              initializeSquarePayment();
-            } else {
-              console.error("Final check failed - element disappeared");
-              setPaymentError("Payment form element is not available");
-            }
-          }, 50);
-        })
-        .catch((error) => {
-          console.error("Failed to find element:", error);
-          setPaymentError("Payment form failed to load");
-        });
+      setPaymentResult({ status: 'COMPLETED' });
+      setStep('receipt');
+      
+      toast({
+        title: "Payment Successful",
+        description: "Membership subscription created successfully!",
+      });
+
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({ queryKey: ["/api/client-memberships"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    } catch (error: any) {
+      console.error('Subscription creation error:', error);
+      toast({
+        title: "Error",
+        description: "Payment succeeded but failed to create membership. Please contact support.",
+        variant: "destructive",
+      });
     }
-  }, [step]);
+  };
+
+  const handlePaymentError = (error: string) => {
+    toast({
+      title: "Payment Failed", 
+      description: error,
+      variant: "destructive",
+    });
+  };
+
+
 
   const initializeSquarePayment = async () => {
     try {
