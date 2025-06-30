@@ -150,14 +150,11 @@ const ClientsPage = () => {
   }, [location]);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ['/api/users'],
+    queryKey: ['/api/users?role=client'],
     queryFn: async () => {
-      // In a real app, we would have a dedicated endpoint for clients
-      // For this demo, we'll fetch all users and filter for clients
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users?role=client');
       if (!response.ok) throw new Error('Failed to fetch clients');
-      const users = await response.json();
-      return users.filter((user: Client) => user.role === 'client');
+      return response.json();
     }
   });
 
