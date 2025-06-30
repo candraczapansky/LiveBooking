@@ -1679,6 +1679,16 @@ If you didn't request this password reset, please ignore this email and your pas
         payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
       }
 
+      // Trigger custom automations for checkout completion
+      try {
+        await triggerCustomAutomation(appointment, storage, 'after payment');
+        await triggerCustomAutomation(appointment, storage, 'checkout completion');
+        await triggerCustomAutomation(appointment, storage, 'service checkout');
+        console.log('Checkout automation triggers executed successfully');
+      } catch (error) {
+        console.error('Failed to trigger checkout automations:', error);
+      }
+
       res.json({ 
         success: true, 
         message: "Gift card payment processed successfully",
@@ -2182,6 +2192,16 @@ If you didn't request this password reset, please ignore this email and your pas
           }
         }
 
+        // Trigger custom automations for checkout completion
+        try {
+          await triggerCustomAutomation(appointment, storage, 'after payment');
+          await triggerCustomAutomation(appointment, storage, 'checkout completion');
+          await triggerCustomAutomation(appointment, storage, 'service checkout');
+          console.log('Checkout automation triggers executed successfully');
+        } catch (error) {
+          console.error('Failed to trigger checkout automations:', error);
+        }
+
         return res.json({ success: true, appointment });
       }
 
@@ -2228,6 +2248,16 @@ If you didn't request this password reset, please ignore this email and your pas
               console.error('Error saving staff earnings:', error);
             }
           }
+        }
+
+        // Trigger custom automations for checkout completion
+        try {
+          await triggerCustomAutomation(appointment, storage, 'after payment');
+          await triggerCustomAutomation(appointment, storage, 'checkout completion');
+          await triggerCustomAutomation(appointment, storage, 'service checkout');
+          console.log('Checkout automation triggers executed successfully');
+        } catch (error) {
+          console.error('Failed to trigger checkout automations:', error);
         }
 
         res.json({ success: true, appointment });
