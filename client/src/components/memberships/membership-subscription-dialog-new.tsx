@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -447,7 +449,7 @@ export default function MembershipSubscriptionDialog({
   };
 
   return (
-    <>
+    <React.Fragment>
       <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
@@ -803,6 +805,6 @@ export default function MembershipSubscriptionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    </>
+    </React.Fragment>
   );
 }
