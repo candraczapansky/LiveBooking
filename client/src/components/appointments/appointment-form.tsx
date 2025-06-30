@@ -136,14 +136,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   });
   
   // Get clients
-  const { data: clients, isLoading: isLoadingClients } = useQuery({
+  const { data: clients, isLoading: isLoadingClients, refetch: refetchClients } = useQuery({
     queryKey: ['/api/users?role=client'],
     queryFn: async () => {
       const response = await fetch('/api/users?role=client');
       if (!response.ok) throw new Error('Failed to fetch clients');
       return response.json();
     },
-    enabled: open
+    enabled: open,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnWindowFocus: true // Refetch when window gains focus
   });
   
   // Get single appointment if editing
@@ -188,6 +190,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       });
     }
   }, [appointment, appointmentId]);
+
+  // Force refresh client data when dialog opens
+  useEffect(() => {
+    if (open) {
+      console.log("Appointment form opened - refreshing client data");
+      refetchClients();
+    }
+  }, [open, refetchClients]);
 
   // Reset form when closing and invalidate cache when opening
   useEffect(() => {
