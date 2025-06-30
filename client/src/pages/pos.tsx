@@ -123,13 +123,14 @@ const PaymentForm = ({ total, onSuccess, onError }: {
         const nonce = result.token;
         
         // Process payment with Square
-        const paymentData = await apiRequest("POST", "/api/create-payment", {
+        const response = await apiRequest("POST", "/api/create-payment", {
           amount: total,
           sourceId: nonce,
           type: "pos_payment",
           description: "Point of Sale Transaction"
         });
 
+        const paymentData = await response.json();
         console.log('POS Payment response:', paymentData);
         
         if (paymentData.payment || paymentData.paymentId) {
@@ -354,10 +355,14 @@ export default function PointOfSale() {
   // Process transaction mutation
   const processTransactionMutation = useMutation({
     mutationFn: async (transaction: Omit<Transaction, 'id' | 'timestamp'>) => {
+      console.log('Processing POS transaction:', transaction);
       const response = await apiRequest("POST", "/api/transactions", transaction);
-      return response.json();
+      const result = await response.json();
+      console.log('POS transaction response:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('POS transaction completed successfully:', data);
       toast({
         title: "Transaction completed",
         description: "Sale processed successfully",
@@ -368,9 +373,10 @@ export default function PointOfSale() {
       setSelectedClient(null);
     },
     onError: (error) => {
+      console.error('POS transaction error:', error);
       toast({
         title: "Transaction failed",
-        description: "Unable to process sale",
+        description: error.message || "Unable to process sale",
         variant: "destructive",
       });
     },
@@ -1214,6 +1220,7 @@ export default function PointOfSale() {
                 <PaymentForm
                   total={getGrandTotal()}
                   onSuccess={() => {
+                    console.log('Square payment successful, processing POS transaction...');
                     // Process transaction after successful payment
                     const transaction = {
                       clientId: selectedClient?.id,
@@ -1223,9 +1230,11 @@ export default function PointOfSale() {
                       total: getGrandTotal(),
                       paymentMethod: "card",
                     };
+                    console.log('POS transaction data:', transaction);
                     processTransactionMutation.mutate(transaction);
                   }}
                   onError={(error) => {
+                    console.error('Square payment error:', error);
                     toast({
                       title: "Payment Failed",
                       description: error,
