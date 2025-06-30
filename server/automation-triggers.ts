@@ -1,6 +1,7 @@
 import { sendEmail } from './email';
 import { sendSMS } from './sms';
 import type { IStorage } from './storage';
+import { storage } from './storage';
 
 export interface AutomationRule {
   id: number;

@@ -37,10 +37,7 @@ import {
   triggerCancellation, 
   triggerNoShow, 
   triggerCustomAutomation,
-  getAutomationRules,
-  addAutomationRule,
-  updateAutomationRule,
-  deleteAutomationRule
+
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
 import { PayrollAutoSync } from "./payroll-auto-sync";
@@ -3481,7 +3478,7 @@ Thank you for choosing Glo Head Spa!
   // Automation Rules API endpoints
   app.get("/api/automation-rules", async (req, res) => {
     try {
-      const rules = getAutomationRules();
+      const rules = await storage.getAllAutomationRules();
       res.json(rules);
     } catch (error: any) {
       res.status(500).json({ error: "Error fetching automation rules: " + error.message });
@@ -3501,7 +3498,7 @@ Thank you for choosing Glo Head Spa!
 
   app.post("/api/automation-rules", validateBody(automationRuleSchema), async (req, res) => {
     try {
-      const newRule = addAutomationRule({
+      const newRule = await storage.createAutomationRule({
         ...req.body,
         sentCount: 0
       });
@@ -3514,7 +3511,7 @@ Thank you for choosing Glo Head Spa!
   app.put("/api/automation-rules/:id", validateBody(automationRuleSchema.partial()), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const updatedRule = updateAutomationRule(id, req.body);
+      const updatedRule = await storage.updateAutomationRule(id, req.body);
       
       if (!updatedRule) {
         return res.status(404).json({ error: "Automation rule not found" });
@@ -3529,7 +3526,7 @@ Thank you for choosing Glo Head Spa!
   app.delete("/api/automation-rules/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const deleted = deleteAutomationRule(id);
+      const deleted = await storage.deleteAutomationRule(id);
       
       if (!deleted) {
         return res.status(404).json({ error: "Automation rule not found" });
