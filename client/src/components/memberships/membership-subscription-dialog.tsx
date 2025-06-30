@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -27,6 +27,164 @@ import { Search, Users, UserPlus, CreditCard, Receipt, Check, X, Mail, Phone, Do
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
+
+// Square Payment Form Component (based on working POS implementation)
+interface PaymentFormProps {
+  total: number;
+  onSuccess: () => void;
+  onError: (error: string) => void;
+}
+
+const PaymentForm = ({ total, onSuccess, onError }: PaymentFormProps) => {
+  const [cardElement, setCardElement] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    initializeSquarePayment();
+  }, []);
+
+  const initializeSquarePayment = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      if (!SQUARE_APP_ID) {
+        throw new Error('Square Application ID not configured');
+      }
+
+      // Load Square Web SDK dynamically
+      if (!window.Square) {
+        const script = document.createElement('script');
+        script.src = 'https://web.squarecdn.com/v1/square.js';
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load Square SDK'));
+          document.head.appendChild(script);
+        });
+      }
+
+      const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+      const card = await payments.card({
+        style: {
+          input: {
+            fontSize: '16px',
+            fontFamily: '"Helvetica Neue", Arial, sans-serif'
+          },
+          '.input-container': {
+            borderColor: '#E5E7EB',
+            borderRadius: '6px'
+          }
+        }
+      });
+      await card.attach('#membership-square-card-element');
+      
+      setCardElement(card);
+      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Square payment form initialization error:', err);
+      setError('Failed to load payment form. Please try again.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!cardElement) {
+      onError('Payment form not ready. Please try again.');
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const result = await cardElement.tokenize();
+      
+      if (result.status === 'OK') {
+        const nonce = result.token;
+        
+        // Process payment with Square
+        const response = await apiRequest("POST", "/api/create-payment", {
+          amount: total,
+          sourceId: nonce,
+          locationId: SQUARE_LOCATION_ID,
+          type: "membership_payment",
+          description: "Membership Subscription Payment"
+        });
+
+        const paymentData = await response.json();
+        
+        if (paymentData.payment && paymentData.payment.status === 'COMPLETED') {
+          onSuccess();
+        } else {
+          throw new Error('Payment was not completed successfully');
+        }
+      } else {
+        const errorMessage = result.errors?.[0]?.detail || 'Payment processing failed';
+        onError(errorMessage);
+      }
+    } catch (err: any) {
+      console.error('Payment processing error:', err);
+      onError(err.message || 'Payment processing failed. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (error) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-red-600 mb-4">{error}</p>
+        <Button 
+          variant="outline" 
+          onClick={initializeSquarePayment}
+          className="text-sm"
+        >
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div 
+        id="membership-square-card-element" 
+        className="min-h-[60px] border rounded-lg p-3 bg-white"
+        data-testid="card-element"
+        role="textbox"
+        aria-label="Credit card number"
+      >
+        {/* Square Card element will be mounted here */}
+      </div>
+      
+      {isLoading && (
+        <div className="flex items-center justify-center text-sm text-muted-foreground">
+          <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
+          Loading secure payment form...
+        </div>
+      )}
+      
+      <Button 
+        type="submit" 
+        disabled={!cardElement || isProcessing || isLoading}
+        className="w-full"
+      >
+        {isProcessing ? (
+          <div className="flex items-center gap-2">
+            <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+            Processing...
+          </div>
+        ) : (
+          `Pay $${total.toFixed(2)}`
+        )}
+      </Button>
+    </form>
+  );
+};
 
 type Membership = {
   id: number;
@@ -61,10 +219,6 @@ export default function MembershipSubscriptionDialog({
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [selectedClient, setSelectedClient] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [cardElement, setCardElement] = useState<any>(null);
-  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
-  const [paymentError, setPaymentError] = useState<string | null>(null);
-  const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [receiptEmail, setReceiptEmail] = useState("");
   const [receiptPhone, setReceiptPhone] = useState("");
@@ -508,11 +662,12 @@ export default function MembershipSubscriptionDialog({
             <div className="space-y-4">
               <Label className="text-sm font-medium">Payment Information</Label>
               <div className="border rounded-lg p-4">
-                {isPaymentLoading ? (
+                {isPaymentLoading && (
                   <div className="text-center py-8">
                     <p>Loading payment form...</p>
                   </div>
-                ) : paymentError ? (
+                )}
+                {paymentError && (
                   <div className="text-center py-8 text-red-600">
                     <p>Error: {paymentError}</p>
                     <Button 
@@ -521,6 +676,7 @@ export default function MembershipSubscriptionDialog({
                       onClick={() => {
                         setPaymentError(null);
                         setIsPaymentLoading(false);
+                        setCardElement(null);
                         setTimeout(() => {
                           initializeSquarePayment();
                         }, 100);
@@ -530,13 +686,19 @@ export default function MembershipSubscriptionDialog({
                       Retry
                     </Button>
                   </div>
-                ) : (
-                  <div 
-                    id="square-card-membership-new" 
-                    className="min-h-[120px] w-full"
-                    style={{ minHeight: '120px', width: '100%', display: 'block' }}
-                  ></div>
                 )}
+                {/* Always render the element so Square SDK can find it */}
+                <div 
+                  ref={elementRef}
+                  id="square-card-membership-new" 
+                  className="min-h-[120px] w-full"
+                  style={{ 
+                    minHeight: '120px', 
+                    width: '100%', 
+                    display: 'block',
+                    opacity: isPaymentLoading || paymentError ? 0.5 : 1
+                  }}
+                ></div>
               </div>
             </div>
           </div>
