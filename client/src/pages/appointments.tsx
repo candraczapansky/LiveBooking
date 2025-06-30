@@ -824,7 +824,9 @@ const AppointmentsPage = () => {
                     String(appointmentDate.getDate()).padStart(2, '0');
                   
                   return appointmentDateStr === dayStr;
-                }).map((appointment: any, index: number) => {
+                })
+                .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                .map((appointment: any) => {
                   const appointmentDate = new Date(appointment.startTime);
                   const endTime = new Date(appointment.endTime);
                   const duration = Math.round((endTime.getTime() - appointmentDate.getTime()) / (1000 * 60));
@@ -838,12 +840,12 @@ const AppointmentsPage = () => {
                     return null;
                   }
                   
-                  // Calculate top position based on minutes from 8:00 AM
+                  // Calculate exact top position based on minutes from 8:00 AM (fixed calculation)
                   const totalMinutesFromStart = (appointmentHour - 8) * 60 + appointmentMinute;
                   const topPosition = (totalMinutesFromStart / 30) * 60; // 60px per 30-minute slot
                   
-                  // Calculate height based on duration
-                  const heightInPixels = Math.max(30, (duration / 30) * 60); // Minimum 30px height
+                  // Calculate height based on duration (minimum 30px to be visible)
+                  const heightInPixels = Math.max(30, (duration / 30) * 60);
                   
                   const staffName = appointment.staff?.user ? 
                     `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
@@ -851,13 +853,16 @@ const AppointmentsPage = () => {
 
                   return (
                     <div
-                      key={appointment.id}
-                      className="absolute inset-x-1 text-white rounded p-1 text-xs cursor-pointer"
+                      key={`appointment-${appointment.id}`}
+                      className="absolute text-white rounded p-1 text-xs cursor-pointer"
                       style={{
                         backgroundColor: appointment.service?.color || '#6b7280',
                         color: '#ffffff',
                         height: `${heightInPixels - 4}px`,
-                        top: `${topPosition + 2}px`
+                        top: `${topPosition + 2}px`,
+                        left: '4px',
+                        right: '4px',
+                        zIndex: 20
                       }}
                       onClick={() => handleAppointmentClick(appointment.id)}
                     >
@@ -875,7 +880,7 @@ const AppointmentsPage = () => {
                       )}
                     </div>
                   );
-                })}
+                }).filter(Boolean)}
               </div>
             ))}
           </div>
