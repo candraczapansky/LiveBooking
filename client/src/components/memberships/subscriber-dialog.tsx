@@ -29,7 +29,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Users, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { PlusCircle, Users, Calendar, Search } from "lucide-react";
 
 type Membership = {
   id: number;
@@ -72,6 +73,7 @@ export default function SubscriberDialog({
   membership,
 }: SubscriberDialogProps) {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -160,11 +162,16 @@ export default function SubscriberDialog({
     removeSubscriberMutation.mutate(membershipId);
   };
 
-  // Filter out clients who are already subscribers
-  const availableClients = clients?.filter((client: User) => 
-    client.role === 'client' && 
-    !subscribers?.some((sub: ClientMembership) => sub.clientId === client.id)
-  ) || [];
+  // Filter out clients who are already subscribers and apply search
+  const availableClients = clients?.filter((client: User) => {
+    const isClient = client.role === 'client';
+    const isNotSubscribed = !subscribers?.some((sub: ClientMembership) => sub.clientId === client.id);
+    const matchesSearch = searchQuery === '' || 
+      getFullName(client.firstName, client.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return isClient && isNotSubscribed && matchesSearch;
+  }) || [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -183,17 +190,37 @@ export default function SubscriberDialog({
               <PlusCircle className="h-4 w-4" />
               Add New Subscriber
             </h3>
+            
+            {/* Search Input */}
+            <div className="mb-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search clients by name or email..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            
             <div className="flex gap-3">
               <Select value={selectedClientId} onValueChange={setSelectedClientId}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Select a client" />
+                  <SelectValue placeholder={availableClients.length === 0 ? "No clients available" : "Select a client"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableClients.map((client: User) => (
-                    <SelectItem key={client.id} value={client.id.toString()}>
-                      {getFullName(client.firstName, client.lastName)} ({client.email})
+                  {availableClients.length === 0 ? (
+                    <SelectItem value="no-clients" disabled>
+                      {searchQuery ? "No clients match your search" : "All clients are already subscribed"}
                     </SelectItem>
-                  ))}
+                  ) : (
+                    availableClients.map((client: User) => (
+                      <SelectItem key={client.id} value={client.id.toString()}>
+                        {getFullName(client.firstName, client.lastName)} ({client.email})
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
               <Button 
