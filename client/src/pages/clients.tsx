@@ -566,51 +566,61 @@ const ClientsPage = () => {
           <div className="max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
-                {/* Page Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                {/* Mobile-Optimized Page Header */}
+                <div className="space-y-4 mb-6">
+                  {/* Title Section */}
                   <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Clients</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">Clients</h1>
                     <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                       Manage your salon clients
                     </p>
                   </div>
-                  <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="relative flex-1 sm:flex-none">
-                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-                      <Input
-                        type="search"
-                        placeholder="Search clients..."
-                        className="pl-8 w-full sm:w-[250px]"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
-                    <div className="flex gap-2 sm:gap-4">
+                  
+                  {/* Search Section */}
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 dark:text-gray-400" />
+                    <Input
+                      type="search"
+                      placeholder="Search clients..."
+                      className="pl-10 h-12 sm:h-10 text-base sm:text-sm w-full"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  
+                  {/* Action Buttons - Mobile First Design */}
+                  <div className="space-y-3">
+                    {/* Primary action - full width on mobile */}
+                    <Button 
+                      onClick={() => setIsAddDialogOpen(true)}
+                      className="w-full h-12 sm:h-10 text-base sm:text-sm font-medium sm:w-auto"
+                      size="default"
+                    >
+                      <PlusCircle className="h-5 w-5 sm:h-4 sm:w-4 mr-2" />
+                      Add New Client
+                    </Button>
+                    
+                    {/* Secondary actions - side by side on mobile */}
+                    <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-2 sm:justify-start">
                       <Button
                         variant="outline"
                         onClick={handleExportClients}
-                        className="flex-1 sm:flex-none min-h-[44px]"
+                        className="h-12 sm:h-10 text-base sm:text-sm sm:w-auto"
                         size="default"
                       >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export CSV
+                        <Download className="h-5 w-5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">Export</span>
+                        <span className="xs:hidden">Export</span>
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() => setIsImportDialogOpen(true)}
-                        className="flex-1 sm:flex-none min-h-[44px]"
+                        className="h-12 sm:h-10 text-base sm:text-sm sm:w-auto"
                         size="default"
                       >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import CSV
-                      </Button>
-                      <Button 
-                        onClick={() => setIsAddDialogOpen(true)}
-                        className="flex-1 sm:flex-none min-h-[44px]"
-                        size="default"
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Add Client
+                        <Upload className="h-5 w-5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span className="hidden xs:inline">Import</span>
+                        <span className="xs:hidden">Import</span>
                       </Button>
                     </div>
                   </div>
