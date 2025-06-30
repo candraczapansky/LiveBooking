@@ -249,6 +249,11 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      // Also invalidate queries with any additional parameters
+      queryClient.invalidateQueries({ predicate: query => 
+        Array.isArray(query.queryKey) && query.queryKey[0] === '/api/services' ||
+        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/services"
+      });
       toast({
         title: "Success",
         description: "Service updated successfully",
