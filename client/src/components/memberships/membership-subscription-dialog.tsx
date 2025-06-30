@@ -160,8 +160,8 @@ export default function MembershipSubscriptionDialog({
         });
       }
 
-      // Initialize Square payments (exact same pattern as working appointment checkout)
-      const payments = window.Square.payments(SQUARE_APP_ID);
+      // Initialize Square payments with location ID
+      const payments = window.Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
       const card = await payments.card({
         style: {
           input: {
@@ -222,6 +222,7 @@ export default function MembershipSubscriptionDialog({
         const paymentResponse = await apiRequest("POST", "/api/create-payment", {
           amount: membership.price,
           sourceId: paymentToken,
+          locationId: SQUARE_LOCATION_ID,
           type: "membership_payment",
           description: `Membership: ${membership.name} - ${selectedClient.firstName} ${selectedClient.lastName}`
         });
