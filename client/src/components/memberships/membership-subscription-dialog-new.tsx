@@ -221,13 +221,10 @@ export default function MembershipSubscriptionDialog({
   // Receipt sending mutations
   const sendReceiptEmailMutation = useMutation({
     mutationFn: async ({ email, receiptData }: { email: string; receiptData: any }) => {
-      return apiRequest('/api/send-receipt-email', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          subject: 'Membership Subscription Receipt',
-          receiptData
-        })
+      return apiRequest("POST", "/api/send-receipt-email", {
+        email,
+        subject: 'Membership Subscription Receipt',
+        receiptData
       });
     },
     onSuccess: () => {
@@ -248,12 +245,9 @@ export default function MembershipSubscriptionDialog({
 
   const sendReceiptSMSMutation = useMutation({
     mutationFn: async ({ phone, receiptData }: { phone: string; receiptData: any }) => {
-      return apiRequest('/api/send-receipt-sms', {
-        method: 'POST',
-        body: {
-          phone,
-          message: `Receipt: Membership subscription - ${receiptData.membership?.name} - $${receiptData.total?.toFixed(2)} - Transaction ID: ${receiptData.transactionId}`
-        }
+      return apiRequest("POST", "/api/send-receipt-sms", {
+        phone,
+        message: `Receipt: Membership subscription - ${receiptData.membership?.name} - $${receiptData.total?.toFixed(2)} - Transaction ID: ${receiptData.transactionId}`
       });
     },
     onSuccess: () => {
@@ -321,39 +315,29 @@ export default function MembershipSubscriptionDialog({
   const handlePaymentSuccess = async () => {
     try {
       // Create the membership subscription
-      const membershipResponse = await apiRequest('/api/client-memberships', {
-        method: 'POST',
-        body: {
-          clientId: selectedClient?.id,
-          membershipId: membership?.id,
-          startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + (membership?.duration || 30) * 24 * 60 * 60 * 1000).toISOString(),
-          active: true
-        }
+      const membershipData = await apiRequest("POST", "/api/client-memberships", {
+        clientId: selectedClient?.id,
+        membershipId: membership?.id,
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + (membership?.duration || 30) * 24 * 60 * 60 * 1000).toISOString(),
+        active: true
       });
-      
-      const membershipData = await membershipResponse.json();
 
       // Create payment record
-      const paymentResponse = await apiRequest('/api/payments', {
-        method: 'POST',
-        body: {
-          clientId: selectedClient?.id,
-          clientMembershipId: membershipData.id,
-          amount: membership?.price,
-          method: "card",
-          status: "completed",
-          type: "membership",
-          description: `Membership payment for ${membership?.name}`,
-          paymentDate: new Date().toISOString()
-        }
+      const paymentRecord = await apiRequest("POST", "/api/payments", {
+        clientId: selectedClient?.id,
+        clientMembershipId: membershipData.id,
+        amount: membership?.price,
+        method: "card",
+        status: "completed",
+        type: "membership",
+        description: `Membership payment for ${membership?.name}`,
+        paymentDate: new Date().toISOString()
       });
-      
-      const paymentData = await paymentResponse.json();
 
       // Set up transaction data for receipt
       setLastTransaction({
-        transactionId: paymentData.id || `TXN-${Date.now()}`,
+        transactionId: paymentRecord.id || `TXN-${Date.now()}`,
         total: membership?.price,
         paymentMethod: 'card',
         membership: membership,
