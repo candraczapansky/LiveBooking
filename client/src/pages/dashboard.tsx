@@ -13,58 +13,51 @@ const Dashboard = () => {
   useDocumentTitle("Dashboard | BeautyBook");
   const { user } = useContext(AuthContext);
   const { isOpen: sidebarOpen } = useSidebar();
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      console.log('Dashboard mobile detection:', mobile, 'width:', window.innerWidth);
+      setIsMobile(mobile);
     };
     
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  console.log('Dashboard render - isMobile:', isMobile, 'width:', window.innerWidth);
   
-  // Mobile layout
+  // Mobile layout - simplified for debugging
   if (isMobile) {
+    console.log('Rendering mobile layout');
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', padding: '0', margin: '0' }}>
         <Header />
         
-        <main className="bg-gray-50 dark:bg-gray-900 p-3">
-          <div className="w-full">
-            {/* Page Heading */}
-            <div className="mb-4">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                Welcome back{user?.firstName ? `, ${user.firstName}` : ""}! Here's what's happening with your business today.
-              </p>
-            </div>
-            
-            {/* Stats Overview */}
-            <div className="mb-6">
-              <StatsOverview />
-            </div>
-            
-            {/* Dashboard Content */}
-            <div className="space-y-6">
-              {/* Appointments Table */}
-              <div className="w-full">
-                <AppointmentsTable />
-              </div>
-              
-              {/* Quick Actions & Notifications */}
-              <div className="space-y-6">
-                <div>
-                  <QuickActions />
-                </div>
-                <div>
-                  <RecentNotifications />
-                </div>
-              </div>
-            </div>
+        <div style={{ padding: '12px', backgroundColor: '#f9fafb' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
+            Mobile Dashboard
+          </h1>
+          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>
+            Welcome back{user?.firstName ? `, ${user.firstName}` : ""}!
+          </p>
+          
+          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
+              Quick Stats
+            </h2>
+            <p style={{ color: '#6b7280' }}>Mobile dashboard content loading...</p>
           </div>
-        </main>
+          
+          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
+              Recent Activity
+            </h2>
+            <p style={{ color: '#6b7280' }}>Recent appointments and notifications...</p>
+          </div>
+        </div>
       </div>
     );
   }
