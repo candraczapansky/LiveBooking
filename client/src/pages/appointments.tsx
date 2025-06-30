@@ -695,6 +695,10 @@ const AppointmentsPage = () => {
     const weekDays = getWeekDays(currentDate);
     const isMobile = window.innerWidth < 768;
     
+    console.log('Current Date:', currentDate);
+    console.log('Week Days:', weekDays.map(d => d.toDateString()));
+    console.log('Appointments:', appointments?.map((apt: any) => ({ id: apt.id, startTime: apt.startTime })));
+    
     // Mobile: Show simplified card-based week view
     if (isMobile) {
       return (
@@ -816,14 +820,14 @@ const AppointmentsPage = () => {
               >
                 {appointments?.filter((appointment: any) => {
                   const appointmentDate = new Date(appointment.startTime);
-                  const dayStr = day.getFullYear() + '-' + 
-                    String(day.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(day.getDate()).padStart(2, '0');
-                  const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                    String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                    String(appointmentDate.getDate()).padStart(2, '0');
                   
-                  return appointmentDateStr === dayStr;
+                  // Use toDateString() for reliable date comparison
+                  const dayDateString = day.toDateString();
+                  const appointmentDateString = appointmentDate.toDateString();
+                  
+                  console.log(`Appointment ${appointment.id}: Day=${dayDateString}, Appointment=${appointmentDateString}, StartTime=${appointment.startTime}, Match=${dayDateString === appointmentDateString}`);
+                  
+                  return dayDateString === appointmentDateString;
                 })
                 .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                 .map((appointment: any) => {
