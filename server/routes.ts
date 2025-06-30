@@ -36,6 +36,7 @@ import {
   triggerBookingConfirmation, 
   triggerCancellation, 
   triggerNoShow, 
+  triggerAfterPayment,
   triggerCustomAutomation,
 
 } from "./automation-triggers";
@@ -3528,7 +3529,7 @@ Thank you for choosing Glo Head Spa!
   const automationRuleSchema = z.object({
     name: z.string().min(1, "Name is required"),
     type: z.enum(["email", "sms"]),
-    trigger: z.enum(["appointment_reminder", "follow_up", "birthday", "no_show", "booking_confirmation", "cancellation", "custom"]),
+    trigger: z.enum(["appointment_reminder", "follow_up", "birthday", "no_show", "booking_confirmation", "cancellation", "after_payment", "custom"]),
     timing: z.string().min(1, "Timing is required"),
     template: z.string().min(1, "Template is required"),
     subject: z.string().optional(),

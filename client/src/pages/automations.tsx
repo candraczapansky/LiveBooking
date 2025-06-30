@@ -37,7 +37,7 @@ type AutomationRule = {
   id: number;
   name: string;
   type: 'email' | 'sms';
-  trigger: 'appointment_reminder' | 'follow_up' | 'birthday' | 'no_show' | 'booking_confirmation' | 'cancellation' | 'custom';
+  trigger: 'appointment_reminder' | 'follow_up' | 'birthday' | 'no_show' | 'booking_confirmation' | 'cancellation' | 'after_payment' | 'custom';
   timing: string; // e.g., "24 hours before", "1 day after", "immediately"
   template: string;
   subject?: string; // Only for email
@@ -196,6 +196,7 @@ export default function Automations() {
     { value: "no_show", label: "No Show" },
     { value: "booking_confirmation", label: "Booking Confirmation" },
     { value: "cancellation", label: "Cancellation" },
+    { value: "after_payment", label: "After Payment" },
     { value: "custom", label: "Custom Trigger" }
   ];
 

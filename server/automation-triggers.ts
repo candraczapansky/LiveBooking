@@ -191,6 +191,10 @@ export async function triggerNoShow(appointmentData: any, storage: IStorage) {
   await triggerAutomations('no_show', appointmentData, storage);
 }
 
+export async function triggerAfterPayment(appointmentData: any, storage: IStorage) {
+  await triggerAutomations('after_payment', appointmentData, storage);
+}
+
 export async function triggerCustomAutomation(appointmentData: any, storage: IStorage, customTriggerName: string) {
   await triggerAutomations('custom', appointmentData, storage, customTriggerName);
 }
