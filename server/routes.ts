@@ -467,8 +467,17 @@ If you didn't request this password reset, please ignore this email and your pas
       
       console.log(`User ${userId} deleted successfully`);
       return res.status(200).json({ success: true, message: "User deleted successfully" });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting user:", error);
+      
+      // Handle specific constraint errors
+      if (error.message && error.message.includes("associated appointments")) {
+        return res.status(400).json({ 
+          error: error.message,
+          type: "constraint_violation"
+        });
+      }
+      
       return res.status(500).json({ error: "Failed to delete user" });
     }
   });

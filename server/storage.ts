@@ -661,13 +661,28 @@ export class DatabaseStorage implements IStorage {
   async deleteUser(id: number): Promise<boolean> {
     try {
       console.log(`DatabaseStorage: Attempting to delete user with ID: ${id}`);
+      
+      // Check for related appointments first
+      const relatedAppointments = await db.select().from(appointments).where(eq(appointments.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedAppointments.length} related appointments for user ${id}`);
+      
+      if (relatedAppointments.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedAppointments.length} appointments`);
+        throw new Error(`Cannot delete user - has ${relatedAppointments.length} associated appointments. Please delete or reassign appointments first.`);
+      }
+      
       const result = await db.delete(users).where(eq(users.id, id));
       const success = result.rowCount ? result.rowCount > 0 : false;
       console.log(`DatabaseStorage: Delete user ${id} result:`, success);
+      
+      // Verify deletion
+      const userAfterDelete = await db.select().from(users).where(eq(users.id, id));
+      console.log(`DatabaseStorage: User exists after deletion:`, userAfterDelete.length > 0);
+      
       return success;
     } catch (error) {
       console.error(`DatabaseStorage: Error deleting user ${id}:`, error);
-      return false;
+      throw error; // Re-throw to bubble up the specific error message
     }
   }
 
