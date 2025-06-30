@@ -134,13 +134,10 @@ export default function MembershipSubscriptionDialog({
         throw new Error('Square Application ID not configured');
       }
 
-      // Load Square Web SDK dynamically
+      // Load Square Web SDK dynamically (force production)
       if (!window.Square) {
         const script = document.createElement('script');
-        const isSandbox = SQUARE_APP_ID.includes('sandbox');
-        script.src = isSandbox 
-          ? 'https://sandbox.web.squarecdn.com/v1/square.js' 
-          : 'https://web.squarecdn.com/v1/square.js';
+        script.src = 'https://web.squarecdn.com/v1/square.js';
         
         await new Promise((resolve, reject) => {
           script.onload = resolve;
