@@ -77,6 +77,8 @@ const MembershipsPage = () => {
   const [selectedMembershipId, setSelectedMembershipId] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [membershipToDelete, setMembershipToDelete] = useState<Membership | null>(null);
+  const [isSubscriberDialogOpen, setIsSubscriberDialogOpen] = useState(false);
+  const [selectedMembershipForSubscribers, setSelectedMembershipForSubscribers] = useState<Membership | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -152,6 +154,11 @@ const MembershipsPage = () => {
   const openDeleteDialog = (membership: Membership) => {
     setMembershipToDelete(membership);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleViewSubscribers = (membership: Membership) => {
+    setSelectedMembershipForSubscribers(membership);
+    setIsSubscriberDialogOpen(true);
   };
 
   return (
@@ -266,7 +273,12 @@ const MembershipsPage = () => {
                         </CardContent>
                         
                         <CardFooter className="bg-muted/50 pt-4">
-                          <Button variant="outline" className="w-full" onClick={() => toast({ title: "Feature Coming Soon", description: "View subscribers functionality will be available soon!" })}>
+                          <Button 
+                            variant="outline" 
+                            className="w-full" 
+                            onClick={() => handleViewSubscribers(membership)}
+                          >
+                            <Users className="h-4 w-4 mr-2" />
                             View Subscribers
                           </Button>
                         </CardFooter>
@@ -334,7 +346,7 @@ const MembershipsPage = () => {
                               </TableCell>
                               <TableCell>{membership.membership?.name}</TableCell>
                               <TableCell>
-                                <Badge variant={membership.active ? "success" : "secondary"}>
+                                <Badge variant={membership.active ? "default" : "secondary"} className={membership.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}>
                                   {membership.active ? "Active" : "Inactive"}
                                 </Badge>
                               </TableCell>
@@ -393,6 +405,13 @@ const MembershipsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Subscriber Dialog */}
+      <SubscriberDialog
+        open={isSubscriberDialogOpen}
+        onOpenChange={setIsSubscriberDialogOpen}
+        membership={selectedMembershipForSubscribers}
+      />
     </div>
   );
 };
