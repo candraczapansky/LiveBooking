@@ -334,7 +334,7 @@ export default function MembershipSubscriptionDialog({
         status: "completed",
         type: "membership",
         description: `Membership payment for ${membership?.name}`,
-        paymentDate: new Date()
+        paymentDate: new Date().toISOString()
       });
 
       // Set up transaction data for receipt

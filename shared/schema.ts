@@ -280,6 +280,8 @@ export const payments = pgTable("payments", {
 export const insertPaymentSchema = createInsertSchema(payments).omit({
   id: true,
   createdAt: true,
+}).extend({
+  paymentDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 // Staff earnings tracking
