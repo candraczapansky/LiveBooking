@@ -273,10 +273,10 @@ const MembershipsPage = () => {
                         </CardContent>
                         
                         <CardFooter className="bg-muted/50 pt-4">
-                          <div className="flex space-x-2 w-full">
+                          <div className="flex flex-col space-y-2 w-full">
                             <Button 
                               variant="outline" 
-                              className="flex-1" 
+                              className="w-full" 
                               onClick={() => handleViewSubscribers(membership)}
                             >
                               <Users className="h-4 w-4 mr-2" />
@@ -284,7 +284,7 @@ const MembershipsPage = () => {
                             </Button>
                             <Button 
                               variant="default" 
-                              className="flex-1" 
+                              className="w-full" 
                               onClick={() => handleViewSubscribers(membership)}
                             >
                               <PlusCircle className="h-4 w-4 mr-2" />

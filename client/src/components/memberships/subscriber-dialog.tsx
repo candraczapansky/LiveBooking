@@ -110,8 +110,8 @@ export default function SubscriberDialog({
       return apiRequest("POST", "/api/client-memberships", {
         clientId,
         membershipId: membership?.id,
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
+        startDate,
+        endDate,
         active: true
       });
     },

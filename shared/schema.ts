@@ -250,6 +250,15 @@ export const clientMemberships = pgTable("client_memberships", {
 
 export const insertClientMembershipSchema = createInsertSchema(clientMemberships).omit({
   id: true,
+}).extend({
+  startDate: z.union([
+    z.date(),
+    z.string().transform((str) => new Date(str))
+  ]),
+  endDate: z.union([
+    z.date(), 
+    z.string().transform((str) => new Date(str))
+  ])
 });
 
 // Payments schema
