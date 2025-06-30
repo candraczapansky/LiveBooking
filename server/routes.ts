@@ -3154,6 +3154,79 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
+  // Send receipt email endpoint
+  app.post("/api/send-receipt-email", async (req, res) => {
+    try {
+      const { email, receiptData } = req.body;
+      
+      if (!email || !receiptData) {
+        return res.status(400).json({ error: "Email and receipt data are required" });
+      }
+
+      const items = receiptData.items.map((item: any) => 
+        `${item.quantity}x ${item.item.name} - $${item.total.toFixed(2)}`
+      ).join('\n');
+
+      const emailContent = `
+Thank you for your purchase!
+
+Transaction Details:
+Transaction ID: ${receiptData.transactionId}
+Date: ${new Date(receiptData.timestamp).toLocaleDateString()}
+
+Items:
+${items}
+
+Subtotal: $${receiptData.subtotal.toFixed(2)}
+Tax: $${receiptData.tax.toFixed(2)}
+Total: $${receiptData.total.toFixed(2)}
+Payment Method: ${receiptData.paymentMethod}
+
+Thank you for choosing our salon!
+      `;
+
+      const result = await sendEmail({
+        to: email,
+        from: "noreply@beautybook.com",
+        subject: "Your Purchase Receipt",
+        text: emailContent
+      });
+
+      if (result.success) {
+        res.json({ success: true, message: "Receipt email sent successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to send receipt email" });
+      }
+    } catch (error: any) {
+      console.error('Receipt email error:', error);
+      res.status(500).json({ error: "Error sending receipt email: " + error.message });
+    }
+  });
+
+  // Send receipt SMS endpoint
+  app.post("/api/send-receipt-sms", async (req, res) => {
+    try {
+      const { phone, receiptData } = req.body;
+      
+      if (!phone || !receiptData) {
+        return res.status(400).json({ error: "Phone and receipt data are required" });
+      }
+
+      const smsContent = `Thank you for your purchase! Transaction ID: ${receiptData.transactionId}. Total: $${receiptData.total.toFixed(2)}. Paid via ${receiptData.paymentMethod}. Visit us again soon!`;
+
+      const result = await sendSMS(phone, smsContent);
+
+      if (result.success) {
+        res.json({ success: true, message: "Receipt SMS sent successfully" });
+      } else {
+        res.status(500).json({ error: "Failed to send receipt SMS" });
+      }
+    } catch (error: any) {
+      console.error('Receipt SMS error:', error);
+      res.status(500).json({ error: "Error sending receipt SMS: " + error.message });
+    }
+  });
+
   // Test email endpoint for debugging
   app.post("/api/test-email", async (req, res) => {
     const { to, subject, content } = req.body;

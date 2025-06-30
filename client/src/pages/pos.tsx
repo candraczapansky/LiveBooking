@@ -20,7 +20,11 @@ import {
   Receipt,
   User,
   DollarSign,
-  Package
+  Package,
+  Mail,
+  MessageSquare,
+  Check,
+  X
 } from "lucide-react";
 import {
   Dialog,
@@ -261,6 +265,8 @@ export default function PointOfSale() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -352,6 +358,54 @@ export default function PointOfSale() {
 
   const clientList = (clients as any[])?.filter((user: any) => user.role === 'client') || [];
 
+  // Send receipt email mutation
+  const sendReceiptEmailMutation = useMutation({
+    mutationFn: async ({ email, receiptData }: { email: string; receiptData: any }) => {
+      const response = await apiRequest("POST", "/api/send-receipt-email", {
+        email,
+        receiptData
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Receipt sent",
+        description: "Email receipt sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Email failed",
+        description: error.message || "Failed to send email receipt",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send receipt SMS mutation
+  const sendReceiptSMSMutation = useMutation({
+    mutationFn: async ({ phone, receiptData }: { phone: string; receiptData: any }) => {
+      const response = await apiRequest("POST", "/api/send-receipt-sms", {
+        phone,
+        receiptData
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Receipt sent",
+        description: "SMS receipt sent successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "SMS failed",
+        description: error.message || "Failed to send SMS receipt",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Process transaction mutation
   const processTransactionMutation = useMutation({
     mutationFn: async (transaction: Omit<Transaction, 'id' | 'timestamp'>) => {
@@ -363,6 +417,19 @@ export default function PointOfSale() {
     },
     onSuccess: (data) => {
       console.log('POS transaction completed successfully:', data);
+      
+      // Store transaction details for receipt
+      setLastTransaction({
+        ...data,
+        client: selectedClient,
+        items: cart,
+        subtotal: getSubtotal(),
+        tax: getTax(),
+        total: getGrandTotal(),
+        paymentMethod,
+        timestamp: new Date()
+      });
+      
       toast({
         title: "Transaction completed",
         description: "Sale processed successfully",
@@ -371,6 +438,7 @@ export default function PointOfSale() {
       setIsCheckoutOpen(false);
       setCashReceived("");
       setSelectedClient(null);
+      setShowReceiptDialog(true);
     },
     onError: (error) => {
       console.error('POS transaction error:', error);
@@ -1272,6 +1340,106 @@ export default function PointOfSale() {
                 )}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Confirmation Dialog */}
+      <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-green-600" />
+              Payment Successful
+            </DialogTitle>
+            <DialogDescription>
+              Would you like to send a receipt to the customer?
+            </DialogDescription>
+          </DialogHeader>
+
+          {lastTransaction && (
+            <div className="space-y-4">
+              {/* Transaction Summary */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Transaction ID:</span>
+                  <span className="font-mono text-xs">{lastTransaction.transactionId}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Amount:</span>
+                  <span className="font-semibold">${lastTransaction.total?.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Payment Method:</span>
+                  <span className="capitalize">{lastTransaction.paymentMethod}</span>
+                </div>
+                {lastTransaction.client && (
+                  <div className="flex justify-between text-sm">
+                    <span>Customer:</span>
+                    <span>{lastTransaction.client.firstName} {lastTransaction.client.lastName}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Receipt Options */}
+              <div className="space-y-3">
+                <p className="text-sm font-medium">Send receipt via:</p>
+                
+                {/* Email Option */}
+                {lastTransaction.client?.email && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      sendReceiptEmailMutation.mutate({
+                        email: lastTransaction.client.email,
+                        receiptData: lastTransaction
+                      });
+                    }}
+                    disabled={sendReceiptEmailMutation.isPending}
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {sendReceiptEmailMutation.isPending ? "Sending..." : `Email to ${lastTransaction.client.email}`}
+                  </Button>
+                )}
+
+                {/* SMS Option */}
+                {lastTransaction.client?.phone && lastTransaction.client.phone.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      sendReceiptSMSMutation.mutate({
+                        phone: lastTransaction.client.phone,
+                        receiptData: lastTransaction
+                      });
+                    }}
+                    disabled={sendReceiptSMSMutation.isPending}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    {sendReceiptSMSMutation.isPending ? "Sending..." : `SMS to ${lastTransaction.client.phone}`}
+                  </Button>
+                )}
+
+                {/* No Contact Info */}
+                {(!lastTransaction.client?.email && (!lastTransaction.client?.phone || lastTransaction.client.phone.length === 0)) && (
+                  <div className="text-center py-4 text-muted-foreground">
+                    <p className="text-sm">No email or phone number available for this customer.</p>
+                    <p className="text-xs mt-1">Receipt can only be sent if customer contact information is provided.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowReceiptDialog(false)}
+            >
+              <X className="h-4 w-4 mr-2" />
+              Skip Receipt
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
