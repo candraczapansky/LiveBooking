@@ -430,6 +430,13 @@ const MembershipsPage = () => {
         onOpenChange={setIsSubscriberDialogOpen}
         membership={selectedMembershipForSubscribers}
       />
+      
+      {/* Add Client Dialog for creating new subscriptions */}
+      <MembershipSubscriptionDialog
+        open={isAddClientDialogOpen}
+        onOpenChange={setIsAddClientDialogOpen}
+        membership={selectedMembershipForAddClient}
+      />
     </div>
   );
 };
