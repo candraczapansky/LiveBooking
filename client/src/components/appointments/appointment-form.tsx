@@ -195,9 +195,20 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
   useEffect(() => {
     if (open) {
       console.log("Appointment form opened - refreshing client data");
+      // Clear cache and refetch immediately
+      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
       refetchClients();
     }
-  }, [open, refetchClients]);
+  }, [open, refetchClients, queryClient]);
+
+  // Debug clients data whenever it changes
+  useEffect(() => {
+    if (clients) {
+      console.log("Clients data updated in appointment form:", clients.length, "clients");
+      console.log("Client names:", clients.map((c: any) => `${c.firstName} ${c.lastName} (ID: ${c.id})`));
+    }
+  }, [clients]);
 
   // Reset form when closing and invalidate cache when opening
   useEffect(() => {
