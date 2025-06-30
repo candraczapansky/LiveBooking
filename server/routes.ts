@@ -437,6 +437,42 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
+  // Delete user route
+  app.delete("/api/users/:id", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    try {
+      console.log(`Attempting to delete user with ID: ${userId}`);
+      
+      // Check if user exists before deletion
+      const existingUser = await storage.getUser(userId);
+      if (!existingUser) {
+        console.log(`User with ID ${userId} not found`);
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      console.log(`User exists, proceeding with deletion:`, existingUser);
+      
+      // Delete the user
+      const deleted = await storage.deleteUser(userId);
+      console.log(`Deletion result:`, deleted);
+      
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete user" });
+      }
+      
+      console.log(`User ${userId} deleted successfully`);
+      return res.status(200).json({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      return res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   // Individual user route
   app.get("/api/users/:id", async (req, res) => {
     const userId = parseInt(req.params.id);

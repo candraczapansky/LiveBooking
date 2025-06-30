@@ -41,6 +41,7 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User>;
+  deleteUser(id: number): Promise<boolean>;
   setPasswordResetToken(userId: number, token: string, expiry: Date): Promise<void>;
   getUserByResetToken(token: string): Promise<User | undefined>;
   clearPasswordResetToken(userId: number): Promise<void>;
@@ -654,6 +655,19 @@ export class DatabaseStorage implements IStorage {
       }
       
       return result.rows[0] as User;
+    }
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    try {
+      console.log(`DatabaseStorage: Attempting to delete user with ID: ${id}`);
+      const result = await db.delete(users).where(eq(users.id, id));
+      const success = result.rowCount ? result.rowCount > 0 : false;
+      console.log(`DatabaseStorage: Delete user ${id} result:`, success);
+      return success;
+    } catch (error) {
+      console.error(`DatabaseStorage: Error deleting user ${id}:`, error);
+      return false;
     }
   }
 
