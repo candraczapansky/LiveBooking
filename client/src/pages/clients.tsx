@@ -207,8 +207,12 @@ const ClientsPage = () => {
     },
     onSuccess: async (response) => {
       const newClient = await response.json();
+      // Invalidate all user-related queries with aggressive cache clearing
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
+      // Force refetch client data for appointment forms
+      queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
       
       toast({
         title: "Success",
