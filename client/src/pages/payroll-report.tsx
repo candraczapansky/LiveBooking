@@ -121,8 +121,12 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     let rangeEnd: Date;
 
     if (timePeriod === 'custom' && customStartDate && customEndDate) {
-      rangeStart = startOfDay(new Date(customStartDate));
-      rangeEnd = endOfDay(new Date(customEndDate));
+      // Parse dates in local timezone to avoid UTC conversion issues
+      const [startYear, startMonth, startDay] = customStartDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = customEndDate.split('-').map(Number);
+      
+      rangeStart = startOfDay(new Date(startYear, startMonth - 1, startDay));
+      rangeEnd = endOfDay(new Date(endYear, endMonth - 1, endDay));
     } else {
       // Use month selection as fallback
       rangeStart = startOfMonth(selectedMonth);

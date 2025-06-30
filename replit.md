@@ -28,6 +28,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Payroll calculations now reflect actual revenue received rather than potential earnings
   - Staff earnings are based solely on services that have been paid for by clients
 
+- **Fixed payroll report custom date range accuracy:**
+  - Resolved timezone issues causing incorrect date filtering in custom date ranges
+  - Fixed date parsing to use local timezone instead of UTC to prevent day-shift errors
+  - Custom date ranges now accurately show payroll data for the selected dates
+  - Eliminated issue where selecting 6/29/25 would show 6/28/25 data
+
 ### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, and Complete Appointment Payment Amount Fix
 
 - **Successfully resolved SMS marketing campaign issues and verified functionality:**
