@@ -149,7 +149,27 @@ const PaymentForm = ({ total, onSuccess, onError }: {
       }
     } catch (error: any) {
       console.error('POS Payment processing error:', error);
-      onError(error.message || 'Payment failed');
+      
+      // Extract specific error message from server response
+      let errorMessage = 'Payment failed';
+      if (error.response?.data?.error) {
+        const serverError = error.response.data.error;
+        if (serverError.includes('GENERIC_DECLINE')) {
+          errorMessage = 'Card declined by bank. Please check card details or try a different payment method.';
+        } else if (serverError.includes('INSUFFICIENT_FUNDS')) {
+          errorMessage = 'Insufficient funds on card. Please try a different payment method.';
+        } else if (serverError.includes('CVV_FAILURE')) {
+          errorMessage = 'CVV verification failed. Please check your security code.';
+        } else if (serverError.includes('INVALID_CARD')) {
+          errorMessage = 'Invalid card information. Please check your card details.';
+        } else {
+          errorMessage = 'Payment processing failed. Please try again or use a different payment method.';
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      onError(errorMessage);
     } finally {
       setIsProcessing(false);
     }

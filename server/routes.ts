@@ -1974,9 +1974,39 @@ If you didn't request this password reset, please ignore this email and your pas
       });
 
       const responseData = await squareResponse.json();
+      console.log('Square API response:', JSON.stringify(responseData, null, 2));
       
-      if (!squareResponse.ok) {
-        throw new Error(`Square API error: ${JSON.stringify(responseData)}`);
+      if (!squareResponse.ok || responseData.payment?.status === 'FAILED') {
+        console.log('Square payment failed:', responseData);
+        
+        // Extract meaningful error message for common decline reasons
+        let errorMessage = 'Payment declined';
+        if (responseData.payment?.card_details?.errors?.length > 0) {
+          const cardError = responseData.payment.card_details.errors[0];
+          switch(cardError.code) {
+            case 'GENERIC_DECLINE':
+              errorMessage = 'Card declined by issuing bank. Please try a different card or payment method.';
+              break;
+            case 'INSUFFICIENT_FUNDS':
+              errorMessage = 'Insufficient funds. Please try a different card.';
+              break;
+            case 'CVV_FAILURE':
+              errorMessage = 'CVV verification failed. Please check your security code.';
+              break;
+            case 'INVALID_CARD':
+              errorMessage = 'Invalid card information. Please check your card details.';
+              break;
+            case 'CARD_EXPIRED':
+              errorMessage = 'Card has expired. Please use a different card.';
+              break;
+            default:
+              errorMessage = cardError.detail || 'Payment declined. Please try a different card.';
+          }
+        } else if (responseData.errors?.length > 0) {
+          errorMessage = responseData.errors[0].detail || 'Payment processing failed';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const response = { payment: responseData.payment };
