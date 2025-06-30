@@ -211,8 +211,66 @@ export default function MembershipSubscriptionDialog({
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [receiptEmail, setReceiptEmail] = useState("");
   const [receiptPhone, setReceiptPhone] = useState("");
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState<any>(null);
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Receipt sending mutations
+  const sendReceiptEmailMutation = useMutation({
+    mutationFn: async ({ email, receiptData }: { email: string; receiptData: any }) => {
+      return apiRequest('/api/send-receipt-email', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          subject: 'Membership Subscription Receipt',
+          receiptData
+        })
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email sent successfully",
+        description: "Receipt has been sent via email"
+      });
+      setManualEmail("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send email",
+        description: error.response?.data?.error || "An error occurred",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const sendReceiptSMSMutation = useMutation({
+    mutationFn: async ({ phone, receiptData }: { phone: string; receiptData: any }) => {
+      return apiRequest('/api/send-receipt-sms', {
+        method: 'POST',
+        body: {
+          phone,
+          message: `Receipt: Membership subscription - ${receiptData.membership?.name} - $${receiptData.total?.toFixed(2)} - Transaction ID: ${receiptData.transactionId}`
+        }
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "SMS sent successfully",
+        description: "Receipt has been sent via SMS"
+      });
+      setManualPhone("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to send SMS",
+        description: error.response?.data?.error || "An error occurred",
+        variant: "destructive"
+      });
+    }
+  });
 
   // Get all clients
   const { data: clients } = useQuery({
@@ -262,20 +320,54 @@ export default function MembershipSubscriptionDialog({
 
   const handlePaymentSuccess = async () => {
     try {
-      // Process membership subscription
-      const subscriptionResponse = await apiRequest("POST", "/api/client-memberships", {
-        clientId: selectedClient?.id,
-        membershipId: membership?.id,
-        status: 'active'
+      // Create the membership subscription
+      const membershipResponse = await apiRequest('/api/client-memberships', {
+        method: 'POST',
+        body: {
+          clientId: selectedClient?.id,
+          membershipId: membership?.id,
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + (membership?.duration || 30) * 24 * 60 * 60 * 1000).toISOString(),
+          active: true
+        }
+      });
+      
+      const membershipData = await membershipResponse.json();
+
+      // Create payment record
+      const paymentResponse = await apiRequest('/api/payments', {
+        method: 'POST',
+        body: {
+          clientId: selectedClient?.id,
+          clientMembershipId: membershipData.id,
+          amount: membership?.price,
+          method: "card",
+          status: "completed",
+          type: "membership",
+          description: `Membership payment for ${membership?.name}`,
+          paymentDate: new Date().toISOString()
+        }
+      });
+      
+      const paymentData = await paymentResponse.json();
+
+      // Set up transaction data for receipt
+      setLastTransaction({
+        transactionId: paymentData.id || `TXN-${Date.now()}`,
+        total: membership?.price,
+        paymentMethod: 'card',
+        membership: membership,
+        client: selectedClient,
+        items: [{
+          name: membership?.name,
+          price: membership?.price,
+          quantity: 1
+        }]
       });
 
-      setPaymentResult({ status: 'COMPLETED' });
-      setStep('receipt');
-      
-      toast({
-        title: "Payment Successful",
-        description: "Membership subscription created successfully!",
-      });
+      // Close main dialog and show receipt dialog
+      onOpenChange(false);
+      setShowReceiptDialog(true);
 
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/client-memberships"] });
