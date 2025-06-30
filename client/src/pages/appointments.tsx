@@ -802,6 +802,85 @@ const AppointmentsPage = () => {
 
         {/* Time Grid */}
         <div className="relative">
+          {/* Appointment overlay container - positioned absolutely to float over time slots */}
+          <div className="absolute inset-0 pointer-events-none z-10">
+            {weekDays.map((day, dayIndex) => (
+              <div 
+                key={dayIndex} 
+                className="absolute pointer-events-auto"
+                style={{
+                  left: `${((dayIndex + 1) / 8) * 100}%`,
+                  width: `${(1/8) * 100}%`,
+                  height: '100%'
+                }}
+              >
+                {appointments?.filter((appointment: any) => {
+                  const appointmentDate = new Date(appointment.startTime);
+                  const dayStr = day.getFullYear() + '-' + 
+                    String(day.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(day.getDate()).padStart(2, '0');
+                  const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                    String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(appointmentDate.getDate()).padStart(2, '0');
+                  
+                  return appointmentDateStr === dayStr;
+                }).map((appointment: any, index: number) => {
+                  const appointmentDate = new Date(appointment.startTime);
+                  const endTime = new Date(appointment.endTime);
+                  const duration = Math.round((endTime.getTime() - appointmentDate.getTime()) / (1000 * 60));
+                  
+                  // Calculate position relative to 8:00 AM start
+                  const appointmentHour = appointmentDate.getHours();
+                  const appointmentMinute = appointmentDate.getMinutes();
+                  
+                  // Skip appointments outside business hours (8 AM to 10 PM)
+                  if (appointmentHour < 8 || appointmentHour >= 22) {
+                    return null;
+                  }
+                  
+                  // Calculate top position based on minutes from 8:00 AM
+                  const totalMinutesFromStart = (appointmentHour - 8) * 60 + appointmentMinute;
+                  const topPosition = (totalMinutesFromStart / 30) * 60; // 60px per 30-minute slot
+                  
+                  // Calculate height based on duration
+                  const heightInPixels = Math.max(30, (duration / 30) * 60); // Minimum 30px height
+                  
+                  const staffName = appointment.staff?.user ? 
+                    `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
+                    'Unknown Staff';
+
+                  return (
+                    <div
+                      key={appointment.id}
+                      className="absolute inset-x-1 text-white rounded p-1 text-xs cursor-pointer"
+                      style={{
+                        backgroundColor: appointment.service?.color || '#6b7280',
+                        color: '#ffffff',
+                        height: `${heightInPixels - 4}px`,
+                        top: `${topPosition + 2}px`
+                      }}
+                      onClick={() => handleAppointmentClick(appointment.id)}
+                    >
+                      <div className="font-medium truncate">
+                        {appointment.service?.name}
+                      </div>
+                      <div className="truncate opacity-90">
+                        {appointment.client?.firstName} {appointment.client?.lastName}
+                      </div>
+                      <div className="truncate opacity-75 text-xs">
+                        {staffName}
+                      </div>
+                      {appointment.paymentStatus === 'paid' && (
+                        <div className="text-xs opacity-90">✓ Paid</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          
+          {/* Time slot grid - this provides the visual structure and time labels */}
           {timeSlots.map((timeSlot, timeIndex) => (
             <div key={timeIndex} className="grid grid-cols-8 min-h-[60px] border-b border-gray-100 dark:border-gray-800">
               {/* Time Label */}
@@ -809,72 +888,10 @@ const AppointmentsPage = () => {
                 {timeSlot}
               </div>
               
-              {/* Day Columns */}
+              {/* Day Columns - empty but provide grid structure */}
               {weekDays.map((day, dayIndex) => (
                 <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" style={{ height: '60px' }}>
-                  {/* Show appointments for this day only on the first time slot (8:00 AM) to avoid duplicates */}
-                  {timeIndex === 0 && appointments?.filter((appointment: any) => {
-                    const appointmentDate = new Date(appointment.startTime);
-                    const dayStr = day.getFullYear() + '-' + 
-                      String(day.getMonth() + 1).padStart(2, '0') + '-' + 
-                      String(day.getDate()).padStart(2, '0');
-                    const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                      String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                      String(appointmentDate.getDate()).padStart(2, '0');
-                    
-                    return appointmentDateStr === dayStr;
-                  }).map((appointment: any, index: number) => {
-                    const appointmentDate = new Date(appointment.startTime);
-                    const endTime = new Date(appointment.endTime);
-                    const duration = Math.round((endTime.getTime() - appointmentDate.getTime()) / (1000 * 60));
-                    
-                    // Calculate position relative to 8:00 AM start
-                    const appointmentHour = appointmentDate.getHours();
-                    const appointmentMinute = appointmentDate.getMinutes();
-                    
-                    // Skip appointments outside business hours (8 AM to 10 PM)
-                    if (appointmentHour < 8 || appointmentHour >= 22) {
-                      return null;
-                    }
-                    
-                    // Calculate top position based on minutes from 8:00 AM
-                    const totalMinutesFromStart = (appointmentHour - 8) * 60 + appointmentMinute;
-                    const topPosition = (totalMinutesFromStart / 30) * 60; // 60px per 30-minute slot
-                    
-                    // Calculate height based on duration
-                    const heightInPixels = Math.max(30, (duration / 30) * 60); // Minimum 30px height
-                    
-                    const staffName = appointment.staff?.user ? 
-                      `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
-                      'Unknown Staff';
-
-                    return (
-                      <div
-                        key={appointment.id}
-                        className="absolute inset-x-1 text-white rounded p-1 text-xs cursor-pointer z-10"
-                        style={{
-                          backgroundColor: appointment.service?.color || '#6b7280',
-                          color: '#ffffff',
-                          height: `${heightInPixels - 4}px`,
-                          top: `${topPosition + 2}px`
-                        }}
-                        onClick={() => handleAppointmentClick(appointment.id)}
-                      >
-                        <div className="font-medium truncate">
-                          {appointment.service?.name}
-                        </div>
-                        <div className="truncate opacity-90">
-                          {appointment.client?.firstName} {appointment.client?.lastName}
-                        </div>
-                        <div className="truncate opacity-75 text-xs">
-                          {staffName}
-                        </div>
-                        {appointment.paymentStatus === 'paid' && (
-                          <div className="text-xs opacity-90">✓ Paid</div>
-                        )}
-                      </div>
-                    );
-                  })}
+                  {/* Empty - appointments are handled by the overlay above */}
                 </div>
               ))}
             </div>
