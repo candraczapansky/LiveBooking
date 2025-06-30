@@ -611,6 +611,68 @@ html:not(.dark) .mobile-nav * {
   color: hsl(0 0% 0%) !important;
 }
 
+/* Comprehensive dark mode enforcement */
+.dark,
+.dark body,
+.dark #root,
+.dark main,
+.dark .main-content,
+.dark > div,
+.dark .flex[style*="height"],
+.dark .flex.min-h-screen,
+.dark .flex.h-full {
+  background-color: hsl(240 10% 3.9%) !important;
+  color: hsl(0 0% 98%) !important;
+}
+
+.dark div[style*="backgroundColor"],
+.dark div[style*="background-color"],
+.dark div[style*="white"],
+.dark div[style*="background: white"],
+.dark div[style*="background: #fff"],
+.dark div[style*="background: #ffffff"] {
+  background-color: hsl(240 10% 3.9%) !important;
+  color: hsl(0 0% 98%) !important;
+}
+
+/* Force dark mode on all major layout containers */
+.dark .bg-white,
+.dark .bg-gray-50,
+.dark .bg-gray-100,
+.dark [class*="bg-white"],
+.dark [class*="bg-gray-50"],
+.dark [class*="bg-gray-100"] {
+  background-color: hsl(240 10% 3.9%) !important;
+  color: hsl(0 0% 98%) !important;
+}
+
+/* Force dark mode on cards and form elements */
+.dark .bg-card,
+.dark .bg-background,
+.dark .bg-popover,
+.dark [data-radix-popper-content-wrapper],
+.dark [data-radix-dialog-content] {
+  background-color: hsl(240 10% 3.9%) !important;
+  color: hsl(0 0% 98%) !important;
+  border-color: hsl(240 3.7% 15.9%) !important;
+}
+
+/* Force dark mode on input elements */
+.dark input,
+.dark textarea,
+.dark select,
+.dark [role="combobox"],
+.dark [role="textbox"] {
+  background-color: hsl(240 3.7% 15.9%) !important;
+  color: hsl(0 0% 98%) !important;
+  border-color: hsl(240 3.7% 15.9%) !important;
+}
+
+/* Override any inline styles that might be setting white backgrounds */
+.dark * {
+  border-color: hsl(240 3.7% 15.9%) !important;
+}
+
 /* Mobile-specific dark mode enforcement */
 @media (max-width: 768px) {
   .dark,
@@ -624,18 +686,6 @@ html:not(.dark) .mobile-nav * {
   .dark .flex.h-full {
     background-color: hsl(240 10% 3.9%) !important;
     color: hsl(0 0% 98%) !important;
-  }
-  
-  .dark div[style*="backgroundColor"],
-  .dark div[style*="background-color"],
-  .dark div[style*="white"] {
-    background-color: hsl(240 10% 3.9%) !important;
-    color: hsl(0 0% 98%) !important;
-  }
-  
-  /* Override any inline styles that might be setting white backgrounds */
-  .dark * {
-    border-color: hsl(240 3.7% 15.9%) !important;
   }
 }
 

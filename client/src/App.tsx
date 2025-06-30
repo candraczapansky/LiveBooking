@@ -277,11 +277,51 @@ function useAuth() {
     root.style.setProperty('--sidebar-primary', hslColor);
     root.style.setProperty('--sidebar-accent-foreground', hslColor);
     
-    // Toggle dark mode class
+    // Apply dark/light mode styling with DOM manipulation
     if (isDark) {
       root.classList.add('dark');
+      // Force dark mode background and text colors
+      document.body.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+      document.body.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+      
+      // Apply to all main containers and override any white backgrounds
+      setTimeout(() => {
+        const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"], [style*="white"]');
+        containers.forEach(container => {
+          if (container instanceof HTMLElement) {
+            container.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+            container.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+          }
+        });
+        
+        // Force the root div to have dark background
+        const rootDiv = document.querySelector('#root > div');
+        if (rootDiv instanceof HTMLElement) {
+          rootDiv.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+        }
+      }, 100);
     } else {
       root.classList.remove('dark');
+      // Force light mode background and text colors
+      document.body.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+      document.body.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+      
+      // Apply to all main containers
+      setTimeout(() => {
+        const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"]');
+        containers.forEach(container => {
+          if (container instanceof HTMLElement) {
+            container.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+            container.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+          }
+        });
+        
+        // Force the root div to have light background
+        const rootDiv = document.querySelector('#root > div');
+        if (rootDiv instanceof HTMLElement) {
+          rootDiv.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+        }
+      }, 100);
     }
   };
 
