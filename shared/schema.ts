@@ -769,3 +769,28 @@ export type InsertSalesHistory = z.infer<typeof insertSalesHistorySchema>;
 // Type definitions
 export type AppointmentHistory = typeof appointmentHistory.$inferSelect;
 export type InsertAppointmentHistory = z.infer<typeof insertAppointmentHistorySchema>;
+
+// Business Settings schema
+export const businessSettings = pgTable("business_settings", {
+  id: serial("id").primaryKey(),
+  businessName: text("business_name").notNull(),
+  address: text("address"),
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  timezone: text("timezone").default("America/New_York"),
+  currency: text("currency").default("USD"),
+  taxRate: doublePrecision("tax_rate").default(0.08),
+  receiptFooter: text("receipt_footer"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertBusinessSettingsSchema = createInsertSchema(businessSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BusinessSettings = typeof businessSettings.$inferSelect;
+export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
