@@ -3217,8 +3217,56 @@ Thank you for choosing our salon!
 
       const result = await sendEmail({
         to: email,
-        from: "noreply@beautybook.com",
+        from: process.env.SENDGRID_FROM_EMAIL || "noreply@beautybook.com",
         subject: "Your Purchase Receipt",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #e91e63; color: white; padding: 20px; text-align: center;">
+              <h1>BeautyBook</h1>
+              <h2>Purchase Receipt</h2>
+            </div>
+            <div style="padding: 20px;">
+              <p><strong>Transaction ID:</strong> ${receiptData.transactionId || receiptData.id}</p>
+              <p><strong>Date:</strong> ${new Date(receiptData.timestamp).toLocaleString()}</p>
+              <p><strong>Payment Method:</strong> ${receiptData.paymentMethod}</p>
+              
+              <h3>Items Purchased:</h3>
+              <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px;">
+                ${receiptData.items.map((item: any) => `
+                  <div style="border-bottom: 1px solid #ddd; padding: 10px 0;">
+                    <div style="display: flex; justify-content: space-between;">
+                      <span><strong>${item.item.name}</strong></span>
+                      <span>$${item.item.price.toFixed(2)}</span>
+                    </div>
+                    <div style="color: #666; font-size: 0.9em;">
+                      Quantity: ${item.quantity} × $${item.item.price.toFixed(2)}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+              
+              <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                  <span>Subtotal:</span>
+                  <span>$${receiptData.subtotal.toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                  <span>Tax:</span>
+                  <span>$${receiptData.tax.toFixed(2)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; border-top: 2px solid #e91e63; padding-top: 10px; margin-top: 10px;">
+                  <span>Total:</span>
+                  <span>$${receiptData.total.toFixed(2)}</span>
+                </div>
+              </div>
+              
+              <p style="margin-top: 30px; text-align: center; color: #666;">
+                Thank you for choosing our salon!<br>
+                We appreciate your business and look forward to serving you again.
+              </p>
+            </div>
+          </div>
+        `,
         text: emailContent
       });
 
