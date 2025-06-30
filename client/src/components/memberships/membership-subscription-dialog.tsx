@@ -63,6 +63,7 @@ export default function MembershipSubscriptionDialog({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [cardElement, setCardElement] = useState<any>(null);
   const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [receiptEmail, setReceiptEmail] = useState("");
@@ -125,14 +126,31 @@ export default function MembershipSubscriptionDialog({
   }, [step]);
 
   const initializeSquarePayment = async () => {
-    if (!window.Square) {
-      console.error('Square Web SDK not loaded');
-      return;
-    }
-
     try {
       setIsPaymentLoading(true);
-      const payments = window.Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+      setPaymentError(null);
+
+      if (!SQUARE_APP_ID) {
+        throw new Error('Square Application ID not configured');
+      }
+
+      // Load Square Web SDK dynamically
+      if (!window.Square) {
+        const script = document.createElement('script');
+        const isSandbox = SQUARE_APP_ID.includes('sandbox');
+        script.src = isSandbox 
+          ? 'https://sandbox.web.squarecdn.com/v1/square.js' 
+          : 'https://web.squarecdn.com/v1/square.js';
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = () => reject(new Error('Failed to load Square SDK'));
+          document.head.appendChild(script);
+        });
+      }
+
+      // Initialize Square payments (like working appointment checkout)
+      const payments = window.Square.payments(SQUARE_APP_ID);
       const card = await payments.card({
         style: {
           input: {
@@ -145,17 +163,16 @@ export default function MembershipSubscriptionDialog({
           }
         }
       });
+      
+      // Attach to element
       await card.attach('#square-card-membership-new');
+      
       setCardElement(card);
       setIsPaymentLoading(false);
     } catch (error: any) {
       console.error('Square payment form initialization error:', error);
+      setPaymentError(error.message || 'Failed to load payment form');
       setIsPaymentLoading(false);
-      toast({
-        title: "Payment Error",
-        description: "Failed to load payment form. Please try again.",
-        variant: "destructive",
-      });
     }
   };
 
@@ -430,6 +447,18 @@ export default function MembershipSubscriptionDialog({
                 {isPaymentLoading ? (
                   <div className="text-center py-8">
                     <p>Loading payment form...</p>
+                  </div>
+                ) : paymentError ? (
+                  <div className="text-center py-8 text-red-600">
+                    <p>Error: {paymentError}</p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={initializeSquarePayment}
+                      className="mt-2"
+                    >
+                      Retry
+                    </Button>
                   </div>
                 ) : (
                   <div id="square-card-membership-new" className="min-h-[100px]"></div>
