@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useLocation } from "wouter";
+import Papa from "papaparse";
 
 
 import {
@@ -54,7 +55,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download } from "lucide-react";
+import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download, Upload } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -126,6 +127,17 @@ const ClientsPage = () => {
   const [showPaymentSection, setShowPaymentSection] = useState(false);
   const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
   const [location] = useLocation();
+  
+  // CSV Import state
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importResults, setImportResults] = useState<{
+    imported: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -279,6 +291,34 @@ const ClientsPage = () => {
       toast({
         title: "Error",
         description: `Failed to delete client: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
+  const importClientsMutation = useMutation({
+    mutationFn: async (clients: any[]) => {
+      return apiRequest("POST", "/api/clients/import", { clients });
+    },
+    onSuccess: async (response) => {
+      const results = await response.json();
+      setImportResults(results);
+      
+      // Invalidate client queries to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
+      queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+      
+      toast({
+        title: "Import Complete",
+        description: `Imported ${results.imported} clients, skipped ${results.skipped}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Import Failed",
+        description: `Failed to import clients: ${error.message}`,
         variant: "destructive",
       });
     }

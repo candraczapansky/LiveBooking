@@ -319,6 +319,82 @@ If you didn't request this password reset, please ignore this email and your pas
     return res.status(201).json(clientWithoutPassword);
   });
 
+  // Bulk client import route
+  app.post("/api/clients/import", async (req, res) => {
+    try {
+      const { clients } = req.body;
+      
+      if (!Array.isArray(clients) || clients.length === 0) {
+        return res.status(400).json({ error: "Invalid clients data" });
+      }
+
+      const results = {
+        imported: 0,
+        skipped: 0,
+        errors: [] as string[]
+      };
+
+      const existingUsers = await storage.getAllUsers();
+      const existingEmails = new Set(existingUsers.map(user => user.email.toLowerCase()));
+
+      for (const clientData of clients) {
+        try {
+          // Validate required fields
+          if (!clientData.email) {
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email is required`);
+            results.skipped++;
+            continue;
+          }
+
+          // Check if email already exists
+          if (existingEmails.has(clientData.email.toLowerCase())) {
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email ${clientData.email} already exists`);
+            results.skipped++;
+            continue;
+          }
+
+          // Generate username and password
+          const username = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+          const password = Math.random().toString(36).substring(2, 12);
+
+          // Create client with default values
+          const newClient = {
+            email: clientData.email,
+            firstName: clientData.firstName || "",
+            lastName: clientData.lastName || "",
+            phone: clientData.phone || "",
+            address: clientData.address || "",
+            city: clientData.city || "",
+            state: clientData.state || "",
+            zipCode: clientData.zipCode || "",
+            username,
+            password,
+            role: "client" as const,
+            // Communication preferences defaults
+            emailAccountManagement: clientData.emailAccountManagement ?? true,
+            emailAppointmentReminders: clientData.emailAppointmentReminders ?? true,
+            emailPromotions: clientData.emailPromotions ?? false,
+            smsAccountManagement: clientData.smsAccountManagement ?? false,
+            smsAppointmentReminders: clientData.smsAppointmentReminders ?? true,
+            smsPromotions: clientData.smsPromotions ?? false,
+          };
+
+          await storage.createUser(newClient);
+          existingEmails.add(clientData.email.toLowerCase());
+          results.imported++;
+        } catch (error) {
+          results.errors.push(`Row ${results.imported + results.skipped + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          results.skipped++;
+        }
+      }
+
+      return res.status(200).json(results);
+    } catch (error) {
+      console.error("Bulk import error:", error);
+      return res.status(500).json({ error: "Failed to import clients" });
+    }
+  });
+
   // Change password route
   app.post("/api/change-password", async (req, res) => {
     const { userId, currentPassword, newPassword } = req.body;
