@@ -3411,7 +3411,7 @@ Thank you for choosing Glo Head Spa!
 
       const result = await sendEmail({
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || "noreply@beautybook.com",
+        from: process.env.SENDGRID_FROM_EMAIL || "noreply@gloheadspa.com",
         subject: "Your Purchase Receipt",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -3421,7 +3421,7 @@ Thank you for choosing Glo Head Spa!
             </div>
             <div style="padding: 20px;">
               <p><strong>Transaction ID:</strong> ${receiptData.transactionId || receiptData.id}</p>
-              <p><strong>Date:</strong> ${new Date(receiptData.timestamp).toLocaleString()}</p>
+              <p><strong>Date:</strong> ${receiptData.timestamp ? new Date(receiptData.timestamp).toLocaleString() : new Date().toLocaleString()}</p>
               <p><strong>Payment Method:</strong> ${receiptData.paymentMethod}</p>
               
               <h3>Items Purchased:</h3>
@@ -3429,11 +3429,11 @@ Thank you for choosing Glo Head Spa!
                 ${receiptData.items.map((item: any) => `
                   <div style="border-bottom: 1px solid #ddd; padding: 10px 0;">
                     <div style="display: flex; justify-content: space-between;">
-                      <span><strong>${item.item.name}</strong></span>
-                      <span>$${item.item.price.toFixed(2)}</span>
+                      <span><strong>${item.item ? item.item.name : item.name}</strong></span>
+                      <span>$${item.item ? item.item.price.toFixed(2) : item.price.toFixed(2)}</span>
                     </div>
                     <div style="color: #666; font-size: 0.9em;">
-                      Quantity: ${item.quantity} × $${item.item.price.toFixed(2)}
+                      Quantity: ${item.quantity} × $${item.item ? item.item.price.toFixed(2) : item.price.toFixed(2)}
                     </div>
                   </div>
                 `).join('')}
