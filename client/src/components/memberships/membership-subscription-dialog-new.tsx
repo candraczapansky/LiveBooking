@@ -332,7 +332,7 @@ export default function MembershipSubscriptionDialog({
         status: "completed",
         type: "membership",
         description: `Membership payment for ${membership?.name}`,
-        paymentDate: new Date().toISOString()
+        paymentDate: new Date()
       });
 
       // Set up transaction data for receipt
@@ -447,7 +447,8 @@ export default function MembershipSubscriptionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -666,5 +667,142 @@ export default function MembershipSubscriptionDialog({
         )}
       </DialogContent>
     </Dialog>
+
+    {/* Receipt Confirmation Dialog */}
+    <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Check className="h-5 w-5 text-green-600" />
+            Payment Successful
+          </DialogTitle>
+          <DialogDescription>
+            Would you like to send a receipt to the customer?
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Transaction Summary */}
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Client:</span>
+              <span className="font-medium">{lastTransaction?.client?.firstName} {lastTransaction?.client?.lastName}</span>
+            </div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-sm text-gray-600">Membership:</span>
+              <span className="font-medium">{lastTransaction?.membership?.name}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-600">Total:</span>
+              <span className="font-bold">${lastTransaction?.total?.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Receipt Options */}
+          <div className="space-y-4">
+            <p className="text-sm font-medium">Send receipt via:</p>
+            
+            {/* Existing Customer Contact Info */}
+            {lastTransaction?.client?.email && (
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  sendReceiptEmailMutation.mutate({
+                    email: lastTransaction.client.email,
+                    receiptData: lastTransaction
+                  });
+                }}
+                disabled={sendReceiptEmailMutation.isPending}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                {sendReceiptEmailMutation.isPending ? "Sending..." : `Email to ${lastTransaction.client.email}`}
+              </Button>
+            )}
+
+            {lastTransaction?.client?.phone && (
+              <Button
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={() => {
+                  sendReceiptSMSMutation.mutate({
+                    phone: lastTransaction.client.phone,
+                    receiptData: lastTransaction
+                  });
+                }}
+                disabled={sendReceiptSMSMutation.isPending}
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                {sendReceiptSMSMutation.isPending ? "Sending..." : `SMS to ${lastTransaction.client.phone}`}
+              </Button>
+            )}
+
+            {/* Manual Entry Options */}
+            <div className="border-t pt-4 space-y-3">
+              <p className="text-xs text-gray-500">Or enter manually:</p>
+              
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter email address"
+                  value={manualEmail}
+                  onChange={(e) => setManualEmail(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (manualEmail) {
+                      sendReceiptEmailMutation.mutate({
+                        email: manualEmail,
+                        receiptData: lastTransaction
+                      });
+                    }
+                  }}
+                  disabled={!manualEmail || sendReceiptEmailMutation.isPending}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Email
+                </Button>
+              </div>
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter phone number"
+                  value={manualPhone}
+                  onChange={(e) => setManualPhone(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (manualPhone) {
+                      sendReceiptSMSMutation.mutate({
+                        phone: manualPhone,
+                        receiptData: lastTransaction
+                      });
+                    }
+                  }}
+                  disabled={!manualPhone || sendReceiptSMSMutation.isPending}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  SMS
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setShowReceiptDialog(false)}
+          >
+            <X className="h-4 w-4 mr-2" />
+            Skip Receipt
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
