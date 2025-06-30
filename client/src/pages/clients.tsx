@@ -379,6 +379,110 @@ const ClientsPage = () => {
     setClientDetail(null);
   };
 
+  // CSV Import handlers
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === 'text/csv') {
+      setImportFile(file);
+      setImportResults(null);
+    } else {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a CSV file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleImportCSV = () => {
+    if (!importFile) {
+      toast({
+        title: "No file selected",
+        description: "Please select a CSV file to import.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsImporting(true);
+    
+    Papa.parse(importFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        const clients = results.data as any[];
+        
+        // Validate and transform the data
+        const validClients = clients.map((row: any) => ({
+          email: row.email || row.Email || '',
+          firstName: row.firstName || row['First Name'] || row.first_name || '',
+          lastName: row.lastName || row['Last Name'] || row.last_name || '',
+          phone: row.phone || row.Phone || '',
+          address: row.address || row.Address || '',
+          city: row.city || row.City || '',
+          state: row.state || row.State || '',
+          zipCode: row.zipCode || row['ZIP Code'] || row.zip_code || '',
+          emailAccountManagement: row.emailAccountManagement !== 'false',
+          emailAppointmentReminders: row.emailAppointmentReminders !== 'false',
+          emailPromotions: row.emailPromotions === 'true',
+          smsAccountManagement: row.smsAccountManagement === 'true',
+          smsAppointmentReminders: row.smsAppointmentReminders !== 'false',
+          smsPromotions: row.smsPromotions === 'true',
+        }));
+
+        importClientsMutation.mutate(validClients);
+        setIsImporting(false);
+      },
+      error: (error) => {
+        setIsImporting(false);
+        toast({
+          title: "CSV Parse Error",
+          description: `Failed to parse CSV file: ${error.message}`,
+          variant: "destructive",
+        });
+      }
+    });
+  };
+
+  const resetImportDialog = () => {
+    setImportFile(null);
+    setImportResults(null);
+    setIsImportDialogOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const downloadSampleCSV = () => {
+    const sampleData = [
+      {
+        email: 'john.doe@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        phone: '(555) 123-4567',
+        address: '123 Main St',
+        city: 'Anytown',
+        state: 'CA',
+        zipCode: '12345',
+        emailAccountManagement: 'true',
+        emailAppointmentReminders: 'true',
+        emailPromotions: 'false',
+        smsAccountManagement: 'true',
+        smsAppointmentReminders: 'true',
+        smsPromotions: 'false'
+      }
+    ];
+
+    const csv = Papa.unparse(sampleData);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'client_import_sample.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleExportClients = () => {
     if (!clients || clients.length === 0) {
       toast({
@@ -490,6 +594,15 @@ const ClientsPage = () => {
                       >
                         <Download className="h-4 w-4 mr-2" />
                         Export CSV
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsImportDialogOpen(true)}
+                        className="flex-1 sm:flex-none min-h-[44px]"
+                        size="default"
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Import CSV
                       </Button>
                       <Button 
                         onClick={() => setIsAddDialogOpen(true)}
@@ -1447,6 +1560,126 @@ const ClientsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* CSV Import Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Import Clients from CSV</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file to import multiple clients at once. Download the sample file to see the required format.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Sample CSV Download */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-medium text-blue-900">Sample CSV Template</h4>
+                  <p className="text-sm text-blue-700 mt-1">Download to see the required format and column headers</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadSampleCSV}
+                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Sample
+                </Button>
+              </div>
+            </div>
+
+            {/* File Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Select CSV File</label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <div className="space-y-2">
+                  <Upload className="h-8 w-8 mx-auto text-gray-400" />
+                  {importFile ? (
+                    <div>
+                      <p className="text-sm font-medium text-green-600">{importFile.name}</p>
+                      <p className="text-xs text-gray-500">File selected successfully</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-sm font-medium">Click to select CSV file</p>
+                      <p className="text-xs text-gray-500">Or drag and drop your file here</p>
+                    </div>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="mt-2"
+                  >
+                    {importFile ? 'Change File' : 'Choose File'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Import Results */}
+            {importResults && (
+              <div className="p-4 bg-gray-50 rounded-lg border">
+                <h4 className="font-medium mb-2">Import Results</h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Successfully imported:</span>
+                    <span className="font-medium text-green-600">{importResults.imported} clients</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Skipped (duplicates/errors):</span>
+                    <span className="font-medium text-orange-600">{importResults.skipped} clients</span>
+                  </div>
+                  {importResults.errors.length > 0 && (
+                    <div className="mt-3">
+                      <p className="font-medium text-red-600 mb-1">Errors:</p>
+                      <div className="max-h-32 overflow-y-auto space-y-1">
+                        {importResults.errors.map((error, index) => (
+                          <p key={index} className="text-xs text-red-600">{error}</p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={resetImportDialog}>
+              {importResults ? 'Close' : 'Cancel'}
+            </Button>
+            {!importResults && (
+              <Button 
+                onClick={handleImportCSV} 
+                disabled={!importFile || isImporting}
+              >
+                {isImporting ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+                    Importing...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Import Clients
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
