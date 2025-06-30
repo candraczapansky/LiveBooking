@@ -158,12 +158,18 @@ export async function triggerAutomations(
           smsPromotions: client.smsPromotions
         });
         
+        console.log(`SMS Template Debug - Rule: ${rule.name}, Original template: "${rule.template}", Processed template: "${processedTemplate}"`);
+        
         const smsResult = await sendSMS(client.phone, processedTemplate);
+        
+        console.log(`SMS sending result for ${rule.name}:`, smsResult);
         
         if (smsResult.success) {
           const newSentCount = (rule.sentCount || 0) + 1;
           await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
           console.log(`SMS automation sent successfully for rule: ${rule.name}`);
+        } else {
+          console.log(`SMS automation failed for rule: ${rule.name}, error: ${smsResult.error}`);
         }
       } else {
         console.log(`Automation skipped for ${rule.name} (${rule.type}): client.email=${!!client.email}, client.phone=${!!client.phone}, canSendEmail=${rule.type === 'email' ? shouldSendEmail(rule, client) : 'N/A'}, canSendSMS=${rule.type === 'sms' ? shouldSendSMS(rule, client) : 'N/A'}`);
