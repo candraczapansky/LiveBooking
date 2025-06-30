@@ -26,7 +26,8 @@ import {
   userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
   notifications, Notification, InsertNotification,
   payrollHistory, PayrollHistory, InsertPayrollHistory,
-  salesHistory, SalesHistory, InsertSalesHistory
+  salesHistory, SalesHistory, InsertSalesHistory,
+  businessSettings, BusinessSettings, InsertBusinessSettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -251,6 +252,11 @@ export interface IStorage {
   getAllSalesHistory(): Promise<SalesHistory[]>;
   updateSalesHistory(id: number, salesData: Partial<InsertSalesHistory>): Promise<SalesHistory>;
   deleteSalesHistory(id: number): Promise<boolean>;
+
+  // Business Settings operations
+  getBusinessSettings(): Promise<BusinessSettings | undefined>;
+  updateBusinessSettings(businessData: Partial<InsertBusinessSettings>): Promise<BusinessSettings>;
+  createBusinessSettings(businessData: InsertBusinessSettings): Promise<BusinessSettings>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1936,6 +1942,32 @@ export class DatabaseStorage implements IStorage {
   async deleteSalesHistory(id: number): Promise<boolean> {
     const result = await db.delete(salesHistory).where(eq(salesHistory.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Business Settings operations
+  async getBusinessSettings(): Promise<BusinessSettings | undefined> {
+    const result = await db.select().from(businessSettings).limit(1);
+    return result[0];
+  }
+
+  async updateBusinessSettings(businessData: Partial<InsertBusinessSettings>): Promise<BusinessSettings> {
+    const existing = await this.getBusinessSettings();
+    if (existing) {
+      const result = await db
+        .update(businessSettings)
+        .set({ ...businessData, updatedAt: new Date() })
+        .where(eq(businessSettings.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      // Create if doesn't exist
+      return await this.createBusinessSettings(businessData as InsertBusinessSettings);
+    }
+  }
+
+  async createBusinessSettings(businessData: InsertBusinessSettings): Promise<BusinessSettings> {
+    const result = await db.insert(businessSettings).values(businessData).returning();
+    return result[0];
   }
 }
 
