@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import { useSidebar } from "@/contexts/SidebarContext";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -122,9 +121,7 @@ const ClientsPage = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
-  const [editingClient, setEditingClient] = useState<Client | null>(null);
-  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
-  const { isOpen: sidebarOpen, isMobile } = useSidebar();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
   const [showPaymentSection, setShowPaymentSection] = useState(false);
@@ -142,7 +139,17 @@ const ClientsPage = () => {
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    const checkSidebarState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined) {
+        setSidebarOpen(globalSidebarState);
+      }
+    };
 
+    const interval = setInterval(checkSidebarState, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle quick action navigation
   useEffect(() => {
@@ -338,7 +345,6 @@ const ClientsPage = () => {
 
   const openEditDialog = (client: Client) => {
     setSelectedClient(client);
-    setEditingClient(client);
     editForm.reset({
       email: client.email,
       firstName: client.firstName || "",
@@ -360,7 +366,6 @@ const ClientsPage = () => {
 
   const openDeleteDialog = (client: Client) => {
     setSelectedClient(client);
-    setDeletingClient(client);
     setIsDeleteDialogOpen(true);
   };
 
@@ -549,19 +554,16 @@ const ClientsPage = () => {
   );
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="hidden lg:block">
-          <SidebarController />
-        </div>
+    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <SidebarController />
+      
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        sidebarOpen ? 'ml-64' : 'ml-0'
+      }`}>
+        <Header />
         
-        <div className={`min-h-screen flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-        }`}>
-          <Header />
-          
-          <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
-            <div className="w-full max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+          <div className="max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
                 {/* Page Header */}
@@ -1678,36 +1680,7 @@ const ClientsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* This section contains the inline form dialogs - they are defined elsewhere in the file */}
-
-      {/* Edit Client Dialog - Inline form is already defined above in the existing dialog structure */}
-
-      {/* Delete Client Confirmation */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the client
-              "{deletingClient?.firstName} {deletingClient?.lastName}" and remove all their data from the system.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteClient}
-              disabled={deleteClientMutation.isPending}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {deleteClientMutation.isPending ? "Deleting..." : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-        </main>
-      </div>
-    </>
+    </div>
   );
 };
 
