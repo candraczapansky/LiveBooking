@@ -3212,7 +3212,7 @@ Tax: $${receiptData.tax.toFixed(2)}
 Total: $${receiptData.total.toFixed(2)}
 Payment Method: ${receiptData.paymentMethod}
 
-Thank you for choosing our salon!
+Thank you for choosing Glo Head Spa!
       `;
 
       const result = await sendEmail({
