@@ -1567,6 +1567,16 @@ If you didn't request this password reset, please ignore this email and your pas
         console.error('Failed to create payment notification:', error);
       }
 
+      // Trigger custom automations for checkout completion
+      try {
+        await triggerCustomAutomation(appointment, storage, 'after payment');
+        await triggerCustomAutomation(appointment, storage, 'checkout completion');
+        await triggerCustomAutomation(appointment, storage, 'service checkout');
+        console.log('Checkout automation triggers executed successfully');
+      } catch (error) {
+        console.error('Failed to trigger checkout automations:', error);
+      }
+
       res.json({ 
         success: true, 
         message: "Cash payment confirmed successfully",
