@@ -3367,23 +3367,36 @@ If you didn't request this password reset, please ignore this email and your pas
         return res.status(400).json({ error: "Email and receipt data are required" });
       }
 
-      const items = receiptData.items.map((item: any) => 
-        `${item.quantity}x ${item.item.name} - $${item.total.toFixed(2)}`
-      ).join('\n');
+      // Handle different receipt data structures (POS vs membership)
+      let items = '';
+      if (receiptData.items && Array.isArray(receiptData.items)) {
+        items = receiptData.items.map((item: any) => {
+          // POS receipt structure
+          if (item.item && item.item.name) {
+            return `${item.quantity}x ${item.item.name} - $${item.total.toFixed(2)}`;
+          }
+          // Membership receipt structure
+          else if (item.name) {
+            return `${item.quantity}x ${item.name} - $${item.price.toFixed(2)}`;
+          }
+          return `1x Item - $${item.price || item.total || 0}`;
+        }).join('\n');
+      } else {
+        // Fallback for single item receipts
+        items = `1x ${receiptData.membership?.name || 'Service'} - $${receiptData.total.toFixed(2)}`;
+      }
 
       const emailContent = `
 Thank you for your purchase!
 
 Transaction Details:
 Transaction ID: ${receiptData.transactionId}
-Date: ${new Date(receiptData.timestamp).toLocaleDateString()}
+Date: ${receiptData.timestamp ? new Date(receiptData.timestamp).toLocaleDateString() : new Date().toLocaleDateString()}
 
 Items:
 ${items}
 
-Subtotal: $${receiptData.subtotal.toFixed(2)}
-Tax: $${receiptData.tax.toFixed(2)}
-Total: $${receiptData.total.toFixed(2)}
+${receiptData.subtotal ? `Subtotal: $${receiptData.subtotal.toFixed(2)}\n` : ''}${receiptData.tax ? `Tax: $${receiptData.tax.toFixed(2)}\n` : ''}Total: $${receiptData.total.toFixed(2)}
 Payment Method: ${receiptData.paymentMethod}
 
 Thank you for choosing Glo Head Spa!

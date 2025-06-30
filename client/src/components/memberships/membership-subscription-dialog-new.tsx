@@ -249,7 +249,7 @@ export default function MembershipSubscriptionDialog({
     mutationFn: async ({ phone, receiptData }: { phone: string; receiptData: any }) => {
       return apiRequest("POST", "/api/send-receipt-sms", {
         phone,
-        message: `Receipt: Membership subscription - ${receiptData.membership?.name} - $${receiptData.total?.toFixed(2)} - Transaction ID: ${receiptData.transactionId}`
+        receiptData
       });
     },
     onSuccess: () => {
