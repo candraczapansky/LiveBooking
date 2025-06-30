@@ -156,6 +156,8 @@ export default function MembershipSubscriptionDialog({
       const maxAttempts = 20; // Increase max attempts
       
       console.log('Looking for element:', elementId);
+      console.log('Payment state:', { isPaymentLoading, paymentError, step });
+      console.log('DOM elements with "square" in id:', Array.from(document.querySelectorAll('[id*="square"]')).map(el => el.id));
       
       while (!element && attempts < maxAttempts) {
         console.log(`Attempt ${attempts + 1}/${maxAttempts} - Element not found, waiting...`);
