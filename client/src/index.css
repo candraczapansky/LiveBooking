@@ -668,6 +668,42 @@ html:not(.dark) .mobile-nav * {
   border-color: hsl(240 3.7% 15.9%) !important;
 }
 
+/* Force consistent text colors in dark mode */
+.dark,
+.dark *,
+.dark p,
+.dark span,
+.dark div,
+.dark h1,
+.dark h2,
+.dark h3,
+.dark h4,
+.dark h5,
+.dark h6,
+.dark label,
+.dark button,
+.dark a,
+.dark li,
+.dark td,
+.dark th,
+.dark text,
+.dark [class*="text-"],
+.dark .text-muted-foreground,
+.dark .text-gray-500,
+.dark .text-gray-600,
+.dark .text-slate-500,
+.dark .text-slate-600 {
+  color: hsl(0 0% 98%) !important;
+}
+
+/* Force dark mode on all text content inside main content area */
+.dark main *,
+.dark .main-content *,
+.dark .page-container *,
+.dark #root > div * {
+  color: hsl(0 0% 98%) !important;
+}
+
 /* Override any inline styles that might be setting white backgrounds */
 .dark * {
   border-color: hsl(240 3.7% 15.9%) !important;

@@ -294,6 +294,14 @@ function useAuth() {
           }
         });
         
+        // Force all text elements to use dark mode colors
+        const textElements = document.querySelectorAll('p, span, div, h1, h2, h3, h4, h5, h6, label, button, a, li, td, th, text');
+        textElements.forEach(element => {
+          if (element instanceof HTMLElement) {
+            element.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+          }
+        });
+        
         // Force the root div to have dark background
         const rootDiv = document.querySelector('#root > div');
         if (rootDiv instanceof HTMLElement) {
@@ -313,6 +321,14 @@ function useAuth() {
           if (container instanceof HTMLElement) {
             container.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
             container.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+          }
+        });
+        
+        // Force all text elements to use light mode colors
+        const textElements = document.querySelectorAll('p, span, div, h1, h2, h3, h4, h5, h6, label, button, a, li, td, th, text');
+        textElements.forEach(element => {
+          if (element instanceof HTMLElement) {
+            element.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
           }
         });
         

@@ -408,39 +408,63 @@ export default function SettingsMobile() {
     if (isDark) {
       document.documentElement.classList.add('dark');
       // Force dark mode background and text colors
-      document.body.style.backgroundColor = 'hsl(240 10% 3.9%)';
-      document.body.style.color = 'hsl(0 0% 98%)';
+      document.body.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+      document.body.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+      
       // Apply to all main containers and override any white backgrounds
-      const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"], [style*="white"]');
-      containers.forEach(container => {
-        if (container instanceof HTMLElement) {
-          container.style.backgroundColor = 'hsl(240 10% 3.9%)';
-          container.style.color = 'hsl(0 0% 98%)';
+      setTimeout(() => {
+        const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"], [style*="white"]');
+        containers.forEach(container => {
+          if (container instanceof HTMLElement) {
+            container.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
+            container.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+          }
+        });
+        
+        // Force all text elements to use dark mode colors
+        const textElements = document.querySelectorAll('p, span, div, h1, h2, h3, h4, h5, h6, label, button, a, li, td, th, text');
+        textElements.forEach(element => {
+          if (element instanceof HTMLElement) {
+            element.style.setProperty('color', 'hsl(0 0% 98%)', 'important');
+          }
+        });
+        
+        // Force the root div to have dark background
+        const rootDiv = document.querySelector('#root > div');
+        if (rootDiv instanceof HTMLElement) {
+          rootDiv.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
         }
-      });
-      // Force the root div to have dark background
-      const rootDiv = document.querySelector('#root > div');
-      if (rootDiv instanceof HTMLElement) {
-        rootDiv.style.setProperty('background-color', 'hsl(240 10% 3.9%)', 'important');
-      }
+      }, 100);
     } else {
       document.documentElement.classList.remove('dark');
       // Force light mode background and text colors
-      document.body.style.backgroundColor = 'hsl(0 0% 100%)';
-      document.body.style.color = 'hsl(222.2 84% 4.9%)';
+      document.body.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+      document.body.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+      
       // Apply to all main containers
-      const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"]');
-      containers.forEach(container => {
-        if (container instanceof HTMLElement) {
-          container.style.backgroundColor = 'hsl(0 0% 100%)';
-          container.style.color = 'hsl(222.2 84% 4.9%)';
+      setTimeout(() => {
+        const containers = document.querySelectorAll('main, .main-content, .page-container, #root > div, .flex, [style*="background"]');
+        containers.forEach(container => {
+          if (container instanceof HTMLElement) {
+            container.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
+            container.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+          }
+        });
+        
+        // Force all text elements to use light mode colors
+        const textElements = document.querySelectorAll('p, span, div, h1, h2, h3, h4, h5, h6, label, button, a, li, td, th, text');
+        textElements.forEach(element => {
+          if (element instanceof HTMLElement) {
+            element.style.setProperty('color', 'hsl(222.2 84% 4.9%)', 'important');
+          }
+        });
+        
+        // Force the root div to have light background
+        const rootDiv = document.querySelector('#root > div');
+        if (rootDiv instanceof HTMLElement) {
+          rootDiv.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
         }
-      });
-      // Force the root div to have light background
-      const rootDiv = document.querySelector('#root > div');
-      if (rootDiv instanceof HTMLElement) {
-        rootDiv.style.setProperty('background-color', 'hsl(0 0% 100%)', 'important');
-      }
+      }, 100);
     }
   };
 
