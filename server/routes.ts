@@ -3192,7 +3192,7 @@ Thank you for choosing our salon!
         text: emailContent
       });
 
-      if (result.success) {
+      if (result) {
         res.json({ success: true, message: "Receipt email sent successfully" });
       } else {
         res.status(500).json({ error: "Failed to send receipt email" });
@@ -3219,7 +3219,7 @@ Thank you for choosing our salon!
       if (result.success) {
         res.json({ success: true, message: "Receipt SMS sent successfully" });
       } else {
-        res.status(500).json({ error: "Failed to send receipt SMS" });
+        res.status(500).json({ error: result.error || "Failed to send receipt SMS" });
       }
     } catch (error: any) {
       console.error('Receipt SMS error:', error);
