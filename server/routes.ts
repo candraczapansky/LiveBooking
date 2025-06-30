@@ -1315,6 +1315,21 @@ If you didn't request this password reset, please ignore this email and your pas
           console.error('Failed to trigger status change automation:', error);
         }
       }
+
+      // Trigger automations based on payment status changes
+      if (existingAppointment && req.body.paymentStatus && existingAppointment.paymentStatus !== req.body.paymentStatus) {
+        try {
+          if (req.body.paymentStatus === 'paid') {
+            console.log('Payment status changed to paid, triggering after payment automations');
+            await triggerAfterPayment(updatedAppointment, storage);
+            await triggerCustomAutomation(updatedAppointment, storage, 'checkout completion');
+            await triggerCustomAutomation(updatedAppointment, storage, 'service checkout');
+            console.log('Payment status change automation triggers executed successfully');
+          }
+        } catch (error) {
+          console.error('Failed to trigger payment status change automation:', error);
+        }
+      }
       
       return res.status(200).json(updatedAppointment);
     } catch (error) {
