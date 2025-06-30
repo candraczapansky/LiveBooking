@@ -545,16 +545,18 @@ const ClientsPage = () => {
   );
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        isMobile ? 'ml-0' : (sidebarOpen ? 'ml-64' : 'ml-16')
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
+          <div className="w-full max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
                 {/* Page Header */}
@@ -1671,6 +1673,9 @@ const ClientsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
