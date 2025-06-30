@@ -208,6 +208,7 @@ const ClientsPage = () => {
     onSuccess: async (response) => {
       const newClient = await response.json();
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
       
       toast({
         title: "Success",
@@ -233,6 +234,7 @@ const ClientsPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
       toast({
         title: "Success",
         description: "Client updated successfully",
@@ -256,6 +258,7 @@ const ClientsPage = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
       toast({
         title: "Success",
         description: "Client deleted successfully",
