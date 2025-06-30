@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
@@ -109,6 +109,31 @@ export default function Automations() {
     },
   });
 
+  // Update automation rule mutation
+  const updateRuleMutation = useMutation({
+    mutationFn: async ({ id, ruleData }: { id: number; ruleData: any }) => {
+      console.log('Updating automation rule:', id, ruleData);
+      return apiRequest("PUT", `/api/automation-rules/${id}`, ruleData);
+    },
+    onSuccess: (data) => {
+      console.log('Rule updated successfully:', data);
+      queryClient.invalidateQueries({ queryKey: ["/api/automation-rules"] });
+      toast({
+        title: "Success",
+        description: "Automation rule updated successfully",
+      });
+      setEditingRule(null);
+    },
+    onError: (error: any) => {
+      console.error('Update failed:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update automation rule",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Form handlers
   const emailForm = useForm<EmailRuleFormValues>({
     resolver: zodResolver(emailRuleSchema),
@@ -134,6 +159,34 @@ export default function Automations() {
       customTriggerName: "",
     },
   });
+
+  // Populate form when editing a rule
+  useEffect(() => {
+    if (editingRule && editingRule.type === 'sms') {
+      smsForm.reset({
+        name: editingRule.name,
+        trigger: editingRule.trigger,
+        timing: editingRule.timing,
+        template: editingRule.template,
+        active: editingRule.active,
+        customTriggerName: editingRule.customTriggerName || "",
+      });
+      setSelectedSMSTrigger(editingRule.trigger);
+      setIsSMSDialogOpen(true);
+    } else if (editingRule && editingRule.type === 'email') {
+      emailForm.reset({
+        name: editingRule.name,
+        trigger: editingRule.trigger,
+        timing: editingRule.timing,
+        subject: editingRule.subject || "",
+        template: editingRule.template,
+        active: editingRule.active,
+        customTriggerName: editingRule.customTriggerName || "",
+      });
+      setSelectedEmailTrigger(editingRule.trigger);
+      setIsEmailDialogOpen(true);
+    }
+  }, [editingRule]);
 
   // Trigger and timing options
   const triggerOptions = [
@@ -201,9 +254,16 @@ export default function Automations() {
     };
 
     console.log('Sending rule data to API:', ruleData);
-    createRuleMutation.mutate(ruleData);
+    
+    if (editingRule && editingRule.type === 'sms') {
+      updateRuleMutation.mutate({ id: editingRule.id, ruleData });
+    } else {
+      createRuleMutation.mutate(ruleData);
+    }
+    
     setIsSMSDialogOpen(false);
     setSelectedSMSTrigger("");
+    setEditingRule(null);
     smsForm.reset();
   };
 
