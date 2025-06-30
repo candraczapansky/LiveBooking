@@ -315,6 +315,8 @@ export default function MembershipSubscriptionDialog({
       setPaymentResult(null);
       setReceiptEmail("");
       setReceiptPhone("");
+      setAutoRenew(false);
+      setRenewalDate("1");
     }
   }, [open]);
 
@@ -326,7 +328,9 @@ export default function MembershipSubscriptionDialog({
         membershipId: membership?.id,
         startDate: new Date().toISOString(),
         endDate: new Date(Date.now() + (membership?.duration || 30) * 24 * 60 * 60 * 1000).toISOString(),
-        active: true
+        active: true,
+        autoRenew: autoRenew,
+        renewalDate: autoRenew ? parseInt(renewalDate) : null
       });
 
       // Create payment record
@@ -518,6 +522,49 @@ export default function MembershipSubscriptionDialog({
                 </div>
               )}
             </div>
+
+            {/* Auto-Renewal Section */}
+            {selectedClient && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="auto-renew" 
+                    checked={autoRenew}
+                    onCheckedChange={(checked) => setAutoRenew(checked as boolean)}
+                  />
+                  <Label htmlFor="auto-renew" className="flex items-center gap-2 text-sm font-medium">
+                    <RefreshCw className="h-4 w-4" />
+                    Enable Auto-Renewal
+                  </Label>
+                </div>
+                
+                {autoRenew && (
+                  <div className="space-y-3 pl-6">
+                    <div className="text-sm text-gray-600">
+                      Automatically charge on the same day each month
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-gray-400" />
+                      <Label htmlFor="renewal-date" className="text-sm">Billing Date:</Label>
+                      <Select value={renewalDate} onValueChange={setRenewalDate}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1st</SelectItem>
+                          <SelectItem value="15">15th</SelectItem>
+                          <SelectItem value="31">31st</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <span className="text-sm text-gray-500">of each month</span>
+                    </div>
+                    <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                      💡 Auto-renewal will charge ${membership?.price?.toFixed(2)} monthly using the same payment method
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Next Button */}
             <div className="flex justify-end pt-4">
