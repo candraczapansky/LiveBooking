@@ -217,6 +217,188 @@ export default function SubscriberDialog({
     }
   });
 
+  // Process payment and create membership subscription
+  const processPaymentMutation = useMutation({
+    mutationFn: async () => {
+      if (!cardElement || !selectedClient || !membership) {
+        throw new Error("Missing payment information");
+      }
+
+      setPaymentProcessing(true);
+
+      try {
+        // Tokenize payment method
+        const tokenResult = await cardElement.tokenize();
+        if (tokenResult.status !== 'OK') {
+          throw new Error(tokenResult.errors?.[0]?.detail || 'Failed to process payment method');
+        }
+
+        const paymentToken = tokenResult.token;
+
+        // Process Square payment
+        const paymentResponse = await apiRequest("POST", "/api/create-payment", {
+          amount: membership.price,
+          sourceId: paymentToken,
+          type: "membership_payment",
+          description: `Membership: ${membership.name} - ${selectedClient.firstName} ${selectedClient.lastName}`
+        });
+        const paymentData = await paymentResponse.json();
+
+        if (!paymentData.payment || paymentData.payment.status !== 'COMPLETED') {
+          throw new Error('Payment processing failed');
+        }
+
+        // Create membership subscription
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + membership.duration);
+
+        const membershipResponse = await apiRequest("POST", "/api/client-memberships", {
+          clientId: selectedClient.id,
+          membershipId: membership.id,
+          startDate,
+          endDate,
+          active: true
+        });
+        const membershipSubscription = await membershipResponse.json();
+
+        // Create payment record
+        const paymentRecordResponse = await apiRequest("POST", "/api/payments", {
+          clientId: selectedClient.id,
+          clientMembershipId: membershipSubscription.id,
+          amount: membership.price,
+          method: "card",
+          status: "completed",
+          type: "membership",
+          description: `Membership payment for ${membership.name}`,
+          squarePaymentId: paymentData.payment.id,
+          paymentDate: new Date()
+        });
+        const paymentRecord = await paymentRecordResponse.json();
+
+        setPaymentResult({
+          membership: membershipSubscription,
+          payment: paymentRecord,
+          squarePayment: paymentData.payment
+        });
+
+        setPaymentCompleted(true);
+        setShowReceiptOptions(true);
+
+        return { membershipSubscription, paymentRecord };
+      } catch (error: any) {
+        setPaymentProcessing(false);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/client-memberships'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      setPaymentProcessing(false);
+      toast({
+        title: "Payment Successful",
+        description: `${selectedClient?.firstName} ${selectedClient?.lastName} successfully subscribed to ${membership?.name}`,
+      });
+    },
+    onError: (error: any) => {
+      setPaymentProcessing(false);
+      toast({
+        title: "Payment Failed",
+        description: error.message || "Payment processing failed. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Send receipt via email
+  const sendEmailReceiptMutation = useMutation({
+    mutationFn: async (email: string) => {
+      if (!paymentResult || !selectedClient || !membership) {
+        throw new Error("Missing receipt information");
+      }
+
+      await apiRequest("POST", "/api/send-receipt-email", {
+        recipientEmail: email,
+        receiptData: {
+          transactionId: paymentResult.squarePayment.id,
+          amount: membership.price,
+          items: [{
+            name: membership.name,
+            description: membership.description,
+            price: membership.price,
+            quantity: 1
+          }],
+          customerName: `${selectedClient.firstName} ${selectedClient.lastName}`,
+          customerEmail: selectedClient.email,
+          paymentMethod: "Credit Card",
+          transactionDate: new Date().toISOString()
+        }
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Email Sent",
+        description: "Receipt sent successfully via email",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Email Failed",
+        description: error.message || "Failed to send email receipt",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Send receipt via SMS
+  const sendSMSReceiptMutation = useMutation({
+    mutationFn: async (phone: string) => {
+      if (!paymentResult || !selectedClient || !membership) {
+        throw new Error("Missing receipt information");
+      }
+
+      await apiRequest("POST", "/api/send-receipt-sms", {
+        recipientPhone: phone,
+        receiptData: {
+          transactionId: paymentResult.squarePayment.id,
+          amount: membership.price,
+          items: [{
+            name: membership.name,
+            description: membership.description,
+            price: membership.price,
+            quantity: 1
+          }],
+          customerName: `${selectedClient.firstName} ${selectedClient.lastName}`,
+          paymentMethod: "Credit Card",
+          transactionDate: new Date().toISOString()
+        }
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "SMS Sent",
+        description: "Receipt sent successfully via SMS",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "SMS Failed",
+        description: error.message || "Failed to send SMS receipt",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleCompleteTransaction = () => {
+    setShowPaymentStep(false);
+    setShowReceiptOptions(false);
+    setPaymentCompleted(false);
+    setSelectedClient(null);
+    setPaymentResult(null);
+    setCardElement(null);
+    onOpenChange(false);
+  };
+
   const handleAddSubscriber = () => {
     if (!selectedClientId) return;
     addSubscriberMutation.mutate(parseInt(selectedClientId));
