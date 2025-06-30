@@ -4266,6 +4266,12 @@ Thank you for choosing Glo Head Spa!
       const service = await storage.getService(appointment.serviceId);
       const client = appointment.clientId ? await storage.getUser(appointment.clientId) : null;
       
+      // Skip if service not found
+      if (!service) {
+        console.log(`Service ${appointment.serviceId} not found for appointment ${appointment.id}`);
+        continue;
+      }
+      
       let earnings = 0;
       const servicePrice = appointment.totalAmount || service.price;
       const serviceDuration = service.duration / 60; // Convert to hours

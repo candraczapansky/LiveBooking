@@ -13,7 +13,18 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### June 30, 2025 - Complete Appointment Service Color System Implementation, POS Receipt Confirmation Feature, and Service Data Synchronization Fix
+### June 30, 2025 - Complete Appointment Service Color System Implementation, POS Receipt Confirmation Feature, Service Data Synchronization Fix, and External Payroll API Creation
+
+- **Created comprehensive external payroll data API endpoint for cross-app integration:**
+  - Built new `/api/payroll-data` endpoint for external applications to access current payroll information
+  - Supports filtering by specific staff member using `staffId` query parameter
+  - Allows custom date ranges with `month` and `year` parameters (defaults to current month)
+  - Returns complete payroll data including staff details, earnings, hours, commission types, and appointment breakdowns
+  - Implements proper error handling for missing services and database connectivity
+  - Added new `getAppointmentsByStaffAndDateRange` method to storage interface for efficient data retrieval
+  - API returns structured JSON with success status, period information, staff count, total payroll, and individual staff data
+  - Perfect for external Replit apps to pull real-time payroll data from the salon management system
+  - **Example usage:** `GET /api/payroll-data` (all staff current month), `GET /api/payroll-data?staffId=19` (specific staff), `GET /api/payroll-data?month=6&year=2025` (specific period)
 
 - **Fixed critical service data synchronization issue between Services page and Point of Sale system:**
   - Identified and resolved duplicate service records in database (removed 27 duplicate entries)
