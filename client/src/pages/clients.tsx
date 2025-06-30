@@ -122,6 +122,8 @@ const ClientsPage = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [deletingClient, setDeletingClient] = useState<Client | null>(null);
   const { isOpen: sidebarOpen, isMobile } = useSidebar();
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
@@ -336,6 +338,7 @@ const ClientsPage = () => {
 
   const openEditDialog = (client: Client) => {
     setSelectedClient(client);
+    setEditingClient(client);
     editForm.reset({
       email: client.email,
       firstName: client.firstName || "",
@@ -357,6 +360,7 @@ const ClientsPage = () => {
 
   const openDeleteDialog = (client: Client) => {
     setSelectedClient(client);
+    setDeletingClient(client);
     setIsDeleteDialogOpen(true);
   };
 
@@ -1675,43 +1679,9 @@ const ClientsPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialogs */}
-      {/* Add Client Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Client</DialogTitle>
-            <DialogDescription>
-              Create a new client profile with their contact information and preferences.
-            </DialogDescription>
-          </DialogHeader>
-          <ClientForm
-            onSubmit={handleAddClient}
-            onCancel={() => setIsDialogOpen(false)}
-            isLoading={createClientMutation.isPending}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* This section contains the inline form dialogs - they are defined elsewhere in the file */}
 
-      {/* Edit Client Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
-            <DialogDescription>
-              Update client profile information and preferences.
-            </DialogDescription>
-          </DialogHeader>
-          {editingClient && (
-            <ClientForm
-              initialData={editingClient}
-              onSubmit={handleEditClient}
-              onCancel={() => setIsEditDialogOpen(false)}
-              isLoading={updateClientMutation.isPending}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Edit Client Dialog - Inline form is already defined above in the existing dialog structure */}
 
       {/* Delete Client Confirmation */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
@@ -1726,7 +1696,7 @@ const ClientsPage = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={handleDeleteClient}
               disabled={deleteClientMutation.isPending}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
@@ -1735,9 +1705,7 @@ const ClientsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-          </div>
         </main>
-      </div>
       </div>
     </>
   );
