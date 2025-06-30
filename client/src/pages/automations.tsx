@@ -187,8 +187,8 @@ export default function Automations() {
   };
 
   const onSMSSubmit = (data: SMSRuleFormValues) => {
-    console.log('SMS form submitted with data:', data);
-    console.log('Form errors:', smsForm.formState.errors);
+    console.log('✅ SMS form submitted successfully with data:', data);
+    console.log('Form errors (should be empty):', smsForm.formState.errors);
     
     const ruleData = {
       name: data.name,
