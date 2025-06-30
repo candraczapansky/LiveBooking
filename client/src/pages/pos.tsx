@@ -234,7 +234,8 @@ type Service = {
   description: string;
   duration: number;
   price: number;
-  category: string;
+  categoryId: number;
+  color: string;
 };
 
 type Product = {
@@ -366,6 +367,11 @@ export default function PointOfSale() {
   // Fetch services
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["/api/services"],
+  });
+
+  // Fetch service categories
+  const { data: categories } = useQuery({
+    queryKey: ["/api/service-categories"],
   });
 
   // Fetch products
@@ -578,9 +584,15 @@ export default function PointOfSale() {
     processTransactionMutation.mutate(transaction);
   };
 
+  // Helper function to get category name by ID
+  const getCategoryName = (categoryId: number) => {
+    const category = (categories as any[])?.find((cat: any) => cat.id === categoryId);
+    return category ? category.name : 'General';
+  };
+
   const filteredServices = (services as any[])?.filter((service: any) =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.category.toLowerCase().includes(searchQuery.toLowerCase())
+    service.description?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
 
   const filteredProducts = (products as any[])?.filter((product: any) =>
@@ -1023,7 +1035,7 @@ export default function PointOfSale() {
                             <CardContent className="p-3 sm:p-4">
                               <div className="flex justify-between items-start mb-2">
                                 <h3 className="font-semibold text-base sm:text-lg">{service.name}</h3>
-                                <Badge variant="secondary" className="text-xs">{service.category}</Badge>
+                                <Badge variant="secondary" className="text-xs">{getCategoryName(service.categoryId)}</Badge>
                               </div>
                               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
                                 {service.description}
