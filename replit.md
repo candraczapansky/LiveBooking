@@ -35,6 +35,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
     - Integrated with existing SendGrid email service and Twilio SMS system
     - Receipt includes transaction ID, items purchased, totals, and payment method
     - Automatic customer contact detection for email/SMS delivery options
+    - **Enhanced with manual contact input functionality:**
+      - Added manual email input field for entering customer email addresses
+      - Added manual phone input field for entering customer phone numbers
+      - Input fields clear automatically after successful receipt delivery
+      - Form validation prevents sending with empty fields
+      - Supports both existing customer data and manual input for maximum flexibility
     - Enhanced user experience with payment confirmation and receipt delivery tracking
 
 ### June 29, 2025 - SMS Marketing Campaign Fix, Server Stability Improvements, Payroll Report Rebuild, Consistent Back Button Styling, Complete Appointment Payment Amount Fix, and Database Connection Resolution

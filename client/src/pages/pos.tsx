@@ -267,6 +267,8 @@ export default function PointOfSale() {
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<any>(null);
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualPhone, setManualPhone] = useState("");
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -372,6 +374,7 @@ export default function PointOfSale() {
         title: "Receipt sent",
         description: "Email receipt sent successfully",
       });
+      setManualEmail("");
     },
     onError: (error: any) => {
       toast({
@@ -396,6 +399,7 @@ export default function PointOfSale() {
         title: "Receipt sent",
         description: "SMS receipt sent successfully",
       });
+      setManualPhone("");
     },
     onError: (error: any) => {
       toast({
@@ -438,6 +442,8 @@ export default function PointOfSale() {
       setIsCheckoutOpen(false);
       setCashReceived("");
       setSelectedClient(null);
+      setManualEmail("");
+      setManualPhone("");
       setShowReceiptDialog(true);
     },
     onError: (error) => {
@@ -1382,10 +1388,10 @@ export default function PointOfSale() {
               </div>
 
               {/* Receipt Options */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <p className="text-sm font-medium">Send receipt via:</p>
                 
-                {/* Email Option */}
+                {/* Existing Customer Contact Info */}
                 {lastTransaction.client?.email && (
                   <Button
                     variant="outline"
@@ -1403,7 +1409,6 @@ export default function PointOfSale() {
                   </Button>
                 )}
 
-                {/* SMS Option */}
                 {lastTransaction.client?.phone && lastTransaction.client.phone.length > 0 && (
                   <Button
                     variant="outline"
@@ -1421,13 +1426,72 @@ export default function PointOfSale() {
                   </Button>
                 )}
 
-                {/* No Contact Info */}
-                {(!lastTransaction.client?.email && (!lastTransaction.client?.phone || lastTransaction.client.phone.length === 0)) && (
-                  <div className="text-center py-4 text-muted-foreground">
-                    <p className="text-sm">No email or phone number available for this customer.</p>
-                    <p className="text-xs mt-1">Receipt can only be sent if customer contact information is provided.</p>
+                {/* Manual Input Section */}
+                <div className="border-t pt-3 space-y-3">
+                  <p className="text-sm font-medium text-muted-foreground">Or enter contact information:</p>
+                  
+                  {/* Manual Email Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-email" className="text-sm">Email Address</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="manual-email"
+                        type="email"
+                        placeholder="customer@email.com"
+                        value={manualEmail}
+                        onChange={(e) => setManualEmail(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (manualEmail.trim()) {
+                            sendReceiptEmailMutation.mutate({
+                              email: manualEmail.trim(),
+                              receiptData: lastTransaction
+                            });
+                          }
+                        }}
+                        disabled={!manualEmail.trim() || sendReceiptEmailMutation.isPending}
+                      >
+                        <Mail className="h-4 w-4 mr-1" />
+                        {sendReceiptEmailMutation.isPending ? "Sending..." : "Send"}
+                      </Button>
+                    </div>
                   </div>
-                )}
+
+                  {/* Manual Phone Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-phone" className="text-sm">Phone Number</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="manual-phone"
+                        type="tel"
+                        placeholder="(555) 123-4567"
+                        value={manualPhone}
+                        onChange={(e) => setManualPhone(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (manualPhone.trim()) {
+                            sendReceiptSMSMutation.mutate({
+                              phone: manualPhone.trim(),
+                              receiptData: lastTransaction
+                            });
+                          }
+                        }}
+                        disabled={!manualPhone.trim() || sendReceiptSMSMutation.isPending}
+                      >
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        {sendReceiptSMSMutation.isPending ? "Sending..." : "Send"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
