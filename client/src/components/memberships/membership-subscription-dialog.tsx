@@ -146,6 +146,21 @@ export default function MembershipSubscriptionDialog({
         });
       }
 
+      // Wait for DOM element to be available
+      const elementId = '#square-card-membership-new';
+      let element = document.querySelector(elementId);
+      let attempts = 0;
+      
+      while (!element && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        element = document.querySelector(elementId);
+        attempts++;
+      }
+      
+      if (!element) {
+        throw new Error(`Payment form element ${elementId} not found after waiting`);
+      }
+
       // Initialize Square payments (like working appointment checkout)
       const payments = window.Square.payments(SQUARE_APP_ID);
       const card = await payments.card({
@@ -162,7 +177,7 @@ export default function MembershipSubscriptionDialog({
       });
       
       // Attach to element
-      await card.attach('#square-card-membership-new');
+      await card.attach(elementId);
       
       setCardElement(card);
       setIsPaymentLoading(false);
