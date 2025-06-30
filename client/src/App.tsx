@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { useState, useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
+import MobileDashboard from "@/pages/mobile-dashboard";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
@@ -94,10 +95,15 @@ function Router() {
 
   // Protected routes that require authentication
   console.log("Showing protected routes (authenticated)");
+  
+  // Check if mobile and use dedicated mobile dashboard
+  const isMobile = window.innerWidth < 768;
+  const DashboardComponent = isMobile ? MobileDashboard : Dashboard;
+  
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/" component={DashboardComponent} />
+      <Route path="/dashboard" component={DashboardComponent} />
       <Route path="/services" component={Services} />
       <Route path="/clients" component={Clients} />
       <Route path="/staff" component={Staff} />
