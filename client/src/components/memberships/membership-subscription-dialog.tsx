@@ -123,40 +123,68 @@ export default function MembershipSubscriptionDialog({
   // Initialize Square payment when payment step is shown
   useEffect(() => {
     if (step === 'payment' && !cardElement) {
-      // Use MutationObserver to detect when element is actually added to DOM
-      const observer = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'childList') {
-            const element = document.querySelector('#square-card-membership-new');
+      console.log("Payment step activated, initializing Square payment...");
+      
+      // Multiple strategies to ensure element exists
+      const waitForElement = () => {
+        return new Promise<HTMLElement>((resolve, reject) => {
+          let attempts = 0;
+          const maxAttempts = 50; // 5 seconds max
+          
+          const checkElement = () => {
+            attempts++;
+            const element = document.querySelector('#square-card-membership-new') as HTMLElement;
+            
+            console.log(`Attempt ${attempts}: Element found =`, !!element);
             if (element) {
-              observer.disconnect();
-              // Give it one more frame to ensure it's fully rendered
-              requestAnimationFrame(() => {
-                initializeSquarePayment();
+              console.log("Element details:", {
+                id: element.id,
+                clientHeight: element.clientHeight,
+                clientWidth: element.clientWidth,
+                offsetHeight: element.offsetHeight,
+                offsetWidth: element.offsetWidth,
+                isConnected: element.isConnected
               });
+            }
+            
+            if (element && element.isConnected && element.offsetHeight > 0) {
+              resolve(element);
               return;
             }
-          }
-        }
-      });
-
-      // Start observing the document for changes
-      observer.observe(document.body, {
-        childList: true,
-        subtree: true
-      });
-
-      // Fallback: check if element already exists
-      const existingElement = document.querySelector('#square-card-membership-new');
-      if (existingElement) {
-        observer.disconnect();
-        requestAnimationFrame(() => {
-          initializeSquarePayment();
+            
+            if (attempts >= maxAttempts) {
+              reject(new Error(`Element not found after ${maxAttempts} attempts`));
+              return;
+            }
+            
+            // Try again in 100ms
+            setTimeout(checkElement, 100);
+          };
+          
+          checkElement();
         });
-      }
+      };
 
-      // Cleanup observer on unmount
-      return () => observer.disconnect();
+      // Wait for element and then initialize
+      waitForElement()
+        .then((element) => {
+          console.log("Element confirmed ready, initializing Square payment...");
+          // Double-check one more time and then initialize
+          setTimeout(() => {
+            const finalCheck = document.querySelector('#square-card-membership-new');
+            if (finalCheck) {
+              console.log("Final check passed, calling initializeSquarePayment");
+              initializeSquarePayment();
+            } else {
+              console.error("Final check failed - element disappeared");
+              setPaymentError("Payment form element is not available");
+            }
+          }, 50);
+        })
+        .catch((error) => {
+          console.error("Failed to find element:", error);
+          setPaymentError("Payment form failed to load");
+        });
     }
   }, [step]);
 
