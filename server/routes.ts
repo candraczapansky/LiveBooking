@@ -3222,7 +3222,7 @@ Thank you for choosing our salon!
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <div style="background-color: #e91e63; color: white; padding: 20px; text-align: center;">
-              <h1>BeautyBook</h1>
+              <h1>Glo Head Spa</h1>
               <h2>Purchase Receipt</h2>
             </div>
             <div style="padding: 20px;">
@@ -3261,7 +3261,7 @@ Thank you for choosing our salon!
               </div>
               
               <p style="margin-top: 30px; text-align: center; color: #666;">
-                Thank you for choosing our salon!<br>
+                Thank you for choosing Glo Head Spa!<br>
                 We appreciate your business and look forward to serving you again.
               </p>
             </div>
@@ -3290,7 +3290,7 @@ Thank you for choosing our salon!
         return res.status(400).json({ error: "Phone and receipt data are required" });
       }
 
-      const smsContent = `Thank you for your purchase! Transaction ID: ${receiptData.transactionId}. Total: $${receiptData.total.toFixed(2)}. Paid via ${receiptData.paymentMethod}. Visit us again soon!`;
+      const smsContent = `Thank you for your purchase at Glo Head Spa! Transaction ID: ${receiptData.transactionId}. Total: $${receiptData.total.toFixed(2)}. Paid via ${receiptData.paymentMethod}. Visit us again soon!`;
 
       const result = await sendSMS(phone, smsContent);
 
@@ -3305,7 +3305,41 @@ Thank you for choosing our salon!
     }
   });
 
-  // Test email endpoint for debugging
+  // Business Settings routes
+  app.get("/api/business-settings", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.getBusinessSettings();
+      if (!settings) {
+        return res.status(404).json({ error: "Business settings not found" });
+      }
+      res.json(settings);
+    } catch (error) {
+      console.error('Error fetching business settings:', error);
+      res.status(500).json({ error: "Failed to fetch business settings" });
+    }
+  });
+
+  app.put("/api/business-settings", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.updateBusinessSettings(req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error('Error updating business settings:', error);
+      res.status(500).json({ error: "Failed to update business settings" });
+    }
+  });
+
+  app.post("/api/business-settings", async (req: Request, res: Response) => {
+    try {
+      const settings = await storage.createBusinessSettings(req.body);
+      res.json(settings);
+    } catch (error) {
+      console.error('Error creating business settings:', error);
+      res.status(500).json({ error: "Failed to create business settings" });
+    }
+  });
+
+ // Test email endpoint for debugging
   app.post("/api/test-email", async (req, res) => {
     const { to, subject, content } = req.body;
     
