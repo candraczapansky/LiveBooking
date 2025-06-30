@@ -162,6 +162,15 @@ export default function SubscriberDialog({
     removeSubscriberMutation.mutate(membershipId);
   };
 
+  // Reset form when dialog closes
+  const handleDialogClose = (open: boolean) => {
+    onOpenChange(open);
+    if (!open) {
+      setSelectedClientId("");
+      setSearchQuery("");
+    }
+  };
+
   // Filter out clients who are already subscribers and apply search
   const availableClients = clients?.filter((client: User) => {
     const isClient = client.role === 'client';
@@ -174,7 +183,7 @@ export default function SubscriberDialog({
   }) || [];
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -189,6 +198,9 @@ export default function SubscriberDialog({
             <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
               <PlusCircle className="h-4 w-4" />
               Add New Subscriber
+              <Badge variant="secondary" className="ml-auto">
+                {availableClients.length} available
+              </Badge>
             </h3>
             
             {/* Search Input */}
