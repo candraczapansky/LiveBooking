@@ -121,7 +121,10 @@ export default function MembershipSubscriptionDialog({
   // Initialize Square payment when payment step is shown
   useEffect(() => {
     if (step === 'payment' && !cardElement) {
-      initializeSquarePayment();
+      // Add a small delay to ensure DOM element is rendered
+      setTimeout(() => {
+        initializeSquarePayment();
+      }, 100);
     }
   }, [step]);
 
@@ -146,20 +149,27 @@ export default function MembershipSubscriptionDialog({
         });
       }
 
-      // Wait for DOM element to be available
+      // Wait for DOM element to be available with more thorough checking
       const elementId = '#square-card-membership-new';
       let element = document.querySelector(elementId);
       let attempts = 0;
+      const maxAttempts = 20; // Increase max attempts
       
-      while (!element && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('Looking for element:', elementId);
+      
+      while (!element && attempts < maxAttempts) {
+        console.log(`Attempt ${attempts + 1}/${maxAttempts} - Element not found, waiting...`);
+        await new Promise(resolve => setTimeout(resolve, 200)); // Increase delay
         element = document.querySelector(elementId);
         attempts++;
       }
       
       if (!element) {
+        console.error(`Payment form element ${elementId} not found after ${maxAttempts} attempts`);
         throw new Error(`Payment form element ${elementId} not found after waiting`);
       }
+      
+      console.log('Element found successfully:', element);
 
       // Initialize Square payments (like working appointment checkout)
       const payments = window.Square.payments(SQUARE_APP_ID);
