@@ -142,13 +142,31 @@ const ClientsPage = () => {
   useEffect(() => {
     const checkSidebarState = () => {
       const globalSidebarState = (window as any).sidebarIsOpen;
+      const isMobile = window.innerWidth < 1024; // lg breakpoint
+      
       if (globalSidebarState !== undefined) {
         setSidebarOpen(globalSidebarState);
       }
+      
+      // On mobile, sidebar should be collapsed
+      if (isMobile && globalSidebarState) {
+        setSidebarOpen(false);
+      }
     };
 
+    // Initial check
+    checkSidebarState();
+    
+    // Listen for window resize
+    window.addEventListener('resize', checkSidebarState);
+    
+    // Listen for sidebar state changes
     const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('resize', checkSidebarState);
+    };
   }, []);
 
   // Handle quick action navigation
@@ -558,8 +576,8 @@ const ClientsPage = () => {
       <SidebarController />
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
-      }`}>
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      } ml-0`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
