@@ -562,7 +562,7 @@ const ClientsPage = () => {
       }`}>
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
@@ -663,13 +663,13 @@ const ClientsPage = () => {
             
             {viewMode === 'list' ? (
               <Card>
-              <CardHeader className="px-6 py-4">
-                <CardTitle>All Clients</CardTitle>
+              <CardHeader className="px-4 sm:px-6 py-4">
+                <CardTitle className="text-lg sm:text-xl">All Clients</CardTitle>
                 <CardDescription>
                   View and manage all your salon clients
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 sm:px-6">
                 {isLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -679,68 +679,135 @@ const ClientsPage = () => {
                     No clients found. {searchQuery ? 'Try a different search term.' : 'Add your first client!'}
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    {/* Mobile Card Layout - Hidden on Desktop */}
+                    <div className="block sm:hidden space-y-3">
                       {filteredClients?.map((client: Client) => (
-                        <TableRow key={client.id}>
-                          <TableCell>
-                            <div className="flex items-center space-x-3">
-                              <Avatar>
-                                <AvatarFallback>
+                        <Card key={client.id} className="p-4 hover:shadow-md transition-shadow">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-1 min-w-0">
+                              <Avatar className="h-12 w-12 flex-shrink-0">
+                                <AvatarFallback className="text-sm font-medium">
                                   {getInitials(client.firstName, client.lastName)}
                                 </AvatarFallback>
                               </Avatar>
-                              <div>
-                                <div className="font-medium">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-base text-gray-900 dark:text-gray-100 truncate">
                                   {getFullName(client.firstName, client.lastName)}
                                 </div>
+                                <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                  {client.email}
+                                </div>
+                                {client.phone && (
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {client.phone}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </TableCell>
-                          <TableCell>{client.email}</TableCell>
-                          <TableCell>{client.phone || "-"}</TableCell>
-                          <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button 
                                   variant="ghost" 
                                   size="default"
-                                  className="min-h-[44px] min-w-[44px] p-2"
+                                  className="h-10 w-10 p-0 flex-shrink-0 ml-2"
                                 >
-                                  <MoreHorizontal className="h-4 w-4" />
+                                  <MoreHorizontal className="h-5 w-5" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleViewClient(client)}>
-                                  <CreditCard className="h-4 w-4 mr-2" /> View Details & Cards
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem onClick={() => handleViewClient(client)} className="py-3">
+                                  <CreditCard className="h-4 w-4 mr-3" /> 
+                                  <span>View Details & Cards</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleViewClient(client)}>
-                                  <Calendar className="h-4 w-4 mr-2" /> Appointments
+                                <DropdownMenuItem onClick={() => handleViewClient(client)} className="py-3">
+                                  <Calendar className="h-4 w-4 mr-3" /> 
+                                  <span>Appointments</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => openEditDialog(client)}>
-                                  <Edit className="h-4 w-4 mr-2" /> Edit
+                                <DropdownMenuItem onClick={() => openEditDialog(client)} className="py-3">
+                                  <Edit className="h-4 w-4 mr-3" /> 
+                                  <span>Edit</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
                                   onClick={() => openDeleteDialog(client)}
-                                  className="text-red-600 focus:text-red-600"
+                                  className="text-red-600 focus:text-red-600 py-3"
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  <Trash2 className="h-4 w-4 mr-3" /> 
+                                  <span>Delete</span>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                          </div>
+                        </Card>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+
+                    {/* Desktop Table Layout - Hidden on Mobile */}
+                    <div className="hidden sm:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Phone</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredClients?.map((client: Client) => (
+                            <TableRow key={client.id}>
+                              <TableCell>
+                                <div className="flex items-center space-x-3">
+                                  <Avatar>
+                                    <AvatarFallback>
+                                      {getInitials(client.firstName, client.lastName)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-medium">
+                                      {getFullName(client.firstName, client.lastName)}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>{client.email}</TableCell>
+                              <TableCell>{client.phone || "-"}</TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="default"
+                                      className="min-h-[44px] min-w-[44px] p-2"
+                                    >
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                                      <CreditCard className="h-4 w-4 mr-2" /> View Details & Cards
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleViewClient(client)}>
+                                      <Calendar className="h-4 w-4 mr-2" /> Appointments
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openEditDialog(client)}>
+                                      <Edit className="h-4 w-4 mr-2" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem 
+                                      onClick={() => openDeleteDialog(client)}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
