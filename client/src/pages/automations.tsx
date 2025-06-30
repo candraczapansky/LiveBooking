@@ -88,9 +88,11 @@ export default function Automations() {
   // Create automation rule mutation
   const createRuleMutation = useMutation({
     mutationFn: async (ruleData: any) => {
+      console.log('Making API request with data:', ruleData);
       return apiRequest("POST", "/api/automation-rules", ruleData);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('API request successful:', data);
       queryClient.invalidateQueries({ queryKey: ["/api/automation-rules"] });
       toast({
         title: "Success",
@@ -98,6 +100,7 @@ export default function Automations() {
       });
     },
     onError: (error: any) => {
+      console.error('API request failed:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create automation rule",
@@ -184,6 +187,9 @@ export default function Automations() {
   };
 
   const onSMSSubmit = (data: SMSRuleFormValues) => {
+    console.log('SMS form submitted with data:', data);
+    console.log('Form errors:', smsForm.formState.errors);
+    
     const ruleData = {
       name: data.name,
       type: "sms" as const,
@@ -194,6 +200,7 @@ export default function Automations() {
       customTriggerName: data.trigger === "custom" ? data.customTriggerName : undefined
     };
 
+    console.log('Sending rule data to API:', ruleData);
     createRuleMutation.mutate(ruleData);
     setIsSMSDialogOpen(false);
     setSelectedSMSTrigger("");
