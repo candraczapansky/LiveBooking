@@ -173,6 +173,9 @@ export default function MembershipSubscriptionDialog({
       setIsPaymentLoading(false);
     } catch (error: any) {
       console.error('Square payment form initialization error:', error);
+      console.error('Error details:', error.name, error.message, error.stack);
+      console.error('Square object available:', !!window.Square);
+      console.error('Element exists at time of error:', !!document.querySelector('#square-card-membership-new'));
       setPaymentError(error.message || 'Failed to load payment form');
       setIsPaymentLoading(false);
     }
