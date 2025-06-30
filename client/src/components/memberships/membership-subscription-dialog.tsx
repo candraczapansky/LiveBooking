@@ -115,6 +115,8 @@ export default function MembershipSubscriptionDialog({
       setReceiptEmail("");
       setReceiptPhone("");
       setCardElement(null);
+      setPaymentError(null);
+      setIsPaymentLoading(false);
     }
   }, [open]);
 
@@ -172,6 +174,8 @@ export default function MembershipSubscriptionDialog({
       }
       
       console.log('Element found successfully:', element);
+      const rect = element.getBoundingClientRect();
+      console.log('Element dimensions:', { width: rect.width, height: rect.height, visible: rect.width > 0 && rect.height > 0 });
 
       // Initialize Square payments (like working appointment checkout)
       const payments = window.Square.payments(SQUARE_APP_ID);
@@ -478,14 +482,24 @@ export default function MembershipSubscriptionDialog({
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={initializeSquarePayment}
+                      onClick={() => {
+                        setPaymentError(null);
+                        setIsPaymentLoading(false);
+                        setTimeout(() => {
+                          initializeSquarePayment();
+                        }, 100);
+                      }}
                       className="mt-2"
                     >
                       Retry
                     </Button>
                   </div>
                 ) : (
-                  <div id="square-card-membership-new" className="min-h-[100px]"></div>
+                  <div 
+                    id="square-card-membership-new" 
+                    className="min-h-[120px] w-full"
+                    style={{ minHeight: '120px', width: '100%', display: 'block' }}
+                  ></div>
                 )}
               </div>
             </div>
