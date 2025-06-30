@@ -100,26 +100,44 @@ export default function SubscriberDialog({
     enabled: open
   });
 
-  // Add subscriber mutation
+  // Add subscriber mutation (creates subscription and opens payment dialog)
   const addSubscriberMutation = useMutation({
     mutationFn: async (clientId: number) => {
       const startDate = new Date();
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + (membership?.duration || 30));
 
-      return apiRequest("POST", "/api/client-memberships", {
+      // Create the membership subscription
+      const membershipResponse = await apiRequest("POST", "/api/client-memberships", {
         clientId,
         membershipId: membership?.id,
         startDate,
         endDate,
         active: true
       });
+      const membershipSubscription = await membershipResponse.json();
+
+      // Create a pending payment record for the membership
+      const paymentResponse = await apiRequest("POST", "/api/payments", {
+        clientId,
+        clientMembershipId: membershipSubscription.id,
+        amount: membership?.price || 0,
+        method: "pending",
+        status: "pending",
+        type: "membership",
+        description: `Membership payment for ${membership?.name}`,
+        paymentDate: new Date()
+      });
+      const payment = await paymentResponse.json();
+
+      return { membershipSubscription, payment };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/client-memberships'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
       toast({
         title: "Success",
-        description: "Subscriber added successfully",
+        description: "Membership subscription created. Payment is pending.",
       });
       setSelectedClientId("");
     },
