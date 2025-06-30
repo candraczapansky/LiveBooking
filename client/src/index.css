@@ -847,12 +847,7 @@ body {
     padding-right: 0.75rem !important;
   }
   
-  /* Grid system overrides for mobile - disabled temporarily */
-  /* .grid[class*="grid-cols-"]:not(.lg\:grid-cols-) {
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 1rem !important;
-  } */
+
   
   /* Component spacing optimization */
   .space-y-6 > * + * {
@@ -905,11 +900,7 @@ body {
   h2 { font-size: clamp(1.125rem, 4vw, 1.5rem) !important; }
   h3 { font-size: clamp(1rem, 3.5vw, 1.25rem) !important; }
   
-  /* Sidebar and desktop layout resets - disabled temporarily */
-  /* [class*="ml-64"], [class*="pl-64"] {
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-  } */
+
   
   /* Card component mobile optimization */
   [class*="rounded-lg"], .card {

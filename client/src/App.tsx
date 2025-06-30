@@ -95,15 +95,10 @@ function Router() {
 
   // Protected routes that require authentication
   console.log("Showing protected routes (authenticated)");
-  
-  // Check if mobile and use dedicated mobile dashboard
-  const isMobile = window.innerWidth < 768;
-  const DashboardComponent = isMobile ? MobileDashboard : Dashboard;
-  
   return (
     <Switch>
-      <Route path="/" component={DashboardComponent} />
-      <Route path="/dashboard" component={DashboardComponent} />
+      <Route path="/" component={Dashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/services" component={Services} />
       <Route path="/clients" component={Clients} />
       <Route path="/staff" component={Staff} />
