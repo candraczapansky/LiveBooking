@@ -151,33 +151,7 @@ export default function MembershipSubscriptionDialog({
         });
       }
 
-      // Wait for DOM element to be available with more thorough checking
-      const elementId = '#square-card-membership-new';
-      let element = document.querySelector(elementId);
-      let attempts = 0;
-      const maxAttempts = 20; // Increase max attempts
-      
-      console.log('Looking for element:', elementId);
-      console.log('Payment state:', { isPaymentLoading, paymentError, step });
-      console.log('DOM elements with "square" in id:', Array.from(document.querySelectorAll('[id*="square"]')).map(el => el.id));
-      
-      while (!element && attempts < maxAttempts) {
-        console.log(`Attempt ${attempts + 1}/${maxAttempts} - Element not found, waiting...`);
-        await new Promise(resolve => setTimeout(resolve, 200)); // Increase delay
-        element = document.querySelector(elementId);
-        attempts++;
-      }
-      
-      if (!element) {
-        console.error(`Payment form element ${elementId} not found after ${maxAttempts} attempts`);
-        throw new Error(`Payment form element ${elementId} not found after waiting`);
-      }
-      
-      console.log('Element found successfully:', element);
-      const rect = element.getBoundingClientRect();
-      console.log('Element dimensions:', { width: rect.width, height: rect.height, visible: rect.width > 0 && rect.height > 0 });
-
-      // Initialize Square payments (like working appointment checkout)
+      // Initialize Square payments (exact same pattern as working appointment checkout)
       const payments = window.Square.payments(SQUARE_APP_ID);
       const card = await payments.card({
         style: {
@@ -193,7 +167,7 @@ export default function MembershipSubscriptionDialog({
       });
       
       // Attach to element
-      await card.attach(elementId);
+      await card.attach('#square-card-membership-new');
       
       setCardElement(card);
       setIsPaymentLoading(false);
