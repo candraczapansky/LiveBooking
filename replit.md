@@ -13,6 +13,18 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### June 30, 2025 - SMS Automation Rule Saving Fix, Service Data Synchronization Resolution, and External Payroll API Creation
+
+- **Fixed critical SMS automation rule saving issue:**
+  - Root cause identified: Frontend was only updating local state without calling backend API
+  - Replaced mock data system with proper React Query integration for automation rules
+  - Added `createRuleMutation` using apiRequest for POST /api/automation-rules endpoint
+  - Fixed form submission handlers (`onSMSSubmit`, `onEmailSubmit`) to use API calls instead of setState
+  - SMS automation rules now properly save to database and persist across sessions
+  - Enhanced error handling with toast notifications for creation success/failure
+  - Completed automations.tsx file rebuild with proper API integration and form validation
+  - Users can now successfully create, save, and manage SMS automation rules
+
 ### June 30, 2025 - Complete Appointment Service Color System Implementation, POS Receipt Confirmation Feature, Service Data Synchronization Fix, and External Payroll API Creation
 
 - **Created comprehensive external payroll data API endpoint for cross-app integration:**
