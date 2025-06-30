@@ -104,6 +104,7 @@ export interface IStorage {
   getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
+  getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
   getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]>;
   updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment>;
@@ -1011,6 +1012,16 @@ export class DatabaseStorage implements IStorage {
 
   async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
     return await db.select().from(appointments).where(eq(appointments.staffId, staffId)).orderBy(desc(appointments.startTime));
+  }
+
+  async getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]> {
+    return await db.select().from(appointments).where(
+      and(
+        eq(appointments.staffId, staffId),
+        gte(appointments.startTime, startDate),
+        lte(appointments.startTime, endDate)
+      )
+    ).orderBy(appointments.startTime);
   }
 
   async getAppointmentsByDate(date: Date): Promise<Appointment[]> {

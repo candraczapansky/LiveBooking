@@ -4186,6 +4186,139 @@ Thank you for choosing Glo Head Spa!
     }
   });
 
+  // Public API endpoint for external payroll data access
+  app.get("/api/payroll-data", async (req, res) => {
+    try {
+      const { staffId, month, year } = req.query;
+      
+      // Default to current month if not specified
+      const targetDate = year && month 
+        ? new Date(parseInt(year as string), parseInt(month as string) - 1, 1)
+        : new Date();
+      
+      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
+      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+      
+      let allStaffPayroll = [];
+      
+      if (staffId) {
+        // Get specific staff member payroll
+        const staffIdNum = parseInt(staffId as string);
+        if (!staffIdNum) {
+          return res.status(400).json({ error: "Valid staff ID is required" });
+        }
+        
+        const staff = await storage.getStaff(staffIdNum);
+        if (!staff) {
+          return res.status(404).json({ error: "Staff member not found" });
+        }
+        
+        const user = await storage.getUser(staff.userId);
+        if (!user) {
+          return res.status(404).json({ error: "User details not found" });
+        }
+        
+        const payrollData = await calculatePayrollForStaff(staff, user, monthStart, monthEnd);
+        allStaffPayroll.push(payrollData);
+        
+      } else {
+        // Get all staff payroll data
+        const allStaff = await storage.getAllStaff();
+        
+        for (const staff of allStaff) {
+          const user = await storage.getUser(staff.userId);
+          if (user) {
+            const payrollData = await calculatePayrollForStaff(staff, user, monthStart, monthEnd);
+            allStaffPayroll.push(payrollData);
+          }
+        }
+      }
+      
+      res.json({
+        success: true,
+        period: {
+          month: targetDate.getMonth() + 1,
+          year: targetDate.getFullYear(),
+          startDate: monthStart.toISOString(),
+          endDate: monthEnd.toISOString()
+        },
+        staffCount: allStaffPayroll.length,
+        totalPayroll: allStaffPayroll.reduce((sum, staff) => sum + staff.totalEarnings, 0),
+        data: allStaffPayroll
+      });
+      
+    } catch (error) {
+      console.error("Error fetching payroll data:", error);
+      res.status(500).json({ error: "Failed to fetch payroll data" });
+    }
+  });
+
+  // Helper function to calculate payroll for a specific staff member
+  async function calculatePayrollForStaff(staff: any, user: any, monthStart: Date, monthEnd: Date) {
+    const appointments = await storage.getAppointmentsByStaffAndDateRange(staff.id, monthStart, monthEnd);
+    const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
+    
+    let totalEarnings = 0;
+    let totalHours = 0;
+    const appointmentDetails = [];
+    
+    for (const appointment of paidAppointments) {
+      const service = await storage.getService(appointment.serviceId);
+      const client = appointment.clientId ? await storage.getUser(appointment.clientId) : null;
+      
+      let earnings = 0;
+      const servicePrice = appointment.totalAmount || service.price;
+      const serviceDuration = service.duration / 60; // Convert to hours
+      
+      // Calculate earnings based on commission type
+      switch (staff.commissionType) {
+        case 'commission':
+          earnings = servicePrice * (staff.commissionRate / 100);
+          break;
+        case 'hourly':
+          earnings = serviceDuration * staff.hourlyRate;
+          break;
+        case 'fixed':
+          earnings = staff.fixedRate;
+          break;
+        case 'hourly_plus_commission':
+          const hourlyPay = serviceDuration * staff.hourlyRate;
+          const commissionPay = servicePrice * (staff.commissionRate / 100);
+          earnings = hourlyPay + commissionPay;
+          break;
+        default:
+          earnings = 0;
+      }
+      
+      totalEarnings += earnings;
+      totalHours += serviceDuration;
+      
+      appointmentDetails.push({
+        appointmentId: appointment.id,
+        date: appointment.startTime,
+        serviceName: service.name,
+        servicePrice: servicePrice,
+        serviceDuration: serviceDuration,
+        clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() : 'Walk-in',
+        earnings: earnings
+      });
+    }
+    
+    return {
+      staffId: staff.id,
+      staffName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+      staffEmail: user.email,
+      commissionType: staff.commissionType,
+      commissionRate: staff.commissionRate,
+      hourlyRate: staff.hourlyRate,
+      fixedRate: staff.fixedRate,
+      totalEarnings: Math.round(totalEarnings * 100) / 100,
+      totalHours: Math.round(totalHours * 100) / 100,
+      appointmentCount: paidAppointments.length,
+      appointments: appointmentDetails
+    };
+  }
+
   // Helper function to create sales history record
   async function createSalesHistoryRecord(paymentData: any, transactionType: string, additionalData?: any) {
     try {
