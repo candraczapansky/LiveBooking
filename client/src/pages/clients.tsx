@@ -545,19 +545,18 @@ const ClientsPage = () => {
   );
 
   return (
-    <>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="hidden lg:block">
-          <SidebarController />
-        </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
+      
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
+        <Header />
         
-        <div className={`min-h-screen flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-        }`}>
-          <Header />
-          
-          <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
-            <div className="w-full max-w-7xl mx-auto">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
+          <div className="w-full max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
                 {/* Page Header */}
@@ -1555,11 +1554,6 @@ const ClientsPage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-            </div>
-          </main>
-        </div>
-      </div>
-
       {/* CSV Import Dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1679,7 +1673,71 @@ const ClientsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+
+      {/* Dialogs */}
+      {/* Add Client Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Client</DialogTitle>
+            <DialogDescription>
+              Create a new client profile with their contact information and preferences.
+            </DialogDescription>
+          </DialogHeader>
+          <ClientForm
+            onSubmit={handleAddClient}
+            onCancel={() => setIsDialogOpen(false)}
+            isLoading={createClientMutation.isPending}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Client Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Client</DialogTitle>
+            <DialogDescription>
+              Update client profile information and preferences.
+            </DialogDescription>
+          </DialogHeader>
+          {editingClient && (
+            <ClientForm
+              initialData={editingClient}
+              onSubmit={handleEditClient}
+              onCancel={() => setIsEditDialogOpen(false)}
+              isLoading={updateClientMutation.isPending}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Client Confirmation */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the client
+              "{deletingClient?.firstName} {deletingClient?.lastName}" and remove all their data from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteClientMutation.isPending}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {deleteClientMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+          </div>
+        </main>
+      </div>
+    </div>
   );
 };
 
