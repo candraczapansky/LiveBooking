@@ -3369,6 +3369,10 @@ If you didn't request this password reset, please ignore this email and your pas
 
       // Handle different receipt data structures (POS vs membership)
       let items = '';
+      
+      // Debug log to see the actual structure
+      console.log('Receipt data structure:', JSON.stringify(receiptData, null, 2));
+      
       if (receiptData.items && Array.isArray(receiptData.items)) {
         items = receiptData.items.map((item: any) => {
           // POS receipt structure
@@ -3377,13 +3381,16 @@ If you didn't request this password reset, please ignore this email and your pas
           }
           // Membership receipt structure
           else if (item.name) {
-            return `${item.quantity}x ${item.name} - $${item.price.toFixed(2)}`;
+            return `${item.quantity || 1}x ${item.name} - $${item.price ? item.price.toFixed(2) : '0.00'}`;
           }
-          return `1x Item - $${item.price || item.total || 0}`;
+          // Fallback for unknown structure
+          else {
+            return `1x Item - $${item.price || item.total || 0}`;
+          }
         }).join('\n');
       } else {
-        // Fallback for single item receipts
-        items = `1x ${receiptData.membership?.name || 'Service'} - $${receiptData.total.toFixed(2)}`;
+        // Fallback for single item receipts (membership subscriptions)
+        items = `1x ${receiptData.membership?.name || receiptData.name || 'Service'} - $${receiptData.total.toFixed(2)}`;
       }
 
       const emailContent = `

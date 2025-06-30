@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
 import MembershipForm from "@/components/memberships/membership-form";
 import MembershipSubscriptionDialog from "@/components/memberships/membership-subscription-dialog-new";
+import SubscriberDialog from "@/components/memberships/subscriber-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {
@@ -79,6 +80,8 @@ const MembershipsPage = () => {
   const [membershipToDelete, setMembershipToDelete] = useState<Membership | null>(null);
   const [isSubscriberDialogOpen, setIsSubscriberDialogOpen] = useState(false);
   const [selectedMembershipForSubscribers, setSelectedMembershipForSubscribers] = useState<Membership | null>(null);
+  const [isAddClientDialogOpen, setIsAddClientDialogOpen] = useState(false);
+  const [selectedMembershipForAddClient, setSelectedMembershipForAddClient] = useState<Membership | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
@@ -159,6 +162,11 @@ const MembershipsPage = () => {
   const handleViewSubscribers = (membership: Membership) => {
     setSelectedMembershipForSubscribers(membership);
     setIsSubscriberDialogOpen(true);
+  };
+
+  const handleAddClient = (membership: Membership) => {
+    setSelectedMembershipForAddClient(membership);
+    setIsAddClientDialogOpen(true);
   };
 
   return (
@@ -285,7 +293,7 @@ const MembershipsPage = () => {
                             <Button 
                               variant="default" 
                               className="w-full" 
-                              onClick={() => handleViewSubscribers(membership)}
+                              onClick={() => handleAddClient(membership)}
                             >
                               <PlusCircle className="h-4 w-4 mr-2" />
                               Add Client
@@ -416,8 +424,8 @@ const MembershipsPage = () => {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Membership Subscription Dialog with Payment */}
-      <MembershipSubscriptionDialog
+      {/* Subscriber Dialog for viewing existing subscribers */}
+      <SubscriberDialog
         open={isSubscriberDialogOpen}
         onOpenChange={setIsSubscriberDialogOpen}
         membership={selectedMembershipForSubscribers}
