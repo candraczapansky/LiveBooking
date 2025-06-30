@@ -89,7 +89,9 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
       return apiRequest("DELETE", `/api/services/${serviceId}`);
     },
     onSuccess: () => {
+      // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({
         title: "Success",
         description: "Service deleted successfully",

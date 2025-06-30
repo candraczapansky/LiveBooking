@@ -200,7 +200,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       return service;
     },
     onSuccess: (service) => {
+      // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({
         title: "Success",
         description: "Service created successfully",
@@ -239,7 +241,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       return service;
     },
     onSuccess: () => {
+      // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       toast({
         title: "Success",
         description: "Service updated successfully",
