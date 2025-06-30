@@ -851,7 +851,7 @@ const AppointmentsPage = () => {
                         className="absolute inset-x-1 text-white rounded p-1 text-xs cursor-pointer z-10"
                         style={{
                           backgroundColor: appointment.service?.color || '#6b7280',
-                          color: isServiceColorLight(appointment.service?.color || '#6b7280') ? '#000000' : '#ffffff',
+                          color: '#ffffff',
                           height: `${heightInSlots * 60 - 4}px`,
                           top: '2px'
                         }}
