@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Users, Calendar, Search } from "lucide-react";
+import { PlusCircle, Users, Calendar, Search, CreditCard, Receipt, Check, X, Mail, Phone, DollarSign } from "lucide-react";
 
 type Membership = {
   id: number;
@@ -67,6 +67,10 @@ interface SubscriberDialogProps {
   membership: Membership | null;
 }
 
+// Square payment configuration
+const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
+const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
+
 export default function SubscriberDialog({
   open,
   onOpenChange,
@@ -74,6 +78,16 @@ export default function SubscriberDialog({
 }: SubscriberDialogProps) {
   const [selectedClientId, setSelectedClientId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [showPaymentStep, setShowPaymentStep] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<User | null>(null);
+  const [cardElement, setCardElement] = useState<any>(null);
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [showReceiptOptions, setShowReceiptOptions] = useState(false);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [paymentResult, setPaymentResult] = useState<any>(null);
+  const [receiptEmail, setReceiptEmail] = useState("");
+  const [receiptPhone, setReceiptPhone] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -100,45 +114,77 @@ export default function SubscriberDialog({
     enabled: open
   });
 
-  // Add subscriber mutation (creates subscription and opens payment dialog)
+  // Initialize Square payment form
+  const initializeSquarePayment = async () => {
+    if (!window.Square) {
+      console.error('Square Web SDK not loaded');
+      return;
+    }
+
+    try {
+      setIsPaymentLoading(true);
+      const payments = window.Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
+      const card = await payments.card({
+        style: {
+          input: {
+            fontSize: '16px',
+            fontFamily: '"Helvetica Neue", Arial, sans-serif'
+          },
+          '.input-container': {
+            borderColor: '#E5E7EB',
+            borderRadius: '6px'
+          }
+        }
+      });
+      await card.attach('#square-card-membership');
+      setCardElement(card);
+      setIsPaymentLoading(false);
+    } catch (error: any) {
+      console.error('Square payment form initialization error:', error);
+      setIsPaymentLoading(false);
+      toast({
+        title: "Payment Error",
+        description: "Failed to load payment form. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Reset dialog state when opening/closing
+  useEffect(() => {
+    if (open) {
+      setShowPaymentStep(false);
+      setSelectedClient(null);
+      setPaymentCompleted(false);
+      setShowReceiptOptions(false);
+      setPaymentResult(null);
+      setReceiptEmail("");
+      setReceiptPhone("");
+    }
+  }, [open]);
+
+  // Initialize Square payment when payment step is shown
+  useEffect(() => {
+    if (showPaymentStep && !cardElement) {
+      initializeSquarePayment();
+    }
+  }, [showPaymentStep]);
+
+  // Add subscriber mutation - now initiates payment flow
   const addSubscriberMutation = useMutation({
     mutationFn: async (clientId: number) => {
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + (membership?.duration || 30));
-
-      // Create the membership subscription
-      const membershipResponse = await apiRequest("POST", "/api/client-memberships", {
-        clientId,
-        membershipId: membership?.id,
-        startDate,
-        endDate,
-        active: true
-      });
-      const membershipSubscription = await membershipResponse.json();
-
-      // Create a pending payment record for the membership
-      const paymentResponse = await apiRequest("POST", "/api/payments", {
-        clientId,
-        clientMembershipId: membershipSubscription.id,
-        amount: membership?.price || 0,
-        method: "pending",
-        status: "pending",
-        type: "membership",
-        description: `Membership payment for ${membership?.name}`,
-        paymentDate: new Date()
-      });
-      const payment = await paymentResponse.json();
-
-      return { membershipSubscription, payment };
+      const client = clients?.find((c: User) => c.id === clientId);
+      if (!client) throw new Error("Client not found");
+      
+      setSelectedClient(client);
+      setReceiptEmail(client.email || "");
+      setReceiptPhone(client.phone || "");
+      setShowPaymentStep(true);
+      
+      return { client };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/client-memberships'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
-      toast({
-        title: "Success",
-        description: "Membership subscription created. Payment is pending.",
-      });
+      // Don't close dialog yet - show payment step instead
       setSelectedClientId("");
     },
     onError: (error) => {
