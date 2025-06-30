@@ -545,18 +545,19 @@ const ClientsPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
-        <SidebarController />
-      </div>
-      
-      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
-        <Header />
+    <>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="hidden lg:block">
+          <SidebarController />
+        </div>
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
-          <div className="w-full max-w-7xl mx-auto">
+        <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+          sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+        }`}>
+          <Header />
+          
+          <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-x-hidden">
+            <div className="w-full max-w-7xl mx-auto">
             {viewMode === 'list' ? (
               <>
                 {/* Page Header */}
@@ -1737,7 +1738,8 @@ const ClientsPage = () => {
           </div>
         </main>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 
