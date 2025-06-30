@@ -2,106 +2,9 @@ import { sendEmail } from './email';
 import { sendSMS } from './sms';
 import type { IStorage } from './storage';
 import { storage } from './storage';
+import type { AutomationRule } from '@shared/schema';
 
-export interface AutomationRule {
-  id: number;
-  name: string;
-  type: 'email' | 'sms';
-  trigger: 'appointment_reminder' | 'follow_up' | 'birthday' | 'no_show' | 'booking_confirmation' | 'cancellation' | 'custom';
-  timing: string;
-  template: string;
-  subject?: string;
-  active: boolean;
-  lastRun?: string;
-  sentCount: number;
-  customTriggerName?: string;
-}
-
-// Mock automation rules storage (in production, this would be in the database)
-const automationRules: AutomationRule[] = [
-  {
-    id: 1,
-    name: "24h Appointment Reminder",
-    type: "email",
-    trigger: "appointment_reminder",
-    timing: "24_hours_before",
-    subject: "Appointment Reminder - {salon_name}",
-    template: "Hi {client_name}, this is a friendly reminder that you have an appointment scheduled for {appointment_time} at {salon_name}. We look forward to seeing you!",
-    active: true,
-    sentCount: 0
-  },
-  {
-    id: 2,
-    name: "Booking Confirmation SMS",
-    type: "sms",
-    trigger: "booking_confirmation",
-    timing: "immediately",
-    template: "Hi {client_name}! Your appointment at {salon_name} for {service_name} on {appointment_date} at {appointment_time} has been confirmed. See you soon!",
-    active: true,
-    sentCount: 0
-  },
-  {
-    id: 3,
-    name: "Appointment Cancellation Email",
-    type: "email",
-    trigger: "cancellation",
-    timing: "immediately",
-    subject: "Appointment Cancelled - {salon_name}",
-    template: "Hi {client_name},\n\nWe've received your cancellation for your appointment scheduled on {appointment_datetime} for {service_name} with {staff_name}.\n\nYour appointment has been successfully cancelled. If you'd like to reschedule, please call us at {salon_phone} or book online.\n\nWe look forward to seeing you again soon!\n\nBest regards,\n{salon_name}",
-    active: true,
-    sentCount: 0
-  },
-  {
-    id: 4,
-    name: "Appointment Cancellation SMS",
-    type: "sms",
-    trigger: "cancellation",
-    timing: "immediately",
-    template: "Hi {client_name}, your appointment at {salon_name} for {appointment_datetime} has been cancelled. Call {salon_phone} to reschedule anytime!",
-    active: true,
-    sentCount: 0
-  },
-  {
-    id: 5,
-    name: "Booking Confirmation Email",
-    type: "email",
-    trigger: "booking_confirmation",
-    timing: "immediately",
-    subject: "Appointment Confirmed - {salon_name}",
-    template: "Dear {client_name},\n\nYour appointment has been confirmed!\n\nDetails:\n- Service: {service_name}\n- Date & Time: {appointment_datetime}\n- Stylist: {staff_name}\n- Duration: {service_duration} minutes\n- Price: ${total_amount}\n\nLocation:\n{salon_address}\n\nIf you have any questions, please don't hesitate to contact us at {salon_phone}.\n\nThank you for choosing {salon_name}!",
-    active: true,
-    sentCount: 0
-  }
-];
-
-export function getAutomationRules(): AutomationRule[] {
-  return automationRules;
-}
-
-export function addAutomationRule(rule: Omit<AutomationRule, 'id'>): AutomationRule {
-  const newRule = {
-    ...rule,
-    id: Date.now()
-  };
-  automationRules.push(newRule);
-  return newRule;
-}
-
-export function updateAutomationRule(id: number, updates: Partial<AutomationRule>): AutomationRule | null {
-  const index = automationRules.findIndex(rule => rule.id === id);
-  if (index === -1) return null;
-  
-  automationRules[index] = { ...automationRules[index], ...updates };
-  return automationRules[index];
-}
-
-export function deleteAutomationRule(id: number): boolean {
-  const index = automationRules.findIndex(rule => rule.id === id);
-  if (index === -1) return false;
-  
-  automationRules.splice(index, 1);
-  return true;
-}
+// Automation rules are now stored in the database via storage layer
 
 // Template variable replacement
 function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
@@ -168,7 +71,10 @@ export async function triggerAutomations(
 ) {
   console.log(`Triggering automations for: ${trigger}`, { appointmentData, customTriggerName });
   
-  const relevantRules = automationRules.filter(rule => {
+  // Get all automation rules from database
+  const allRules = await storage.getAllAutomationRules();
+  
+  const relevantRules = allRules.filter(rule => {
     if (!rule.active) return false;
     
     if (rule.trigger === 'custom' && customTriggerName) {
@@ -237,8 +143,8 @@ export async function triggerAutomations(
         });
 
         if (emailSent) {
-          rule.sentCount++;
-          rule.lastRun = new Date().toISOString();
+          const newSentCount = (rule.sentCount || 0) + 1;
+          await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
           console.log(`Email automation sent successfully for rule: ${rule.name}`);
         }
       } else if (rule.type === 'sms' && client.phone && shouldSendSMS(rule, client)) {
@@ -251,8 +157,8 @@ export async function triggerAutomations(
         const smsResult = await sendSMS(client.phone, processedTemplate);
         
         if (smsResult.success) {
-          rule.sentCount++;
-          rule.lastRun = new Date().toISOString();
+          const newSentCount = (rule.sentCount || 0) + 1;
+          await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
           console.log(`SMS automation sent successfully for rule: ${rule.name}`);
         }
       } else {
