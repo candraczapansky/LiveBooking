@@ -365,8 +365,10 @@ export default function PointOfSale() {
   const TAX_RATE = 0.085;
 
   // Fetch services
-  const { data: services, isLoading: servicesLoading } = useQuery({
+  const { data: services, isLoading: servicesLoading, refetch: refetchServices } = useQuery({
     queryKey: ["/api/services"],
+    staleTime: 0, // Always consider data stale
+    gcTime: 0, // Don't cache data (gcTime replaces cacheTime)
   });
 
   // Fetch service categories
