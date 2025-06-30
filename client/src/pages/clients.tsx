@@ -1555,6 +1555,11 @@ const ClientsPage = () => {
         </AlertDialogContent>
       </AlertDialog>
 
+            </div>
+          </main>
+        </div>
+      </div>
+
       {/* CSV Import Dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
@@ -1674,10 +1679,6 @@ const ClientsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-            </div>
-          </main>
-        </div>
-      </div>
     </>
   );
 };
