@@ -794,3 +794,31 @@ export const insertBusinessSettingsSchema = createInsertSchema(businessSettings)
 
 export type BusinessSettings = typeof businessSettings.$inferSelect;
 export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
+
+// Automation Rules schema
+export const automationRules = pgTable("automation_rules", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // "email" or "sms"
+  trigger: text("trigger").notNull(), // "appointment_reminder", "follow_up", "birthday", etc.
+  timing: text("timing").notNull(), // "24 hours before", "1 day after", "immediately", etc.
+  template: text("template").notNull(),
+  subject: text("subject"), // Only for email type
+  active: boolean("active").default(true),
+  customTriggerName: text("custom_trigger_name"), // For custom triggers
+  sentCount: integer("sent_count").default(0),
+  lastRun: timestamp("last_run"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
+  id: true,
+  sentCount: true,
+  lastRun: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type AutomationRule = typeof automationRules.$inferSelect;
+export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;

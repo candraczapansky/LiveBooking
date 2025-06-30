@@ -27,7 +27,8 @@ import {
   notifications, Notification, InsertNotification,
   payrollHistory, PayrollHistory, InsertPayrollHistory,
   salesHistory, SalesHistory, InsertSalesHistory,
-  businessSettings, BusinessSettings, InsertBusinessSettings
+  businessSettings, BusinessSettings, InsertBusinessSettings,
+  automationRules, AutomationRule, InsertAutomationRule
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -258,6 +259,15 @@ export interface IStorage {
   getBusinessSettings(): Promise<BusinessSettings | undefined>;
   updateBusinessSettings(businessData: Partial<InsertBusinessSettings>): Promise<BusinessSettings>;
   createBusinessSettings(businessData: InsertBusinessSettings): Promise<BusinessSettings>;
+
+  // Automation Rules operations
+  createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule>;
+  getAutomationRule(id: number): Promise<AutomationRule | undefined>;
+  getAllAutomationRules(): Promise<AutomationRule[]>;
+  updateAutomationRule(id: number, ruleData: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined>;
+  deleteAutomationRule(id: number): Promise<boolean>;
+  updateAutomationRuleSentCount(id: number, sentCount: number): Promise<void>;
+  updateAutomationRuleLastRun(id: number, lastRun: Date): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1979,6 +1989,49 @@ export class DatabaseStorage implements IStorage {
   async createBusinessSettings(businessData: InsertBusinessSettings): Promise<BusinessSettings> {
     const result = await db.insert(businessSettings).values(businessData).returning();
     return result[0];
+  }
+
+  // Automation Rules operations
+  async createAutomationRule(rule: InsertAutomationRule): Promise<AutomationRule> {
+    const result = await db.insert(automationRules).values(rule).returning();
+    return result[0];
+  }
+
+  async getAutomationRule(id: number): Promise<AutomationRule | undefined> {
+    const result = await db.select().from(automationRules).where(eq(automationRules.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllAutomationRules(): Promise<AutomationRule[]> {
+    return await db.select().from(automationRules).orderBy(desc(automationRules.createdAt));
+  }
+
+  async updateAutomationRule(id: number, ruleData: Partial<InsertAutomationRule>): Promise<AutomationRule | undefined> {
+    const result = await db
+      .update(automationRules)
+      .set({ ...ruleData, updatedAt: new Date() })
+      .where(eq(automationRules.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAutomationRule(id: number): Promise<boolean> {
+    const result = await db.delete(automationRules).where(eq(automationRules.id, id));
+    return result.rowCount > 0;
+  }
+
+  async updateAutomationRuleSentCount(id: number, sentCount: number): Promise<void> {
+    await db
+      .update(automationRules)
+      .set({ sentCount, lastRun: new Date(), updatedAt: new Date() })
+      .where(eq(automationRules.id, id));
+  }
+
+  async updateAutomationRuleLastRun(id: number, lastRun: Date): Promise<void> {
+    await db
+      .update(automationRules)
+      .set({ lastRun, updatedAt: new Date() })
+      .where(eq(automationRules.id, id));
   }
 }
 
