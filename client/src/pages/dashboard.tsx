@@ -29,34 +29,36 @@ const Dashboard = () => {
 
   console.log('Dashboard render - isMobile:', isMobile, 'width:', window.innerWidth);
   
-  // Mobile layout - simplified for debugging
+  // Mobile layout - ultra simplified for debugging
   if (isMobile) {
-    console.log('Rendering mobile layout');
+    console.log('Rendering ultra simple mobile layout');
     return (
-      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb', padding: '0', margin: '0' }}>
-        <Header />
-        
-        <div style={{ padding: '12px', backgroundColor: '#f9fafb' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-            Mobile Dashboard
-          </h1>
-          <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '24px' }}>
-            Welcome back{user?.firstName ? `, ${user.firstName}` : ""}!
-          </p>
-          
-          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-              Quick Stats
-            </h2>
-            <p style={{ color: '#6b7280' }}>Mobile dashboard content loading...</p>
-          </div>
-          
-          <div style={{ backgroundColor: 'white', padding: '16px', borderRadius: '8px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
-              Recent Activity
-            </h2>
-            <p style={{ color: '#6b7280' }}>Recent appointments and notifications...</p>
-          </div>
+      <div style={{ 
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#ff0000',
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        fontSize: '24px',
+        color: 'white',
+        fontWeight: 'bold',
+        textAlign: 'center'
+      }}>
+        <div>MOBILE TEST</div>
+        <div style={{ fontSize: '16px', marginTop: '16px' }}>
+          Width: {window.innerWidth}px
+        </div>
+        <div style={{ fontSize: '16px', marginTop: '8px' }}>
+          User: {user?.firstName || 'Unknown'}
+        </div>
+        <div style={{ fontSize: '14px', marginTop: '16px', backgroundColor: 'rgba(0,0,0,0.5)', padding: '8px', borderRadius: '4px' }}>
+          If you can see this red screen with white text, the mobile detection and React rendering is working!
         </div>
       </div>
     );
