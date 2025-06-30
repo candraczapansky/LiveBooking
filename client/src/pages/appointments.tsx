@@ -53,7 +53,7 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentDate, setCurrentDate] = useState(new Date('2025-07-06')); // Set to July 6, 2025 to show the week with appointments
   const { isOpen: sidebarOpen } = useSidebar();
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
@@ -695,10 +695,6 @@ const AppointmentsPage = () => {
     const weekDays = getWeekDays(currentDate);
     const isMobile = window.innerWidth < 768;
     
-    console.log('Current Date:', currentDate);
-    console.log('Week Days:', weekDays.map(d => d.toDateString()));
-    console.log('Appointments:', appointments?.map((apt: any) => ({ id: apt.id, startTime: apt.startTime })));
-    
     // Mobile: Show simplified card-based week view
     if (isMobile) {
       return (
@@ -825,7 +821,7 @@ const AppointmentsPage = () => {
                   const dayDateString = day.toDateString();
                   const appointmentDateString = appointmentDate.toDateString();
                   
-                  console.log(`Appointment ${appointment.id}: Day=${dayDateString}, Appointment=${appointmentDateString}, StartTime=${appointment.startTime}, Match=${dayDateString === appointmentDateString}`);
+
                   
                   return dayDateString === appointmentDateString;
                 })
