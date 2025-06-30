@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -29,184 +29,53 @@ const Dashboard = () => {
 
   console.log('Dashboard render - isMobile:', isMobile, 'width:', window.innerWidth);
   
-  // Mobile layout - working mobile dashboard
+  // Mobile layout - simplified debugging approach
   if (isMobile) {
-    console.log('Rendering working mobile dashboard');
-    return (
-      <div style={{ 
-        minHeight: '100vh',
-        backgroundColor: '#f9fafb',
-        padding: 0,
-        margin: 0,
-        overflow: 'auto'
-      }}>
-        {/* Simple Mobile Header */}
-        <div style={{
-          backgroundColor: '#fb83bd',
-          color: 'white',
-          padding: '16px',
+    console.log('Mobile render attempt');
+    try {
+      return React.createElement('div', {
+        style: {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#00ff00',
+          zIndex: 10000,
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>
-              BeautyBook
-            </h1>
-            <p style={{ fontSize: '14px', margin: 0, opacity: 0.9 }}>
-              Welcome back, {user?.firstName || 'Admin'}!
-            </p>
-          </div>
-          <div style={{ fontSize: '24px' }}>☰</div>
-        </div>
-        
-        {/* Dashboard Content */}
-        <div style={{ padding: '16px' }}>
-          {/* Quick Stats */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '12px',
-            marginBottom: '24px'
-          }}>
-            <div style={{
-              backgroundColor: 'white',
-              padding: '16px',
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#fb83bd' }}>12</div>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Today's Appointments</div>
-            </div>
-            <div style={{
-              backgroundColor: 'white',
-              padding: '16px',
-              borderRadius: '8px',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              textAlign: 'center'
-            }}>
-              <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#10b981' }}>$2,450</div>
-              <div style={{ fontSize: '12px', color: '#6b7280' }}>Today's Revenue</div>
-            </div>
-          </div>
-          
-          {/* Quick Actions */}
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: '24px'
-          }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#111827' }}>
-                Quick Actions
-              </h2>
-            </div>
-            <div style={{ padding: '16px' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: '12px'
-              }}>
-                <button style={{
-                  backgroundColor: '#fb83bd',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '12px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  New Appointment
-                </button>
-                <button style={{
-                  backgroundColor: '#6366f1',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '12px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  Add Client
-                </button>
-                <button style={{
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '12px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  POS Sale
-                </button>
-                <button style={{
-                  backgroundColor: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '6px',
-                  padding: '12px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}>
-                  View Reports
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {/* Recent Activity */}
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{ padding: '16px', borderBottom: '1px solid #e5e7eb' }}>
-              <h2 style={{ fontSize: '18px', fontWeight: 'bold', margin: 0, color: '#111827' }}>
-                Recent Activity
-              </h2>
-            </div>
-            <div style={{ padding: '16px' }}>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>
-                  New appointment booked
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  Sarah Johnson - Hair Cut & Style
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  2 minutes ago
-                </div>
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>
-                  Payment received
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  $85.00 - Credit Card
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  15 minutes ago
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>
-                  New client added
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  Emma Davis
-                </div>
-                <div style={{ fontSize: '12px', color: '#6b7280' }}>
-                  1 hour ago
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          color: 'black',
+          fontSize: '20px',
+          fontWeight: 'bold',
+          textAlign: 'center',
+          padding: '20px'
+        }
+      }, [
+        React.createElement('div', { key: 'title' }, 'MOBILE WORKING'),
+        React.createElement('div', { key: 'width', style: { fontSize: '16px', marginTop: '10px' } }, `Screen: ${window.innerWidth}x${window.innerHeight}`),
+        React.createElement('div', { key: 'user', style: { fontSize: '16px', marginTop: '10px' } }, `User: ${user?.firstName || 'Loading...'}`),
+        React.createElement('div', { key: 'message', style: { fontSize: '14px', marginTop: '20px', backgroundColor: 'rgba(255,255,255,0.8)', padding: '10px', borderRadius: '5px' } }, 'Green screen means React is rendering mobile content successfully!')
+      ]);
+    } catch (error) {
+      console.error('Mobile render error:', error);
+      return React.createElement('div', {
+        style: {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: '#ff00ff',
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          fontSize: '18px'
+        }
+      }, 'MOBILE ERROR CAUGHT');
+    }
   }
   
   // Desktop layout
