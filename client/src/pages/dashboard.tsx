@@ -1,4 +1,4 @@
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "@/App";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -13,7 +13,63 @@ const Dashboard = () => {
   useDocumentTitle("Dashboard | BeautyBook");
   const { user } = useContext(AuthContext);
   const { isOpen: sidebarOpen } = useSidebar();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
+  // Mobile layout
+  if (isMobile) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <Header />
+        
+        <main className="bg-gray-50 dark:bg-gray-900 p-3">
+          <div className="w-full">
+            {/* Page Heading */}
+            <div className="mb-4">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                Welcome back{user?.firstName ? `, ${user.firstName}` : ""}! Here's what's happening with your business today.
+              </p>
+            </div>
+            
+            {/* Stats Overview */}
+            <div className="mb-6">
+              <StatsOverview />
+            </div>
+            
+            {/* Dashboard Content */}
+            <div className="space-y-6">
+              {/* Appointments Table */}
+              <div className="w-full">
+                <AppointmentsTable />
+              </div>
+              
+              {/* Quick Actions & Notifications */}
+              <div className="space-y-6">
+                <div>
+                  <QuickActions />
+                </div>
+                <div>
+                  <RecentNotifications />
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+  
+  // Desktop layout
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
