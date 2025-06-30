@@ -35,6 +35,8 @@ function shouldSendEmail(rule: AutomationRule, client: any): boolean {
       return client.emailAccountManagement === true;
     case 'follow_up':
       return client.emailPromotions === true;
+    case 'after_payment':
+      return client.emailPromotions === true;
     default:
       return true;
   }
@@ -56,6 +58,8 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
     case 'cancellation':
       return client.smsAccountManagement === true;
     case 'follow_up':
+      return client.smsPromotions === true;
+    case 'after_payment':
       return client.smsPromotions === true;
     default:
       return true;

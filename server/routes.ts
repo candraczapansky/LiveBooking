@@ -1570,7 +1570,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
       // Trigger custom automations for checkout completion
       try {
-        await triggerCustomAutomation(appointment, storage, 'after payment');
+        await triggerAfterPayment(appointment, storage);
         await triggerCustomAutomation(appointment, storage, 'checkout completion');
         await triggerCustomAutomation(appointment, storage, 'service checkout');
         console.log('Checkout automation triggers executed successfully');
@@ -1682,7 +1682,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
       // Trigger custom automations for checkout completion
       try {
-        await triggerCustomAutomation(appointment, storage, 'after payment');
+        await triggerAfterPayment(appointment, storage);
         await triggerCustomAutomation(appointment, storage, 'checkout completion');
         await triggerCustomAutomation(appointment, storage, 'service checkout');
         console.log('Checkout automation triggers executed successfully');
@@ -2195,7 +2195,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
         // Trigger custom automations for checkout completion
         try {
-          await triggerCustomAutomation(appointment, storage, 'after payment');
+          await triggerAfterPayment(appointment, storage);
           await triggerCustomAutomation(appointment, storage, 'checkout completion');
           await triggerCustomAutomation(appointment, storage, 'service checkout');
           console.log('Checkout automation triggers executed successfully');
@@ -2253,7 +2253,7 @@ If you didn't request this password reset, please ignore this email and your pas
 
         // Trigger custom automations for checkout completion
         try {
-          await triggerCustomAutomation(appointment, storage, 'after payment');
+          await triggerAfterPayment(appointment, storage);
           await triggerCustomAutomation(appointment, storage, 'checkout completion');
           await triggerCustomAutomation(appointment, storage, 'service checkout');
           console.log('Checkout automation triggers executed successfully');
