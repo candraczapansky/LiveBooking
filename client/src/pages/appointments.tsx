@@ -398,9 +398,21 @@ const AppointmentsPage = () => {
     setDragOverTimeSlot(null);
   };
 
+  // Stable staff column mapping using memoization to prevent re-ordering
+  const staffColumnMap = useMemo(() => {
+    if (!staff) return new Map();
+    
+    const columnMap = new Map();
+    staff.forEach((staffMember: any, index: number) => {
+      columnMap.set(staffMember.id, index);
+    });
+    
+    return columnMap;
+  }, [staff]);
+
   // Memoized appointment positioning to prevent recalculations during re-renders
   const appointmentPositions = useMemo(() => {
-    if (!appointments || !services) return new Map();
+    if (!appointments || !services || !staff) return new Map();
     
     const positionMap = new Map();
     
@@ -414,7 +426,12 @@ const AppointmentsPage = () => {
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
-        positionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
+        positionMap.set(appointment.id, { 
+          top: '0px', 
+          height: '0px', 
+          display: 'none',
+          columnIndex: -1 
+        });
         return;
       }
       
@@ -430,25 +447,26 @@ const AppointmentsPage = () => {
       const slotsNeeded = Math.ceil(serviceDuration / 15);
       const calculatedHeight = slotsNeeded * slotHeight;
       
+      // Get stable column index using staff ID
+      const columnIndex = staffColumnMap.get(appointment.staffId) ?? -1;
+      
       positionMap.set(appointment.id, {
         top: `${topPosition}px`,
-        height: `${calculatedHeight}px`
+        height: `${calculatedHeight}px`,
+        columnIndex: columnIndex
       });
     });
     
     return positionMap;
-  }, [appointments, services, zoomLevel]);
+  }, [appointments, services, staff, zoomLevel, staffColumnMap]);
 
   const getAppointmentStyle = (appointment: any) => {
-    return appointmentPositions.get(appointment.id) || { top: '0px', height: '0px', display: 'none' };
+    const position = appointmentPositions.get(appointment.id);
+    return position ? { top: position.top, height: position.height } : { top: '0px', height: '0px', display: 'none' };
   };
 
-  const getStaffColumn = (staffName: string) => {
-    if (!staff) return -1;
-    return staff.findIndex((staffMember: any) => {
-      const fullName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-      return fullName === staffName;
-    });
+  const getStaffColumn = (staffId: number) => {
+    return staffColumnMap.get(staffId) ?? -1;
   };
 
   const handleAddAppointment = (timeSlot?: string) => {
@@ -689,10 +707,15 @@ const AppointmentsPage = () => {
                 hour12: true
               });
 
-              // Find staff member and get column
+              // Get positioning data from memoized cache for stable rendering
+              const positionData = appointmentPositions.get(appointment.id);
+              if (!positionData || positionData.columnIndex === -1) return null;
+              
+              const columnIndex = positionData.columnIndex;
+              
+              // Find staff member for display
               const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-              const columnIndex = getStaffColumn(staffName);
               
               // Find service information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
@@ -701,8 +724,6 @@ const AppointmentsPage = () => {
               // Find client information
               const client = users?.find((u: any) => u.id === appointment.clientId);
               const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
-              
-              if (columnIndex === -1) return null;
 
               const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
