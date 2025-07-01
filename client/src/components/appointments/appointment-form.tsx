@@ -64,6 +64,7 @@ interface AppointmentFormProps {
   onOpenChange: (open: boolean) => void;
   appointmentId: number | null;
   selectedDate?: Date;
+  selectedTime?: string;
 }
 
 const generateTimeSlots = () => {
@@ -88,7 +89,7 @@ const generateTimeSlots = () => {
 
 const allTimeSlots = generateTimeSlots();
 
-const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: AppointmentFormProps) => {
+const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const { toast } = useToast();
@@ -102,7 +103,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       serviceId: "",
       clientId: "",
       date: selectedDate || new Date(),
-      time: "10:00",
+      time: selectedTime || "10:00",
       notes: "",
     },
   });

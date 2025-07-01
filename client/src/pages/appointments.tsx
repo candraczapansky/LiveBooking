@@ -62,6 +62,7 @@ const AppointmentsPage = () => {
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
   const [hoverInfo, setHoverInfo] = useState({ visible: false, time: '', x: 0, y: 0 });
+  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
 
   // Calculate time from position in calendar
   const calculateTimeFromPosition = (y: number, timeSlotHeight: number) => {
@@ -436,8 +437,23 @@ const AppointmentsPage = () => {
     });
   };
 
-  const handleAddAppointment = () => {
+  const handleAddAppointment = (timeSlot?: string) => {
     setSelectedAppointmentId(null);
+    
+    // Convert time slot format to match appointment form format
+    if (timeSlot) {
+      const [timeStr, period] = timeSlot.split(' ');
+      const [hours, minutes] = timeStr.split(':');
+      let hour = parseInt(hours);
+      if (period === 'PM' && hour !== 12) hour += 12;
+      if (period === 'AM' && hour === 12) hour = 0;
+      
+      const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes}`;
+      setSelectedTime(formattedTime);
+    } else {
+      setSelectedTime(undefined);
+    }
+    
     setIsFormOpen(true);
   };
 
