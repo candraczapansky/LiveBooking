@@ -2761,6 +2761,7 @@ If you didn't request this password reset, please ignore this email and your pas
         await storage.createPayment({
           clientId: appointment.clientId,
           amount: service?.price || Number(appointment.totalAmount || 0),
+          totalAmount: service?.price || Number(appointment.totalAmount || 0),
           method: 'cash',
           status: 'completed',
           appointmentId: appointmentId,
@@ -2819,6 +2820,7 @@ If you didn't request this password reset, please ignore this email and your pas
         await storage.createPayment({
           clientId: appointment.clientId,
           amount: Number(response.payment?.amountMoney?.amount || 0) / 100, // Convert back from cents
+          totalAmount: Number(response.payment?.amountMoney?.amount || 0) / 100,
           method: 'card',
           status: 'completed',
           appointmentId: appointmentId,
@@ -3786,6 +3788,7 @@ If you didn't request this password reset, please ignore this email and your pas
         paymentRecord = await storage.createPayment({
           clientId: clientId || 1, // Default client for POS sales if none selected
           amount: total,
+          totalAmount: total,
           method: paymentMethod === 'card' ? 'card' : 'cash',
           status: 'completed',
           type: 'pos_payment',

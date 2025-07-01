@@ -157,6 +157,8 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         // Process payment with Square
         const paymentData = await apiRequest("POST", "/api/create-payment", {
           amount: appointment.amount,
+          tipAmount: tipAmount,
+          totalAmount: totalAmount,
           sourceId: nonce,
           type: "appointment_payment",
           appointmentId: appointment.id,
