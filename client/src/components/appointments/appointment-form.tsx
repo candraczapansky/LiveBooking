@@ -113,6 +113,8 @@ const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => 
   return slotMinutes >= startMinutes && slotMinutes < endMinutes;
 };
 
+
+
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -153,6 +155,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // Fetch staff schedules for time slot filtering
   const { data: schedules = [] } = useQuery({
     queryKey: ['/api/schedules'],
+    enabled: open,
+  });
+
+  // Fetch existing appointments to check for conflicts
+  const { data: existingAppointments = [] } = useQuery({
+    queryKey: ['/api/appointments'],
     enabled: open,
   });
   
@@ -198,7 +206,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   
   const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
 
-  // Filter available time slots based on staff schedule
+
+
+  // Filter available time slots based on staff schedule and existing appointments
   const getAvailableTimeSlots = () => {
     if (!selectedStaffId || !selectedFormDate) {
       return allTimeSlots; // Show all slots if no staff selected
@@ -220,11 +230,49 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return []; // No schedule = no available slots
     }
 
-    // Filter time slots to only include those within scheduled hours
+    // Filter time slots to only include those within scheduled hours and without conflicts
     return allTimeSlots.filter(slot => {
-      return staffSchedules.some((schedule: any) => 
+      // Check if time is within staff schedule
+      const isWithinSchedule = staffSchedules.some((schedule: any) => 
         isTimeInRange(slot.value, schedule.startTime, schedule.endTime)
       );
+      
+      if (!isWithinSchedule) return false;
+      
+      // Check if there's no appointment conflict
+      if (!selectedService) return true; // If no service selected, allow the slot
+      
+      // Create start and end times for the potential appointment
+      const [hours, minutes] = slot.value.split(':').map(Number);
+      const appointmentStart = new Date(selectedFormDate);
+      appointmentStart.setHours(hours, minutes, 0, 0);
+      
+      // Calculate appointment end time including buffer
+      const totalDuration = selectedService.duration + 
+                           (selectedService.bufferTimeBefore || 0) + 
+                           (selectedService.bufferTimeAfter || 0);
+      const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+      
+      // Check for conflicts with existing appointments
+      const hasConflict = existingAppointments.some((appointment: any) => {
+        // Skip the current appointment if editing
+        if (appointmentId && appointment.id === appointmentId) {
+          return false;
+        }
+        
+        // Only check appointments for the same staff member
+        if (appointment.staffId !== parseInt(selectedStaffId)) {
+          return false;
+        }
+        
+        const existingStart = new Date(appointment.startTime);
+        const existingEnd = new Date(appointment.endTime);
+        
+        // Check if appointment times overlap
+        return (appointmentStart < existingEnd && appointmentEnd > existingStart);
+      });
+      
+      return !hasConflict;
     });
   };
 
