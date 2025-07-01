@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import AppointmentCheckout from "@/components/appointments/appointment-checkout"
 import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { memo } from "react";
 
 // Force re-render when theme changes
 const forceDropdownRerender = () => {
@@ -43,6 +44,95 @@ const timeSlots = [
   "9:00 PM", "9:15 PM", "9:30 PM", "9:45 PM",
   "10:00 PM"
 ];
+
+// Memoized appointment component to prevent unnecessary re-renders
+const AppointmentBlock = memo(({ 
+  appointment, 
+  appointmentStyle, 
+  columnIndex, 
+  columnWidth, 
+  service, 
+  client, 
+  staff,
+  onAppointmentClick,
+  draggedAppointment,
+  onDragStart,
+  onDragEnd 
+}: any) => {
+  const startTime = new Date(appointment.startTime);
+  const timeString = startTime.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true
+  });
+
+  const isPaid = appointment.paymentStatus === 'paid';
+  const serviceColor = appointment.service?.color || service?.color || '#6b7280';
+  const backgroundColor = serviceColor;
+  const borderColor = serviceColor;
+  
+  const isServiceColorLight = (color: string) => {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return brightness > 155;
+  };
+
+  const serviceName = service?.name || 'Service';
+  const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
+  const duration = service?.duration || 60;
+
+  return (
+    <div
+      key={appointment.id}
+      draggable
+      onDragStart={(e) => onDragStart(e, appointment)}
+      onDragEnd={onDragEnd}
+      onClick={(e) => {
+        e.stopPropagation();
+        onAppointmentClick(appointment.id);
+      }}
+      className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-150 cursor-pointer hover:scale-[1.02] group relative"
+      style={{
+        left: `${80 + (columnIndex * columnWidth) + 4}px`,
+        width: `${columnWidth - 8}px`,
+        ...appointmentStyle,
+        backgroundColor: backgroundColor,
+        borderLeftColor: borderColor,
+        color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
+        opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
+      }}
+    >
+      {isPaid && (
+        <div className="absolute top-1 right-1 bg-white/20 text-white px-1 py-0.5 rounded text-xs font-medium">
+          PAID
+        </div>
+      )}
+      <div className="text-xs font-medium leading-tight mb-1" title={serviceName}>
+        {serviceName}
+      </div>
+      <div className="text-xs opacity-90 leading-tight mb-1" title={clientName}>
+        {clientName}
+      </div>
+      <div className="text-xs opacity-75 leading-tight" title={`${timeString} • ${duration} min`}>
+        {timeString} • {duration} min
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Only re-render if the appointment data actually changed
+  return (
+    prevProps.appointment.id === nextProps.appointment.id &&
+    prevProps.appointment.startTime === nextProps.appointment.startTime &&
+    prevProps.appointment.paymentStatus === nextProps.appointment.paymentStatus &&
+    prevProps.appointmentStyle.top === nextProps.appointmentStyle.top &&
+    prevProps.appointmentStyle.height === nextProps.appointmentStyle.height &&
+    prevProps.columnIndex === nextProps.columnIndex &&
+    prevProps.columnWidth === nextProps.columnWidth
+  );
+});
 
 const AppointmentsPage = () => {
   useDocumentTitle("Appointments | Glo Head Spa");
@@ -793,66 +883,28 @@ const AppointmentsPage = () => {
               
               // Find service information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const serviceName = service?.name || 'Service';
               
               // Find client information
               const client = users?.find((u: any) => u.id === appointment.clientId);
-              const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
-              
-
-
-              // Always use service colors, regardless of payment status
-              const isPaid = appointment.paymentStatus === 'paid';
-              const serviceColor = appointment.service?.color || '#6b7280';
-              const backgroundColor = serviceColor; // Always use service color
-              const borderColor = serviceColor; // Always use service color for border
-              
-              const isServiceColorLight = (color: string) => {
-                const hex = color.replace('#', '');
-                const r = parseInt(hex.substr(0, 2), 16);
-                const g = parseInt(hex.substr(2, 2), 16);
-                const b = parseInt(hex.substr(4, 2), 16);
-                const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-                return brightness > 155;
-              };
 
               return (
-                <div
+                <AppointmentBlock
                   key={appointment.id}
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, appointment)}
-                  onDragEnd={handleDragEnd}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedAppointmentId(appointment.id);
+                  appointment={appointment}
+                  appointmentStyle={appointmentStyle}
+                  columnIndex={columnIndex}
+                  columnWidth={columnWidth}
+                  service={service}
+                  client={client}
+                  staff={staffMember}
+                  onAppointmentClick={(id: number) => {
+                    setSelectedAppointmentId(id);
                     setIsFormOpen(true);
                   }}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-150 cursor-pointer hover:scale-[1.02] group relative"
-                  style={{
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
-                    width: `${columnWidth - 8}px`,
-                    ...appointmentStyle,
-                    backgroundColor: backgroundColor,
-                    borderLeftColor: borderColor,
-                    color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
-                    opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
-                  }}
-                >
-                  {isPaid && (
-                    <div className="absolute top-1 right-1 bg-white/20 text-white px-1 py-0.5 rounded text-xs font-medium">
-                      PAID
-                    </div>
-                  )}
-                  <div className="text-xs font-medium leading-tight mb-1" title={serviceName}>
-                    {serviceName}
-                  </div>
-                  <div className="text-xs opacity-90 leading-tight mb-1" title={clientName}>
-                    {clientName}
-                  </div>
-                  <div className="text-xs opacity-75 leading-tight" title={`${timeString} • ${duration} min`}>
-                    {timeString} • {duration} min
-                  </div>
-                </div>
+                  draggedAppointment={draggedAppointment}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                />
               );
             })}
           </div>
