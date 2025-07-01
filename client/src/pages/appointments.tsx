@@ -743,6 +743,16 @@ const AppointmentsPage = () => {
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
               const columnIndex = getStaffColumn(staffName);
               
+              // Debug staff column assignment for appointments that are moving
+              if (appointment.id >= 100) {
+                console.log(`[COLUMN DEBUG] Appointment ${appointment.id}:`, {
+                  staffId: appointment.staffId,
+                  staffName,
+                  columnIndex,
+                  totalStaffCount: staff?.length
+                });
+              }
+              
               if (columnIndex === -1) return null;
 
               const appointmentStyle = getAppointmentStyle(appointment);
