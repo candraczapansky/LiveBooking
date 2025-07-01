@@ -367,8 +367,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
       const [hours, minutes] = values.time.split(':').map(Number);
-      const startTime = new Date(values.date);
-      startTime.setHours(hours, minutes, 0, 0);
+      
+      // Create the date in local timezone to avoid UTC conversion issues
+      const year = values.date.getFullYear();
+      const month = values.date.getMonth();
+      const day = values.date.getDate();
+      
+      // Create startTime in local timezone
+      const startTime = new Date(year, month, day, hours, minutes, 0, 0);
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
@@ -378,6 +384,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                            (selectedServiceData?.bufferTimeAfter || 0);
       
       const endTime = addMinutes(startTime, totalDuration);
+
+      console.log('Creating appointment with local time:', {
+        selectedTime: values.time,
+        localStartTime: startTime,
+        localStartTimeString: startTime.toLocaleString(),
+        isoString: startTime.toISOString()
+      });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
@@ -432,8 +445,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       }
 
       const [hours, minutes] = values.time.split(':').map(Number);
-      const startTime = new Date(values.date);
-      startTime.setHours(hours, minutes, 0, 0);
+      
+      // Create the date in local timezone to avoid UTC conversion issues
+      const year = values.date.getFullYear();
+      const month = values.date.getMonth();
+      const day = values.date.getDate();
+      
+      // Create startTime in local timezone
+      const startTime = new Date(year, month, day, hours, minutes, 0, 0);
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
@@ -443,6 +462,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                            (selectedServiceData?.bufferTimeAfter || 0);
       
       const endTime = addMinutes(startTime, totalDuration);
+
+      console.log('Updating appointment with local time:', {
+        selectedTime: values.time,
+        localStartTime: startTime,
+        localStartTimeString: startTime.toLocaleString(),
+        isoString: startTime.toISOString()
+      });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
