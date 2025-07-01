@@ -395,6 +395,19 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
 
   return (
     <div className="space-y-6">
+      {/* Detailed Payroll View - Moved to Top for Visibility */}
+      {detailStaffId && (
+        <DetailedPayrollView 
+          staffId={detailStaffId}
+          month={selectedMonth}
+          onBack={() => {
+            console.log('Going back to summary view');
+            setViewMode('summary');
+            setDetailStaffId(null);
+          }}
+        />
+      )}
+
       {/* Header Controls */}
       <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
         <div>
@@ -612,18 +625,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </CardContent>
       </Card>
 
-      {/* Detailed Payroll View - Debug Always Show */}
-      {detailStaffId && (
-        <DetailedPayrollView 
-          staffId={detailStaffId}
-          month={selectedMonth}
-          onBack={() => {
-            console.log('Going back to summary view');
-            setViewMode('summary');
-            setDetailStaffId(null);
-          }}
-        />
-      )}
+
     </div>
   );
 }
