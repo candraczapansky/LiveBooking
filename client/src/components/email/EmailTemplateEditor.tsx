@@ -166,7 +166,7 @@ const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEdit
             'Salon Name': {
               name: 'Salon Name',
               value: '{{salon_name}}',
-              sample: 'BeautyBook Salon'
+              sample: 'Glo Head Spa'
             },
             'Appointment Date': {
               name: 'Appointment Date',

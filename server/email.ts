@@ -90,7 +90,7 @@ export function createAppointmentReminderEmail(
           <p><strong>Time:</strong> ${appointmentTime}</p>
         </div>
         <p>We look forward to seeing you!</p>
-        <p>Best regards,<br>BeautyBook Team</p>
+        <p>Best regards,<br>Glo Head Spa Team</p>
       </div>
     `,
     text: `Dear ${clientName}, this is a reminder about your upcoming ${serviceName} appointment on ${appointmentDate} at ${appointmentTime}.`
@@ -124,14 +124,14 @@ export function createMarketingCampaignEmail(
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #e91e63; color: white; padding: 20px; text-align: center;">
-          <h1>BeautyBook</h1>
+          <h1>Glo Head Spa</h1>
         </div>
         <div style="padding: 20px;">
           <p>Dear ${clientName},</p>
           ${content}
           <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
           <p style="font-size: 12px; color: #666;">
-            You received this email because you are a valued client of BeautyBook.
+            You received this email because you are a valued client of Glo Head Spa.
             <br><br>
             <a href="${unsubscribeLink}" style="color: #999; text-decoration: underline;">
               Unsubscribe from marketing emails
@@ -168,7 +168,7 @@ export function createAccountUpdateEmail(
           <p><strong>Details:</strong> ${details}</p>
         </div>
         <p>If you have any questions, please contact us.</p>
-        <p>Best regards,<br>BeautyBook Team</p>
+        <p>Best regards,<br>Glo Head Spa Team</p>
       </div>
     `,
     text: `Dear ${clientName}, your account has been updated. ${updateType}: ${details}`

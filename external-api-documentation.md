@@ -183,7 +183,7 @@ curl "https://your-domain.replit.app/api/external/service-categories"
 
 **Endpoint:** `POST /api/appointments/webhook`
 
-**Description:** Send new appointments to BeautyBook calendar (as previously documented).
+**Description:** Send new appointments to Glo Head Spa calendar (as previously documented).
 
 **Required Fields:**
 - `startTime` - ISO date string
