@@ -17,17 +17,17 @@ const Dashboard = () => {
   
   // Desktop layout
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+      <div className={`h-screen flex flex-col transition-all duration-300 ${
         sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-auto">
           <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
             {/* Page Heading */}
             <div className="mb-4 sm:mb-6">

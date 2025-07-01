@@ -1136,18 +1136,17 @@ const AppointmentsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 mobile-scroll">
+    <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+      <div className={`h-screen flex flex-col transition-all duration-300 ${
         sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 pb-safe-area-inset-bottom"
-              style={{ paddingBottom: "env(safe-area-inset-bottom, 24px)" }}>
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-auto">
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
