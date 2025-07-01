@@ -420,10 +420,23 @@ const AppointmentsPage = () => {
     const positionMap = new Map();
     
     appointments.forEach((appointment: any) => {
-      // Create a new Date object from the UTC timestamp
+      // Debug time conversion issue
       const appointmentTime = new Date(appointment.startTime);
       
-      // Get local time components for positioning calculation
+      if (appointment.id > 130) {
+        console.log(`[TIME DEBUG] Appointment ${appointment.id} time conversion:`, {
+          stored: appointment.startTime,
+          parsed: appointmentTime,
+          localString: appointmentTime.toLocaleString(),
+          hours: appointmentTime.getHours(),
+          minutes: appointmentTime.getMinutes(),
+          timezoneOffset: appointmentTime.getTimezoneOffset(),
+          utcHours: appointmentTime.getUTCHours(),
+          utcMinutes: appointmentTime.getUTCMinutes()
+        });
+      }
+      
+      // Get local time components for positioning calculation 
       const startHour = appointmentTime.getHours();
       const startMinute = appointmentTime.getMinutes();
       
