@@ -46,6 +46,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
+import TipSelection from "@/components/appointments/tip-selection";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -290,6 +291,7 @@ export default function PointOfSale() {
   const [lastTransaction, setLastTransaction] = useState<any>(null);
   const [manualEmail, setManualEmail] = useState("");
   const [manualPhone, setManualPhone] = useState("");
+  const [tipAmount, setTipAmount] = useState(0);
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -543,7 +545,7 @@ export default function PointOfSale() {
 
   const getSubtotal = () => getCartTotal();
   const getTax = () => getSubtotal() * TAX_RATE;
-  const getGrandTotal = () => getSubtotal() + getTax();
+  const getGrandTotal = () => getSubtotal() + getTax() + tipAmount;
 
   const getChange = () => {
     if (paymentMethod === "cash" && cashReceived) {
@@ -1353,10 +1355,36 @@ export default function PointOfSale() {
               </div>
             )}
 
-            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">Total Amount:</span>
-                <span className="text-lg font-bold">${getGrandTotal().toFixed(2)}</span>
+            {/* Tip Selection */}
+            <div className="space-y-3">
+              <h4 className="text-md font-medium">Add Tip</h4>
+              <TipSelection 
+                serviceAmount={getSubtotal() + getTax()}
+                onTipChange={setTipAmount}
+                selectedTip={tipAmount}
+              />
+            </div>
+
+            {/* Payment Summary */}
+            <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Subtotal:</span>
+                <span>${getSubtotal().toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Tax ({(TAX_RATE * 100).toFixed(1)}%):</span>
+                <span>${getTax().toFixed(2)}</span>
+              </div>
+              {tipAmount > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span>Tip:</span>
+                  <span>${tipAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <Separator />
+              <div className="flex justify-between font-semibold">
+                <span>Total:</span>
+                <span>${getGrandTotal().toFixed(2)}</span>
               </div>
             </div>
           </div>
