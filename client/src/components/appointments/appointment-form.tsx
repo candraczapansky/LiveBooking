@@ -468,6 +468,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   const updateMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
+      console.log('Update mutation function called with:', values);
+      console.log('Current appointmentId:', appointmentId);
+      
       if (!appointmentId || appointmentId <= 0) {
         throw new Error("No appointment ID provided");
       }
@@ -562,9 +565,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   });
 
   const onSubmit = (values: AppointmentFormValues) => {
+    console.log('Form submitted with values:', values);
+    console.log('Appointment ID:', appointmentId);
+    console.log('Form validation errors:', form.formState.errors);
+    console.log('Form is valid:', form.formState.isValid);
+    
     if (appointmentId && appointmentId > 0) {
+      console.log('Calling updateMutation.mutate');
       updateMutation.mutate(values);
     } else {
+      console.log('Calling createMutation.mutate');
       createMutation.mutate(values);
     }
   };
