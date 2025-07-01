@@ -53,8 +53,9 @@ const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
 
 // Square payment form component
-const PaymentForm = ({ total, onSuccess, onError }: { 
+const PaymentForm = ({ total, tipAmount, onSuccess, onError }: { 
   total: number; 
+  tipAmount: number;
   onSuccess: () => void; 
   onError: (error: string) => void; 
 }) => {
@@ -476,6 +477,7 @@ export default function PointOfSale() {
       setSelectedClient(null);
       setManualEmail("");
       setManualPhone("");
+      setTipAmount(0);
       setShowReceiptDialog(true);
     },
     onError: (error) => {
@@ -1332,6 +1334,7 @@ export default function PointOfSale() {
                 <label className="text-sm font-medium mb-2 block">Card Information</label>
                 <PaymentForm
                   total={getGrandTotal()}
+                  tipAmount={tipAmount}
                   onSuccess={() => {
                     console.log('Square payment successful, processing POS transaction...');
                     // Process transaction after successful payment
@@ -1340,6 +1343,7 @@ export default function PointOfSale() {
                       items: cart,
                       subtotal: getSubtotal(),
                       tax: getTax(),
+                      tipAmount: tipAmount,
                       total: getGrandTotal(),
                       paymentMethod: "card",
                     };
