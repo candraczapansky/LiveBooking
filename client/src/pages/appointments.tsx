@@ -839,72 +839,61 @@ const AppointmentsPage = () => {
                 String(currentDateOnly.getDate()).padStart(2, '0');
               
               return appointmentDateStr === currentDateStr;
-            }).map((appointment: any) => {
+            })
+            .sort((a: any, b: any) => {
+              // Sort by start time first, then by ID for stable positioning
+              const timeA = new Date(a.startTime).getTime();
+              const timeB = new Date(b.startTime).getTime();
+              if (timeA !== timeB) return timeA - timeB;
+              return a.id - b.id;
+            })
+            .map((appointment: any, index: number) => {
               const startTime = new Date(appointment.startTime);
               
-              // Use service duration only (not including buffer times) for visual display
-              const appointmentService = services?.find((s: any) => s.id === appointment.serviceId);
-              const duration = appointmentService?.duration || 60; // Only the actual service time
-              
-              const timeString = startTime.toLocaleTimeString('en-US', { 
-                hour: 'numeric', 
-                minute: '2-digit',
-                hour12: true
-              });
-
               // Find staff member and get column
               const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-              const columnIndex = getStaffColumn(staffName);
-              
-              // Debug staff column assignment for appointments that are moving
-              if (appointment.id >= 100) {
-                console.log(`[COLUMN DEBUG] Appointment ${appointment.id}:`, {
-                  staffId: appointment.staffId,
-                  staffName,
-                  columnIndex,
-                  totalStaffCount: staff?.length
-                });
-              }
+              const columnIndex = staff?.findIndex((s: any) => s.id === appointment.staffId) || 0;
               
               if (columnIndex === -1) return null;
 
               const appointmentStyle = getAppointmentStyle(appointment);
               
-              // Debug appointment style for recent appointments
-              if (appointment.id >= 100) {
-                console.log(`[APPOINTMENT STYLE DEBUG] Appointment ${appointment.id}:`, {
-                  appointmentStyle,
-                  startTime: appointment.startTime,
-                  timeString,
-                  expectedSlot: Math.floor(((startTime.getHours() - 8) * 60 + startTime.getMinutes()) / 15)
-                });
-              }
-              
-              // Find service information
+              // Find service and client information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
-              
-              // Find client information
               const client = users?.find((u: any) => u.id === appointment.clientId);
 
+              // Create a stable key based on appointment's immutable properties
+              const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
+              
               return (
-                <AppointmentBlock
-                  key={appointment.id}
-                  appointment={appointment}
-                  appointmentStyle={appointmentStyle}
-                  columnIndex={columnIndex}
-                  columnWidth={columnWidth}
-                  service={service}
-                  client={client}
-                  staff={staffMember}
-                  onAppointmentClick={(id: number) => {
-                    setSelectedAppointmentId(id);
-                    setIsFormOpen(true);
+                <div
+                  key={stableKey}
+                  className="absolute pointer-events-auto"
+                  style={{
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                    width: `${columnWidth - 8}px`,
+                    ...appointmentStyle,
+                    zIndex: 10
                   }}
-                  draggedAppointment={draggedAppointment}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                />
+                >
+                  <AppointmentBlock
+                    appointment={appointment}
+                    appointmentStyle={appointmentStyle}
+                    columnIndex={columnIndex}
+                    columnWidth={columnWidth}
+                    service={service}
+                    client={client}
+                    staff={staffMember}
+                    onAppointmentClick={(id: number) => {
+                      setSelectedAppointmentId(id);
+                      setIsFormOpen(true);
+                    }}
+                    draggedAppointment={draggedAppointment}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  />
+                </div>
               );
             })}
           </div>
