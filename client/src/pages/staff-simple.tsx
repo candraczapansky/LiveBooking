@@ -186,7 +186,7 @@ const StaffPageSimple = () => {
           {/* Header Section */}
           <Card className="mb-4 p-4 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">Staff Management - FIXED</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 m-0">Staff Management</h1>
               <Button 
                 onClick={handleAddStaff} 
                 className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-medium"
