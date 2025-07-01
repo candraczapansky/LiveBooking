@@ -8,6 +8,7 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentForm from "@/components/appointments/appointment-form";
 import AppointmentCheckout from "@/components/appointments/appointment-checkout";
+import SimpleCalendar from "@/components/calendar/simple-calendar";
 import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1517,14 +1518,17 @@ const AppointmentsPage = () => {
                 </div>
               </div>
             </div>
-            {/* Calendar Views */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
-              <div className="overflow-x-auto">
-                {viewMode === 'day' && renderDayView()}
-                {viewMode === 'week' && renderWeekView()}
-                {viewMode === 'month' && renderMonthView()}
-              </div>
-            </div>
+            {/* Simple Calendar */}
+            <SimpleCalendar
+              appointments={appointments || []}
+              staff={staff || []}
+              users={users || []}
+              services={services || []}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              onAppointmentClick={handleAppointmentClick}
+              onAddAppointment={handleAddAppointment}
+            />
           </div>
         </main>
       </div>
