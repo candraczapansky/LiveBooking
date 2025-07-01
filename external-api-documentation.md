@@ -1,10 +1,10 @@
-# BeautyBook External API Documentation
+# Glo Head Spa External API Documentation
 
-This document provides comprehensive information about BeautyBook's external APIs for frontend app integration.
+This document provides comprehensive information about Glo Head Spa's external APIs for frontend app integration.
 
 ## Base URL
 ```
-https://your-beautybook-domain.replit.app
+https://your-glo-head-spa-domain.replit.app
 ```
 
 ## Authentication
@@ -220,7 +220,7 @@ async function getServiceCategories() {
   return data.data; // Array of categories
 }
 
-// Send appointment to BeautyBook
+// Send appointment to Glo Head Spa
 async function sendAppointment(appointmentData) {
   const response = await fetch('https://your-domain.replit.app/api/appointments/webhook', {
     method: 'POST',
@@ -297,4 +297,4 @@ Common HTTP status codes:
 
 ## Support
 
-For questions or issues with the external APIs, please check the server console logs or contact the BeautyBook development team.
+For questions or issues with the external APIs, please check the server console logs or contact the Glo Head Spa development team.

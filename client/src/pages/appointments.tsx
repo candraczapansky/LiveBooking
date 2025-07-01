@@ -45,7 +45,7 @@ const timeSlots = [
 ];
 
 const AppointmentsPage = () => {
-  useDocumentTitle("Appointments | BeautyBook");
+  useDocumentTitle("Appointments | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();

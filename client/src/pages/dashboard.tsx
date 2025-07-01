@@ -10,7 +10,7 @@ import RecentNotifications from "@/components/dashboard/notifications";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const Dashboard = () => {
-  useDocumentTitle("Dashboard | BeautyBook");
+  useDocumentTitle("Dashboard | Glo Head Spa");
   const { user } = useContext(AuthContext);
   const { isOpen: sidebarOpen } = useSidebar();
 

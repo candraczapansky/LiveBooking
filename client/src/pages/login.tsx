@@ -155,7 +155,7 @@ const Login = () => {
               <Scissors className="h-10 w-10 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold mb-2">BeautyBook</CardTitle>
+          <CardTitle className="text-3xl font-bold mb-2">Glo Head Spa</CardTitle>
           <CardDescription className="text-base text-gray-600 dark:text-gray-400">
             Salon & Spa Management Platform
           </CardDescription>
