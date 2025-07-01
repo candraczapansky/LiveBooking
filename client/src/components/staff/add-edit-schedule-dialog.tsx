@@ -52,9 +52,10 @@ interface AddEditScheduleDialogProps {
   onOpenChange: (open: boolean) => void;
   schedule?: any;
   defaultStaffId?: number;
+  onSuccess?: () => void;
 }
 
-export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId }: AddEditScheduleDialogProps) {
+export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId, onSuccess }: AddEditScheduleDialogProps) {
   const queryClient = useQueryClient();
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const { toast } = useToast();
@@ -122,10 +123,19 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       return result;
     },
     onSuccess: () => {
-      // Force refresh all schedule data
+      // Force refresh all schedule data with multiple strategies
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+      
+      // Force immediate refetch to update UI
       queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+      
+      // Additional cache clearing for any potential related queries
+      queryClient.removeQueries({ queryKey: ['/api/schedules'] });
+      
+      // Call parent callback for additional refresh
+      onSuccess?.();
+      
       toast({
         title: "Success",
         description: "Schedule updated successfully.",

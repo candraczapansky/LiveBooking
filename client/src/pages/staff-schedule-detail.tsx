@@ -28,6 +28,8 @@ export default function StaffScheduleDetailPage() {
   // Fetch schedules for this staff member
   const { data: allSchedules = [], isLoading } = useQuery({
     queryKey: ['/api/schedules'],
+    staleTime: 0, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
@@ -210,6 +212,15 @@ export default function StaffScheduleDetailPage() {
         onOpenChange={setIsDialogOpen}
         schedule={editingSchedule}
         defaultStaffId={staffId}
+        onSuccess={() => {
+          console.log("Parent component forcing schedule refresh after edit");
+          // Force immediate refresh of schedule data with small delay
+          setTimeout(() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+            queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+            console.log("Schedule data refresh triggered from parent");
+          }, 100);
+        }}
       />
     </div>
   );
