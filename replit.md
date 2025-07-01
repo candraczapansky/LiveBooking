@@ -33,15 +33,20 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Enhanced appointment creation workflow with precise time selection from calendar clicks
   - Time conversion logic properly handles 12/24 hour format between calendar and form
 
-- **Implemented staff schedule-based time filtering for appointment booking:**
+- **Implemented complete appointment availability filtering system:**
   - Added comprehensive schedule checking logic to prevent appointments when staff is not scheduled
   - Integrated staff schedule fetching into AppointmentForm component
   - Created intelligent time slot filtering based on staff member's working hours
-  - Only displays time slots that fall within the staff member's scheduled hours for the selected day
+  - **Enhanced with appointment conflict detection to show only truly available slots:**
+    - System now checks existing appointments for the selected staff member and date
+    - Filters out time slots that would conflict with existing bookings
+    - Considers service duration and buffer times when checking for conflicts
+    - Only displays time slots that are both within staff schedule AND available for booking
+    - Prevents double-booking by showing only genuinely open appointment slots
   - Shows "No available time slots" message when staff member is not scheduled for the selected day
   - Automatically clears invalid time selections when staff or date changes
-  - Enhanced user experience by preventing invalid appointment bookings upfront
-  - Ensures appointments can only be created during staff members' actual working hours
+  - Enhanced user experience by preventing invalid appointment bookings and conflicts upfront
+  - Ensures appointments can only be created during staff members' actual working hours when they're truly available
 
 ### July 1, 2025 - Complete Application Rebranding to "Glo Head Spa" and External API System Implementation
 
