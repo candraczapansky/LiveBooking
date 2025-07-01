@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -398,21 +398,24 @@ const AppointmentsPage = () => {
     setDragOverTimeSlot(null);
   };
 
-  // Stable staff column mapping using memoization to prevent re-ordering
-  const staffColumnMap = useMemo(() => {
-    if (!staff) return new Map();
-    
-    const columnMap = new Map();
-    staff.forEach((staffMember: any, index: number) => {
-      columnMap.set(staffMember.id, index);
-    });
-    
-    return columnMap;
+  // Create stable staff column mapping that doesn't change on re-renders
+  const getStaffColumn = useMemo(() => {
+    return (staffName: string) => {
+      if (!staff) return -1;
+      
+      // Sort staff by ID to ensure consistent ordering
+      const sortedStaff = [...staff].sort((a: any, b: any) => a.id - b.id);
+      
+      return sortedStaff.findIndex((staffMember: any) => {
+        const fullName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+        return fullName === staffName;
+      });
+    };
   }, [staff]);
 
   // Memoized appointment positioning to prevent recalculations during re-renders
   const appointmentPositions = useMemo(() => {
-    if (!appointments || !services || !staff) return new Map();
+    if (!appointments || !services) return new Map();
     
     const positionMap = new Map();
     
@@ -426,12 +429,7 @@ const AppointmentsPage = () => {
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
-        positionMap.set(appointment.id, { 
-          top: '0px', 
-          height: '0px', 
-          display: 'none',
-          columnIndex: -1 
-        });
+        positionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
         return;
       }
       
@@ -447,27 +445,20 @@ const AppointmentsPage = () => {
       const slotsNeeded = Math.ceil(serviceDuration / 15);
       const calculatedHeight = slotsNeeded * slotHeight;
       
-      // Get stable column index using staff ID
-      const columnIndex = staffColumnMap.get(appointment.staffId) ?? -1;
-      
       positionMap.set(appointment.id, {
         top: `${topPosition}px`,
-        height: `${calculatedHeight}px`,
-        columnIndex: columnIndex
+        height: `${calculatedHeight}px`
       });
     });
     
     return positionMap;
-  }, [appointments, services, staff, zoomLevel, staffColumnMap]);
+  }, [appointments, services, zoomLevel]);
 
   const getAppointmentStyle = (appointment: any) => {
-    const position = appointmentPositions.get(appointment.id);
-    return position ? { top: position.top, height: position.height } : { top: '0px', height: '0px', display: 'none' };
+    return appointmentPositions.get(appointment.id) || { top: '0px', height: '0px', display: 'none' };
   };
 
-  const getStaffColumn = (staffId: number) => {
-    return staffColumnMap.get(staffId) ?? -1;
-  };
+
 
   const handleAddAppointment = (timeSlot?: string) => {
     setSelectedAppointmentId(null);
@@ -707,15 +698,15 @@ const AppointmentsPage = () => {
                 hour12: true
               });
 
-              // Get positioning data from memoized cache for stable rendering
-              const positionData = appointmentPositions.get(appointment.id);
-              if (!positionData || positionData.columnIndex === -1) return null;
-              
-              const columnIndex = positionData.columnIndex;
-              
-              // Find staff member for display
+              // Find staff member and get column
               const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
+              const columnIndex = getStaffColumn(staffName);
+              
+              if (columnIndex === -1) return null;
+
+              const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
+              const appointmentStyle = getAppointmentStyle(appointment);
               
               // Find service information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
@@ -724,9 +715,6 @@ const AppointmentsPage = () => {
               // Find client information
               const client = users?.find((u: any) => u.id === appointment.clientId);
               const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
-
-              const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
-              const appointmentStyle = getAppointmentStyle(appointment);
               
 
 
