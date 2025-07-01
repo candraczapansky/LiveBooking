@@ -571,6 +571,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     },
   });
 
+  // Debug appointmentId changes
+  useEffect(() => {
+    console.log('AppointmentForm appointmentId changed:', appointmentId);
+  }, [appointmentId]);
+
   const onSubmit = (values: AppointmentFormValues) => {
     console.log('Form submitted with values:', values);
     console.log('Appointment ID:', appointmentId);
