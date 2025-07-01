@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2, ArrowLeft, Eye } from "lucide-react";
+import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2, ArrowLeft, Eye, Download } from "lucide-react";
 import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -263,6 +263,74 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     };
   }, [filteredPayrollData]);
 
+  // Export payroll data to CSV
+  const handleExportReport = () => {
+    try {
+      // Create CSV headers
+      const headers = [
+        'Staff Name',
+        'Title',
+        'Commission Type',
+        'Base Rate',
+        'Total Services',
+        'Total Revenue',
+        'Total Commission',
+        'Total Hours',
+        'Hourly Wage',
+        'Total Hourly Pay',
+        'Total Earnings'
+      ];
+      
+      // Create CSV rows
+      const csvData = filteredPayrollData.map(data => [
+        data.staffName,
+        data.title,
+        data.commissionType,
+        data.baseCommissionRate,
+        data.totalServices,
+        data.totalRevenue.toFixed(2),
+        data.totalCommission.toFixed(2),
+        data.totalHours,
+        data.hourlyWage.toFixed(2),
+        data.totalHourlyPay.toFixed(2),
+        data.totalEarnings.toFixed(2)
+      ]);
+      
+      // Combine headers and data
+      const csvContent = [headers, ...csvData]
+        .map(row => row.map(cell => `"${cell}"`).join(','))
+        .join('\n');
+      
+      // Create and download file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      const monthYear = format(selectedMonth, 'MMMM-yyyy');
+      const staffFilter = selectedStaff === 'all' ? 'All-Staff' : 
+        filteredPayrollData.find(d => d.staffId.toString() === selectedStaff)?.staffName?.replace(/\s+/g, '-') || 'Unknown';
+      
+      link.setAttribute('download', `Payroll-Report-${monthYear}-${staffFilter}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Export Successful",
+        description: `Payroll report exported as CSV file`,
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while exporting the report.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Sync payroll data to external system
   const handlePayrollSync = async (staffId: number) => {
     setSyncing(staffId);
@@ -426,6 +494,15 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </div>
         
         <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportReport}
+            className="flex items-center space-x-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export Report</span>
+          </Button>
           <Button
             variant="outline"
             size="sm"
