@@ -399,20 +399,10 @@ const AppointmentsPage = () => {
   };
 
   const getAppointmentStyle = (appointment: any) => {
-    const startTime = new Date(appointment.startTime);
-    
-    // Use UTC time components and convert to local time properly
-    // This ensures consistency with how appointments are created
+    // Parse the UTC time string to ensure proper timezone handling
     const utcTime = new Date(appointment.startTime);
-    console.log('Appointment positioning debug:', {
-      appointmentId: appointment.id,
-      originalStartTime: appointment.startTime,
-      utcTime: utcTime.toISOString(),
-      localTime: utcTime.toLocaleString(),
-      getHours: utcTime.getHours(),
-      getMinutes: utcTime.getMinutes()
-    });
     
+    // Get local time components - this should match the timezone used when creating appointments
     const startHour = utcTime.getHours();
     const startMinute = utcTime.getMinutes();
     
@@ -426,14 +416,6 @@ const AppointmentsPage = () => {
     const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
     const slotHeight = 30 * zoomLevel;
     const topPosition = (totalMinutesFromStart / 15) * slotHeight;
-    
-    console.log('Position calculation:', {
-      startHour,
-      startMinute,
-      totalMinutesFromStart,
-      slotHeight,
-      topPosition
-    });
     
     // Use service duration only (not including buffer times) for visual display
     const service = services?.find((s: any) => s.id === appointment.serviceId);
