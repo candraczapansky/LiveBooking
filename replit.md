@@ -33,6 +33,16 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Enhanced appointment creation workflow with precise time selection from calendar clicks
   - Time conversion logic properly handles 12/24 hour format between calendar and form
 
+- **Implemented staff schedule-based time filtering for appointment booking:**
+  - Added comprehensive schedule checking logic to prevent appointments when staff is not scheduled
+  - Integrated staff schedule fetching into AppointmentForm component
+  - Created intelligent time slot filtering based on staff member's working hours
+  - Only displays time slots that fall within the staff member's scheduled hours for the selected day
+  - Shows "No available time slots" message when staff member is not scheduled for the selected day
+  - Automatically clears invalid time selections when staff or date changes
+  - Enhanced user experience by preventing invalid appointment bookings upfront
+  - Ensures appointments can only be created during staff members' actual working hours
+
 ### July 1, 2025 - Complete Application Rebranding to "Glo Head Spa" and External API System Implementation
 
 - **Successfully completed comprehensive rebranding from "BeautyBook" to "Glo Head Spa":**
