@@ -1576,6 +1576,45 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
   
+  // Auto-renewal management routes
+  app.post("/api/auto-renewal/manual-check", async (req, res) => {
+    try {
+      if (!autoRenewalService) {
+        return res.status(503).json({ error: "Auto-renewal service not available" });
+      }
+      
+      const result = await autoRenewalService.manualRenewalCheck();
+      res.json({ 
+        message: "Manual renewal check completed",
+        ...result
+      });
+    } catch (error: any) {
+      console.error('Error during manual renewal check:', error);
+      res.status(500).json({ error: "Error processing renewals: " + error.message });
+    }
+  });
+
+  app.patch("/api/client-memberships/:id/auto-renewal", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const { autoRenew, renewalDate, paymentMethodId } = req.body;
+    
+    try {
+      const updatedMembership = await storage.updateClientMembership(id, {
+        autoRenew: Boolean(autoRenew),
+        renewalDate: renewalDate ? parseInt(renewalDate) : null,
+        paymentMethodId: paymentMethodId || null
+      });
+      
+      res.json({
+        message: autoRenew ? "Auto-renewal enabled" : "Auto-renewal disabled",
+        membership: updatedMembership
+      });
+    } catch (error: any) {
+      console.error('Error updating auto-renewal settings:', error);
+      res.status(500).json({ error: "Error updating auto-renewal settings: " + error.message });
+    }
+  });
+  
   // Payments routes
   app.post("/api/payments", validateBody(insertPaymentSchema), async (req, res) => {
     const newPayment = await storage.createPayment(req.body);

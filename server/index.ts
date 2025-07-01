@@ -3,6 +3,8 @@ import { config } from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { PgStorage } from "./storage";
+import { AutoRenewalService } from "./auto-renewal-service";
+import { Client, Environment } from "square";
 
 // Load environment variables
 config();
