@@ -42,6 +42,7 @@ import {
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
 import { PayrollAutoSync } from "./payroll-auto-sync";
+import { AutoRenewalService } from "./auto-renewal-service";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 
 // Custom schema for service with staff assignments
