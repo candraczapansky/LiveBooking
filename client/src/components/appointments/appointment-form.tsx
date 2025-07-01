@@ -939,6 +939,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                 <Button 
                   type="submit"
                   disabled={isLoading}
+                  onClick={(e) => {
+                    console.log('Button clicked!');
+                    console.log('Form errors before submit:', form.formState.errors);
+                    console.log('Form values:', form.getValues());
+                    console.log('Form is valid:', form.formState.isValid);
+                    
+                    // Don't prevent default - let the form handle submission
+                  }}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
