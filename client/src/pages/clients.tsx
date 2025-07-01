@@ -113,7 +113,7 @@ const clientFormSchema = z.object({
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 
 const ClientsPage = () => {
-  useDocumentTitle("Clients | BeautyBook");
+  useDocumentTitle("Clients | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");

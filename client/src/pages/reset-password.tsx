@@ -22,7 +22,7 @@ const resetPasswordSchema = z.object({
 type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
 const ResetPassword = () => {
-  useDocumentTitle("Reset Password | BeautyBook");
+  useDocumentTitle("Reset Password | Glo Head Spa");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

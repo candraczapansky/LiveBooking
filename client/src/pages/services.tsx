@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const ServicesPage = () => {
-  useDocumentTitle("Services | BeautyBook");
+  useDocumentTitle("Services | Glo Head Spa");
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);

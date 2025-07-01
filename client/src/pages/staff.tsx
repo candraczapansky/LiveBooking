@@ -50,7 +50,7 @@ type StaffMember = {
 };
 
 const StaffPage = () => {
-  useDocumentTitle("Staff | BeautyBook");
+  useDocumentTitle("Staff | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");

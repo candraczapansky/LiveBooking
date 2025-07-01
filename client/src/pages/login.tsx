@@ -33,7 +33,7 @@ type LoginValues = z.infer<typeof loginSchema>;
 type RegisterValues = z.infer<typeof registerSchema>;
 
 const Login = () => {
-  useDocumentTitle("Login | BeautyBook");
+  useDocumentTitle("Login | Glo Head Spa");
   const [, navigate] = useLocation();
   const authContext = useContext(AuthContext);
   const { login } = authContext;
@@ -92,7 +92,7 @@ const Login = () => {
       // Show success toast
       toast({
         title: "Login Successful", 
-        description: "Welcome back to BeautyBook!",
+        description: "Welcome back to Glo Head Spa!",
       });
       
       // Force page reload to reinitialize auth context with fresh data

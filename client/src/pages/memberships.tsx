@@ -70,7 +70,7 @@ type ClientMembership = {
 };
 
 const MembershipsPage = () => {
-  useDocumentTitle("Memberships | BeautyBook");
+  useDocumentTitle("Memberships | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("plans");

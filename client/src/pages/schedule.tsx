@@ -21,7 +21,7 @@ type StaffMember = {
 };
 
 const SchedulePage = () => {
-  useDocumentTitle("Staff Schedule | BeautyBook");
+  useDocumentTitle("Staff Schedule | Glo Head Spa");
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
 

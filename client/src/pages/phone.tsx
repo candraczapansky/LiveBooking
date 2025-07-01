@@ -58,7 +58,7 @@ interface CallAnalytics {
 }
 
 export default function PhonePage() {
-  useDocumentTitle("Phone System | BeautyBook");
+  useDocumentTitle("Phone System | Glo Head Spa");
   const { user } = useContext(AuthContext);
   const { isOpen: sidebarOpen } = useSidebar();
   

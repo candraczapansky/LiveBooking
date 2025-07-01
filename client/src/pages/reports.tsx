@@ -1318,7 +1318,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
 };
 
 const ReportsPage = () => {
-  useDocumentTitle("Reports | BeautyBook");
+  useDocumentTitle("Reports | Glo Head Spa");
   const [timePeriod, setTimePeriod] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");

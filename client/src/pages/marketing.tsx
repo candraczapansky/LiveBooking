@@ -132,7 +132,7 @@ type CampaignFormValues = z.infer<typeof campaignFormSchema>;
 type PromoFormValues = z.infer<typeof promoFormSchema>;
 
 const MarketingPage = () => {
-  useDocumentTitle("Marketing | BeautyBook");
+  useDocumentTitle("Marketing | Glo Head Spa");
   const { toast } = useToast();
 
   const [location, setLocation] = useLocation();

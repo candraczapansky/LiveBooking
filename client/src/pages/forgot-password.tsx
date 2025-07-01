@@ -18,7 +18,7 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 const ForgotPassword = () => {
-  useDocumentTitle("Forgot Password | BeautyBook");
+  useDocumentTitle("Forgot Password | Glo Head Spa");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);

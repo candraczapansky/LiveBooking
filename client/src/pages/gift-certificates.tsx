@@ -44,7 +44,7 @@ type GiftCertificateForm = z.infer<typeof giftCertificateSchema>;
 const PRESET_AMOUNTS = [25, 50, 75, 100, 150, 200];
 
 export default function GiftCertificatesPage() {
-  useDocumentTitle("Gift Certificates | BeautyBook");
+  useDocumentTitle("Gift Certificates | Glo Head Spa");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
