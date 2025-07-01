@@ -43,6 +43,8 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
   const [isLoading, setIsLoading] = useState(true);
   const [cardElement, setCardElement] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [tipAmount, setTipAmount] = useState(0);
+  const [showTipSelection, setShowTipSelection] = useState(false);
 
   useEffect(() => {
     initializeSquarePaymentForm();
@@ -241,10 +243,41 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
     );
   }
 
+  const totalAmount = appointment.amount + tipAmount;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-lg font-semibold">Payment Information</h3>
+        
+        {/* Tip Selection */}
+        <div className="space-y-3">
+          <h4 className="text-md font-medium">Add Tip</h4>
+          <TipSelection 
+            serviceAmount={appointment.amount}
+            onTipChange={setTipAmount}
+            selectedTip={tipAmount}
+          />
+        </div>
+
+        {/* Payment Summary */}
+        {tipAmount > 0 && (
+          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+            <div className="flex justify-between text-sm">
+              <span>Service Total:</span>
+              <span>{formatPrice(appointment.amount)}</span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span>Tip:</span>
+              <span>{formatPrice(tipAmount)}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between font-semibold">
+              <span>Total:</span>
+              <span>{formatPrice(totalAmount)}</span>
+            </div>
+          </div>
+        )}
         
         <div 
           id="square-card-element" 
@@ -264,32 +297,49 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         )}
       </div>
       
-      <div className="flex gap-3">
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          <Button 
+            type="button" 
+            variant="outline" 
+            onClick={onCancel}
+            disabled={isProcessing}
+            className="flex-1"
+          >
+            Back
+          </Button>
+          <Button 
+            type="submit" 
+            disabled={!cardElement || isProcessing || isLoading}
+            className="flex-1"
+          >
+            {isProcessing ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
+                Processing...
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4" />
+                Pay {formatPrice(totalAmount)}
+              </div>
+            )}
+          </Button>
+        </div>
+        
+        <div className="text-center">
+          <span className="text-sm text-muted-foreground">or</span>
+        </div>
+        
         <Button 
           type="button" 
           variant="outline" 
-          onClick={onCancel}
+          onClick={handleCashPayment}
           disabled={isProcessing}
-          className="flex-1"
+          className="w-full"
         >
-          Back
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={!cardElement || isProcessing || isLoading}
-          className="flex-1"
-        >
-          {isProcessing ? (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
-              Processing...
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              Pay {formatPrice(appointment.amount)}
-            </div>
-          )}
+          <DollarSign className="w-4 h-4 mr-2" />
+          Pay Cash {formatPrice(totalAmount)}
         </Button>
       </div>
     </form>
