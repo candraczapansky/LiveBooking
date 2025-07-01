@@ -21,6 +21,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Updated client booking page header and footer branding
   - Changed mobile dashboard branding display
   - Updated email test page default subject line
+  - Updated hamburger menu brand name in header component
   - Modified application documentation and main project title in replit.md
   - Ensured consistent brand identity throughout all user-facing content and page titles
   - All browser tab titles now properly display "Glo Head Spa" across all application pages

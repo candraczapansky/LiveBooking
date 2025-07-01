@@ -107,7 +107,7 @@ const Header = () => {
             </div>
             <div className="lg:hidden ml-2 sm:ml-3 truncate">
               <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-primary truncate hover:opacity-80 transition-opacity cursor-pointer">
-                BeautyBook
+                Glo Head Spa
               </Link>
             </div>
           </div>
