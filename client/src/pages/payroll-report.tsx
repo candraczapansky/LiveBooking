@@ -636,12 +636,16 @@ interface DetailedPayrollViewProps {
 }
 
 function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProps) {
+  console.log('DetailedPayrollView rendering for staffId:', staffId);
+  
   const { data: detailData, isLoading } = useQuery({
     queryKey: [`/api/payroll/${staffId}/detailed`, month.toISOString()],
     queryFn: () => 
       fetch(`/api/payroll/${staffId}/detailed?month=${month.toISOString()}`)
         .then(res => res.json())
   });
+
+  console.log('DetailedPayrollView data:', detailData, 'isLoading:', isLoading);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -650,25 +654,32 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
     }).format(amount);
   };
 
-  if (isLoading) {
-    return (
-      <Card className="mt-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <Button variant="outline" onClick={onBack}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Summary
-            </Button>
+  // Simple test render first
+  return (
+    <Card className="mt-6 border-2 border-red-500">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Summary
+          </Button>
+          <div>
+            <CardTitle>TEST: Detailed Payroll Report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Staff ID: {staffId} - {format(month, 'MMMM yyyy')}
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="p-4 bg-yellow-100">
+          <p>Loading: {isLoading ? 'YES' : 'NO'}</p>
+          <p>Data available: {detailData ? 'YES' : 'NO'}</p>
+          <p>Staff Name: {detailData?.staffName || 'Loading...'}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Card className="mt-6">
