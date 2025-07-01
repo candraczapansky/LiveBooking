@@ -4,7 +4,6 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { PgStorage } from "./storage";
 import { AutoRenewalService } from "./auto-renewal-service";
-import { Client, Environment } from "square";
 
 // Load environment variables
 config();
@@ -45,7 +44,13 @@ app.use((req, res, next) => {
 
 (async () => {
   try {
-    const server = await registerRoutes(app, new PgStorage());
+    const storage = new PgStorage();
+    
+    // Initialize auto-renewal service (Square client will be initialized within the service)
+    const autoRenewalService = new AutoRenewalService(storage, null as any);
+    autoRenewalService.startService();
+    
+    const server = await registerRoutes(app, storage, autoRenewalService);
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;

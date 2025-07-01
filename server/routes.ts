@@ -89,7 +89,7 @@ function validateBody<T>(schema: z.ZodType<T>) {
   };
 }
 
-export async function registerRoutes(app: Express, storage: IStorage): Promise<Server> {
+export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
   // Temporarily disable PayrollAutoSync to isolate the crash issue
   const payrollAutoSync = {
     triggerPayrollSync: async () => {
