@@ -44,17 +44,29 @@ export default function SimpleCalendar({
   onAddAppointment
 }: SimpleCalendarProps) {
   
+  // Debug appointments data
+  console.log('Simple Calendar received appointments:', appointments?.length || 0, 'appointments');
+  console.log('Current date:', currentDate.toISOString().split('T')[0]);
+  
   // Filter appointments for current date
   const dayAppointments = useMemo(() => {
-    if (!appointments) return [];
+    if (!appointments || !Array.isArray(appointments)) {
+      console.log('Simple Calendar: No appointments or not an array');
+      return [];
+    }
     
     const currentDateStr = currentDate.toISOString().split('T')[0];
     
-    return appointments.filter((appointment: any) => {
+    const filtered = appointments.filter((appointment: any) => {
+      if (!appointment || !appointment.startTime) return false;
       const appointmentDate = new Date(appointment.startTime);
       const appointmentDateStr = appointmentDate.toISOString().split('T')[0];
       return appointmentDateStr === currentDateStr;
     });
+    
+    console.log('Simple Calendar filtered appointments for', currentDateStr, ':', filtered.length);
+    
+    return filtered;
   }, [appointments, currentDate]);
 
   // Get appointment for specific staff and time slot
