@@ -23,6 +23,9 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Updated email test page default subject line
   - Updated hamburger menu brand name in header component
   - Modified application documentation and main project title in replit.md
+  - Fixed main application title in index.html from "BeautyBook" to "Glo Head Spa"
+  - Updated all password reset email templates to reference "Glo Head Spa" instead of "BeautyBook"
+  - Changed User-Agent headers in external API calls to "GloHeadSpa-PayrollSync/1.0"
   - Ensured consistent brand identity throughout all user-facing content and page titles
   - All browser tab titles now properly display "Glo Head Spa" across all application pages
   - Complete visual and textual consistency achieved for the new salon business identity

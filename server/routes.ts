@@ -172,12 +172,12 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       // Send password reset email
       const emailParams = {
         to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@beautybook.com',
-        subject: "Reset Your BeautyBook Password",
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject: "Reset Your Glo Head Spa Password",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">BeautyBook</h1>
+              <h1 style="color: #9532b8;">Glo Head Spa</h1>
               <h2 style="color: #333;">Password Reset Request</h2>
             </div>
             
@@ -186,7 +186,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             </p>
             
             <p style="color: #666; line-height: 1.6;">
-              You requested to reset your password for your BeautyBook account. 
+              You requested to reset your password for your Glo Head Spa account. 
               Click the button below to create a new password:
             </p>
             
@@ -214,14 +214,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             
             <hr style="border: 1px solid #eee; margin: 30px 0;">
             <p style="color: #999; font-size: 12px; text-align: center;">
-              This email was sent from your BeautyBook salon management system.
+              This email was sent from your Glo Head Spa salon management system.
             </p>
           </div>
         `,
         text: `
 Hello ${user.firstName || 'there'},
 
-You requested to reset your password for your BeautyBook account.
+You requested to reset your password for your Glo Head Spa account.
 
 Please visit the following link to reset your password:
 ${resetUrl}
@@ -230,7 +230,7 @@ This reset link will expire in 1 hour for security reasons.
 
 If you didn't request this password reset, please ignore this email and your password will remain unchanged.
 
-- BeautyBook Team
+- Glo Head Spa Team
         `
       };
 
@@ -4535,7 +4535,7 @@ Thank you for choosing Glo Head Spa!
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'BeautyBook-PayrollSync/1.0'
+              'User-Agent': 'GloHeadSpa-PayrollSync/1.0'
             },
             body: JSON.stringify(payrollData),
             signal: controller.signal
