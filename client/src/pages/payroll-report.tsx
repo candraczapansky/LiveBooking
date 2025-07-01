@@ -406,6 +406,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
               `Track staff earnings and commission for ${format(selectedMonth, 'MMMM yyyy')}`
             )}
           </p>
+          {/* Debug info */}
+          <div className="text-xs text-gray-500 mt-1">
+            Debug: viewMode={viewMode}, detailStaffId={detailStaffId}
+          </div>
         </div>
         
         <div className="flex items-center space-x-2">
@@ -555,8 +559,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                             variant="outline"
                             size="sm"
                             onClick={() => {
+                              console.log('Setting detail view for staff:', data.staffId);
                               setDetailStaffId(data.staffId);
                               setViewMode('detail');
+                              console.log('State should now be:', { viewMode: 'detail', detailStaffId: data.staffId });
                             }}
                           >
                             <Eye className="h-3 w-3 mr-1" />
