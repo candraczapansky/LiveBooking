@@ -1439,6 +1439,242 @@ If you didn't request this password reset, please ignore this email and your pas
     return res.status(204).end();
   });
 
+  // External Appointment Webhook - Receives new appointments from external frontend app
+  app.post("/api/appointments/webhook", async (req, res) => {
+    try {
+      console.log('Received appointment webhook data:', req.body);
+      
+      const {
+        clientId,
+        serviceId,
+        staffId,
+        startTime,
+        endTime,
+        notes,
+        status = 'confirmed',
+        externalAppointmentId,
+        clientInfo,
+        serviceInfo,
+        staffInfo
+      } = req.body;
+
+      // Validate required fields
+      if (!startTime || !endTime) {
+        return res.status(400).json({ 
+          error: "Missing required fields: startTime and endTime are required" 
+        });
+      }
+
+      let finalClientId = clientId;
+      let finalServiceId = serviceId;
+      let finalStaffId = staffId;
+
+      // If client doesn't exist but clientInfo is provided, create the client
+      if (!clientId && clientInfo) {
+        try {
+          const newClient = await storage.createUser({
+            username: clientInfo.email || `client_${Date.now()}`,
+            email: clientInfo.email || '',
+            password: 'temp_password_' + Math.random().toString(36).substr(2, 9),
+            role: 'client',
+            firstName: clientInfo.firstName || '',
+            lastName: clientInfo.lastName || '',
+            phone: clientInfo.phone || '',
+            address: clientInfo.address || null,
+            city: clientInfo.city || null,
+            state: clientInfo.state || null,
+            zipCode: clientInfo.zipCode || null
+          });
+          finalClientId = newClient.id;
+          console.log('Created new client from webhook:', newClient);
+        } catch (error) {
+          console.error('Failed to create client from webhook:', error);
+          return res.status(400).json({ error: "Failed to create client" });
+        }
+      }
+
+      // If service doesn't exist but serviceInfo is provided, create the service
+      if (!serviceId && serviceInfo) {
+        try {
+          // First ensure we have a category
+          let categoryId = serviceInfo.categoryId;
+          if (!categoryId && serviceInfo.categoryName) {
+            const categories = await storage.getAllServiceCategories();
+            let category = categories.find(c => c.name.toLowerCase() === serviceInfo.categoryName.toLowerCase());
+            if (!category) {
+              category = await storage.createServiceCategory({
+                name: serviceInfo.categoryName,
+                description: `Category for ${serviceInfo.categoryName} services`
+              });
+            }
+            categoryId = category.id;
+          }
+
+          const newService = await storage.createService({
+            name: serviceInfo.name || 'External Service',
+            description: serviceInfo.description || 'Service from external app',
+            price: serviceInfo.price || 0,
+            duration: serviceInfo.duration || 60,
+            categoryId: categoryId || 1, // Default category if none provided
+            color: serviceInfo.color || '#3b82f6'
+          });
+          finalServiceId = newService.id;
+          console.log('Created new service from webhook:', newService);
+        } catch (error) {
+          console.error('Failed to create service from webhook:', error);
+          return res.status(400).json({ error: "Failed to create service" });
+        }
+      }
+
+      // If staff doesn't exist but staffInfo is provided, create the staff member
+      if (!staffId && staffInfo) {
+        try {
+          const newStaffUser = await storage.createUser({
+            username: staffInfo.email || `staff_${Date.now()}`,
+            email: staffInfo.email || '',
+            password: 'temp_password_' + Math.random().toString(36).substr(2, 9),
+            role: 'staff',
+            firstName: staffInfo.firstName || '',
+            lastName: staffInfo.lastName || ''
+          });
+
+          const newStaff = await storage.createStaff({
+            userId: newStaffUser.id,
+            title: staffInfo.title || 'Stylist',
+            bio: staffInfo.bio || null,
+            commissionType: 'commission',
+            commissionRate: 0.3
+          });
+          finalStaffId = newStaff.id;
+          console.log('Created new staff from webhook:', newStaff);
+        } catch (error) {
+          console.error('Failed to create staff from webhook:', error);
+          return res.status(400).json({ error: "Failed to create staff member" });
+        }
+      }
+
+      // Check for scheduling conflicts with existing appointments
+      if (finalStaffId) {
+        const staffAppointments = await storage.getAppointmentsByStaff(finalStaffId);
+        const newStart = new Date(startTime);
+        const newEnd = new Date(endTime);
+        
+        const conflictingAppointment = staffAppointments.find(appointment => {
+          const existingStart = new Date(appointment.startTime);
+          const existingEnd = new Date(appointment.endTime);
+          
+          // Check for any overlap
+          return newStart < existingEnd && newEnd > existingStart;
+        });
+        
+        if (conflictingAppointment) {
+          return res.status(409).json({ 
+            error: "Scheduling Conflict",
+            message: "The requested time slot conflicts with an existing appointment",
+            conflictingAppointment: {
+              id: conflictingAppointment.id,
+              startTime: conflictingAppointment.startTime,
+              endTime: conflictingAppointment.endTime
+            }
+          });
+        }
+      }
+
+      // Calculate total amount from service if available
+      let totalAmount = 0;
+      if (finalServiceId) {
+        try {
+          const service = await storage.getService(finalServiceId);
+          totalAmount = service?.price || 0;
+        } catch (error) {
+          console.log('Could not fetch service price, using 0');
+        }
+      }
+
+      // Create the appointment
+      const appointmentData = {
+        clientId: finalClientId,
+        serviceId: finalServiceId,
+        staffId: finalStaffId,
+        startTime: new Date(startTime),
+        endTime: new Date(endTime),
+        status,
+        notes: notes || `Appointment from external app${externalAppointmentId ? ` (External ID: ${externalAppointmentId})` : ''}`,
+        totalAmount,
+        externalId: externalAppointmentId || null
+      };
+
+      const newAppointment = await storage.createAppointment(appointmentData);
+      
+      // Trigger booking confirmation automation
+      try {
+        await triggerBookingConfirmation(newAppointment, storage);
+        console.log('Booking automation triggered for webhook appointment');
+      } catch (error) {
+        console.error('Failed to trigger booking automation:', error);
+      }
+
+      // Create notification for new appointment
+      try {
+        const client = finalClientId ? await storage.getUser(finalClientId) : null;
+        const service = finalServiceId ? await storage.getService(finalServiceId) : null;
+        
+        await storage.createNotification({
+          type: 'new_appointment',
+          title: 'New Appointment from External App',
+          message: `New appointment scheduled${client ? ` for ${client.firstName} ${client.lastName}` : ''}${service ? ` - ${service.name}` : ''}`,
+          relatedId: newAppointment.id,
+          userId: null
+        });
+      } catch (error) {
+        console.error('Failed to create notification for webhook appointment:', error);
+      }
+
+      console.log('Successfully created appointment from webhook:', newAppointment);
+      
+      res.status(201).json({
+        success: true,
+        message: "Appointment created successfully",
+        appointment: newAppointment,
+        createdEntities: {
+          client: !clientId && clientInfo ? { id: finalClientId, created: true } : null,
+          service: !serviceId && serviceInfo ? { id: finalServiceId, created: true } : null,
+          staff: !staffId && staffInfo ? { id: finalStaffId, created: true } : null
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Error processing appointment webhook:', error);
+      res.status(500).json({ 
+        error: "Failed to create appointment",
+        details: error.message 
+      });
+    }
+  });
+
+  // Webhook status and testing endpoint
+  app.get("/api/appointments/webhook", async (req, res) => {
+    res.json({
+      status: "Appointment webhook endpoint is active",
+      endpoint: "/api/appointments/webhook",
+      method: "POST",
+      description: "Receives new appointments from external frontend applications",
+      requiredFields: ["startTime", "endTime"],
+      optionalFields: [
+        "clientId", "serviceId", "staffId",
+        "notes", "status", "externalAppointmentId",
+        "clientInfo", "serviceInfo", "staffInfo"
+      ],
+      features: [
+        "Auto-creates clients, services, and staff if not found",
+        "Checks for scheduling conflicts",
+        "Triggers booking automation",
+        "Creates notifications",
+        "Calculates service pricing"
+      ]
+    });
+  });
+
   // Appointment History routes
   app.get("/api/appointment-history", async (req, res) => {
     try {
