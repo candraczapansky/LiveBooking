@@ -605,6 +605,207 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
           )}
         </CardContent>
       </Card>
+
+      {/* Detailed Payroll View */}
+      {viewMode === 'detail' && detailStaffId && (
+        <DetailedPayrollView 
+          staffId={detailStaffId}
+          month={selectedMonth}
+          onBack={() => {
+            setViewMode('summary');
+            setDetailStaffId(null);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Detailed Payroll View Component
+interface DetailedPayrollViewProps {
+  staffId: number;
+  month: Date;
+  onBack: () => void;
+}
+
+function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProps) {
+  const { data: detailData, isLoading } = useQuery({
+    queryKey: [`/api/payroll/${staffId}/detailed`, month.toISOString()],
+    queryFn: () => 
+      fetch(`/api/payroll/${staffId}/detailed?month=${month.toISOString()}`)
+        .then(res => res.json())
+  });
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount);
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Summary
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Summary
+          </Button>
+          <div>
+            <CardTitle>Detailed Payroll Report</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              {detailData?.staffName} - {format(month, 'MMMM yyyy')}
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {detailData && (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Services</p>
+                      <p className="text-2xl font-bold">{detailData.summary.totalAppointments}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Revenue</p>
+                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.totalRevenue)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Total Commission</p>
+                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.totalCommission)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-2">
+                    <UsersIcon className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Avg Per Service</p>
+                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.averageCommissionPerService)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Staff Info */}
+            <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+              <h3 className="font-semibold mb-2">Staff Information</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Title:</span>
+                  <p className="font-medium">{detailData.title}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Commission Type:</span>
+                  <p className="font-medium">{detailData.commissionType.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Base Commission Rate:</span>
+                  <p className="font-medium">{(detailData.baseCommissionRate * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Hourly Rate:</span>
+                  <p className="font-medium">{detailData.hourlyRate ? formatCurrency(detailData.hourlyRate) : 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Appointments Table */}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Service</TableHead>
+                    <TableHead className="text-right">Service Price</TableHead>
+                    <TableHead className="text-right">Commission Rate</TableHead>
+                    <TableHead className="text-right">Commission Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailData.appointments.map((appointment: any) => (
+                    <TableRow key={appointment.appointmentId}>
+                      <TableCell>
+                        {format(new Date(appointment.date), 'MMM dd, yyyy')}
+                      </TableCell>
+                      <TableCell>{appointment.clientName}</TableCell>
+                      <TableCell>{appointment.serviceName}</TableCell>
+                      <TableCell className="text-right">
+                        {formatCurrency(appointment.servicePrice)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {(appointment.commissionRate * 100).toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(appointment.commissionAmount)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={appointment.paymentStatus === 'paid' ? 'default' : 'secondary'}>
+                          {appointment.paymentStatus}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            {detailData.appointments.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No paid appointments found for this period.
+              </div>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
