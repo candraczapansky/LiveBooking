@@ -413,13 +413,21 @@ const AppointmentsPage = () => {
     };
   }, [staff]);
 
-  // Memoized appointment positioning to prevent recalculations during re-renders
+  // Use a ref to maintain stable positioning across re-renders
+  const appointmentPositionsRef = useRef(new Map());
+  
+  // Memoized appointment positioning that preserves existing positions
   const appointmentPositions = useMemo(() => {
-    if (!appointments || !services || !staff) return new Map();
+    if (!appointments || !services || !staff) return appointmentPositionsRef.current;
     
-    const positionMap = new Map();
+    // Get existing positions to preserve them
+    const existingPositions = appointmentPositionsRef.current;
+    const newPositionMap = new Map();
     
-    appointments.forEach((appointment: any) => {
+    // Sort appointments by ID to ensure consistent processing order
+    const sortedAppointments = [...appointments].sort((a, b) => a.id - b.id);
+    
+    sortedAppointments.forEach((appointment: any) => {
       // Debug time conversion issue
       const appointmentTime = new Date(appointment.startTime);
       
@@ -453,7 +461,7 @@ const AppointmentsPage = () => {
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
-        positionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
+        newPositionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
         return;
       }
       
@@ -488,13 +496,26 @@ const AppointmentsPage = () => {
       const slotsNeeded = Math.ceil(serviceDuration / 15);
       const calculatedHeight = slotsNeeded * slotHeight;
       
-      positionMap.set(appointment.id, {
+      // Calculate new position for this appointment
+      const newPosition = {
         top: `${topPosition}px`,
         height: `${calculatedHeight}px`
-      });
+      };
+      
+      // Check if position has changed, if not preserve existing
+      const existingPosition = existingPositions.get(appointment.id);
+      if (existingPosition && 
+          existingPosition.top === newPosition.top && 
+          existingPosition.height === newPosition.height) {
+        newPositionMap.set(appointment.id, existingPosition);
+      } else {
+        newPositionMap.set(appointment.id, newPosition);
+      }
     });
     
-    return positionMap;
+    // Update the ref with the new positions
+    appointmentPositionsRef.current = newPositionMap;
+    return newPositionMap;
   }, [appointments, services, staff, zoomLevel]);
 
   const getAppointmentStyle = (appointment: any) => {
@@ -806,7 +827,7 @@ const AppointmentsPage = () => {
                     setSelectedAppointmentId(appointment.id);
                     setIsFormOpen(true);
                   }}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] group relative"
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-150 cursor-pointer hover:scale-[1.02] group relative"
                   style={{
                     left: `${80 + (columnIndex * columnWidth) + 4}px`,
                     width: `${columnWidth - 8}px`,
