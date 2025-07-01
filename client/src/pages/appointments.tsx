@@ -1122,6 +1122,21 @@ const AppointmentsPage = () => {
                   setCurrentDate(day);
                   setViewMode('day');
                 }}
+                onMouseMove={(e) => {
+                  const dateStr = day.toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  });
+                  setHoverInfo({
+                    visible: true,
+                    time: dateStr,
+                    x: e.clientX,
+                    y: e.clientY
+                  });
+                }}
+                onMouseLeave={handleCalendarMouseLeave}
               >
                 {/* Date number */}
                 <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
