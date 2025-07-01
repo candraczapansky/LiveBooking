@@ -225,14 +225,22 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         serviceId: "",
         clientId: "",
         date: selectedDate || new Date(),
-        time: "10:00",
+        time: selectedTime || "10:00",
         notes: "",
       });
     } else {
       // Invalidate services cache when opening to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
-  }, [open, selectedDate, queryClient]);
+  }, [open, selectedDate, selectedTime, queryClient]);
+
+  // Update time when selectedTime prop changes
+  useEffect(() => {
+    if (open && selectedTime && !appointmentId) {
+      // Only update time for new appointments, not when editing existing ones
+      form.setValue('time', selectedTime);
+    }
+  }, [selectedTime, open, appointmentId]);
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {

@@ -22,8 +22,16 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Added hover functionality to day view, week view, and month view calendars
   - Day/week views show precise time (e.g., "2:30 PM") based on cursor position within time slots
   - Month view shows full date information (e.g., "Monday, July 1, 2025") when hovering over calendar dates
-  - Floating tooltip follows cursor with professional dark styling and proper z-index layering
+  - Floating tooltip follows cursor with dynamic theme colors from user settings
   - Enhanced user experience with intuitive calendar time discovery without clicking
+
+- **Fixed time hover tooltip color theming and implemented click-to-time functionality:**
+  - Fixed hover tooltip to use dynamic theme colors instead of hardcoded dark background
+  - Tooltip now uses var(--primary) background and var(--primary-foreground) text colors
+  - Implemented click-to-time feature - clicked time automatically populates appointment form
+  - Added selectedTime prop to AppointmentForm component for seamless time selection
+  - Enhanced appointment creation workflow with precise time selection from calendar clicks
+  - Time conversion logic properly handles 12/24 hour format between calendar and form
 
 ### July 1, 2025 - Complete Application Rebranding to "Glo Head Spa" and External API System Implementation
 

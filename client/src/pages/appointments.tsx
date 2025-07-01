@@ -1367,6 +1367,7 @@ const AppointmentsPage = () => {
         onOpenChange={setIsFormOpen}
         appointmentId={selectedAppointmentId}
         selectedDate={currentDate}
+        selectedTime={selectedTime}
       />
 
       {/* Checkout Component */}
