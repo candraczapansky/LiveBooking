@@ -36,12 +36,13 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - All browser tab titles now properly display "Glo Head Spa" across all application pages
   - Complete visual and textual consistency achieved for the new salon business identity
 
-- **Investigating staff schedule editing persistence issue:**
-  - Staff schedule editing form allows input and saving but changes don't persist after saving
-  - Added debugging to backend PUT /api/schedules/:id endpoint to trace update process
-  - Added frontend debugging to schedule update mutation to monitor data flow
-  - Enhanced cache invalidation to invalidate both ['/api/schedules'] and ['/api/staff'] queries after updates
-  - API endpoint returns 200 status indicating successful update, investigating data synchronization
+- **Fixed staff schedule editing persistence issue:**
+  - Root cause identified: Form was allowing multiple day selection during editing, causing confusion between form data and actual update
+  - Modified schedule editing form to disable day selection when editing existing schedules (day changes require new schedule creation)
+  - Fixed form submission logic to preserve original dayOfWeek when editing instead of using form's daysOfWeek array
+  - Enhanced cache invalidation with forced refetch to ensure UI updates immediately after successful edits
+  - Added clear UI messaging explaining that day changes require creating a new schedule
+  - Staff schedule editing now works correctly with proper data persistence and immediate UI updates
 
 ### July 1, 2025 - Complete External API System Implementation for Frontend App Integration
 

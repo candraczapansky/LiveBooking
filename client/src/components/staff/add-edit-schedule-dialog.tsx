@@ -122,8 +122,10 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       return result;
     },
     onSuccess: () => {
+      // Force refresh all schedule data
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+      queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
       toast({
         title: "Success",
         description: "Schedule updated successfully.",
@@ -143,15 +145,16 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (schedule) {
-      // For editing, update the single schedule
+      // For editing, keep the original day and update other fields
       const scheduleData = {
         ...data,
-        dayOfWeek: data.daysOfWeek[0], // Use first selected day for editing
+        dayOfWeek: schedule.dayOfWeek, // Keep the original day when editing
         staffId: parseInt(data.staffId),
         serviceCategories: data.serviceCategories || [],
         endDate: data.endDate || null,
         isBlocked: data.isBlocked || false,
       };
+      console.log("Submitting schedule edit with data:", scheduleData);
       updateScheduleMutation.mutate(scheduleData);
     } else {
       // For creating, create a schedule for each selected day
@@ -261,41 +264,52 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
               render={() => (
                 <FormItem>
                   <FormLabel>Days of Week</FormLabel>
-                  <div className="grid grid-cols-2 gap-2">
-                    {daysOfWeek.map((day) => (
-                      <FormField
-                        key={day}
-                        control={form.control}
-                        name="daysOfWeek"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={day}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(day)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), day])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value: string) => value !== day
-                                          )
+                  {schedule ? (
+                    <div className="p-3 bg-muted rounded-md">
+                      <p className="text-sm text-muted-foreground">
+                        Editing schedule for: <strong>{schedule.dayOfWeek}</strong>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        To change the day, create a new schedule instead.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {daysOfWeek.map((day) => (
+                        <FormField
+                          key={day}
+                          control={form.control}
+                          name="daysOfWeek"
+                          render={({ field }) => {
+                            return (
+                              <FormItem
+                                key={day}
+                                className="flex flex-row items-start space-x-3 space-y-0"
+                              >
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value?.includes(day)}
+                                    onCheckedChange={(checked) => {
+                                      return checked
+                                        ? field.onChange([...(field.value || []), day])
+                                        : field.onChange(
+                                            field.value?.filter(
+                                              (value: string) => value !== day
+                                            )
                                         )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                {day}
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
-                      />
-                    ))}
-                  </div>
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="text-sm font-normal">
+                                  {day}
+                                </FormLabel>
+                              </FormItem>
+                            )
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
