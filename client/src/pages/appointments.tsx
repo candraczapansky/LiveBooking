@@ -760,6 +760,16 @@ const AppointmentsPage = () => {
 
               const appointmentStyle = getAppointmentStyle(appointment);
               
+              // Debug appointment style for recent appointments
+              if (appointment.id >= 100) {
+                console.log(`[APPOINTMENT STYLE DEBUG] Appointment ${appointment.id}:`, {
+                  appointmentStyle,
+                  startTime: appointment.startTime,
+                  timeString,
+                  expectedSlot: Math.floor(((startTime.getHours() - 8) * 60 + startTime.getMinutes()) / 15)
+                });
+              }
+              
               // Find service information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
               const serviceName = service?.name || 'Service';
