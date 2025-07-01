@@ -556,30 +556,33 @@ const AppointmentsPage = () => {
       }
       
       // Calculate position based on time slots starting from 8:00 AM
-      // Each time slot is 30px * zoomLevel high (regardless of 15-minute intervals)
-      const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
-      const slotHeight = Math.round(30 * zoomLevel); // Match the time slot rendering exactly
+      // Each time slot row is 30px * zoomLevel high
+      const slotHeight = Math.round(30 * zoomLevel);
       
-      // Calculate position based on 15-minute intervals matching timeSlots array
-      // Find the slot index in the timeSlots array
-      const slotIndex = Math.floor(totalMinutesFromStart / 15);
-      const topPosition = slotIndex * slotHeight;
+      // Find the exact time slot this appointment should appear in
+      const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true
+      });
+      
+      // Find the index of this time in the timeSlots array
+      const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
+      const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
       
       // Debug positioning calculation for the new appointment
       if (appointment.id >= 110) {
-        const slotIndex = Math.floor(totalMinutesFromStart / 15);
-        const timeSlot = timeSlots[slotIndex];
         console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
           startHour,
           startMinute,
-          totalMinutesFromStart,
-          slotHeight,
+          timeSlotString,
           slotIndex,
-          timeSlot,
+          foundInArray: slotIndex >= 0,
+          timeSlotAtIndex: timeSlots[slotIndex],
           topPosition,
           finalTopPosition: `${topPosition}px`,
           zoomLevel,
-          shouldAppearAt: `${timeSlot} (${startHour}:${String(startMinute).padStart(2, '0')})`
+          shouldAppearAt: timeSlotString
         });
       }
       
@@ -887,7 +890,7 @@ const AppointmentsPage = () => {
                   key={stableKey}
                   className="absolute pointer-events-auto"
                   style={{
-                    left: `${20 + (columnIndex * columnWidth) + 4}px`, // Time column width + staff column offset + padding
+                    left: `${80 + 4}px`, // Time column width (80px) + padding
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     zIndex: 10
