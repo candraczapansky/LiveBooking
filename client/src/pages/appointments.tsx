@@ -415,7 +415,7 @@ const AppointmentsPage = () => {
 
   // Memoized appointment positioning to prevent recalculations during re-renders
   const appointmentPositions = useMemo(() => {
-    if (!appointments || !services) return new Map();
+    if (!appointments || !services || !staff) return new Map();
     
     const positionMap = new Map();
     
@@ -495,7 +495,7 @@ const AppointmentsPage = () => {
     });
     
     return positionMap;
-  }, [appointments, services, zoomLevel]);
+  }, [appointments, services, staff, zoomLevel]);
 
   const getAppointmentStyle = (appointment: any) => {
     return appointmentPositions.get(appointment.id) || { top: '0px', height: '0px', display: 'none' };
