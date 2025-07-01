@@ -4015,7 +4015,7 @@ Thank you for choosing Glo Head Spa!
             <p style="color: #999; font-size: 12px;">This is a test email sent from your salon management system.</p>
           </div>
         `,
-        text: `Test Email from BeautyBook\n\n${content}\n\nThis is a test email sent from your salon management system.`
+        text: `Test Email from Glo Head Spa\n\n${content}\n\nThis is a test email sent from your salon management system.`
       };
 
       const success = await sendEmail(emailParams);
