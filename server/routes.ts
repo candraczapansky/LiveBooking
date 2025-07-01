@@ -1252,6 +1252,9 @@ If you didn't request this password reset, please ignore this email and your pas
   
   app.get("/api/appointments/:id", async (req, res) => {
     const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid appointment ID" });
+    }
     const appointment = await storage.getAppointment(id);
     
     if (!appointment) {
