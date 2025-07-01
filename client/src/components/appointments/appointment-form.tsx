@@ -295,8 +295,19 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // Load appointment data when editing
   useEffect(() => {
     if (appointment && appointmentId && appointmentId > 0) {
-      const appointmentDate = new Date(appointment.startTime);
-      const appointmentTime = format(appointmentDate, 'HH:mm');
+      // Parse the ISO string to get the correct time
+      const isoString = appointment.startTime;
+      
+      // Extract the time directly from the ISO string (ignoring timezone conversion)
+      // Example: "2025-07-05T14:30:00.000Z" -> extract "14:30"
+      const timeMatch = isoString.match(/T(\d{2}):(\d{2})/);
+      const appointmentTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : '10:00';
+      
+      // Create date object for the date part
+      const utcDate = new Date(isoString);
+      const appointmentDate = new Date(utcDate.getFullYear(), utcDate.getMonth(), utcDate.getDate());
+      
+
       
       form.reset({
         staffId: appointment.staffId?.toString() || "",
@@ -306,6 +317,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: appointmentTime,
         notes: appointment.notes || "",
       });
+      
+
     }
   }, [appointment, appointmentId]);
 
@@ -330,7 +343,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   // Reset form when closing and invalidate cache when opening
   useEffect(() => {
+    console.log('Form reset effect triggered:', { open, appointmentId, selectedTime });
+    
     if (!open) {
+      console.log('Dialog closed - resetting form to defaults');
       form.reset({
         staffId: "",
         serviceId: "",
@@ -340,6 +356,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         notes: "",
       });
     } else if (!appointmentId) {
+      console.log('New appointment - resetting form with new defaults');
       // Only reset with defaults for new appointments, not when editing existing ones
       form.reset({
         staffId: "",
@@ -352,6 +369,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Invalidate services cache when opening to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     } else {
+      console.log('Editing appointment - NOT resetting form, letting appointment data load');
       // Just invalidate cache for existing appointments (form will be populated by appointment data)
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
