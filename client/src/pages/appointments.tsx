@@ -427,6 +427,17 @@ const AppointmentsPage = () => {
       const startHour = appointmentTime.getHours();
       const startMinute = appointmentTime.getMinutes();
       
+      // Debug positioning calculation for the new appointment
+      if (appointment.id >= 76) { // Debug recent appointments
+        console.log(`[DEBUG] Positioning appointment ${appointment.id}:`, {
+          appointmentStartTime: appointment.startTime,
+          appointmentTimeObject: appointmentTime,
+          startHour,
+          startMinute,
+          timeString: appointmentTime.toLocaleTimeString()
+        });
+      }
+      
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
         positionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
@@ -438,6 +449,16 @@ const AppointmentsPage = () => {
       const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
       const slotHeight = 30 * zoomLevel;
       const topPosition = (totalMinutesFromStart / 15) * slotHeight;
+      
+      // Debug positioning calculation for the new appointment
+      if (appointment.id > 130) {
+        console.log(`[DEBUG] Position calculation for appointment ${appointment.id}:`, {
+          totalMinutesFromStart,
+          slotHeight,
+          topPosition,
+          finalTopPosition: `${topPosition}px`
+        });
+      }
       
       // Use service duration for height calculation
       const service = services.find((s: any) => s.id === appointment.serviceId);
