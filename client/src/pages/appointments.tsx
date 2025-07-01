@@ -556,13 +556,14 @@ const AppointmentsPage = () => {
       }
       
       // Calculate position based on time slots starting from 8:00 AM
-      // Each 15-minute slot is 30px * zoomLevel high  
+      // Each time slot is 30px * zoomLevel high (regardless of 15-minute intervals)
       const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
       const slotHeight = Math.round(30 * zoomLevel); // Match the time slot rendering exactly
       
-      // Remove the incorrect 30-minute offset that was causing timing issues
-      // Use direct time calculation for accurate positioning
-      const topPosition = (totalMinutesFromStart / 15) * slotHeight;
+      // Calculate position based on 15-minute intervals matching timeSlots array
+      // Find the slot index in the timeSlots array
+      const slotIndex = Math.floor(totalMinutesFromStart / 15);
+      const topPosition = slotIndex * slotHeight;
       
       // Debug positioning calculation for the new appointment
       if (appointment.id >= 110) {
@@ -886,7 +887,7 @@ const AppointmentsPage = () => {
                   key={stableKey}
                   className="absolute pointer-events-auto"
                   style={{
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                    left: `${20 + (columnIndex * columnWidth) + 4}px`, // Time column width + staff column offset + padding
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     zIndex: 10
