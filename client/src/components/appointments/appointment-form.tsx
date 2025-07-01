@@ -89,6 +89,30 @@ const generateTimeSlots = () => {
 
 const allTimeSlots = generateTimeSlots();
 
+// Helper functions for schedule filtering
+const getDayName = (date: Date) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[date.getDay()];
+};
+
+const formatDateForComparison = (date: Date) => {
+  return date.toISOString().split('T')[0];
+};
+
+const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => {
+  // Convert time strings to minutes for comparison
+  const timeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  const slotMinutes = timeToMinutes(timeSlot);
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+  
+  return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+};
+
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
@@ -108,8 +132,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     },
   });
   
-  // Watch selected staff to filter services
+  // Watch selected staff to filter services and time slots
   const selectedStaffId = form.watch("staffId");
+  const selectedFormDate = form.watch("date");
   
   // Get services for selected staff (staff-centric workflow)
   const { data: services = [], isLoading: isLoadingServices } = useQuery({
@@ -123,6 +148,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return data.map((item: any) => item.service || item);
     },
     enabled: open && !!selectedStaffId,
+  });
+
+  // Fetch staff schedules for time slot filtering
+  const { data: schedules = [] } = useQuery({
+    queryKey: ['/api/schedules'],
+    enabled: open,
   });
   
   // Get staff
@@ -166,6 +197,38 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const startTimeString = form.watch("time");
   
   const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
+
+  // Filter available time slots based on staff schedule
+  const getAvailableTimeSlots = () => {
+    if (!selectedStaffId || !selectedFormDate) {
+      return allTimeSlots; // Show all slots if no staff selected
+    }
+
+    const dayName = getDayName(selectedFormDate);
+    const currentDate = formatDateForComparison(selectedFormDate);
+    
+    // Find schedules for this staff member on this day
+    const staffSchedules = schedules.filter((schedule: any) => 
+      schedule.staffId === parseInt(selectedStaffId) && 
+      schedule.dayOfWeek === dayName &&
+      schedule.startDate <= currentDate &&
+      (!schedule.endDate || schedule.endDate >= currentDate) &&
+      !schedule.isBlocked
+    );
+
+    if (staffSchedules.length === 0) {
+      return []; // No schedule = no available slots
+    }
+
+    // Filter time slots to only include those within scheduled hours
+    return allTimeSlots.filter(slot => {
+      return staffSchedules.some((schedule: any) => 
+        isTimeInRange(slot.value, schedule.startTime, schedule.endTime)
+      );
+    });
+  };
+
+  const availableTimeSlots = getAvailableTimeSlots();
   
   const endTime = selectedService && startTimeString ? (() => {
     const [hours, minutes] = startTimeString.split(':').map(Number);
@@ -241,6 +304,17 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       form.setValue('time', selectedTime);
     }
   }, [selectedTime, open, appointmentId]);
+
+  // Clear time when staff changes or when no slots are available
+  useEffect(() => {
+    const currentTime = form.getValues('time');
+    const availableSlots = getAvailableTimeSlots();
+    
+    // If the current time is not in available slots, clear it
+    if (currentTime && !availableSlots.some(slot => slot.value === currentTime)) {
+      form.setValue('time', '');
+    }
+  }, [selectedStaffId, selectedFormDate]);
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
@@ -640,11 +714,17 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           <SelectValue placeholder="Select a time" />
                         </SelectTrigger>
                         <SelectContent>
-                          {allTimeSlots.map((slot) => (
-                            <SelectItem key={slot.value} value={slot.value}>
-                              {slot.label}
+                          {availableTimeSlots.length > 0 ? (
+                            availableTimeSlots.map((slot) => (
+                              <SelectItem key={slot.value} value={slot.value}>
+                                {slot.label}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <SelectItem value="no-slots" disabled>
+                              {selectedStaffId ? "No available time slots for this staff member on this day" : "Select a staff member first"}
                             </SelectItem>
-                          ))}
+                          )}
                         </SelectContent>
                       </Select>
                     </FormControl>
