@@ -549,17 +549,13 @@ const AppointmentsPage = () => {
                   ) : (
                     <div className="text-gray-500 dark:text-gray-400 text-sm italic">No appointments scheduled</div>
                   )}
-                  <button
+                  <Button
                     onClick={() => handleAddAppointment()}
-                    className="w-full text-center p-3 bg-transparent rounded-lg border-2 transition-colors"
-                    style={{
-                      borderColor: 'hsl(var(--primary))',
-                      color: 'hsl(var(--primary))',
-                      backgroundColor: 'transparent'
-                    }}
+                    variant="default"
+                    className="w-full"
                   >
                     + Add appointment for {staffName}
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
