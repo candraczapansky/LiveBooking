@@ -462,6 +462,7 @@ export default function PointOfSale() {
         items: cart,
         subtotal: getSubtotal(),
         tax: getTax(),
+        tipAmount: tipAmount,
         total: getGrandTotal(),
         paymentMethod,
         timestamp: new Date()
