@@ -1382,10 +1382,12 @@ const AppointmentsPage = () => {
       {/* Time Hover Tooltip */}
       {hoverInfo.visible && (
         <div
-          className="fixed z-50 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg pointer-events-none"
+          className="fixed z-50 text-sm px-3 py-2 rounded-lg shadow-lg pointer-events-none"
           style={{
             left: hoverInfo.x + 10,
             top: hoverInfo.y - 40,
+            backgroundColor: 'var(--primary)',
+            color: 'var(--primary-foreground)',
           }}
         >
           {hoverInfo.time}
