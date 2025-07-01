@@ -4670,6 +4670,102 @@ Thank you for choosing Glo Head Spa!
     }
   });
 
+  // Get detailed payroll breakdown for a specific staff member with individual appointments
+  app.get("/api/payroll/:staffId/detailed", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const month = req.query.month ? new Date(req.query.month as string) : new Date();
+      
+      if (!staffId) {
+        return res.status(400).json({ error: "Valid staff ID is required" });
+      }
+
+      // Get staff member details
+      const staff = await storage.getStaff(staffId);
+      if (!staff) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Get user details
+      const user = await storage.getUser(staff.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User details not found" });
+      }
+
+      const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
+      const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+
+      // Get all paid appointments for this staff member in the time period
+      const allAppointments = await storage.getAllAppointments();
+      const staffAppointments = allAppointments.filter(appointment => 
+        appointment.staffId === staffId && 
+        appointment.paymentStatus === 'paid' &&
+        new Date(appointment.startTime) >= monthStart &&
+        new Date(appointment.startTime) <= monthEnd
+      );
+
+      // Get services and clients data for mapping
+      const allServices = await storage.getAllServices();
+      const allUsers = await storage.getAllUsers();
+      
+      // Build detailed appointment breakdown
+      const appointmentDetails = await Promise.all(
+        staffAppointments.map(async (appointment) => {
+          const service = allServices.find(s => s.id === appointment.serviceId);
+          const client = allUsers.find(u => u.id === appointment.clientId);
+          
+          // Calculate commission for this appointment
+          let commissionAmount = 0;
+          if (staff.commissionType === 'commission' && service) {
+            commissionAmount = (service.price || 0) * (staff.commissionRate || 0);
+          } else if (staff.commissionType === 'fixed') {
+            commissionAmount = staff.fixedRate || 0;
+          }
+
+          return {
+            appointmentId: appointment.id,
+            date: appointment.startTime,
+            clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
+            serviceName: service?.name || 'Unknown Service',
+            servicePrice: service?.price || 0,
+            commissionRate: staff.commissionRate || 0,
+            commissionAmount: commissionAmount,
+            commissionType: staff.commissionType,
+            duration: service?.duration || 0,
+            status: appointment.status,
+            paymentStatus: appointment.paymentStatus
+          };
+        })
+      );
+
+      // Calculate totals
+      const totalRevenue = appointmentDetails.reduce((sum, detail) => sum + detail.servicePrice, 0);
+      const totalCommission = appointmentDetails.reduce((sum, detail) => sum + detail.commissionAmount, 0);
+      const totalAppointments = appointmentDetails.length;
+
+      res.json({
+        staffId: staff.id,
+        staffName: `${user.firstName} ${user.lastName}`,
+        title: staff.title,
+        commissionType: staff.commissionType,
+        baseCommissionRate: staff.commissionRate || 0,
+        hourlyRate: staff.hourlyRate || 0,
+        month: month.toISOString().substring(0, 7),
+        summary: {
+          totalAppointments,
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          totalCommission: Math.round(totalCommission * 100) / 100,
+          averageCommissionPerService: totalAppointments > 0 ? Math.round((totalCommission / totalAppointments) * 100) / 100 : 0
+        },
+        appointments: appointmentDetails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      });
+
+    } catch (error) {
+      console.error("Error fetching detailed payroll data:", error);
+      res.status(500).json({ error: "Failed to fetch detailed payroll data" });
+    }
+  });
+
   // Get payroll data for a specific staff member (for local use)
   app.get("/api/payroll/:staffId", async (req, res) => {
     try {

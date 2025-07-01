@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2 } from "lucide-react";
+import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2, ArrowLeft, Eye } from "lucide-react";
 import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -71,6 +71,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
   const [selectedStaff, setSelectedStaff] = useState<string>("all");
   const [syncing, setSyncing] = useState<number | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
+  const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
+  const [detailStaffId, setDetailStaffId] = useState<number | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -549,6 +551,17 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setDetailStaffId(data.staffId);
+                              setViewMode('detail');
+                            }}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View Details
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"
