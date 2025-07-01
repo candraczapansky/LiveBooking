@@ -26,7 +26,7 @@ const MobileDashboard = () => {
         }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>
-              BeautyBook
+              Glo Head Spa
             </h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
               Welcome, {user?.firstName || 'Admin'}!

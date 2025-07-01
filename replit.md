@@ -1,8 +1,8 @@
-# BeautyBook - Salon Management System
+# Glo Head Spa - Salon Management System
 
 ## Overview
 
-BeautyBook is a comprehensive salon management system built with a React frontend and Express backend. It's designed to help salon businesses manage their services, staff, appointments, clients, memberships, marketing campaigns, and generate reports.
+Glo Head Spa is a comprehensive salon management system built with a React frontend and Express backend. It's designed to help salon businesses manage their services, staff, appointments, clients, memberships, marketing campaigns, and generate reports.
 
 The system uses a modern tech stack with React for the UI, Express for the API, and Drizzle ORM for database operations. It features a clean, user-friendly interface with a dashboard-based layout for different management functions.
 
@@ -12,6 +12,19 @@ Preferred communication style: Simple, everyday language.
 Preferred color scheme: Pink primary color with black text for better readability and modern aesthetic.
 
 ## Recent Changes
+
+### July 1, 2025 - Complete Application Rebranding to "Glo Head Spa" and External API System Implementation
+
+- **Successfully completed comprehensive rebranding from "BeautyBook" to "Glo Head Spa":**
+  - Updated all page titles across the entire application using useDocumentTitle hooks
+  - Modified login page welcome message and toast notifications to reflect new brand name
+  - Updated client booking page header and footer branding
+  - Changed mobile dashboard branding display
+  - Updated email test page default subject line
+  - Modified application documentation and main project title in replit.md
+  - Ensured consistent brand identity throughout all user-facing content and page titles
+  - All browser tab titles now properly display "Glo Head Spa" across all application pages
+  - Complete visual and textual consistency achieved for the new salon business identity
 
 ### July 1, 2025 - Complete External API System Implementation for Frontend App Integration
 

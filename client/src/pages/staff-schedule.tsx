@@ -26,7 +26,7 @@ import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffSchedulePage() {
-  useDocumentTitle("Staff Schedule | BeautyBook");
+  useDocumentTitle("Staff Schedule | Glo Head Spa");
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");

@@ -10,7 +10,7 @@ import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function EmailTestPage() {
   const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('Test Email from BeautyBook');
+  const [subject, setSubject] = useState('Test Email from Glo Head Spa');
   const [content, setContent] = useState('This is a test email to verify delivery. If you receive this, your email system is working correctly!');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);

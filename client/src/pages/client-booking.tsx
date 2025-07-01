@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
 const ClientBookingPage = () => {
-  useDocumentTitle("Book an Appointment | BeautyBook");
+  useDocumentTitle("Book an Appointment | Glo Head Spa");
   const [isBookingOpen, setIsBookingOpen] = useState(true);
   const { toast } = useToast();
   const [location, navigate] = useLocation();
@@ -22,7 +22,7 @@ const ClientBookingPage = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">BeautyBook Salon & Spa</h1>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Glo Head Spa</h1>
           <Button 
             variant="outline" 
             size="sm" 
@@ -52,7 +52,7 @@ const ClientBookingPage = () => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            &copy; {new Date().getFullYear()} BeautyBook Salon & Spa. All rights reserved.
+            &copy; {new Date().getFullYear()} Glo Head Spa. All rights reserved.
           </p>
         </div>
       </footer>
