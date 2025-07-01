@@ -274,6 +274,8 @@ export const payments = pgTable("payments", {
   appointmentId: integer("appointment_id"),
   clientMembershipId: integer("client_membership_id"),
   amount: doublePrecision("amount").notNull(),
+  tipAmount: doublePrecision("tip_amount").default(0),
+  totalAmount: doublePrecision("total_amount").notNull(), // amount + tipAmount
   method: text("method").notNull().default("card"), // card, cash, check, etc.
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   type: text("type").notNull().default("appointment"), // appointment, pos_payment, membership
