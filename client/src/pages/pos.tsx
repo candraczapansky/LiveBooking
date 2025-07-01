@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
+import TipSelection from "@/components/appointments/tip-selection";
 import { 
   Plus, 
   Minus, 
@@ -46,7 +47,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
-import TipSelection from "@/components/appointments/tip-selection";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -129,7 +129,9 @@ const PaymentForm = ({ total, onSuccess, onError }: {
         
         // Process payment with Square
         const response = await apiRequest("POST", "/api/create-payment", {
-          amount: total,
+          amount: total - tipAmount, // Base amount without tip
+          tipAmount: tipAmount,
+          totalAmount: total,
           sourceId: nonce,
           type: "pos_payment",
           description: "Point of Sale Transaction"
@@ -581,6 +583,7 @@ export default function PointOfSale() {
       items: cart,
       subtotal: getSubtotal(),
       tax: getTax(),
+      tipAmount: tipAmount,
       total: getGrandTotal(),
       paymentMethod,
     };
