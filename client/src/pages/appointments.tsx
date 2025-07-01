@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -398,35 +398,49 @@ const AppointmentsPage = () => {
     setDragOverTimeSlot(null);
   };
 
+  // Memoized appointment positioning to prevent recalculations during re-renders
+  const appointmentPositions = useMemo(() => {
+    if (!appointments || !services) return new Map();
+    
+    const positionMap = new Map();
+    
+    appointments.forEach((appointment: any) => {
+      // Create a new Date object from the UTC timestamp
+      const appointmentTime = new Date(appointment.startTime);
+      
+      // Get local time components for positioning calculation
+      const startHour = appointmentTime.getHours();
+      const startMinute = appointmentTime.getMinutes();
+      
+      // Ensure appointment is within business hours (8 AM to 10 PM)
+      if (startHour < 8 || startHour >= 22) {
+        positionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
+        return;
+      }
+      
+      // Calculate position based on time slots starting from 8:00 AM
+      // Each 15-minute slot is 30px * zoomLevel high  
+      const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
+      const slotHeight = 30 * zoomLevel;
+      const topPosition = (totalMinutesFromStart / 15) * slotHeight;
+      
+      // Use service duration for height calculation
+      const service = services.find((s: any) => s.id === appointment.serviceId);
+      const serviceDuration = service?.duration || 60;
+      const slotsNeeded = Math.ceil(serviceDuration / 15);
+      const calculatedHeight = slotsNeeded * slotHeight;
+      
+      positionMap.set(appointment.id, {
+        top: `${topPosition}px`,
+        height: `${calculatedHeight}px`
+      });
+    });
+    
+    return positionMap;
+  }, [appointments, services, zoomLevel]);
+
   const getAppointmentStyle = (appointment: any) => {
-    // Create a new Date object from the UTC timestamp
-    const appointmentTime = new Date(appointment.startTime);
-    
-    // Get local time components for positioning calculation
-    const startHour = appointmentTime.getHours();
-    const startMinute = appointmentTime.getMinutes();
-    
-    // Ensure appointment is within business hours (8 AM to 10 PM)
-    if (startHour < 8 || startHour >= 22) {
-      return { top: '0px', height: '0px', display: 'none' };
-    }
-    
-    // Calculate position based on time slots starting from 8:00 AM
-    // Each 15-minute slot is 30px * zoomLevel high  
-    const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
-    const slotHeight = 30 * zoomLevel;
-    const topPosition = (totalMinutesFromStart / 15) * slotHeight;
-    
-    // Use service duration for height calculation
-    const service = services?.find((s: any) => s.id === appointment.serviceId);
-    const serviceDuration = service?.duration || 60;
-    const slotsNeeded = Math.ceil(serviceDuration / 15);
-    const calculatedHeight = slotsNeeded * slotHeight;
-    
-    return {
-      top: `${topPosition}px`,
-      height: `${calculatedHeight}px`
-    };
+    return appointmentPositions.get(appointment.id) || { top: '0px', height: '0px', display: 'none' };
   };
 
   const getStaffColumn = (staffName: string) => {
