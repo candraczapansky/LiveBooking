@@ -784,6 +784,10 @@ If you didn't request this password reset, please ignore this email and your pas
     const id = parseInt(req.params.id);
     const { assignedStaff, ...serviceData } = req.body;
     
+    console.log("Backend received update request for service:", id);
+    console.log("Backend received assignedStaff:", assignedStaff);
+    console.log("Backend received serviceData:", serviceData);
+    
     try {
       // Update basic service data first
       const updatedService = await storage.updateService(id, serviceData);

@@ -130,11 +130,13 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       ])
         .then(([serviceData, staffData]) => {
           // Transform staff data to match form requirements
+          console.log("Raw staff data from API:", staffData);
           const assignedStaff = staffData.map((staff: any) => ({
-            staffId: staff.id,
+            staffId: staff.id, // This should be the staff member's ID, not the staffService ID
             customRate: staff.customRate || undefined,
             customCommissionRate: staff.customCommissionRate || undefined,
           }));
+          console.log("Transformed staff data for form:", assignedStaff);
           
           form.reset({
             name: serviceData.name,
@@ -238,6 +240,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         assignedStaff: assignedStaff
       };
       
+      console.log("Frontend form data before sending:", data);
+      console.log("Frontend assignedStaff array:", assignedStaff);
       console.log("Frontend sending data:", JSON.stringify(fullServiceData, null, 2));
       
       const response = await apiRequest("PUT", `/api/services/${serviceId}`, fullServiceData);
