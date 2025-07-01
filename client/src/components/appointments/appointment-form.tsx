@@ -339,11 +339,23 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: selectedTime || "10:00",
         notes: "",
       });
-    } else {
+    } else if (!appointmentId) {
+      // Only reset with defaults for new appointments, not when editing existing ones
+      form.reset({
+        staffId: "",
+        serviceId: "",
+        clientId: "",
+        date: selectedDate || new Date(),
+        time: selectedTime || "10:00",
+        notes: "",
+      });
       // Invalidate services cache when opening to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+    } else {
+      // Just invalidate cache for existing appointments (form will be populated by appointment data)
+      queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
-  }, [open, selectedDate, selectedTime, queryClient]);
+  }, [open, selectedDate, selectedTime, queryClient, appointmentId]);
 
   // Update time when selectedTime prop changes
   useEffect(() => {
@@ -353,16 +365,19 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     }
   }, [selectedTime, open, appointmentId]);
 
-  // Clear time when staff changes or when no slots are available
+  // Clear time when staff changes or when no slots are available (for new appointments only)
   useEffect(() => {
-    const currentTime = form.getValues('time');
-    const availableSlots = getAvailableTimeSlots();
-    
-    // If the current time is not in available slots, clear it
-    if (currentTime && !availableSlots.some(slot => slot.value === currentTime)) {
-      form.setValue('time', '');
+    // Don't clear time when editing existing appointments - let the user edit the time freely
+    if (!appointmentId) {
+      const currentTime = form.getValues('time');
+      const availableSlots = getAvailableTimeSlots();
+      
+      // If the current time is not in available slots, clear it
+      if (currentTime && !availableSlots.some(slot => slot.value === currentTime)) {
+        form.setValue('time', '');
+      }
     }
-  }, [selectedStaffId, selectedFormDate]);
+  }, [selectedStaffId, selectedFormDate, appointmentId]);
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
