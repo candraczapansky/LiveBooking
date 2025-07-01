@@ -343,10 +343,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   // Reset form when closing and invalidate cache when opening
   useEffect(() => {
-    console.log('Form reset effect triggered:', { open, appointmentId, selectedTime });
-    
     if (!open) {
-      console.log('Dialog closed - resetting form to defaults');
       form.reset({
         staffId: "",
         serviceId: "",
@@ -356,7 +353,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         notes: "",
       });
     } else if (!appointmentId) {
-      console.log('New appointment - resetting form with new defaults');
       // Only reset with defaults for new appointments, not when editing existing ones
       form.reset({
         staffId: "",
@@ -369,7 +365,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Invalidate services cache when opening to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     } else {
-      console.log('Editing appointment - NOT resetting form, letting appointment data load');
       // Just invalidate cache for existing appointments (form will be populated by appointment data)
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
