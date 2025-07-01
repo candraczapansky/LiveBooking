@@ -96,7 +96,7 @@ const SimpleMobileMenu = () => {
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100" style={{ color: 'hsl(0 0% 0%)' }}>
-                BeautyBook
+                Glo Head Spa
               </h2>
               <button
                 onClick={closeMenu}

@@ -151,7 +151,7 @@ const Sidebar = () => {
                   style={{ color: primaryColor }}
                 />
               </Button>
-              {isOpen && <h1 className="text-xl font-bold text-primary">BeautyBook</h1>}
+              {isOpen && <h1 className="text-xl font-bold text-primary">Glo Head Spa</h1>}
             </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">

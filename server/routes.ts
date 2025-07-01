@@ -3079,7 +3079,7 @@ If you didn't request this password reset, please ignore this email and your pas
               const emailParams = createMarketingCampaignEmail(
                 recipient.email,
                 recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
-                campaign.subject || 'Marketing Update from BeautyBook',
+                campaign.subject || 'Marketing Update from Glo Head Spa',
                 campaign.content,
                 process.env.SENDGRID_FROM_EMAIL || 'test@example.com', // Use verified sender email
                 campaignRecipient.trackingToken || undefined
@@ -3254,7 +3254,7 @@ If you didn't request this password reset, please ignore this email and your pas
           <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background-color: #f5f5f5;">
             <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
               <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #e91e63; margin: 0;">BeautyBook</h1>
+                <h1 style="color: #e91e63; margin: 0;">Glo Head Spa</h1>
               </div>
               <h2 style="color: #333; text-align: center;">You've Been Unsubscribed</h2>
               <p style="color: #666; line-height: 1.6;">
@@ -3328,7 +3328,7 @@ If you didn't request this password reset, please ignore this email and your pas
         appointmentDate,
         appointmentTime,
         service.name,
-        'noreply@beautybook.com'
+        'noreply@gloheadspa.com'
       );
 
       const success = await sendEmail(emailParams);
@@ -3395,7 +3395,7 @@ If you didn't request this password reset, please ignore this email and your pas
             appointmentDate,
             appointmentTime,
             service.name,
-            'noreply@beautybook.com'
+            'noreply@gloheadspa.com'
           );
 
           const success = await sendEmail(emailParams);
@@ -4009,7 +4009,7 @@ Thank you for choosing Glo Head Spa!
         subject: subject,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Test Email from BeautyBook</h2>
+            <h2 style="color: #333;">Test Email from Glo Head Spa</h2>
             <p style="color: #666; line-height: 1.6;">${content}</p>
             <hr style="border: 1px solid #eee; margin: 20px 0;">
             <p style="color: #999; font-size: 12px;">This is a test email sent from your salon management system.</p>
