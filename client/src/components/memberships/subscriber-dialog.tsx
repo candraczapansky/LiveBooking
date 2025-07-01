@@ -430,15 +430,15 @@ export default function SubscriberDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             {membership?.name} Subscribers
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-6 overflow-y-auto">
+        <div className="space-y-6 overflow-y-auto flex-1 min-h-0">
           {/* Add New Subscriber Section */}
           <div className="border rounded-lg p-4 bg-muted/30">
             <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
@@ -498,8 +498,8 @@ export default function SubscriberDialog({
           </div>
 
           {/* Current Subscribers Table */}
-          <div>
-            <h3 className="text-sm font-medium mb-3 flex items-center gap-2">
+          <div className="flex flex-col min-h-0">
+            <h3 className="text-sm font-medium mb-3 flex items-center gap-2 flex-shrink-0">
               <Users className="h-4 w-4" />
               Current Subscribers ({subscribers?.length || 0})
             </h3>
@@ -513,77 +513,79 @@ export default function SubscriberDialog({
                 No subscribers yet. Add your first subscriber above.
               </div>
             ) : (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscribers?.map((subscription: ClientMembership) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell>
-                          <div className="flex items-center space-x-3">
-                            <Avatar>
-                              <AvatarFallback>
-                                {getInitials(
-                                  subscription.client?.firstName,
-                                  subscription.client?.lastName
-                                )}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">
-                                {getFullName(
-                                  subscription.client?.firstName,
-                                  subscription.client?.lastName
-                                )}
-                              </div>
-                              <div className="text-sm text-muted-foreground">
-                                {subscription.client?.email}
+              <div className="border rounded-lg overflow-hidden flex-1 min-h-0">
+                <div className="max-h-[300px] overflow-y-auto">
+                  <Table>
+                    <TableHeader className="sticky top-0 bg-white dark:bg-gray-800 z-10">
+                      <TableRow>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Start Date</TableHead>
+                        <TableHead>End Date</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {subscribers?.map((subscription: ClientMembership) => (
+                        <TableRow key={subscription.id}>
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <Avatar>
+                                <AvatarFallback>
+                                  {getInitials(
+                                    subscription.client?.firstName,
+                                    subscription.client?.lastName
+                                  )}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">
+                                  {getFullName(
+                                    subscription.client?.firstName,
+                                    subscription.client?.lastName
+                                  )}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {subscription.client?.email}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={subscription.active ? "default" : "secondary"}>
-                            {subscription.active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {formatDate(new Date(subscription.startDate))}
-                        </TableCell>
-                        <TableCell className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          {formatDate(new Date(subscription.endDate))}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveSubscriber(subscription.id)}
-                            disabled={removeSubscriberMutation.isPending}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            {removeSubscriberMutation.isPending ? "Removing..." : "Remove"}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={subscription.active ? "default" : "secondary"}>
+                              {subscription.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {formatDate(new Date(subscription.startDate))}
+                          </TableCell>
+                          <TableCell className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            {formatDate(new Date(subscription.endDate))}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveSubscriber(subscription.id)}
+                              disabled={removeSubscriberMutation.isPending}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {removeSubscriberMutation.isPending ? "Removing..." : "Remove"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
