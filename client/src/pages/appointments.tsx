@@ -705,7 +705,6 @@ const AppointmentsPage = () => {
               
               if (columnIndex === -1) return null;
 
-              const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
               
               // Find service information
@@ -746,7 +745,7 @@ const AppointmentsPage = () => {
                   }}
                   className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02] group relative"
                   style={{
-                    left: `${leftPosition + 4}px`,
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     backgroundColor: backgroundColor,
