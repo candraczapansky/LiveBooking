@@ -61,6 +61,46 @@ const AppointmentsPage = () => {
   const [zoomLevel, setZoomLevel] = useState(1);
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
+  const [hoverInfo, setHoverInfo] = useState({ visible: false, time: '', x: 0, y: 0 });
+
+  // Calculate time from position in calendar
+  const calculateTimeFromPosition = (y: number, timeSlotHeight: number) => {
+    const startHour = 8; // 8:00 AM
+    const minutesPerPixel = 15 / (timeSlotHeight / 4); // 15 minutes per quarter slot
+    const totalMinutes = y * minutesPerPixel;
+    
+    const hours = Math.floor(totalMinutes / 60) + startHour;
+    const minutes = Math.floor(totalMinutes % 60);
+    
+    // Round to nearest 15 minutes
+    const roundedMinutes = Math.round(minutes / 15) * 15;
+    
+    // Format time
+    const displayHours = hours > 12 ? hours - 12 : hours;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const formattedHours = displayHours === 0 ? 12 : displayHours;
+    
+    return `${formattedHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
+  };
+
+  // Handle mouse move over calendar time slots
+  const handleCalendarMouseMove = (e: React.MouseEvent, timeSlotIndex: number) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const y = e.clientY - rect.top;
+    const time = calculateTimeFromPosition(timeSlotIndex * 60 + y, 60);
+    
+    setHoverInfo({
+      visible: true,
+      time: time,
+      x: e.clientX,
+      y: e.clientY
+    });
+  };
+
+  // Handle mouse leave calendar
+  const handleCalendarMouseLeave = () => {
+    setHoverInfo({ visible: false, time: '', x: 0, y: 0 });
+  };
 
   // Handle quick action navigation
   useEffect(() => {
@@ -568,6 +608,17 @@ const AppointmentsPage = () => {
                       onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
                       onDragLeave={isAvailable ? handleDragLeave : undefined}
                       onDrop={isAvailable ? (e) => handleDrop(e, time) : undefined}
+                      onMouseMove={(e) => {
+                        if (isAvailable) {
+                          setHoverInfo({
+                            visible: true,
+                            time: time,
+                            x: e.clientX,
+                            y: e.clientY
+                          });
+                        }
+                      }}
+                      onMouseLeave={handleCalendarMouseLeave}
                       onClick={isAvailable ? () => {
                         // Set time for new appointment
                         const [timeStr, period] = time.split(' ');
@@ -901,7 +952,13 @@ const AppointmentsPage = () => {
               
               {/* Day Columns - empty but provide grid structure */}
               {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" style={{ height: '60px' }}>
+                <div 
+                  key={dayIndex} 
+                  className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" 
+                  style={{ height: '60px' }}
+                  onMouseMove={(e) => handleCalendarMouseMove(e, timeIndex)}
+                  onMouseLeave={handleCalendarMouseLeave}
+                >
                   {/* Empty - appointments are handled by the overlay above */}
                 </div>
               ))}
@@ -1298,6 +1355,19 @@ const AppointmentsPage = () => {
           onClose={() => setIsCheckoutOpen(false)}
           onSuccess={handlePaymentSuccess}
         />
+      )}
+
+      {/* Time Hover Tooltip */}
+      {hoverInfo.visible && (
+        <div
+          className="fixed z-50 bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg pointer-events-none"
+          style={{
+            left: hoverInfo.x + 10,
+            top: hoverInfo.y - 40,
+          }}
+        >
+          {hoverInfo.time}
+        </div>
       )}
     </div>
   );
