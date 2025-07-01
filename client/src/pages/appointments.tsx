@@ -399,12 +399,12 @@ const AppointmentsPage = () => {
   };
 
   const getAppointmentStyle = (appointment: any) => {
-    // Parse the UTC time string to ensure proper timezone handling
-    const utcTime = new Date(appointment.startTime);
+    // Create a new Date object from the UTC timestamp
+    const appointmentTime = new Date(appointment.startTime);
     
-    // Get local time components - this should match the timezone used when creating appointments
-    const startHour = utcTime.getHours();
-    const startMinute = utcTime.getMinutes();
+    // Get local time components for positioning calculation
+    const startHour = appointmentTime.getHours();
+    const startMinute = appointmentTime.getMinutes();
     
     // Ensure appointment is within business hours (8 AM to 10 PM)
     if (startHour < 8 || startHour >= 22) {
@@ -412,16 +412,15 @@ const AppointmentsPage = () => {
     }
     
     // Calculate position based on time slots starting from 8:00 AM
-    // Each 15-minute slot is 30px * zoomLevel high
+    // Each 15-minute slot is 30px * zoomLevel high  
     const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
     const slotHeight = 30 * zoomLevel;
     const topPosition = (totalMinutesFromStart / 15) * slotHeight;
     
-    // Use service duration only (not including buffer times) for visual display
+    // Use service duration for height calculation
     const service = services?.find((s: any) => s.id === appointment.serviceId);
-    const serviceDuration = service?.duration || 60; // Only the actual service time
-    
-    const slotsNeeded = Math.ceil(serviceDuration / 15); // 15-minute increments
+    const serviceDuration = service?.duration || 60;
+    const slotsNeeded = Math.ceil(serviceDuration / 15);
     const calculatedHeight = slotsNeeded * slotHeight;
     
     return {
@@ -693,6 +692,8 @@ const AppointmentsPage = () => {
 
               const leftPosition = 80 + (columnIndex * columnWidth); // Desktop view only
               const appointmentStyle = getAppointmentStyle(appointment);
+              
+
 
               // Always use service colors, regardless of payment status
               const isPaid = appointment.paymentStatus === 'paid';
