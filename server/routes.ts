@@ -2136,6 +2136,7 @@ If you didn't request this password reset, please ignore this email and your pas
       const payment = await storage.createPayment({
         clientId: appointment.clientId,
         amount: paymentAmount,
+        totalAmount: paymentAmount,
         method: 'cash',
         status: 'completed',
         appointmentId: appointmentId
@@ -2265,6 +2266,7 @@ If you didn't request this password reset, please ignore this email and your pas
       await storage.createPayment({
         clientId: appointment.clientId,
         amount: appointmentAmount,
+        totalAmount: appointmentAmount,
         method: 'gift_card',
         status: 'completed',
         appointmentId: appointmentId
@@ -2538,6 +2540,7 @@ If you didn't request this password reset, please ignore this email and your pas
         const paymentRecord = await storage.createPayment({
           clientId: 1, // Default client for POS sales
           amount: amount,
+          totalAmount: amount,
           method: 'cash',
           status: 'completed',
           type: type,
@@ -2629,6 +2632,7 @@ If you didn't request this password reset, please ignore this email and your pas
         const paymentRecord = await storage.createPayment({
           clientId: 1, // Default client for POS sales, could be made dynamic
           amount: amount,
+          totalAmount: amount,
           method: 'card',
           status: 'completed',
           type: type,
