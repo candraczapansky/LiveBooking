@@ -309,6 +309,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       
 
       
+      console.log('Resetting form with appointment data:', {
+        staffId: appointment.staffId?.toString(),
+        serviceId: appointment.serviceId?.toString(), 
+        clientId: appointment.clientId?.toString(),
+        originalAppointment: appointment
+      });
+
       form.reset({
         staffId: appointment.staffId?.toString() || "",
         serviceId: appointment.serviceId?.toString() || "",
