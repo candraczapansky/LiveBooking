@@ -656,9 +656,48 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
     }).format(amount);
   };
 
-  // Simple test render first
+  if (isLoading) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Summary
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!detailData) {
+    return (
+      <Card className="mt-6">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <Button variant="outline" onClick={onBack}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Summary
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No payroll data found for this period.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card className="mt-6 border-2 border-red-500">
+    <Card className="mt-6">
       <CardHeader>
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={onBack}>
@@ -666,18 +705,83 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
             Back to Summary
           </Button>
           <div>
-            <CardTitle>TEST: Detailed Payroll Report</CardTitle>
+            <CardTitle>Detailed Payroll Report</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Staff ID: {staffId} - {format(month, 'MMMM yyyy')}
+              {detailData.staffName} ({detailData.title}) - {format(month, 'MMMM yyyy')}
             </p>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="p-4 bg-yellow-100">
-          <p>Loading: {isLoading ? 'YES' : 'NO'}</p>
-          <p>Data available: {detailData ? 'YES' : 'NO'}</p>
-          <p>Staff Name: {detailData?.staffName || 'Loading...'}</p>
+        {/* Summary Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-blue-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600">
+              {detailData.summary.totalAppointments}
+            </div>
+            <div className="text-sm text-blue-600">Total Appointments</div>
+          </div>
+          <div className="bg-green-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(detailData.summary.totalRevenue)}
+            </div>
+            <div className="text-sm text-green-600">Total Revenue</div>
+          </div>
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-purple-600">
+              {formatCurrency(detailData.summary.totalCommission)}
+            </div>
+            <div className="text-sm text-purple-600">Total Commission</div>
+          </div>
+          <div className="bg-orange-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-orange-600">
+              {formatCurrency(detailData.summary.averageCommissionPerService)}
+            </div>
+            <div className="text-sm text-orange-600">Avg Commission/Service</div>
+          </div>
+        </div>
+
+        {/* Appointments Table */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Individual Appointments</h3>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead>Service Price</TableHead>
+                  <TableHead>Commission Rate</TableHead>
+                  <TableHead>Commission Earned</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detailData.appointments.map((appointment: any) => (
+                  <TableRow key={appointment.appointmentId}>
+                    <TableCell>
+                      {format(new Date(appointment.date), 'MMM dd, yyyy')}
+                    </TableCell>
+                    <TableCell>{appointment.clientName}</TableCell>
+                    <TableCell>{appointment.serviceName}</TableCell>
+                    <TableCell>{appointment.duration} min</TableCell>
+                    <TableCell>{formatCurrency(appointment.servicePrice)}</TableCell>
+                    <TableCell>{(appointment.commissionRate * 100)}%</TableCell>
+                    <TableCell className="font-semibold text-green-600">
+                      {formatCurrency(appointment.commissionAmount)}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={appointment.paymentStatus === 'paid' ? 'default' : 'secondary'}>
+                        {appointment.paymentStatus}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </CardContent>
     </Card>
