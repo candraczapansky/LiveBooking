@@ -170,7 +170,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
     const [hours, minutes] = startTimeString.split(':').map(Number);
     const startDate = new Date();
     startDate.setHours(hours, minutes, 0, 0);
-    const endDate = addMinutes(startDate, selectedService.duration);
+    
+    // Calculate total duration including buffer times
+    const totalDuration = selectedService.duration + 
+                         (selectedService.bufferTimeBefore || 0) + 
+                         (selectedService.bufferTimeAfter || 0);
+    
+    const endDate = addMinutes(startDate, totalDuration);
     return format(endDate, 'h:mm a');
   })() : null;
   
@@ -234,7 +240,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       startTime.setHours(hours, minutes, 0, 0);
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
-      const endTime = addMinutes(startTime, selectedServiceData?.duration || 60);
+      
+      // Calculate total duration including buffer times
+      const totalDuration = (selectedServiceData?.duration || 60) + 
+                           (selectedServiceData?.bufferTimeBefore || 0) + 
+                           (selectedServiceData?.bufferTimeAfter || 0);
+      
+      const endTime = addMinutes(startTime, totalDuration);
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
@@ -293,7 +305,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
       startTime.setHours(hours, minutes, 0, 0);
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
-      const endTime = addMinutes(startTime, selectedServiceData?.duration || 60);
+      
+      // Calculate total duration including buffer times
+      const totalDuration = (selectedServiceData?.duration || 60) + 
+                           (selectedServiceData?.bufferTimeBefore || 0) + 
+                           (selectedServiceData?.bufferTimeAfter || 0);
+      
+      const endTime = addMinutes(startTime, totalDuration);
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
@@ -635,7 +653,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate }: Ap
                   </div>
                   <div className="pl-6">
                     <p><strong>Service:</strong> {selectedService.name}</p>
-                    <p><strong>Duration:</strong> {selectedService.duration} minutes</p>
+                    <p><strong>Service Duration:</strong> {selectedService.duration} minutes</p>
+                    {(selectedService.bufferTimeBefore > 0 || selectedService.bufferTimeAfter > 0) && (
+                      <>
+                        {selectedService.bufferTimeBefore > 0 && (
+                          <p><strong>Buffer Before:</strong> {selectedService.bufferTimeBefore} minutes</p>
+                        )}
+                        {selectedService.bufferTimeAfter > 0 && (
+                          <p><strong>Buffer After:</strong> {selectedService.bufferTimeAfter} minutes</p>
+                        )}
+                        <p><strong>Total Time:</strong> {selectedService.duration + (selectedService.bufferTimeBefore || 0) + (selectedService.bufferTimeAfter || 0)} minutes</p>
+                      </>
+                    )}
                     <p><strong>End Time:</strong> {endTime}</p>
                   </div>
                 </div>
