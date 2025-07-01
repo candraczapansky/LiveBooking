@@ -1446,6 +1446,179 @@ If you didn't request this password reset, please ignore this email and your pas
     return res.status(204).end();
   });
 
+  // External Data API - Provides staff schedules and services for external frontend apps
+  app.get("/api/external/staff-availability", async (req, res) => {
+    try {
+      const { date, staffId } = req.query;
+      
+      // Get all staff with their user details
+      const allStaff = await storage.getAllStaff();
+      const staffWithDetails = await Promise.all(
+        allStaff.map(async (staff) => {
+          const user = await storage.getUser(staff.userId);
+          const schedules = await storage.getStaffSchedulesByStaffId(staff.id);
+          const services = await storage.getStaffServices(staff.id);
+          
+          // Get detailed service information
+          const serviceDetails = await Promise.all(
+            services.map(async (staffService) => {
+              const service = await storage.getService(staffService.serviceId);
+              const category = service ? await storage.getServiceCategory(service.categoryId) : null;
+              return {
+                id: service?.id,
+                name: service?.name,
+                duration: service?.duration,
+                price: service?.price,
+                category: category?.name,
+                customRate: staffService.customRate,
+                customCommissionRate: staffService.customCommissionRate
+              };
+            })
+          );
+          
+          return {
+            id: staff.id,
+            userId: staff.userId,
+            title: staff.title,
+            commissionType: staff.commissionType,
+            commissionRate: staff.commissionRate,
+            hourlyRate: staff.hourlyRate,
+            fixedRate: staff.fixedRate,
+            user: user ? {
+              id: user.id,
+              firstName: user.firstName,
+              lastName: user.lastName,
+              email: user.email,
+              phone: user.phone
+            } : null,
+            schedules: schedules,
+            services: serviceDetails.filter(s => s.id) // Remove null services
+          };
+        })
+      );
+      
+      // Filter by specific staff member if requested
+      const result = staffId 
+        ? staffWithDetails.filter(staff => staff.id === parseInt(staffId as string))
+        : staffWithDetails;
+      
+      res.json({
+        success: true,
+        data: result,
+        timestamp: new Date().toISOString(),
+        filters: { date, staffId }
+      });
+    } catch (error: any) {
+      console.error('Error fetching staff availability:', error);
+      res.status(500).json({ 
+        error: "Failed to fetch staff availability",
+        details: error.message 
+      });
+    }
+  });
+
+  app.get("/api/external/services", async (req, res) => {
+    try {
+      const { categoryId, staffId } = req.query;
+      
+      // Get all services with categories and assigned staff
+      const allServices = await storage.getAllServices();
+      const servicesWithDetails = await Promise.all(
+        allServices.map(async (service) => {
+          const category = await storage.getServiceCategory(service.categoryId);
+          const staffAssignments = await storage.getStaffServicesByService(service.id);
+          
+          // Get staff details for each assignment
+          const assignedStaff = await Promise.all(
+            staffAssignments.map(async (assignment) => {
+              const staff = await storage.getStaff(assignment.staffId);
+              const user = staff ? await storage.getUser(staff.userId) : null;
+              return {
+                staffId: staff?.id,
+                customRate: assignment.customRate,
+                customCommissionRate: assignment.customCommissionRate,
+                staff: staff ? {
+                  id: staff.id,
+                  title: staff.title,
+                  user: user ? {
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    email: user.email
+                  } : null
+                } : null
+              };
+            })
+          );
+          
+          return {
+            id: service.id,
+            name: service.name,
+            description: service.description,
+            duration: service.duration,
+            price: service.price,
+            color: service.color,
+            bufferTimeBefore: service.bufferTimeBefore,
+            bufferTimeAfter: service.bufferTimeAfter,
+            category: category ? {
+              id: category.id,
+              name: category.name,
+              color: category.color
+            } : null,
+            assignedStaff: assignedStaff.filter(a => a.staff)
+          };
+        })
+      );
+      
+      // Apply filters
+      let filteredServices = servicesWithDetails;
+      
+      if (categoryId) {
+        filteredServices = filteredServices.filter(service => 
+          service.category?.id === parseInt(categoryId as string)
+        );
+      }
+      
+      if (staffId) {
+        filteredServices = filteredServices.filter(service =>
+          service.assignedStaff.some(assignment => 
+            assignment.staffId === parseInt(staffId as string)
+          )
+        );
+      }
+      
+      res.json({
+        success: true,
+        data: filteredServices,
+        timestamp: new Date().toISOString(),
+        filters: { categoryId, staffId }
+      });
+    } catch (error: any) {
+      console.error('Error fetching services:', error);
+      res.status(500).json({ 
+        error: "Failed to fetch services",
+        details: error.message 
+      });
+    }
+  });
+
+  app.get("/api/external/service-categories", async (req, res) => {
+    try {
+      const categories = await storage.getAllServiceCategories();
+      
+      res.json({
+        success: true,
+        data: categories,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('Error fetching service categories:', error);
+      res.status(500).json({ 
+        error: "Failed to fetch service categories",
+        details: error.message 
+      });
+    }
+  });
+
   // External Appointment Webhook - Receives new appointments from external frontend app
   app.post("/api/appointments/webhook", async (req, res) => {
     try {
