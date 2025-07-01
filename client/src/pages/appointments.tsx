@@ -464,10 +464,16 @@ const AppointmentsPage = () => {
       const topPosition = (totalMinutesFromStart / 15) * slotHeight;
       
       // Debug positioning calculation for the new appointment
-      if (appointment.id > 130) {
-        console.log(`[DEBUG] Position calculation for appointment ${appointment.id}:`, {
+      if (appointment.id >= 100) {
+        const expectedSlotIndex = Math.floor(totalMinutesFromStart / 15);
+        const expectedTimeSlot = timeSlots[expectedSlotIndex];
+        console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
+          startHour,
+          startMinute,
           totalMinutesFromStart,
           slotHeight,
+          expectedSlotIndex,
+          expectedTimeSlot,
           topPosition,
           finalTopPosition: `${topPosition}px`
         });
