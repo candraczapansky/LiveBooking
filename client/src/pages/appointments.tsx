@@ -866,6 +866,19 @@ const AppointmentsPage = () => {
               // Create a stable key based on appointment's immutable properties
               const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
               
+              // Debug the actual style being applied for recent appointments
+              if (appointment.id >= 110) {
+                console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
+                  appointmentStyle,
+                  finalStyle: {
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                    width: `${columnWidth - 8}px`,
+                    ...appointmentStyle,
+                    zIndex: 10
+                  }
+                });
+              }
+              
               return (
                 <div
                   key={stableKey}
