@@ -13,7 +13,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### July 1, 2025 - Calendar Hover Feature and Complete Tip System Implementation
+### July 1, 2025 - Calendar Hover Feature, Complete Tip System Implementation, and Appointment Timing Fix
 
 - **Successfully implemented calendar hover time display feature:**
   - Added interactive time tooltips that appear when cursor hovers over calendar time slots
@@ -47,6 +47,14 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Automatically clears invalid time selections when staff or date changes
   - Enhanced user experience by preventing invalid appointment bookings and conflicts upfront
   - Ensures appointments can only be created during staff members' actual working hours when they're truly available
+
+- **Fixed critical appointment display timing issue:**
+  - Resolved timezone conversion bug where appointments weren't displaying at correct times on calendar
+  - Root cause: appointment creation was using setHours() then toISOString() causing UTC conversion issues
+  - Fixed by creating Date objects with explicit year/month/day/hour/minute parameters in local timezone
+  - Appointments now display at the exact time selected during booking (e.g., 2:30 PM appointment appears at 2:30 PM slot)
+  - Enhanced debugging with console logging to track timezone handling during appointment creation and updates
+  - Both create and update appointment functions now handle timezone consistently
 
 ### July 1, 2025 - Complete Application Rebranding to "Glo Head Spa" and External API System Implementation
 
