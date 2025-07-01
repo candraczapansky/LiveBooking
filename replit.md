@@ -36,6 +36,13 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - All browser tab titles now properly display "Glo Head Spa" across all application pages
   - Complete visual and textual consistency achieved for the new salon business identity
 
+- **Investigating staff schedule editing persistence issue:**
+  - Staff schedule editing form allows input and saving but changes don't persist after saving
+  - Added debugging to backend PUT /api/schedules/:id endpoint to trace update process
+  - Added frontend debugging to schedule update mutation to monitor data flow
+  - Enhanced cache invalidation to invalidate both ['/api/schedules'] and ['/api/staff'] queries after updates
+  - API endpoint returns 200 status indicating successful update, investigating data synchronization
+
 ### July 1, 2025 - Complete External API System Implementation for Frontend App Integration
 
 - **Created comprehensive external data API system for frontend app integration:**

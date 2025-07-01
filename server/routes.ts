@@ -4321,8 +4321,15 @@ Thank you for choosing Glo Head Spa!
   app.put("/api/schedules/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
+      console.log("Updating schedule ID:", id);
+      console.log("Request body:", req.body);
+      
       const validatedData = insertStaffScheduleSchema.partial().parse(req.body);
+      console.log("Validated data:", validatedData);
+      
       const schedule = await storage.updateStaffSchedule(id, validatedData);
+      console.log("Updated schedule result:", schedule);
+      
       res.json(schedule);
     } catch (error) {
       console.error("Error updating staff schedule:", error);

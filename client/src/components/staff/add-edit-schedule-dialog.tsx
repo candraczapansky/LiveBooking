@@ -112,14 +112,18 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
   const updateScheduleMutation = useMutation({
     mutationFn: async (data: any) => {
+      console.log("Frontend sending schedule update data:", data);
       const response = await apiRequest("PUT", `/api/schedules/${schedule.id}`, data);
       if (!response.ok) {
         throw new Error("Failed to update schedule");
       }
-      return response.json();
+      const result = await response.json();
+      console.log("Frontend received schedule update result:", result);
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
       toast({
         title: "Success",
         description: "Schedule updated successfully.",
