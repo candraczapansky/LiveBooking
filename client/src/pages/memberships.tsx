@@ -308,81 +308,83 @@ const MembershipsPage = () => {
               
               {/* Subscribers Tab */}
               <TabsContent value="subscribers">
-                <Card>
-                  <CardHeader>
+                <Card className="flex flex-col h-[600px]">
+                  <CardHeader className="flex-shrink-0">
                     <CardTitle>Membership Subscribers</CardTitle>
                     <CardDescription>
                       View and manage clients with active memberships
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="flex-1 overflow-hidden p-0">
                     {isClientMembershipsLoading ? (
                       <div className="flex justify-center py-8">
                         <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                       </div>
                     ) : clientMemberships?.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400 px-6">
                         No clients have active memberships yet.
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Client</TableHead>
-                            <TableHead>Membership</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Start Date</TableHead>
-                            <TableHead>End Date</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {clientMemberships?.map((membership: ClientMembership) => (
-                            <TableRow key={membership.id}>
-                              <TableCell>
-                                <div className="flex items-center space-x-3">
-                                  <Avatar>
-                                    <AvatarFallback>
-                                      {getInitials(
-                                        membership.client?.firstName,
-                                        membership.client?.lastName
-                                      )}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <div className="font-medium">
-                                      {getFullName(
-                                        membership.client?.firstName,
-                                        membership.client?.lastName
-                                      )}
-                                    </div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {membership.client?.email}
+                      <div className="overflow-auto h-full">
+                        <Table>
+                          <TableHeader className="sticky top-0 bg-white dark:bg-gray-800 z-10">
+                            <TableRow>
+                              <TableHead>Client</TableHead>
+                              <TableHead>Membership</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Start Date</TableHead>
+                              <TableHead>End Date</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {clientMemberships?.map((membership: ClientMembership) => (
+                              <TableRow key={membership.id}>
+                                <TableCell>
+                                  <div className="flex items-center space-x-3">
+                                    <Avatar>
+                                      <AvatarFallback>
+                                        {getInitials(
+                                          membership.client?.firstName,
+                                          membership.client?.lastName
+                                        )}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-medium">
+                                        {getFullName(
+                                          membership.client?.firstName,
+                                          membership.client?.lastName
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                                        {membership.client?.email}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              </TableCell>
-                              <TableCell>{membership.membership?.name}</TableCell>
-                              <TableCell>
-                                <Badge variant={membership.active ? "default" : "secondary"} className={membership.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}>
-                                  {membership.active ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>{formatDate(new Date(membership.startDate))}</TableCell>
-                              <TableCell>{formatDate(new Date(membership.endDate))}</TableCell>
-                              <TableCell className="text-right">
-                                <Button 
-                                  variant="ghost" 
-                                  className="text-primary" 
-                                  onClick={() => toast({ title: "Feature Coming Soon", description: "Membership management will be available soon!" })}
-                                >
-                                  Details
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                                </TableCell>
+                                <TableCell>{membership.membership?.name}</TableCell>
+                                <TableCell>
+                                  <Badge variant={membership.active ? "default" : "secondary"} className={membership.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}>
+                                    {membership.active ? "Active" : "Inactive"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{formatDate(new Date(membership.startDate))}</TableCell>
+                                <TableCell>{formatDate(new Date(membership.endDate))}</TableCell>
+                                <TableCell className="text-right">
+                                  <Button 
+                                    variant="ghost" 
+                                    className="text-primary" 
+                                    onClick={() => toast({ title: "Feature Coming Soon", description: "Membership management will be available soon!" })}
+                                  >
+                                    Details
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
