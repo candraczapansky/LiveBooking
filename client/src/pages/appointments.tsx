@@ -423,7 +423,7 @@ const AppointmentsPage = () => {
       // Debug time conversion issue
       const appointmentTime = new Date(appointment.startTime);
       
-      if (appointment.id > 130) {
+      if (appointment.id >= 100) {
         console.log(`[TIME DEBUG] Appointment ${appointment.id} time conversion:`, {
           stored: appointment.startTime,
           parsed: appointmentTime,
