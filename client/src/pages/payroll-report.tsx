@@ -265,6 +265,9 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
 
   // Export payroll data to CSV
   const handleExportReport = () => {
+    console.log('Export button clicked');
+    console.log('Filtered payroll data:', filteredPayrollData);
+    
     try {
       // Create CSV headers
       const headers = [
