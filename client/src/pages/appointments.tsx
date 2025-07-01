@@ -550,7 +550,7 @@ const AppointmentsPage = () => {
                     <div className="text-gray-500 dark:text-gray-400 text-sm italic">No appointments scheduled</div>
                   )}
                   <button
-                    onClick={handleAddAppointment}
+                    onClick={() => handleAddAppointment()}
                     className="w-full text-center p-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-pink-300 hover:text-pink-600 transition-colors"
                   >
                     + Add appointment for {staffName}
@@ -636,17 +636,7 @@ const AppointmentsPage = () => {
                       }}
                       onMouseLeave={handleCalendarMouseLeave}
                       onClick={isAvailable ? () => {
-                        // Set time for new appointment
-                        const [timeStr, period] = time.split(' ');
-                        const [hours, minutes] = timeStr.split(':');
-                        let hour = parseInt(hours);
-                        if (period === 'PM' && hour !== 12) hour += 12;
-                        if (period === 'AM' && hour === 12) hour = 0;
-                        
-                        const appointmentDate = new Date(currentDate);
-                        appointmentDate.setHours(hour, parseInt(minutes), 0, 0);
-                        
-                        handleAddAppointment();
+                        handleAddAppointment(time);
                       } : undefined}
                     />
                   );
@@ -1242,7 +1232,7 @@ const AppointmentsPage = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
                 <Button
-                  onClick={handleAddAppointment}
+                  onClick={() => handleAddAppointment()}
                   className="min-h-[44px] justify-center"
                   size="default"
                 >
