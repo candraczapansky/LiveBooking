@@ -131,11 +131,13 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         .then(([serviceData, staffData]) => {
           // Transform staff data to match form requirements
           console.log("Raw staff data from API:", staffData);
-          const assignedStaff = staffData.map((staff: any) => ({
-            staffId: staff.id, // This should be the staff member's ID, not the staffService ID
-            customRate: staff.customRate || undefined,
-            customCommissionRate: staff.customCommissionRate || undefined,
-          }));
+          const assignedStaff = staffData
+            .filter((staff: any) => staff.id && staff.user) // Only include staff with valid ID and user data
+            .map((staff: any) => ({
+              staffId: staff.id, // This should be the staff member's ID
+              customRate: staff.customRate || undefined,
+              customCommissionRate: staff.customCommissionRate || undefined,
+            }));
           console.log("Transformed staff data for form:", assignedStaff);
           
           form.reset({

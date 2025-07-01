@@ -1082,7 +1082,10 @@ If you didn't request this password reset, please ignore this email and your pas
       })
     );
     
-    return res.status(200).json(staffDetails);
+    // Filter out entries with missing staff or user data
+    const validStaffDetails = staffDetails.filter(detail => detail.id && detail.user);
+    
+    return res.status(200).json(validStaffDetails);
   });
 
   app.delete("/api/staff-services/:id", async (req, res) => {
