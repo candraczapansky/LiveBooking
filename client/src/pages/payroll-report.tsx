@@ -612,12 +612,13 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </CardContent>
       </Card>
 
-      {/* Detailed Payroll View */}
-      {viewMode === 'detail' && detailStaffId && (
+      {/* Detailed Payroll View - Debug Always Show */}
+      {detailStaffId && (
         <DetailedPayrollView 
           staffId={detailStaffId}
           month={selectedMonth}
           onBack={() => {
+            console.log('Going back to summary view');
             setViewMode('summary');
             setDetailStaffId(null);
           }}
