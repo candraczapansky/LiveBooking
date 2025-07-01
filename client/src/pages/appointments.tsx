@@ -551,7 +551,11 @@ const AppointmentsPage = () => {
                   )}
                   <button
                     onClick={() => handleAddAppointment()}
-                    className="w-full text-center p-3 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:border-pink-300 hover:text-pink-600 transition-colors"
+                    className="w-full text-center p-3 bg-transparent rounded-lg border-2 border-pink-300 text-pink-600 hover:border-pink-400 hover:text-pink-700 transition-colors"
+                    style={{
+                      borderColor: 'var(--primary)',
+                      color: 'var(--primary)'
+                    }}
                   >
                     + Add appointment for {staffName}
                   </button>
