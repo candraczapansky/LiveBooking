@@ -890,7 +890,7 @@ const AppointmentsPage = () => {
                   key={stableKey}
                   className="absolute pointer-events-auto"
                   style={{
-                    left: `${80 + 4}px`, // Time column width (80px) + padding
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`, // Time column + staff column offset + padding
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     zIndex: 10
