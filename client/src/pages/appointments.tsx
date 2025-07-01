@@ -27,20 +27,20 @@ const forceDropdownRerender = () => {
 import { useLocation } from "wouter";
 
 const timeSlots = [
-  "8:00 AM", "8:30 AM",
-  "9:00 AM", "9:30 AM",
-  "10:00 AM", "10:30 AM",
-  "11:00 AM", "11:30 AM",
-  "12:00 PM", "12:30 PM",
-  "1:00 PM", "1:30 PM",
-  "2:00 PM", "2:30 PM",
-  "3:00 PM", "3:30 PM",
-  "4:00 PM", "4:30 PM",
-  "5:00 PM", "5:30 PM",
-  "6:00 PM", "6:30 PM",
-  "7:00 PM", "7:30 PM",
-  "8:00 PM", "8:30 PM",
-  "9:00 PM", "9:30 PM",
+  "8:00 AM", "8:15 AM", "8:30 AM", "8:45 AM",
+  "9:00 AM", "9:15 AM", "9:30 AM", "9:45 AM",
+  "10:00 AM", "10:15 AM", "10:30 AM", "10:45 AM",
+  "11:00 AM", "11:15 AM", "11:30 AM", "11:45 AM",
+  "12:00 PM", "12:15 PM", "12:30 PM", "12:45 PM",
+  "1:00 PM", "1:15 PM", "1:30 PM", "1:45 PM",
+  "2:00 PM", "2:15 PM", "2:30 PM", "2:45 PM",
+  "3:00 PM", "3:15 PM", "3:30 PM", "3:45 PM",
+  "4:00 PM", "4:15 PM", "4:30 PM", "4:45 PM",
+  "5:00 PM", "5:15 PM", "5:30 PM", "5:45 PM",
+  "6:00 PM", "6:15 PM", "6:30 PM", "6:45 PM",
+  "7:00 PM", "7:15 PM", "7:30 PM", "7:45 PM",
+  "8:00 PM", "8:15 PM", "8:30 PM", "8:45 PM",
+  "9:00 PM", "9:15 PM", "9:30 PM", "9:45 PM",
   "10:00 PM"
 ];
 
@@ -359,8 +359,6 @@ const AppointmentsPage = () => {
 
   const getAppointmentStyle = (appointment: any) => {
     const startTime = new Date(appointment.startTime);
-    const endTime = new Date(appointment.endTime);
-    const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
     
     // Get local time components to avoid timezone issues
     const startHour = startTime.getHours();
@@ -372,15 +370,18 @@ const AppointmentsPage = () => {
     }
     
     // Calculate position based on time slots starting from 8:00 AM
-    // Each 30-minute slot is 30px * zoomLevel high
+    // Each 15-minute slot is 30px * zoomLevel high
     const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
     const slotHeight = 30 * zoomLevel;
-    const topPosition = (totalMinutesFromStart / 30) * slotHeight;
+    const topPosition = (totalMinutesFromStart / 15) * slotHeight;
     
-    const slotsNeeded = Math.ceil(duration / 30);
+    // Use service duration only (not including buffer times) for visual display
+    const service = services?.find((s: any) => s.id === appointment.serviceId);
+    const serviceDuration = service?.duration || 60; // Only the actual service time
+    
+    const slotsNeeded = Math.ceil(serviceDuration / 15); // 15-minute increments
     const calculatedHeight = slotsNeeded * slotHeight;
     
-    // Use actual appointment duration, don't force minimum height that extends beyond time
     return {
       top: `${topPosition}px`,
       height: `${calculatedHeight}px`
@@ -605,8 +606,11 @@ const AppointmentsPage = () => {
               return appointmentDateStr === currentDateStr;
             }).map((appointment: any) => {
               const startTime = new Date(appointment.startTime);
-              const endTime = new Date(appointment.endTime);
-              const duration = Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60));
+              
+              // Use service duration only (not including buffer times) for visual display
+              const appointmentService = services?.find((s: any) => s.id === appointment.serviceId);
+              const duration = appointmentService?.duration || 60; // Only the actual service time
+              
               const timeString = startTime.toLocaleTimeString('en-US', { 
                 hour: 'numeric', 
                 minute: '2-digit',
@@ -828,8 +832,10 @@ const AppointmentsPage = () => {
                 .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                 .map((appointment: any) => {
                   const appointmentDate = new Date(appointment.startTime);
-                  const endTime = new Date(appointment.endTime);
-                  const duration = Math.round((endTime.getTime() - appointmentDate.getTime()) / (1000 * 60));
+                  
+                  // Use service duration only (not including buffer times) for visual display
+                  const appointmentService = services?.find((s: any) => s.id === appointment.serviceId);
+                  const duration = appointmentService?.duration || 60; // Only the actual service time
                   
                   // Calculate position relative to 8:00 AM start
                   const appointmentHour = appointmentDate.getHours();
