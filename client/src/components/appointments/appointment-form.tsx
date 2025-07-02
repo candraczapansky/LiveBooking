@@ -465,20 +465,32 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
-    onSuccess: (data: any) => {
-      // Force refresh all appointment-related queries
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+    onSuccess: async (data: any) => {
+      console.log("[APPOINTMENT FORM] Create success - invalidating cache and refreshing");
       
-      onOpenChange(false);
+      // Force refresh all appointment-related queries
+      await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      
+      console.log("[APPOINTMENT FORM] Cache invalidated and refetched");
+      
+      // Call the callback with appointment data if provided
+      if (onAppointmentCreated) {
+        console.log("[APPOINTMENT FORM] Calling onAppointmentCreated callback");
+        onAppointmentCreated(data);
+      }
+      
+      // Small delay to ensure cache refresh completes before closing
+      setTimeout(() => {
+        onOpenChange(false);
+      }, 100);
+      
       toast({
         title: "Success",
         description: "Appointment created successfully.",
       });
-      // Call the callback with appointment data if provided
-      if (onAppointmentCreated) {
-        onAppointmentCreated(data);
-      }
+      
+      console.log("[APPOINTMENT FORM] Create success handler completed");
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;

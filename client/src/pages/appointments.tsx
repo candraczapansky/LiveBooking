@@ -1604,6 +1604,8 @@ const AppointmentsPage = () => {
         selectedTime={selectedTime}
         onAppointmentCreated={(appointment) => {
           console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
+          // Force manual refetch of appointments to ensure immediate display
+          refetchAppointments();
           // Navigate to the appointment's date when created
           if (appointment && appointment.startTime) {
             const appointmentDate = new Date(appointment.startTime);
