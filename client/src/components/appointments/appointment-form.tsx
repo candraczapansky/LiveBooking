@@ -606,7 +606,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     console.log('AppointmentForm appointmentId changed:', appointmentId);
   }, [appointmentId]);
 
-  const onSubmit = (values: AppointmentFormValues) => {
+  const handleFormSubmit = (values: AppointmentFormValues) => {
     console.log('Form submitted with values:', values);
     console.log('Form validation errors:', form.formState.errors);
     
@@ -630,6 +630,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       createMutation.mutate(correctedValues);
     }
   };
+
+  const onSubmit = handleFormSubmit;
 
   const handleCashPayment = async () => {
     if (!appointmentId || appointmentId <= 0 || !appointment) return;
@@ -1009,9 +1011,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                     console.log('Form values:', form.getValues());
                     console.log('Form is valid:', form.formState.isValid);
                     
-                    // Bypass form validation and call onSubmit directly
+                    // Bypass form validation and call handleFormSubmit directly
                     const values = form.getValues();
-                    onSubmit(values);
+                    handleFormSubmit(values);
                   }}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
