@@ -363,9 +363,9 @@ const AppointmentsPage = () => {
 
   const handlePayment = (appointment: any) => {
     // Get service details and calculate amount
-    const service = services?.find((s: any) => s.id === appointment.serviceId);
-    const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
-    const client = users?.find((u: any) => u.id === appointment.clientId);
+    const service = Array.isArray(services) ? services.find((s: any) => s.id === appointment.serviceId) : null;
+    const staffMember = Array.isArray(staff) ? staff.find((s: any) => s.id === appointment.staffId) : null;
+    const client = Array.isArray(users) ? users.find((u: any) => u.id === appointment.clientId) : null;
     
     // Use totalAmount from appointment if available, otherwise fallback to service price
     const paymentAmount = appointment.totalAmount || service?.price || 0;
@@ -400,10 +400,10 @@ const AppointmentsPage = () => {
   // Drag and drop mutation
   const dragMutation = useMutation({
     mutationFn: async ({ appointmentId, newStartTime }: { appointmentId: number; newStartTime: Date }) => {
-      const appointment = appointments?.find((apt: any) => apt.id === appointmentId);
+      const appointment = Array.isArray(appointments) ? appointments.find((apt: any) => apt.id === appointmentId) : null;
       if (!appointment) throw new Error('Appointment not found');
 
-      const service = services?.find((s: any) => s.id === appointment.serviceId);
+      const service = Array.isArray(services) ? services.find((s: any) => s.id === appointment.serviceId) : null;
       const duration = service?.duration || 60;
       const newEndTime = new Date(newStartTime.getTime() + duration * 60 * 1000);
 
@@ -463,7 +463,7 @@ const AppointmentsPage = () => {
     if (!draggedAppointment) return;
 
     // Check if the staff member is available at this time slot
-    const staffMember = staff?.find((s: any) => s.id === draggedAppointment.staffId);
+    const staffMember = Array.isArray(staff) ? staff.find((s: any) => s.id === draggedAppointment.staffId) : null;
     if (!staffMember || !isStaffAvailable(staffMember.id, timeSlot, currentDate)) {
       toast({
         title: "Cannot Move Appointment",
@@ -676,16 +676,18 @@ const AppointmentsPage = () => {
   };
 
   const renderDayView = () => {
-    const staffCount = staff?.length || 1;
+    const staffArray = Array.isArray(staff) ? staff : [];
+    const staffCount = staffArray.length || 1;
     const isMobileView = window.innerWidth < 768;
     
     // For mobile, use a simpler card-based layout
     if (isMobileView) {
       return (
         <div className="space-y-4 p-4">
-          {staff?.map((staffMember: any) => {
+          {staffArray.map((staffMember: any) => {
             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-            const staffAppointments = appointments?.filter((appointment: any) => {
+            const appointmentsArray = Array.isArray(appointments) ? appointments : [];
+            const staffAppointments = appointmentsArray.filter((appointment: any) => {
               const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
               
@@ -1531,10 +1533,10 @@ const AppointmentsPage = () => {
             </div>
             {/* Simple Calendar */}
             <SimpleCalendar
-              appointments={appointments || []}
-              staff={staff || []}
-              users={users || []}
-              services={services || []}
+              appointments={Array.isArray(appointments) ? appointments : []}
+              staff={Array.isArray(staff) ? staff : []}
+              users={Array.isArray(users) ? users : []}
+              services={Array.isArray(services) ? services : []}
               currentDate={currentDate}
               onDateChange={setCurrentDate}
               onAppointmentClick={handleAppointmentClick}
