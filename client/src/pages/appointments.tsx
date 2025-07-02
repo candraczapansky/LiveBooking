@@ -150,6 +150,11 @@ const AppointmentsPage = () => {
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
   const [zoomLevel, setZoomLevel] = useState(1);
+  
+  // Debug zoom level changes
+  useEffect(() => {
+    console.log('Zoom level changed to:', zoomLevel);
+  }, [zoomLevel]);
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
   const [hoverInfo, setHoverInfo] = useState({ visible: false, time: '', x: 0, y: 0 });
@@ -819,7 +824,10 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time grid */}
-        <div className="relative min-w-max">
+        <div 
+          className="relative min-w-max origin-top-left"
+          style={{ transform: `scale(${zoomLevel})` }}
+        >
           {/* Time labels and grid lines */}
           <div className="flex">
             <div className="w-20 flex-shrink-0">
@@ -1077,7 +1085,10 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time Grid */}
-        <div className="relative">
+        <div 
+          className="relative origin-top-left"
+          style={{ transform: `scale(${zoomLevel})` }}
+        >
           {/* Appointment overlay container - positioned absolutely to float over time slots */}
           <div className="absolute inset-0 pointer-events-none z-10">
             {weekDays.map((day, dayIndex) => (
