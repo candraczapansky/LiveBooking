@@ -1184,7 +1184,7 @@ const AppointmentsPage = () => {
                 {timeSlot}
               </div>
               
-              {/* Day Columns - empty but provide grid structure */}
+              {/* Day Columns - clickable for appointment scheduling */}
               {weekDays.map((day, dayIndex) => (
                 <div 
                   key={dayIndex} 
@@ -1192,6 +1192,15 @@ const AppointmentsPage = () => {
                   style={{ height: '60px' }}
                   onMouseMove={(e) => handleCalendarMouseMove(e, timeIndex)}
                   onMouseLeave={handleCalendarMouseLeave}
+                  onClick={() => {
+                    // Set the selected date to the clicked day
+                    setCurrentDate(day);
+                    // Set the selected time to the clicked time slot
+                    setSelectedTime(timeSlot);
+                    // Open appointment form with pre-selected date and time
+                    setSelectedAppointmentId(null);
+                    setIsFormOpen(true);
+                  }}
                 >
                   {/* Empty - appointments are handled by the overlay above */}
                 </div>
@@ -1277,6 +1286,13 @@ const AppointmentsPage = () => {
                     setCurrentDate(day);
                     setViewMode('day');
                   }}
+                  onDoubleClick={() => {
+                    // Double-click to directly schedule an appointment
+                    setCurrentDate(day);
+                    setSelectedTime('9:00 AM'); // Default to 9 AM for month view scheduling
+                    setSelectedAppointmentId(null);
+                    setIsFormOpen(true);
+                  }}
                 >
                   {/* Date number */}
                   <div className={`text-sm font-semibold mb-1 ${
@@ -1355,6 +1371,13 @@ const AppointmentsPage = () => {
                 onClick={() => {
                   setCurrentDate(day);
                   setViewMode('day');
+                }}
+                onDoubleClick={() => {
+                  // Double-click to directly schedule an appointment
+                  setCurrentDate(day);
+                  setSelectedTime('9:00 AM'); // Default to 9 AM for month view scheduling
+                  setSelectedAppointmentId(null);
+                  setIsFormOpen(true);
                 }}
                 onMouseMove={(e) => {
                   const dateStr = day.toLocaleDateString('en-US', { 
@@ -1587,6 +1610,21 @@ const AppointmentsPage = () => {
                 </div>
               </div>
             </div>
+            {/* Quick Tips */}
+            {(viewMode === 'week' || viewMode === 'month') && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>💡 Quick Tips:</strong>
+                  {viewMode === 'week' && (
+                    <span> Click any time slot to schedule an appointment for that specific time.</span>
+                  )}
+                  {viewMode === 'month' && (
+                    <span> Single-click a date to view that day, or double-click to schedule an appointment at 9:00 AM.</span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Calendar Views */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
               {viewMode === 'day' && renderDayView()}
