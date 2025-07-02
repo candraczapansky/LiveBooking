@@ -362,14 +362,20 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       });
     } else if (!appointmentId) {
       // Only reset with defaults for new appointments, not when editing existing ones
+      const resetDate = selectedDate || new Date();
+      console.log('Resetting form with date:', resetDate);
       form.reset({
         staffId: "",
         serviceId: "",
         clientId: "",
-        date: selectedDate || new Date(),
+        date: resetDate,
         time: selectedTime || "10:00",
         notes: "",
       });
+      // Force the date field to update and clear any validation errors
+      form.setValue('date', resetDate);
+      form.clearErrors('date');
+      form.trigger('date');
       // Invalidate services cache when opening to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     } else {
@@ -385,6 +391,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       form.setValue('time', selectedTime);
     }
   }, [selectedTime, open, appointmentId]);
+
+  // Update date when selectedDate prop changes
+  useEffect(() => {
+    if (open && selectedDate && !appointmentId) {
+      console.log('Setting date from selectedDate prop:', selectedDate);
+      form.setValue('date', selectedDate);
+      // Clear any existing date validation errors
+      form.clearErrors('date');
+      // Trigger validation for the date field specifically
+      form.trigger('date');
+    }
+  }, [selectedDate, open, appointmentId]);
 
   // Clear time when staff changes or when no slots are available (for new appointments only)
   useEffect(() => {
