@@ -150,11 +150,6 @@ const AppointmentsPage = () => {
   const [selectedStaff, setSelectedStaff] = useState("all");
   const [selectedService, setSelectedService] = useState("all");
   const [zoomLevel, setZoomLevel] = useState(1);
-  
-  // Debug zoom level changes
-  useEffect(() => {
-    console.log('Zoom level changed to:', zoomLevel);
-  }, [zoomLevel]);
   const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
   const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
   const [hoverInfo, setHoverInfo] = useState({ visible: false, time: '', x: 0, y: 0 });
