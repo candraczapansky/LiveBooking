@@ -136,16 +136,6 @@ export async function triggerAutomations(
   const appointmentDateString = appointmentDate.toLocaleDateString('en-US', localDateOptions);
   const appointmentDateTime = appointmentDate.toLocaleString('en-US', localDateTimeOptions);
   
-  console.log('Timezone conversion debug:', {
-    originalUTC: appointmentData.startTime,
-    appointmentDate: appointmentDate.toISOString(),
-    localTime: appointmentTime,
-    localDate: appointmentDateString,
-    localDateTime: appointmentDateTime
-  });
-  
-  console.log('Template variables for automation:', variables);
-  
   const variables = {
     client_name: client.firstName || client.username,
     client_email: client.email,

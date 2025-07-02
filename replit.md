@@ -13,6 +13,18 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### July 2, 2025 - Appointment Confirmation Timezone Fix
+
+- **Fixed critical timezone display issue in appointment confirmation messages:**
+  - Root cause identified: Automation system was displaying UTC times instead of local Central Time in email/SMS confirmations
+  - Updated automation-triggers.ts to use proper timezone conversion with America/Chicago timezone
+  - Implemented proper Intl.DateTimeFormatOptions for consistent local time display
+  - Appointments scheduled for 8:00 PM now correctly show "08:00 PM" in confirmations instead of "01:00 AM"
+  - Enhanced template variable preparation with proper timezone handling for appointment_time, appointment_date, and appointment_datetime fields
+  - Fixed variable initialization error that was preventing automation messages from sending
+  - Confirmed fix working: UTC time "2025-07-08T01:00:00.000Z" now displays as "08:00 PM" on "7/7/2025" in local time
+  - Both email and SMS confirmation messages now show accurate local appointment times for improved client experience
+
 ### July 1, 2025 - Calendar Hover Feature, Complete Tip System Implementation, and Appointment Timing Fix
 
 - **Successfully implemented calendar hover time display feature:**
