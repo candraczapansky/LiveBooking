@@ -350,16 +350,48 @@ const AppointmentsPage = () => {
   };
 
   const zoomIn = () => {
-    if (zoomLevel < 3) {
-      setZoomLevel(prev => Math.min(prev + 0.5, 3));
+    if (zoomLevel < 4) {
+      setZoomLevel(prev => Math.min(prev + 0.25, 4));
     }
   };
 
   const zoomOut = () => {
-    if (zoomLevel > 0.5) {
-      setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
+    if (zoomLevel > 0.25) {
+      setZoomLevel(prev => Math.max(prev - 0.25, 0.25));
     }
   };
+
+  const resetZoom = () => {
+    setZoomLevel(1);
+  };
+
+  const getZoomLabel = () => {
+    return `${Math.round(zoomLevel * 100)}%`;
+  };
+
+  // Keyboard shortcuts for zoom
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only trigger if not typing in an input field
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === '=') {
+        e.preventDefault();
+        zoomIn();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+        e.preventDefault();
+        zoomOut();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomLevel]);
 
   const handlePayment = (appointment: any) => {
     // Get service details and calculate amount
@@ -1471,22 +1503,33 @@ const AppointmentsPage = () => {
                     </Select>
 
                     {/* Zoom Controls */}
-                    <div className="hidden lg:flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+                    <div className="flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={zoomOut}
                         className="h-8 w-8 p-0 rounded-none border-r"
-                        disabled={zoomLevel <= 0.5}
+                        disabled={zoomLevel <= 0.25}
+                        title="Zoom Out"
                       >
                         <ZoomOut className="h-3 w-3" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
+                        onClick={resetZoom}
+                        className="h-8 px-2 rounded-none border-r text-xs font-medium min-w-[40px]"
+                        title="Reset Zoom"
+                      >
+                        {getZoomLabel()}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={zoomIn}
                         className="h-8 w-8 p-0 rounded-none"
-                        disabled={zoomLevel >= 3}
+                        disabled={zoomLevel >= 4}
+                        title="Zoom In"
                       >
                         <ZoomIn className="h-3 w-3" />
                       </Button>

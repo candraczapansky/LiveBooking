@@ -13,7 +13,25 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### July 2, 2025 - Appointment Confirmation Timezone Fix
+### July 2, 2025 - Appointment Booking Timezone Fix and Enhanced Calendar Zoom Functionality
+
+- **Fixed critical appointment booking timezone conversion issue:**
+  - Root cause identified: Appointment form was incorrectly converting Central Time to UTC during booking
+  - User selecting "2:00 PM" was creating appointments stored as "7:00 PM UTC" causing false conflict errors
+  - Updated both createMutation and updateMutation in appointment-form.tsx with proper timezone handling
+  - Implemented correct Central Time (UTC-5) to UTC conversion using manual offset calculation
+  - System now properly stores 2:00 PM Central as 7:00 PM UTC and displays correctly in confirmations
+  - Eliminated false scheduling conflicts when booking appointments at standard business hours
+  - Enhanced debugging logs to track timezone conversion during appointment creation and updates
+
+- **Implemented enhanced calendar zoom functionality:**
+  - Expanded zoom range from 0.5x-3x to 0.25x-4x with finer 0.25x increments for more precise control
+  - Added zoom percentage indicator in controls showing current zoom level (25% to 400%)
+  - Created reset zoom button to quickly return to 100% default view
+  - Added keyboard shortcuts: Ctrl/Cmd + "=" (zoom in), Ctrl/Cmd + "-" (zoom out), Ctrl/Cmd + "0" (reset)
+  - Made zoom controls visible on mobile devices for improved accessibility
+  - Enhanced zoom controls with tooltips and better disabled states
+  - Keyboard shortcuts respect input field focus to prevent conflicts during typing
 
 - **Fixed critical timezone display issue in appointment confirmation messages:**
   - Root cause identified: Automation system was displaying UTC times instead of local Central Time in email/SMS confirmations
