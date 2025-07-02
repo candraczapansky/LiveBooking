@@ -448,8 +448,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         description: "Appointment created successfully.",
       });
       // Call the callback with appointment data if provided
+      console.log("[APPOINTMENT FORM] Success callback - appointment data:", data);
       if (onAppointmentCreated) {
+        console.log("[APPOINTMENT FORM] Calling onAppointmentCreated with:", data);
         onAppointmentCreated(data);
+      } else {
+        console.log("[APPOINTMENT FORM] No onAppointmentCreated callback provided");
       }
     },
     onError: (error: any) => {

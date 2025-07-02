@@ -1541,10 +1541,14 @@ const AppointmentsPage = () => {
         selectedDate={currentDate}
         selectedTime={selectedTime}
         onAppointmentCreated={(appointment) => {
+          console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
           // Navigate to the appointment's date when created
           if (appointment && appointment.startTime) {
             const appointmentDate = new Date(appointment.startTime);
+            console.log("[APPOINTMENTS PAGE] Navigating to date:", appointmentDate);
             setCurrentDate(appointmentDate);
+          } else {
+            console.log("[APPOINTMENTS PAGE] No startTime found in appointment data");
           }
         }}
       />
