@@ -214,6 +214,13 @@ const AppointmentsPage = () => {
     queryKey: ['/api/appointments'],
   });
 
+  // Debug appointments data changes
+  useEffect(() => {
+    console.log("[APPOINTMENTS PAGE] Appointments data updated:", appointments.length, "appointments");
+    console.log("[APPOINTMENTS PAGE] First 5 appointments (newest):", appointments.slice(0, 5).map((apt: any) => ({ id: apt.id, startTime: apt.startTime, service: apt.serviceId })));
+    console.log("[APPOINTMENTS PAGE] Last 5 appointments (oldest):", appointments.slice(-5).map((apt: any) => ({ id: apt.id, startTime: apt.startTime, service: apt.serviceId })));
+  }, [appointments]);
+
   // Fetch staff from API
   const { data: staff = [], isLoading: staffLoading } = useQuery({
     queryKey: ['/api/staff'],

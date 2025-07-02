@@ -468,11 +468,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     onSuccess: async (data: any) => {
       console.log("[APPOINTMENT FORM] Create success - invalidating cache and refreshing");
       
-      // Force refresh all appointment-related queries
+      // Force complete cache refresh
       await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      await queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      await queryClient.resetQueries({ queryKey: ['/api/appointments'] });
       
-      console.log("[APPOINTMENT FORM] Cache invalidated and refetched");
+      console.log("[APPOINTMENT FORM] Cache invalidated and reset");
       
       // Call the callback with appointment data if provided
       if (onAppointmentCreated) {
@@ -483,7 +483,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Small delay to ensure cache refresh completes before closing
       setTimeout(() => {
         onOpenChange(false);
-      }, 100);
+      }, 200);
       
       toast({
         title: "Success",
