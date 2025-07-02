@@ -1587,17 +1587,12 @@ const AppointmentsPage = () => {
                 </div>
               </div>
             </div>
-            {/* Simple Calendar */}
-            <SimpleCalendar
-              appointments={Array.isArray(appointments) ? appointments : []}
-              staff={Array.isArray(staff) ? staff : []}
-              users={Array.isArray(users) ? users : []}
-              services={Array.isArray(services) ? services : []}
-              currentDate={currentDate}
-              onDateChange={setCurrentDate}
-              onAppointmentClick={handleAppointmentClick}
-              onAddAppointment={handleAddAppointment}
-            />
+            {/* Calendar Views */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+              {viewMode === 'day' && renderDayView()}
+              {viewMode === 'week' && renderWeekView()}
+              {viewMode === 'month' && renderMonthView()}
+            </div>
           </div>
         </main>
       </div>
