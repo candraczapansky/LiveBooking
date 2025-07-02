@@ -106,6 +106,46 @@ export async function triggerAutomations(
 
   // Prepare template variables
   const appointmentDate = new Date(appointmentData.startTime);
+  
+  // Convert UTC time to local time for display
+  const localOptions: Intl.DateTimeFormatOptions = { 
+    timeZone: 'America/Chicago', // Central Time Zone
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: true
+  };
+  
+  const localDateOptions: Intl.DateTimeFormatOptions = { 
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric'
+  };
+  
+  const localDateTimeOptions: Intl.DateTimeFormatOptions = { 
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: 'numeric', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  };
+  
+  const appointmentTime = appointmentDate.toLocaleTimeString('en-US', localOptions);
+  const appointmentDateString = appointmentDate.toLocaleDateString('en-US', localDateOptions);
+  const appointmentDateTime = appointmentDate.toLocaleString('en-US', localDateTimeOptions);
+  
+  console.log('Timezone conversion debug:', {
+    originalUTC: appointmentData.startTime,
+    appointmentDate: appointmentDate.toISOString(),
+    localTime: appointmentTime,
+    localDate: appointmentDateString,
+    localDateTime: appointmentDateTime
+  });
+  
+  console.log('Template variables for automation:', variables);
+  
   const variables = {
     client_name: client.firstName || client.username,
     client_email: client.email,
@@ -113,13 +153,13 @@ export async function triggerAutomations(
     service_name: service?.name || 'Service',
     service_duration: service?.duration?.toString() || '60',
     staff_name: staffUser ? `${staffUser.firstName} ${staffUser.lastName}`.trim() || staffUser.username : 'Staff',
-    appointment_date: appointmentDate.toLocaleDateString(),
-    appointment_time: appointmentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    appointment_datetime: appointmentDate.toLocaleString(),
-    salon_name: 'BeautyBook Salon',
+    appointment_date: appointmentDateString,
+    appointment_time: appointmentTime,
+    appointment_datetime: appointmentDateTime,
+    salon_name: 'Glo Head Spa',
     salon_phone: '(555) 123-4567',
     salon_address: '123 Beauty Street, City, State 12345',
-    booking_date: new Date().toLocaleDateString(),
+    booking_date: new Date().toLocaleDateString('en-US', localDateOptions),
     total_amount: service?.price?.toString() || '0'
   };
 
