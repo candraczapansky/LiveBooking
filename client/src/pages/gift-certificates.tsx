@@ -274,8 +274,7 @@ export default function GiftCertificatesPage() {
   });
 
   const balanceQuery = useQuery({
-    queryKey: ['/api/gift-card-balance', balanceCheckCode],
-    queryFn: () => apiRequest(`/api/gift-card-balance/${balanceCheckCode}`),
+    queryKey: [`/api/gift-card-balance/${balanceCheckCode}`],
     enabled: !!balanceCheckCode && balanceCheckCode.length >= 8,
     retry: false,
   });
