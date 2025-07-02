@@ -144,7 +144,7 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [currentDate, setCurrentDate] = useState(new Date('2025-07-06')); // Set to July 6, 2025 to show the week with appointments
+  const [currentDate, setCurrentDate] = useState(new Date('2025-07-05')); // Set to July 5, 2025 to show the newly created appointment
   const { isOpen: sidebarOpen } = useSidebar();
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
@@ -206,7 +206,7 @@ const AppointmentsPage = () => {
   }, [location]);
 
   // Fetch appointments from API
-  const { data: appointments, isLoading: appointmentsLoading } = useQuery({
+  const { data: appointments, isLoading: appointmentsLoading, refetch: refetchAppointments } = useQuery({
     queryKey: ['/api/appointments'],
   });
 

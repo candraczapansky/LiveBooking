@@ -47,6 +47,16 @@ export default function SimpleCalendar({
   // Debug appointments data
   console.log('Simple Calendar received appointments:', appointments?.length || 0, 'appointments');
   console.log('Current date:', currentDate.toISOString().split('T')[0]);
+  console.log('Simple Calendar staff data:', staff?.map((s: any) => ({
+    id: s.id,
+    name: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'No user data'
+  })));
+  console.log('Simple Calendar appointments:', appointments?.map((a: any) => ({
+    id: a.id,
+    staffId: a.staffId,
+    startTime: a.startTime,
+    service: a.service?.name
+  })));
   
   // Filter appointments for current date
   const dayAppointments = useMemo(() => {
@@ -65,6 +75,12 @@ export default function SimpleCalendar({
     });
     
     console.log('Simple Calendar filtered appointments for', currentDateStr, ':', filtered.length);
+    console.log('Filtered appointments:', filtered.map((a: any) => ({
+      id: a.id,
+      staffId: a.staffId,
+      startTime: a.startTime,
+      service: a.service?.name
+    })));
     
     return filtered;
   }, [appointments, currentDate]);
