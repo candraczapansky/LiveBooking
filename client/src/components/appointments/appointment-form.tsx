@@ -65,6 +65,7 @@ interface AppointmentFormProps {
   appointmentId: number | null;
   selectedDate?: Date;
   selectedTime?: string;
+  onAppointmentCreated?: (appointment: any) => void;
 }
 
 const generateTimeSlots = () => {
@@ -439,13 +440,17 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       onOpenChange(false);
       toast({
         title: "Success",
         description: "Appointment created successfully.",
       });
+      // Call the callback with appointment data if provided
+      if (onAppointmentCreated) {
+        onAppointmentCreated(data);
+      }
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;

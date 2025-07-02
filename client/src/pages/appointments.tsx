@@ -144,7 +144,7 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [currentDate, setCurrentDate] = useState(new Date('2025-07-05')); // Set to July 5, 2025 to show the newly created appointment
+  const [currentDate, setCurrentDate] = useState(new Date()); // Use today's date by default
   const { isOpen: sidebarOpen } = useSidebar();
   const [viewMode, setViewMode] = useState("day");
   const [selectedStaff, setSelectedStaff] = useState("all");
