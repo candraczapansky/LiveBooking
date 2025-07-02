@@ -325,16 +325,22 @@ export default function GiftCertificatesPage() {
     if (!purchaseData || !email) return;
 
     try {
-      await apiRequest("POST", "/api/send-receipt", {
-        type: "gift_certificate",
+      await apiRequest("POST", "/api/send-receipt-email", {
         email: email,
-        data: {
-          giftCardCode: purchaseData.giftCard.code,
-          amount: purchaseData.giftCard.initialAmount,
-          recipientName: purchaseData.giftCard.issuedToName,
-          recipientEmail: purchaseData.giftCard.issuedToEmail,
-          purchaserName: giftCertificateData?.purchaserName,
-          message: giftCertificateData?.message || ""
+        receiptData: {
+          transactionId: purchaseData.giftCard.code,
+          timestamp: new Date().toISOString(),
+          total: purchaseData.giftCard.initialAmount,
+          paymentMethod: "Credit Card",
+          name: `Gift Certificate for ${purchaseData.giftCard.issuedToName}`,
+          items: [
+            {
+              name: `Gift Certificate for ${purchaseData.giftCard.issuedToName}`,
+              quantity: 1,
+              price: purchaseData.giftCard.initialAmount,
+              total: purchaseData.giftCard.initialAmount
+            }
+          ]
         }
       });
 
@@ -355,13 +361,12 @@ export default function GiftCertificatesPage() {
     if (!purchaseData || !phone) return;
 
     try {
-      await apiRequest("POST", "/api/send-sms-receipt", {
-        type: "gift_certificate",
+      await apiRequest("POST", "/api/send-receipt-sms", {
         phone: phone,
-        data: {
-          giftCardCode: purchaseData.giftCard.code,
-          amount: purchaseData.giftCard.initialAmount,
-          recipientName: purchaseData.giftCard.issuedToName
+        receiptData: {
+          transactionId: purchaseData.giftCard.code,
+          total: purchaseData.giftCard.initialAmount,
+          paymentMethod: "Credit Card"
         }
       });
 
