@@ -88,7 +88,15 @@ export default function SimpleCalendar({
   // Get appointment for specific staff and time slot
   const getAppointmentForSlot = (staffId: number, slotTime: string) => {
     return dayAppointments.find((appointment: any) => {
+      // Only show appointments for staff members that actually exist
       if (appointment.staffId !== staffId) return false;
+      
+      // Verify the staff member exists in our staff data
+      const staffExists = staff?.some((s: any) => s.id === appointment.staffId);
+      if (!staffExists) {
+        console.log(`Skipping appointment ${appointment.id} - staff ID ${appointment.staffId} not found in staff list`);
+        return false;
+      }
       
       const appointmentDate = new Date(appointment.startTime);
       const appointmentTime = appointmentDate.toLocaleTimeString('en-US', {

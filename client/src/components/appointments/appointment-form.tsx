@@ -563,11 +563,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       });
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete appointment.",
-        variant: "destructive",
-      });
+      // Don't show error if appointment was already deleted (404)
+      if (!error.message?.includes("not found") && !error.message?.includes("404")) {
+        toast({
+          title: "Error",
+          description: error.message || "Failed to delete appointment.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
