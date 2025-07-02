@@ -612,6 +612,24 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     console.log('Form validation errors:', form.formState.errors);
     console.log('Form is valid:', form.formState.isValid);
     
+    // Check if date is missing and try to set it from selectedDate
+    if (!values.date && selectedDate) {
+      console.log('Date missing in form values, setting from selectedDate:', selectedDate);
+      form.setValue('date', selectedDate);
+      values.date = selectedDate;
+    }
+    
+    // Validate that we have a date before proceeding
+    if (!values.date) {
+      console.log('ERROR: No date available for appointment creation');
+      toast({
+        title: "Date Required",
+        description: "Please select a date for the appointment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (appointmentId && appointmentId > 0) {
       console.log('Calling updateMutation.mutate');
       updateMutation.mutate(values);
@@ -824,6 +842,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                               !field.value && "text-muted-foreground"
                             )}
                             disabled={isLoading}
+                            onClick={() => {
+                              console.log('Date button clicked, current field value:', field.value);
+                              console.log('Current form date value:', form.getValues('date'));
+                              console.log('Selected date prop:', selectedDate);
+                            }}
                           >
                             {field.value ? (
                               format(field.value, "PPP")
@@ -838,7 +861,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                         <Calendar
                           mode="single"
                           selected={field.value}
-                          onSelect={field.onChange}
+                          onSelect={(date) => {
+                            console.log('Calendar date selected:', date);
+                            field.onChange(date);
+                            if (date) {
+                              // Force form validation after date selection
+                              form.trigger('date');
+                            }
+                          }}
                           disabled={(date) =>
                             date < new Date(new Date().setHours(0, 0, 0, 0))
                           }
