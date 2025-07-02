@@ -33,7 +33,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Gift, CreditCard, DollarSign, Mail, User, Search, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Gift, CreditCard, DollarSign, Mail, User, Search, CheckCircle, XCircle, Clock, Receipt, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -238,6 +238,8 @@ export default function GiftCertificatesPage() {
   const [balanceCheckCode, setBalanceCheckCode] = useState("");
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [giftCertificateData, setGiftCertificateData] = useState<GiftCertificateForm | null>(null);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+  const [purchaseData, setPurchaseData] = useState<any>(null);
 
   const form = useForm<GiftCertificateForm>({
     resolver: zodResolver(giftCertificateSchema),
@@ -253,17 +255,13 @@ export default function GiftCertificatesPage() {
 
   const purchaseGiftCertificateMutation = useMutation({
     mutationFn: async (data: GiftCertificateForm) => {
-      return await apiRequest("POST", "/api/gift-certificates/purchase", data);
+      const response = await apiRequest("POST", "/api/gift-certificates/purchase", data);
+      return await response.json();
     },
     onSuccess: (data) => {
-      toast({
-        title: "Gift Certificate Purchased!",
-        description: `Gift certificate code ${data.giftCard.code} has been sent to ${data.giftCard.issuedToEmail}`,
-      });
-      form.reset();
-      setSelectedAmount(null);
+      setPurchaseData(data);
       setShowPaymentDialog(false);
-      setGiftCertificateData(null);
+      setShowReceiptDialog(true);
       queryClient.invalidateQueries({ queryKey: ['/api/gift-cards'] });
     },
     onError: (error: any) => {
@@ -321,6 +319,76 @@ export default function GiftCertificatesPage() {
 
   const handleBalanceCheck = (code: string) => {
     setBalanceCheckCode(code.toUpperCase());
+  };
+
+  const handleReceiptEmailSend = async (email: string) => {
+    if (!purchaseData || !email) return;
+
+    try {
+      await apiRequest("POST", "/api/send-receipt", {
+        type: "gift_certificate",
+        email: email,
+        data: {
+          giftCardCode: purchaseData.giftCard.code,
+          amount: purchaseData.giftCard.initialAmount,
+          recipientName: purchaseData.giftCard.issuedToName,
+          recipientEmail: purchaseData.giftCard.issuedToEmail,
+          purchaserName: giftCertificateData?.purchaserName,
+          message: giftCertificateData?.message || ""
+        }
+      });
+
+      toast({
+        title: "Receipt Sent!",
+        description: `Receipt sent to ${email}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to Send Receipt",
+        description: "Please try again or contact support",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReceiptSMSSend = async (phone: string) => {
+    if (!purchaseData || !phone) return;
+
+    try {
+      await apiRequest("POST", "/api/send-sms-receipt", {
+        type: "gift_certificate",
+        phone: phone,
+        data: {
+          giftCardCode: purchaseData.giftCard.code,
+          amount: purchaseData.giftCard.initialAmount,
+          recipientName: purchaseData.giftCard.issuedToName
+        }
+      });
+
+      toast({
+        title: "SMS Receipt Sent!",
+        description: `Receipt sent to ${phone}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Failed to Send SMS",
+        description: "Please try again or contact support",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCloseReceipt = () => {
+    setShowReceiptDialog(false);
+    setPurchaseData(null);
+    setGiftCertificateData(null);
+    form.reset();
+    setSelectedAmount(null);
+    
+    toast({
+      title: "Gift Certificate Purchased!",
+      description: `Gift certificate code ${purchaseData?.giftCard?.code} has been sent to ${purchaseData?.giftCard?.issuedToEmail}`,
+    });
   };
 
   const getStatusIcon = (status: string) => {
@@ -654,6 +722,124 @@ export default function GiftCertificatesPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
               Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Confirmation Dialog */}
+      <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              Gift Certificate Purchase Complete!
+            </DialogTitle>
+            <DialogDescription>
+              Your gift certificate has been successfully purchased and emailed to the recipient.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {purchaseData && (
+            <div className="space-y-6">
+              {/* Purchase Summary */}
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <h3 className="font-medium text-green-900 dark:text-green-100 mb-3">Purchase Summary</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Gift Certificate Code:</span>
+                    <span className="font-mono font-medium text-green-900 dark:text-green-100">
+                      {purchaseData.giftCard.code}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Amount:</span>
+                    <span className="font-medium text-green-900 dark:text-green-100">
+                      ${purchaseData.giftCard.initialAmount.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Recipient:</span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {purchaseData.giftCard.issuedToName}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Sent to:</span>
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {purchaseData.giftCard.issuedToEmail}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Receipt Options */}
+              <div className="space-y-4">
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Send Receipt Copy</h3>
+                
+                {/* Email Receipt */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Email Receipt
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="Enter email address"
+                      id="receipt-email"
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={() => {
+                        const email = (document.getElementById('receipt-email') as HTMLInputElement)?.value;
+                        if (email) {
+                          handleReceiptEmailSend(email);
+                          (document.getElementById('receipt-email') as HTMLInputElement).value = '';
+                        }
+                      }}
+                      variant="outline"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send
+                    </Button>
+                  </div>
+                </div>
+
+                {/* SMS Receipt */}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    SMS Receipt
+                  </label>
+                  <div className="flex gap-2">
+                    <Input
+                      type="tel"
+                      placeholder="Enter phone number"
+                      id="receipt-phone"
+                      className="flex-1"
+                    />
+                    <Button
+                      onClick={() => {
+                        const phone = (document.getElementById('receipt-phone') as HTMLInputElement)?.value;
+                        if (phone) {
+                          handleReceiptSMSSend(phone);
+                          (document.getElementById('receipt-phone') as HTMLInputElement).value = '';
+                        }
+                      }}
+                      variant="outline"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Send
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button onClick={handleCloseReceipt} className="w-full">
+              <Receipt className="h-4 w-4 mr-2" />
+              Complete Purchase
             </Button>
           </DialogFooter>
         </DialogContent>
