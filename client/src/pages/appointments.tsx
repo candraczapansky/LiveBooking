@@ -1096,7 +1096,7 @@ const AppointmentsPage = () => {
             {weekDays.map((day, dayIndex) => (
               <div 
                 key={dayIndex} 
-                className="absolute pointer-events-auto"
+                className="absolute pointer-events-none"
                 style={{
                   left: `${((dayIndex + 1) / 8) * 100}%`,
                   width: `${(1/8) * 100}%`,
@@ -1192,7 +1192,9 @@ const AppointmentsPage = () => {
                   style={{ height: '60px' }}
                   onMouseMove={(e) => handleCalendarMouseMove(e, timeIndex)}
                   onMouseLeave={handleCalendarMouseLeave}
-                  onClick={() => {
+                  onClick={(e) => {
+                    console.log('Week view time slot clicked:', { timeSlot, day: day.toDateString() });
+                    e.stopPropagation();
                     // Set the selected date to the clicked day
                     setCurrentDate(day);
                     // Set the selected time to the clicked time slot
