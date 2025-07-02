@@ -1540,6 +1540,13 @@ const AppointmentsPage = () => {
         appointmentId={selectedAppointmentId}
         selectedDate={currentDate}
         selectedTime={selectedTime}
+        onAppointmentCreated={(appointment) => {
+          // Navigate to the appointment's date when created
+          if (appointment && appointment.startTime) {
+            const appointmentDate = new Date(appointment.startTime);
+            setCurrentDate(appointmentDate);
+          }
+        }}
       />
 
       {/* Checkout Component */}

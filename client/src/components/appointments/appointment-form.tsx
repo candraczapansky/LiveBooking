@@ -116,7 +116,7 @@ const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => 
 
 
 
-const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime }: AppointmentFormProps) => {
+const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const { toast } = useToast();
