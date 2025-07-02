@@ -466,19 +466,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
     onSuccess: (data: any) => {
+      // Force refresh all appointment-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      
       onOpenChange(false);
       toast({
         title: "Success",
         description: "Appointment created successfully.",
       });
       // Call the callback with appointment data if provided
-      console.log("[APPOINTMENT FORM] Success callback - appointment data:", data);
       if (onAppointmentCreated) {
-        console.log("[APPOINTMENT FORM] Calling onAppointmentCreated with:", data);
         onAppointmentCreated(data);
-      } else {
-        console.log("[APPOINTMENT FORM] No onAppointmentCreated callback provided");
       }
     },
     onError: (error: any) => {
@@ -557,8 +556,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("PUT", `/api/appointments/${appointmentId}`, appointmentData);
     },
     onSuccess: () => {
+      // Force refresh all appointment-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      
       onOpenChange(false);
       toast({
         title: "Success",
@@ -591,7 +593,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("DELETE", `/api/appointments/${appointmentId}`);
     },
     onSuccess: () => {
+      // Force refresh all appointment-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      
       onOpenChange(false);
       toast({
         title: "Success",
