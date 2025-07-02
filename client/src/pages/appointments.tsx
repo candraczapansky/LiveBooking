@@ -196,32 +196,36 @@ const AppointmentsPage = () => {
 
   // Handle quick action navigation
   useEffect(() => {
-    const searchParams = new URLSearchParams(location.split('?')[1] || '');
-    if (searchParams.get('new') === 'true') {
-      setSelectedAppointmentId(null);
-      setIsFormOpen(true);
-      // Clean up URL without triggering navigation
-      window.history.replaceState({}, '', '/appointments');
+    try {
+      const searchParams = new URLSearchParams(location.split('?')[1] || '');
+      if (searchParams.get('new') === 'true') {
+        setSelectedAppointmentId(null);
+        setIsFormOpen(true);
+        // Clean up URL without triggering navigation
+        window.history.replaceState({}, '', '/appointments');
+      }
+    } catch (error) {
+      console.log('URL parameter parsing error:', error);
     }
   }, [location]);
 
   // Fetch appointments from API
-  const { data: appointments, isLoading: appointmentsLoading, refetch: refetchAppointments } = useQuery({
+  const { data: appointments = [], isLoading: appointmentsLoading, refetch: refetchAppointments } = useQuery({
     queryKey: ['/api/appointments'],
   });
 
   // Fetch staff from API
-  const { data: staff, isLoading: staffLoading } = useQuery({
+  const { data: staff = [], isLoading: staffLoading } = useQuery({
     queryKey: ['/api/staff'],
   });
 
   // Fetch services from API
-  const { data: services, isLoading: servicesLoading } = useQuery({
+  const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['/api/services'],
   });
 
   // Fetch users to get client information
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ['/api/users'],
   });
 
@@ -267,6 +271,11 @@ const AppointmentsPage = () => {
     const dayName = getDayName(date);
     const currentDate = formatDateForComparison(date);
     
+    // Ensure schedules is an array
+    if (!Array.isArray(schedules)) {
+      return true; // Default to available if no schedule data
+    }
+    
     // Find schedules for this staff member on this day
     const staffSchedules = schedules.filter((schedule: any) => 
       schedule.staffId === staffId && 
@@ -276,7 +285,7 @@ const AppointmentsPage = () => {
     );
 
     if (staffSchedules.length === 0) {
-      return false; // No schedule = not available
+      return true; // Default to available if no specific schedule
     }
 
     // Convert time slot to 24-hour format for comparison
@@ -492,7 +501,7 @@ const AppointmentsPage = () => {
   // Create stable staff column mapping that doesn't change on re-renders
   const getStaffColumn = useMemo(() => {
     return (staffName: string) => {
-      if (!staff) return -1;
+      if (!Array.isArray(staff) || staff.length === 0) return -1;
       
       // Sort staff by ID to ensure consistent ordering
       const sortedStaff = [...staff].sort((a: any, b: any) => a.id - b.id);
@@ -509,7 +518,9 @@ const AppointmentsPage = () => {
   
   // Memoized appointment positioning that preserves existing positions
   const appointmentPositions = useMemo(() => {
-    if (!appointments || !services || !staff) return appointmentPositionsRef.current;
+    if (!Array.isArray(appointments) || !Array.isArray(services) || !Array.isArray(staff)) {
+      return appointmentPositionsRef.current;
+    }
     
     // Get existing positions to preserve them
     const existingPositions = appointmentPositionsRef.current;
