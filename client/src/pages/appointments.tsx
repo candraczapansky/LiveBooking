@@ -571,30 +571,34 @@ const AppointmentsPage = () => {
       // Each time slot row is 40px * zoomLevel high
       const slotHeight = Math.round(40 * zoomLevel);
       
-      // Find the exact time slot this appointment should appear in
-      const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true
-      });
+      // Calculate position based on hour/minute directly instead of string matching
+      // This ensures precise positioning even if time format doesn't match exactly
+      const appointmentHour = startHour;
+      const appointmentMinute = startMinute;
       
-      // Find the index of this time in the timeSlots array
-      const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
-      const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
+      // Calculate slots from 8:00 AM (each slot is 15 minutes)
+      const baseHour = 8; // 8:00 AM start
+      const hoursPastBase = appointmentHour - baseHour;
+      const totalMinutesPastBase = (hoursPastBase * 60) + appointmentMinute;
+      const slotIndex = Math.floor(totalMinutesPastBase / 15); // 15-minute slots
+      
+      // Ensure we're within valid range (8 AM to 10 PM = 0 to 55 slots)
+      const validSlotIndex = Math.max(0, Math.min(slotIndex, 55));
+      const topPosition = validSlotIndex * slotHeight;
       
       // Debug positioning calculation for the new appointment
       if (appointment.id >= 110) {
         console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
           startHour,
           startMinute,
-          timeSlotString,
-          slotIndex,
-          foundInArray: slotIndex >= 0,
-          timeSlotAtIndex: timeSlots[slotIndex],
+          appointmentHour,
+          appointmentMinute,
+          validSlotIndex,
           topPosition,
           finalTopPosition: `${topPosition}px`,
           zoomLevel,
-          shouldAppearAt: timeSlotString
+          totalMinutesPastBase,
+          slotHeight
         });
       }
       
@@ -645,14 +649,20 @@ const AppointmentsPage = () => {
     
     // Calculate position based on time slots
     const slotHeight = Math.round(40 * zoomLevel);
-    const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true
-    });
     
-    const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
-    const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
+    // Calculate position based on hour/minute directly for precise positioning
+    const appointmentHour = startHour;
+    const appointmentMinute = startMinute;
+    
+    // Calculate slots from 8:00 AM (each slot is 15 minutes)
+    const baseHour = 8; // 8:00 AM start
+    const hoursPastBase = appointmentHour - baseHour;
+    const totalMinutesPastBase = (hoursPastBase * 60) + appointmentMinute;
+    const slotIndex = Math.floor(totalMinutesPastBase / 15); // 15-minute slots
+    
+    // Ensure we're within valid range (8 AM to 10 PM = 0 to 55 slots)
+    const validSlotIndex = Math.max(0, Math.min(slotIndex, 55));
+    const topPosition = validSlotIndex * slotHeight;
     
     // Use service duration for height
     const service = services?.find((s: any) => s.id === appointment.serviceId);
@@ -940,7 +950,7 @@ const AppointmentsPage = () => {
                   key={stableKey}
                   className="absolute pointer-events-auto"
                   style={{
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`, // Time column + staff column offset + padding
+                    left: `${96 + (columnIndex * columnWidth) + 4}px`, // Time column (24*4=96) + staff column offset + padding
                     width: `${columnWidth - 8}px`,
                     ...appointmentStyle,
                     zIndex: 10
