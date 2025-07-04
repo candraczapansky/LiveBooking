@@ -892,44 +892,67 @@ const AppointmentsPage = () => {
               
               if (columnIndex === -1) return null;
 
-              const appointmentStyle = getAppointmentStyle(appointment);
+              // Calculate appointment position directly
+              const utcTime = new Date(appointment.startTime);
+              const centralTime = new Date(utcTime.getTime() - (5 * 60 * 60 * 1000));
+              const hour = centralTime.getHours();
+              const minute = centralTime.getMinutes();
               
-              // Find service and client information
+              // Skip appointments outside business hours
+              if (hour < 8 || hour >= 22) return null;
+              
+              // Calculate position
+              const minutesFromStart = (hour - 8) * 60 + minute;
+              const slotHeight = 30 * zoomLevel;
+              const topPosition = Math.round((minutesFromStart / 15) * slotHeight);
+              
+              // Get service and calculate height
               const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const client = users?.find((u: any) => u.id === appointment.clientId);
-
-              // Create a stable key based on appointment's immutable properties
-              const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
+              const duration = service?.duration || 60;
+              const height = Math.round((duration / 15) * slotHeight);
               
-              // Appointment positioning and timezone conversion now working correctly
+              // Get client info
+              const client = users?.find((u: any) => u.id === appointment.clientId);
+              
+              // Calculate proper column positioning
+              const timeColumnWidth = 80;
+              const availableWidth = 1200 - timeColumnWidth; // Use fixed width for now
+              const staffCount = Array.isArray(staff) ? staff.length : 1;
+              const staffColumnWidth = Math.floor(availableWidth / staffCount);
+              const leftPosition = timeColumnWidth + (columnIndex * staffColumnWidth) + 2;
+              const appointmentWidth = staffColumnWidth - 4;
               
               return (
                 <div
-                  key={stableKey}
-                  className="absolute pointer-events-auto"
+                  key={appointment.id}
+                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg cursor-pointer"
                   style={{
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`, // Time column + staff column offset + padding
-                    width: `${columnWidth - 8}px`,
-                    ...appointmentStyle,
-                    zIndex: 10
+                    left: `${leftPosition}px`,
+                    width: `${appointmentWidth}px`,
+                    top: `${topPosition}px`,
+                    height: `${height}px`,
+                    zIndex: 10,
+                    backgroundColor: service?.color || '#e2e8f0',
+                    borderLeftColor: service?.color || '#64748b'
+                  }}
+                  onClick={() => {
+                    setSelectedAppointmentId(appointment.id);
+                    setIsFormOpen(true);
                   }}
                 >
-                  <AppointmentBlock
-                    appointment={appointment}
-                    appointmentStyle={appointmentStyle}
-                    columnIndex={columnIndex}
-                    columnWidth={columnWidth}
-                    service={service}
-                    client={client}
-                    staff={staffMember}
-                    onAppointmentClick={(id: number) => {
-                      setSelectedAppointmentId(id);
-                      setIsFormOpen(true);
-                    }}
-                    draggedAppointment={draggedAppointment}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  />
+                  <div className="text-xs font-medium truncate">
+                    {service?.name || 'Unknown Service'}
+                  </div>
+                  <div className="text-xs opacity-90 truncate">
+                    {client?.firstName} {client?.lastName}
+                  </div>
+                  <div className="text-xs opacity-75">
+                    {centralTime.toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit', 
+                      hour12: true 
+                    })}
+                  </div>
                 </div>
               );
             })}

@@ -19,7 +19,7 @@ import Clients from "@/pages/clients";
 import Staff from "@/pages/staff-simple";
 import Rooms from "@/pages/rooms";
 import Devices from "@/pages/devices";
-import Appointments from "@/pages/appointments";
+import Appointments from "@/pages/appointments-new";
 import Memberships from "@/pages/memberships";
 import Reports from "@/pages/reports";
 import Marketing from "@/pages/marketing";
