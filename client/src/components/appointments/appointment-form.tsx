@@ -427,13 +427,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       const month = values.date.getMonth();
       const day = values.date.getDate();
       
-      // Create a date string in Central Time format and parse it correctly
-      const centralTimeString = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-      
-      // Create date as if it's in Central Time (UTC-5/UTC-6)
-      const centralTimezoneOffset = 5 * 60; // Central Time is UTC-5 (during daylight saving time)
+      // Create appointment time correctly by treating input as Central Time
+      // The issue was that we were adding timezone offset when we should just create the Date normally
+      // JavaScript Date constructor already creates dates in local time
       const localDate = new Date(year, month, day, hours, minutes, 0, 0);
-      const utcTime = new Date(localDate.getTime() + (centralTimezoneOffset * 60 * 1000));
+      
+      // For database storage, we want UTC time, so just use toISOString()
+      // The calendar display will handle timezone conversion properly
+      const utcTime = localDate;
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
@@ -446,7 +447,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       console.log('Creating appointment with timezone conversion:', {
         selectedTime: values.time,
-        centralTimeString: centralTimeString,
         localDate: localDate,
         utcTime: utcTime,
         utcIsoString: utcTime.toISOString(),
@@ -518,15 +518,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       const [hours, minutes] = values.time.split(':').map(Number);
       
-      // Create the date in Central Time and convert to UTC properly
+      // Create appointment time correctly by treating input as Central Time
       const year = values.date.getFullYear();
       const month = values.date.getMonth();
       const day = values.date.getDate();
       
-      // Create date as if it's in Central Time (UTC-5/UTC-6)
-      const centralTimezoneOffset = 5 * 60; // Central Time is UTC-5 (during daylight saving time)
+      // JavaScript Date constructor already creates dates in local time
       const localDate = new Date(year, month, day, hours, minutes, 0, 0);
-      const utcTime = new Date(localDate.getTime() + (centralTimezoneOffset * 60 * 1000));
+      
+      // For database storage, we want UTC time, so just use toISOString()
+      const utcTime = localDate;
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
