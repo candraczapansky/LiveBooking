@@ -558,12 +558,12 @@ const ClientsPage = () => {
       <SidebarController />
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
       }`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto px-2 sm:px-0">
             {viewMode === 'list' ? (
               <>
                 {/* Mobile-Optimized Page Header */}
