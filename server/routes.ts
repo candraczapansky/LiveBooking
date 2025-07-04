@@ -1109,54 +1109,82 @@ If you didn't request this password reset, please ignore this email and your pas
   
   // Appointments routes
   app.get("/api/appointments", async (req, res) => {
-    const { clientId, staffId, date } = req.query;
-    
-    let appointments;
-    if (clientId) {
-      appointments = await storage.getAppointmentsByClient(parseInt(clientId as string));
-    } else if (staffId) {
-      appointments = await storage.getAppointmentsByStaff(parseInt(staffId as string));
-    } else if (date) {
-      appointments = await storage.getAppointmentsByDate(new Date(date as string));
-    } else {
-      // Return all appointments when no filters are specified
-      appointments = await storage.getAllAppointments();
-    }
-    
-    // Get detailed information for each appointment
-    const detailedAppointments = await Promise.all(
-      appointments.map(async (appointment) => {
-        const service = await storage.getService(appointment.serviceId);
-        const client = await storage.getUser(appointment.clientId);
-        const staffMember = await storage.getStaff(appointment.staffId);
-        const staffUser = staffMember ? await storage.getUser(staffMember.userId) : null;
+    try {
+      const { clientId, staffId, date } = req.query;
+      
+      let appointments;
+      if (clientId) {
+        appointments = await storage.getAppointmentsByClient(parseInt(clientId as string));
+      } else if (staffId) {
+        appointments = await storage.getAppointmentsByStaff(parseInt(staffId as string));
+      } else if (date) {
+        appointments = await storage.getAppointmentsByDate(new Date(date as string));
+      } else {
+        // Return all appointments when no filters are specified
+        appointments = await storage.getAllAppointments();
+      }
+      
+      // Get detailed information for each appointment with controlled concurrency
+      const detailedAppointments: any[] = [];
+      const batchSize = 3; // Reduced batch size to prevent connection overload
+      
+      for (let i = 0; i < appointments.length; i += batchSize) {
+        const batch = appointments.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async (appointment) => {
+            try {
+              const service = await storage.getService(appointment.serviceId);
+              const client = await storage.getUser(appointment.clientId);
+              const staffMember = await storage.getStaff(appointment.staffId);
+              const staffUser = staffMember ? await storage.getUser(staffMember.userId) : null;
+          
+              return {
+                ...appointment,
+                service,
+                client: client ? {
+                  id: client.id,
+                  username: client.username,
+                  email: client.email,
+                  firstName: client.firstName,
+                  lastName: client.lastName,
+                  phone: client.phone
+                } : null,
+                staff: staffMember ? {
+                  ...staffMember,
+                  user: staffUser ? {
+                    id: staffUser.id,
+                    username: staffUser.username,
+                    email: staffUser.email,
+                    firstName: staffUser.firstName,
+                    lastName: staffUser.lastName
+                  } : null
+                } : null
+              };
+            } catch (error) {
+              console.error('Error fetching appointment details:', error);
+              // Return appointment with null details if there's an error
+              return {
+                ...appointment,
+                service: null,
+                client: null,
+                staff: null
+              };
+            }
+          })
+        );
+        detailedAppointments.push(...batchResults);
         
-        return {
-          ...appointment,
-          service,
-          client: client ? {
-            id: client.id,
-            username: client.username,
-            email: client.email,
-            firstName: client.firstName,
-            lastName: client.lastName,
-            phone: client.phone
-          } : null,
-          staff: staffMember ? {
-            ...staffMember,
-            user: staffUser ? {
-              id: staffUser.id,
-              username: staffUser.username,
-              email: staffUser.email,
-              firstName: staffUser.firstName,
-              lastName: staffUser.lastName
-            } : null
-          } : null
-        };
-      })
-    );
-    
-    return res.status(200).json(detailedAppointments);
+        // Add a small delay between batches to prevent overwhelming the database
+        if (i + batchSize < appointments.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      return res.status(200).json(detailedAppointments);
+    } catch (error) {
+      console.error('Error in appointments route:', error);
+      return res.status(500).json({ error: 'Failed to fetch appointments' });
+    }
   });
   
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
