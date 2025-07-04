@@ -90,13 +90,13 @@ export default function DevicesPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="space-y-6">
+        <div className="space-y-6 px-2 sm:px-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse mx-4 sm:mx-0">
+            <Card key={i} className="animate-pulse">
               <CardHeader className="pb-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2 flex-1">
@@ -126,7 +126,7 @@ export default function DevicesPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 px-2 sm:px-0">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         <Button 
