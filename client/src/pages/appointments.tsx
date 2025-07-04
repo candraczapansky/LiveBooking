@@ -716,9 +716,11 @@ const AppointmentsPage = () => {
   };
 
   const renderDayView = () => {
+    console.log(`[DAY VIEW] Rendering day view for date: ${currentDate}, viewMode: ${viewMode}`);
     const staffArray = Array.isArray(staff) ? staff : [];
     const staffCount = staffArray.length || 1;
     const isMobileView = window.innerWidth < 768;
+    console.log(`[DAY VIEW] Mobile view: ${isMobileView}, staff count: ${staffCount}, appointments count: ${appointments?.length || 0}`);
     
     // For mobile, use a simpler card-based layout
     if (isMobileView) {
@@ -887,12 +889,13 @@ const AppointmentsPage = () => {
               const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
               
-              // Convert both dates to local timezone for comparison
-              // This ensures appointments appear on the correct calendar date
-              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
-              const currentLocalDate = new Date(currentDateOnly.getFullYear(), currentDateOnly.getMonth(), currentDateOnly.getDate());
+              // Simple date string comparison to avoid timezone issues
+              const appointmentDateString = appointmentDate.toDateString();
+              const currentDateString = currentDateOnly.toDateString();
               
-              return appointmentLocalDate.getTime() === currentLocalDate.getTime();
+              console.log(`[DATE FILTER] Appointment ${appointment.id}: ${appointmentDateString} vs Current: ${currentDateString}`, appointmentDateString === currentDateString);
+              
+              return appointmentDateString === currentDateString;
             })
             .sort((a: any, b: any) => {
               // Sort by start time first, then by ID for stable positioning
@@ -920,18 +923,17 @@ const AppointmentsPage = () => {
               // Create a stable key based on appointment's immutable properties
               const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
               
-              // Debug the actual style being applied for recent appointments
-              if (appointment.id >= 110) {
-                console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
-                  appointmentStyle,
-                  finalStyle: {
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
-                    width: `${columnWidth - 8}px`,
-                    ...appointmentStyle,
-                    zIndex: 10
-                  }
-                });
-              }
+              // Debug the actual style being applied for all appointments
+              console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
+                appointmentStyle,
+                hasDisplay: appointmentStyle.display,
+                finalStyle: {
+                  left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                  width: `${columnWidth - 8}px`,
+                  ...appointmentStyle,
+                  zIndex: 10
+                }
+              });
               
               return (
                 <div
@@ -1561,19 +1563,24 @@ const AppointmentsPage = () => {
                 </div>
               </div>
             </div>
-            {/* Simple Calendar */}
+            {/* Calendar Views */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm min-h-[400px] overflow-hidden">
               <div className="h-full overflow-y-auto">
-                <SimpleCalendar
-                  appointments={Array.isArray(appointments) ? appointments : []}
-                  staff={Array.isArray(staff) ? staff : []}
-                  users={Array.isArray(users) ? users : []}
-                  services={Array.isArray(services) ? services : []}
-                  currentDate={currentDate}
-                  onDateChange={setCurrentDate}
-                  onAppointmentClick={handleAppointmentClick}
-                  onAddAppointment={handleAddAppointment}
-                />
+                {viewMode === 'day' && renderDayView()}
+                {viewMode === 'week' && renderWeekView()}
+                {viewMode === 'month' && renderMonthView()}
+                {!viewMode && (
+                  <SimpleCalendar
+                    appointments={Array.isArray(appointments) ? appointments : []}
+                    staff={Array.isArray(staff) ? staff : []}
+                    users={Array.isArray(users) ? users : []}
+                    services={Array.isArray(services) ? services : []}
+                    currentDate={currentDate}
+                    onDateChange={setCurrentDate}
+                    onAppointmentClick={handleAppointmentClick}
+                    onAddAppointment={handleAddAppointment}
+                  />
+                )}
               </div>
             </div>
           </div>
