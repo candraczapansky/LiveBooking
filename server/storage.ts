@@ -1049,7 +1049,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   private convertLocalToISO(localTimeValue: string | Date): string {
-    // If it's already a Date object, convert to ISO string
+    // If it's already a Date object, return ISO string without conversion
     if (localTimeValue instanceof Date) {
       return localTimeValue.toISOString();
     }
@@ -1065,14 +1065,15 @@ export class DatabaseStorage implements IStorage {
     }
     
     // Convert local datetime string (YYYY-MM-DD HH:MM:SS) to proper ISO format
-    // Parse as local time, then convert to ISO
+    // IMPORTANT: Database stores local times as strings, but we need to return them as if they were UTC
+    // to prevent double timezone conversion in the frontend
     const [datePart, timePart] = localTimeValue.split(' ');
     const [year, month, day] = datePart.split('-').map(Number);
     const [hour, minute, second] = timePart.split(':').map(Number);
     
-    // Create date in local timezone
-    const localDate = new Date(year, month - 1, day, hour, minute, second || 0);
-    return localDate.toISOString();
+    // Create date as if it were UTC to prevent timezone double-conversion
+    const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second || 0));
+    return utcDate.toISOString();
   }
 
   async getAppointmentsByClient(clientId: number): Promise<any[]> {

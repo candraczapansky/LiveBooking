@@ -784,7 +784,7 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time grid */}
-        <div className="relative min-w-max">
+        <div className="relative min-w-max" style={{ height: `${timeSlots.length * Math.round(30 * zoomLevel)}px` }}>
           {/* Time labels and grid lines */}
           <div className="flex">
             <div className="w-20 flex-shrink-0">
