@@ -582,17 +582,7 @@ const AppointmentsPage = () => {
       const startHour = centralTime.getHours();
       const startMinute = centralTime.getMinutes();
       
-      // Debug the timezone conversion
-      if (appointment.id >= 100) {
-        console.log(`[TIMEZONE DEBUG] Appointment ${appointment.id}:`, {
-          storedUTC: appointment.startTime,
-          utcTime: appointmentTime.toISOString(),
-          centralTime: centralTime.toISOString(),
-          displayHour: startHour,
-          displayMinute: startMinute,
-          shouldShowAt: `${startHour}:${startMinute.toString().padStart(2, '0')}`
-        });
-      }
+      // Timezone conversion completed - appointments now display at correct Central Time
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
@@ -604,32 +594,22 @@ const AppointmentsPage = () => {
       // Each time slot row is 30px * zoomLevel high
       const slotHeight = Math.round(30 * zoomLevel);
       
-      // Create time string for the converted Central Time
+      // Calculate position based on actual time, not trying to match exact time slots
+      // This accounts for appointments that may not fall on exact 15-minute boundaries
+      const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
+      const topPosition = (totalMinutesFromStart / 15) * slotHeight; // 15 minutes per slot
+      
+      // Create time string for debugging
       const timeSlotString = centralTime.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true,
-        timeZone: 'America/Chicago'
+        hour12: true
       });
       
-      // Find the index of this time in the timeSlots array
-      const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
-      const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
+      // Find the closest time slot for debugging purposes
+      const slotIndex = Math.round(totalMinutesFromStart / 15);
       
-      // Debug positioning calculation
-      if (appointment.id >= 100) {
-        console.log(`[POSITION DEBUG] Appointment ${appointment.id}:`, {
-          centralHour: startHour,
-          centralMinute: startMinute,
-          timeSlotString,
-          slotIndex,
-          foundInArray: slotIndex >= 0,
-          timeSlotAtIndex: timeSlots[slotIndex],
-          topPosition,
-          finalTopPosition: `${topPosition}px`,
-          zoomLevel
-        });
-      }
+      // Position calculated based on exact time for precise alignment
       
       // Use service duration for height calculation
       const service = services.find((s: any) => s.id === appointment.serviceId);

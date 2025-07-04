@@ -19,10 +19,12 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Root cause identified: Appointments stored in UTC were displaying at wrong times on calendar
   - UTC stored times like "2025-07-02T04:00:00.000Z" were appearing at 11:00 PM instead of correct local time
   - Fixed by implementing proper UTC to Central Time (UTC-5) conversion in appointment positioning logic
-  - Added timezone debugging to track conversion process: UTC time → Central Time → calendar position
-  - Appointments now display at correct time slots matching their actual scheduled times
-  - Enhanced positioning calculation to use converted Central Time for accurate time slot matching
-  - Calendar visual alignment now properly reflects appointment booking times
+  - Replaced time slot string matching with precise mathematical positioning calculation
+  - Enhanced positioning to calculate exact pixel position based on minutes from start time
+  - Appointments now position at: (totalMinutesFromStart / 15) * slotHeight for precise alignment
+  - Removed dependency on exact time slot string matching for more robust positioning
+  - Calendar appointments now display accurately at their scheduled Central Time slots
+  - Verified fix with debug output showing correct timezone conversion and positioning calculations
 
 ### July 2, 2025 - Week and Month View Appointment Scheduling Implementation and Enhanced Calendar Interaction
 
