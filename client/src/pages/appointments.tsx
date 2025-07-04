@@ -627,7 +627,54 @@ const AppointmentsPage = () => {
   }, [appointments, services, staff, zoomLevel]);
 
   const getAppointmentStyle = (appointment: any) => {
-    return appointmentPositions.get(appointment.id) || { top: '0px', height: '0px', display: 'none' };
+    const storedPosition = appointmentPositions.get(appointment.id);
+    
+    if (storedPosition) {
+      console.log(`[STYLE DEBUG] Found stored position for appointment ${appointment.id}:`, storedPosition);
+      return storedPosition;
+    }
+    
+    // Fallback: Calculate position directly if not in Map
+    const appointmentTime = new Date(appointment.startTime);
+    const startHour = appointmentTime.getHours();
+    const startMinute = appointmentTime.getMinutes();
+    
+    // Skip appointments outside business hours (8 AM to 10 PM)
+    if (startHour < 8 || startHour >= 22) {
+      console.log(`[STYLE DEBUG] Appointment ${appointment.id} outside business hours:`, { startHour });
+      return { top: '0px', height: '0px', display: 'none' };
+    }
+    
+    // Calculate position based on time slots
+    const slotHeight = Math.round(30 * zoomLevel);
+    const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
+    const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
+    
+    // Use service duration for height
+    const service = services?.find((s: any) => s.id === appointment.serviceId);
+    const serviceDuration = service?.duration || 60;
+    const slotsNeeded = Math.ceil(serviceDuration / 15);
+    const calculatedHeight = slotsNeeded * slotHeight;
+    
+    const fallbackStyle = {
+      top: `${topPosition}px`,
+      height: `${calculatedHeight}px`
+    };
+    
+    console.log(`[STYLE DEBUG] Calculated fallback position for appointment ${appointment.id}:`, {
+      timeSlotString,
+      slotIndex,
+      topPosition,
+      fallbackStyle
+    });
+    
+    return fallbackStyle;
   };
 
 

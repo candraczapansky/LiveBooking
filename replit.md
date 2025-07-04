@@ -13,7 +13,22 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### July 4, 2025 - Critical App Startup Fix and Complete Timezone Calendar Display Fix and Mobile Appointments Page Improvements
+### July 4, 2025 - Complete Calendar Display System Fix and Critical Timezone Conversion Resolution
+
+- **Successfully resolved persistent calendar display issue preventing all appointments from showing:**
+  - Root cause identified: getAppointmentStyle function returned `display: 'none'` for appointments not found in positioning Map
+  - Implemented comprehensive fallback positioning calculation when appointments not found in stored positions
+  - Added detailed debugging logs to track appointment positioning and styling throughout render process
+  - Enhanced appointment style calculation with direct position computation based on time slots and service duration
+  - Calendar now displays all valid appointments with proper positioning regardless of Map storage status
+  - Fixed calendar container height to accommodate all time slots from 8:00 AM to 10:00 PM
+
+- **Fixed critical timezone double-conversion bug causing appointments to appear at wrong times:**
+  - Root cause identified: convertLocalToISO method was applying local timezone conversion twice
+  - Updated convertLocalToISO to treat database strings as UTC to prevent double timezone conversion
+  - Appointments stored as 3:00 PM local time now correctly display at 3:00 PM instead of 10:00 AM
+  - Enhanced debugging with detailed time conversion logging to track timezone handling throughout system
+  - All appointment times now display at their intended local times with proper calendar positioning
 
 - **Fixed critical application startup error preventing server from running:**
   - Root cause identified: convertLocalToISO method expected string parameters but database returned Date objects
@@ -28,14 +43,6 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Updated onAppointmentCreated callback to force manual data refresh alongside cache invalidation
   - New appointments now appear immediately on calendar without requiring page refresh
   - Calendar automatically navigates to appointment date when new appointments are created
-
-- **Fixed critical timezone display issue preventing new appointments from appearing on calendar:**
-  - Root cause identified: Database now stores local time strings (YYYY-MM-DD HH:MM:SS) but frontend expected ISO format
-  - Created convertLocalToISO method in DatabaseStorage to properly format datetime strings for frontend consumption
-  - Updated getAllAppointments, getActiveAppointmentsByStaff, and getActiveAppointmentsByDate methods with time conversion
-  - Appointments now properly appear on calendar immediately after booking with correct time display
-  - Fixed TypeScript compilation errors with proper variable naming to avoid conflicts with schema imports
-  - New appointments (like ID 152 scheduled for 9:30 AM) now display correctly at their intended time slots
 
 ### July 4, 2025 - Mobile Appointments Page Improvements and Conflict Detection Fix
 
