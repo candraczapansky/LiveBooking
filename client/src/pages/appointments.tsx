@@ -586,9 +586,10 @@ const AppointmentsPage = () => {
       const validSlotIndex = Math.max(0, Math.min(slotIndex, 55));
       const topPosition = validSlotIndex * slotHeight;
       
-      // Debug positioning calculation for the new appointment
-      if (appointment.id >= 130) {
+      // Debug positioning calculation for ALL appointments to find the issue
+      if (appointment.id >= 76) {
         console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
+          appointmentTime: appointment.startTime,
           startHour,
           startMinute,
           appointmentHour,
@@ -601,7 +602,9 @@ const AppointmentsPage = () => {
           finalTopPosition: `${topPosition}px`,
           zoomLevel,
           slotHeight,
-          expectedSlotFor12PM: 'Should be slot 16 (240min ÷ 15 = 16)'
+          calculationCheck: `${hoursPastBase}h * 60min + ${appointmentMinute}min = ${totalMinutesPastBase}min ÷ 15 = slot ${slotIndex}`,
+          expectedFor12PM: 'Should be slot 16 (640px) for 12:00 PM',
+          actualVsExpected: topPosition === 640 ? 'CORRECT' : 'WRONG - Half expected value!'
         });
       }
       
@@ -634,11 +637,11 @@ const AppointmentsPage = () => {
   }, [appointments, services, staff, zoomLevel]);
 
   const getAppointmentStyle = (appointment: any) => {
-    const storedPosition = appointmentPositions.get(appointment.id);
-    
-    if (storedPosition) {
-      return storedPosition;
-    }
+    // Temporarily bypass stored positions to use fixed calculation
+    // const storedPosition = appointmentPositions.get(appointment.id);
+    // if (storedPosition) {
+    //   return storedPosition;
+    // }
     
     // Fallback: Calculate position directly if not in Map
     const appointmentTime = new Date(appointment.startTime);
@@ -650,8 +653,9 @@ const AppointmentsPage = () => {
       return { top: '0px', height: '0px', display: 'none' };
     }
     
-    // Calculate position based on time slots
-    const slotHeight = Math.round(40 * zoomLevel);
+    // Calculate position based on time slots  
+    // Use consistent 40px slot height to match calendar layout
+    const slotHeight = 40;
     
     // Calculate position based on hour/minute directly for precise positioning
     const appointmentHour = startHour;
