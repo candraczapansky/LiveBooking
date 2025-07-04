@@ -322,72 +322,72 @@ export default function Products() {
   const totalValue = products?.reduce((sum: number, p: Product) => sum + (p.price * p.stockQuantity), 0) || 0;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen lg:h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden ml-0 lg:ml-64">
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Product Management</h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
+            <div className="mb-6 sm:mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">Product Management</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1 sm:mt-2 text-sm sm:text-base">
                 Manage your salon's product inventory and pricing
               </p>
             </div>
 
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Products</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 md:gap-6 mb-6 sm:mb-8">
+              <Card className="min-h-[120px] sm:min-h-[140px]">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                  <CardTitle className="text-xs sm:text-sm font-medium leading-tight">Total Products</CardTitle>
+                  <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{totalProducts}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="text-xl sm:text-2xl font-bold">{totalProducts}</div>
+                  <p className="text-xs text-muted-foreground leading-tight">
                     {activeProducts} active
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Low Stock Alert</CardTitle>
-                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <Card className="min-h-[120px] sm:min-h-[140px]">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                  <CardTitle className="text-xs sm:text-sm font-medium leading-tight">Low Stock Alert</CardTitle>
+                  <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{lowStockProducts}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="text-xl sm:text-2xl font-bold">{lowStockProducts}</div>
+                  <p className="text-xs text-muted-foreground leading-tight">
                     Products below minimum stock
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Inventory Value</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+              <Card className="min-h-[120px] sm:min-h-[140px]">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                  <CardTitle className="text-xs sm:text-sm font-medium leading-tight">Inventory Value</CardTitle>
+                  <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
-                  <p className="text-xs text-muted-foreground">
+                <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="text-xl sm:text-2xl font-bold">${totalValue.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground leading-tight">
                     Total retail value
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Categories</CardTitle>
-                  <Package className="h-4 w-4 text-muted-foreground" />
+              <Card className="min-h-[120px] sm:min-h-[140px]">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+                  <CardTitle className="text-xs sm:text-sm font-medium leading-tight">Categories</CardTitle>
+                  <Package className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">
+                <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="text-xl sm:text-2xl font-bold">
                     {new Set(products?.map((p: Product) => p.category)).size || 0}
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground leading-tight">
                     Product categories
                   </p>
                 </CardContent>
@@ -395,13 +395,13 @@ export default function Products() {
             </div>
 
             {/* Search and Add Product */}
-            <div className="flex justify-between items-center mb-6">
-              <div className="relative">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center mb-4 sm:mb-6">
+              <div className="relative flex-1 sm:flex-none">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                 <Input
                   type="search"
                   placeholder="Search products..."
-                  className="pl-8 w-80"
+                  className="pl-8 w-full sm:w-80"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -409,12 +409,12 @@ export default function Products() {
 
               <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => resetForm()}>
+                  <Button onClick={() => resetForm()} className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Product
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-auto">
                   <DialogHeader>
                     <DialogTitle>Add New Product</DialogTitle>
                     <DialogDescription>
@@ -632,94 +632,157 @@ export default function Products() {
               </Dialog>
             </div>
 
-            {/* Products Table */}
+            {/* Products */}
             <Card>
-              <CardHeader>
-                <CardTitle>Products ({filteredProducts.length})</CardTitle>
-                <CardDescription>
+              <CardHeader className="px-3 sm:px-6">
+                <CardTitle className="text-lg sm:text-xl">Products ({filteredProducts.length})</CardTitle>
+                <CardDescription className="text-sm">
                   Manage your product inventory and details
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-3 sm:px-6">
                 {isLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Stock</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
+                  <>
+                    {/* Mobile Card Layout */}
+                    <div className="block md:hidden space-y-3">
                       {filteredProducts.map((product: Product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <div>
-                              <div className="font-medium">{product.name}</div>
-                              {product.brand && (
-                                <div className="text-sm text-gray-500">{product.brand}</div>
-                              )}
-                              {product.sku && (
-                                <div className="text-xs text-gray-400">SKU: {product.sku}</div>
-                              )}
+                        <Card key={product.id} className="border border-gray-200 dark:border-gray-700">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-base truncate">{product.name}</h3>
+                                {product.brand && (
+                                  <p className="text-sm text-gray-500 truncate">{product.brand}</p>
+                                )}
+                                {product.sku && (
+                                  <p className="text-xs text-gray-400">SKU: {product.sku}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleEdit(product)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(product.id)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">{product.category}</Badge>
-                          </TableCell>
-                          <TableCell>${product.price.toFixed(2)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <span>{product.stockQuantity}</span>
-                              {product.stockQuantity <= product.minStockLevel && (
-                                <Badge variant="destructive" className="text-xs">Low</Badge>
-                              )}
+                            
+                            <div className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-3">
+                                <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                                <span className="font-semibold text-lg">${product.price.toFixed(2)}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">Stock: {product.stockQuantity}</span>
+                                {product.stockQuantity <= product.minStockLevel && (
+                                  <Badge variant="destructive" className="text-xs">Low</Badge>
+                                )}
+                              </div>
                             </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={product.isActive ? "default" : "secondary"}>
-                              {product.isActive ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(product)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(product.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                            
+                            <div className="mt-3 flex justify-between items-center">
+                              <Badge variant={product.isActive ? "default" : "secondary"} className="text-xs">
+                                {product.isActive ? "Active" : "Inactive"}
+                              </Badge>
                             </div>
-                          </TableCell>
-                        </TableRow>
+                          </CardContent>
+                        </Card>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+
+                    {/* Desktop Table Layout */}
+                    <div className="hidden md:block">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Price</TableHead>
+                            <TableHead>Stock</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredProducts.map((product: Product) => (
+                            <TableRow key={product.id}>
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.brand && (
+                                    <div className="text-sm text-gray-500">{product.brand}</div>
+                                  )}
+                                  {product.sku && (
+                                    <div className="text-xs text-gray-400">SKU: {product.sku}</div>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary">{product.category}</Badge>
+                              </TableCell>
+                              <TableCell>${product.price.toFixed(2)}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <span>{product.stockQuantity}</span>
+                                  {product.stockQuantity <= product.minStockLevel && (
+                                    <Badge variant="destructive" className="text-xs">Low</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant={product.isActive ? "default" : "secondary"}>
+                                  {product.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(product)}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDelete(product.id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
                 )}
 
                 {!isLoading && filteredProducts.length === 0 && (
                   <div className="text-center py-8">
                     <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                    <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
                       No products found
                     </h3>
-                    <p className="text-gray-500 dark:text-gray-400 mb-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                       Get started by adding your first product to the inventory.
                     </p>
                   </div>
@@ -729,7 +792,7 @@ export default function Products() {
 
             {/* Edit Product Dialog */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-auto">
                 <DialogHeader>
                   <DialogTitle>Edit Product</DialogTitle>
                   <DialogDescription>
