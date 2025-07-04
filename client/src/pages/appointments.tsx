@@ -568,8 +568,8 @@ const AppointmentsPage = () => {
       }
       
       // Calculate position based on time slots starting from 8:00 AM
-      // Each time slot row is 30px * zoomLevel high
-      const slotHeight = Math.round(30 * zoomLevel);
+      // Each time slot row is 40px * zoomLevel high
+      const slotHeight = Math.round(40 * zoomLevel);
       
       // Find the exact time slot this appointment should appear in
       const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
@@ -644,7 +644,7 @@ const AppointmentsPage = () => {
     }
     
     // Calculate position based on time slots
-    const slotHeight = Math.round(30 * zoomLevel);
+    const slotHeight = Math.round(40 * zoomLevel);
     const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
       hour: 'numeric', 
       minute: '2-digit',
@@ -802,13 +802,13 @@ const AppointmentsPage = () => {
 
     // Desktop grid view
     const availableWidth = window.innerWidth - 280 - 100; // Sidebar + padding
-    const columnWidth = Math.max(280, Math.floor(availableWidth / staffCount));
+    const columnWidth = Math.max(300, Math.floor(availableWidth / staffCount));
     
     return (
-      <div className="relative overflow-x-auto">
+      <div className="relative overflow-x-auto bg-white dark:bg-gray-800">
         {/* Header with staff names */}
-        <div className="flex border-b bg-white dark:bg-gray-800 sticky top-0 z-10 min-w-max">
-          <div className="w-20 flex-shrink-0 border-r p-4 text-sm font-medium text-gray-600 dark:text-gray-300">
+        <div className="flex border-b bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 min-w-max">
+          <div className="w-24 flex-shrink-0 border-r border-gray-200 dark:border-gray-600 p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800">
             Time
           </div>
           {staff?.map((staffMember: any) => {
@@ -816,8 +816,8 @@ const AppointmentsPage = () => {
             return (
               <div 
                 key={staffMember.id}
-                className="border-r p-4 text-sm font-medium text-gray-900 dark:text-gray-100 flex-shrink-0" 
-                style={{ width: columnWidth, minWidth: '280px' }}
+                className="border-r border-gray-200 dark:border-gray-600 p-3 text-sm font-semibold text-gray-900 dark:text-gray-100 flex-shrink-0 text-center" 
+                style={{ width: columnWidth, minWidth: '300px' }}
               >
                 <span className="truncate block">{staffName}</span>
               </div>
@@ -826,24 +826,24 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time grid */}
-        <div className="relative min-w-max" style={{ height: `${timeSlots.length * Math.round(30 * zoomLevel)}px` }}>
+        <div className="relative min-w-max bg-white dark:bg-gray-900" style={{ height: `${timeSlots.length * Math.round(40 * zoomLevel)}px` }}>
           {/* Time labels and grid lines */}
           <div className="flex">
-            <div className="w-20 flex-shrink-0">
+            <div className="w-24 flex-shrink-0 bg-gray-50 dark:bg-gray-800">
               {timeSlots.map((time, index) => (
                 <div 
                   key={time} 
-                  className="border-r border-b px-2 py-1 text-xs text-gray-500 dark:text-gray-400 flex items-center"
-                  style={{ height: Math.round(30 * zoomLevel) }}
+                  className="border-r border-b border-gray-200 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-end"
+                  style={{ height: Math.round(40 * zoomLevel) }}
                 >
-                  <span className="text-xs">{time}</span>
+                  <span>{time}</span>
                 </div>
               ))}
             </div>
             
             {/* Staff columns */}
             {staff?.map((staffMember: any) => (
-              <div key={staffMember.id} className="flex-shrink-0 border-r relative" style={{ width: columnWidth, minWidth: '280px' }}>
+              <div key={staffMember.id} className="flex-shrink-0 border-r border-gray-200 dark:border-gray-600 relative bg-white dark:bg-gray-900" style={{ width: columnWidth, minWidth: '300px' }}>
                 {timeSlots.map((time, index) => {
                   const isAvailable = isStaffAvailable(staffMember.id, time, currentDate);
                   
@@ -857,7 +857,7 @@ const AppointmentsPage = () => {
                             }`
                           : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-50'
                       }`}
-                      style={{ height: Math.round(30 * zoomLevel) }}
+                      style={{ height: Math.round(40 * zoomLevel) }}
                       onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
                       onDragLeave={isAvailable ? handleDragLeave : undefined}
                       onDrop={isAvailable ? (e) => handleDrop(e, time) : undefined}
