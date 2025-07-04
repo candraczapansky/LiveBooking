@@ -214,13 +214,6 @@ const AppointmentsPage = () => {
     queryKey: ['/api/appointments'],
   });
 
-  // Debug appointments data changes
-  useEffect(() => {
-    console.log("[APPOINTMENTS PAGE] Appointments data updated:", appointments.length, "appointments");
-    console.log("[APPOINTMENTS PAGE] First 5 appointments (newest):", appointments.slice(0, 5).map((apt: any) => ({ id: apt.id, startTime: apt.startTime, service: apt.serviceId })));
-    console.log("[APPOINTMENTS PAGE] Last 5 appointments (oldest):", appointments.slice(-5).map((apt: any) => ({ id: apt.id, startTime: apt.startTime, service: apt.serviceId })));
-  }, [appointments]);
-
   // Fetch staff from API
   const { data: staff = [], isLoading: staffLoading } = useQuery({
     queryKey: ['/api/staff'],
@@ -357,48 +350,16 @@ const AppointmentsPage = () => {
   };
 
   const zoomIn = () => {
-    if (zoomLevel < 4) {
-      setZoomLevel(prev => Math.min(prev + 0.25, 4));
+    if (zoomLevel < 3) {
+      setZoomLevel(prev => Math.min(prev + 0.5, 3));
     }
   };
 
   const zoomOut = () => {
-    if (zoomLevel > 0.25) {
-      setZoomLevel(prev => Math.max(prev - 0.25, 0.25));
+    if (zoomLevel > 0.5) {
+      setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
     }
   };
-
-  const resetZoom = () => {
-    setZoomLevel(1);
-  };
-
-  const getZoomLabel = () => {
-    return `${Math.round(zoomLevel * 100)}%`;
-  };
-
-  // Keyboard shortcuts for zoom
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Only trigger if not typing in an input field
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === '=') {
-        e.preventDefault();
-        zoomIn();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '-') {
-        e.preventDefault();
-        zoomOut();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === '0') {
-        e.preventDefault();
-        resetZoom();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [zoomLevel]);
 
   const handlePayment = (appointment: any) => {
     // Get service details and calculate amount
@@ -569,18 +530,36 @@ const AppointmentsPage = () => {
     const sortedAppointments = [...appointments].sort((a, b) => a.id - b.id);
     
     sortedAppointments.forEach((appointment: any) => {
-      // Parse the stored time and convert to local timezone for display
+      // Debug time conversion issue
       const appointmentTime = new Date(appointment.startTime);
       
-      // Convert UTC time to Central Time (UTC-5) for proper positioning
-      // Central Time is 5 hours behind UTC, so we subtract 5 hours from UTC
-      const centralTime = new Date(appointmentTime.getTime() - (5 * 60 * 60 * 1000));
+      if (appointment.id >= 100) {
+        console.log(`[TIME DEBUG] Appointment ${appointment.id} time conversion:`, {
+          stored: appointment.startTime,
+          parsed: appointmentTime,
+          localString: appointmentTime.toLocaleString(),
+          hours: appointmentTime.getHours(),
+          minutes: appointmentTime.getMinutes(),
+          timezoneOffset: appointmentTime.getTimezoneOffset(),
+          utcHours: appointmentTime.getUTCHours(),
+          utcMinutes: appointmentTime.getUTCMinutes()
+        });
+      }
       
-      // Use Central Time for positioning calculations
-      const startHour = centralTime.getHours();
-      const startMinute = centralTime.getMinutes();
+      // Get local time components for positioning calculation 
+      const startHour = appointmentTime.getHours();
+      const startMinute = appointmentTime.getMinutes();
       
-      // Timezone conversion fix complete - appointments now display at correct Central Time
+      // Debug positioning calculation for the new appointment
+      if (appointment.id >= 76) { // Debug recent appointments
+        console.log(`[DEBUG] Positioning appointment ${appointment.id}:`, {
+          appointmentStartTime: appointment.startTime,
+          appointmentTimeObject: appointmentTime,
+          startHour,
+          startMinute,
+          timeString: appointmentTime.toLocaleTimeString()
+        });
+      }
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
@@ -592,22 +571,32 @@ const AppointmentsPage = () => {
       // Each time slot row is 30px * zoomLevel high
       const slotHeight = Math.round(30 * zoomLevel);
       
-      // Calculate position based on actual time, not trying to match exact time slots
-      // This accounts for appointments that may not fall on exact 15-minute boundaries
-      const totalMinutesFromStart = (startHour - 8) * 60 + startMinute;
-      const topPosition = (totalMinutesFromStart / 15) * slotHeight; // 15 minutes per slot
-      
-      // Create time string for debugging
-      const timeSlotString = centralTime.toLocaleTimeString('en-US', { 
+      // Find the exact time slot this appointment should appear in
+      const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
         hour12: true
       });
       
-      // Find the closest time slot for debugging purposes
-      const slotIndex = Math.round(totalMinutesFromStart / 15);
+      // Find the index of this time in the timeSlots array
+      const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
+      const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
       
-      // Position calculated based on Central Time for accurate alignment
+      // Debug positioning calculation for the new appointment
+      if (appointment.id >= 110) {
+        console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
+          startHour,
+          startMinute,
+          timeSlotString,
+          slotIndex,
+          foundInArray: slotIndex >= 0,
+          timeSlotAtIndex: timeSlots[slotIndex],
+          topPosition,
+          finalTopPosition: `${topPosition}px`,
+          zoomLevel,
+          shouldAppearAt: timeSlotString
+        });
+      }
       
       // Use service duration for height calculation
       const service = services.find((s: any) => s.id === appointment.serviceId);
@@ -798,10 +787,7 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time grid */}
-        <div 
-          className="relative min-w-max origin-top-left"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
+        <div className="relative min-w-max">
           {/* Time labels and grid lines */}
           <div className="flex">
             <div className="w-20 flex-shrink-0">
@@ -860,15 +846,14 @@ const AppointmentsPage = () => {
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
             {appointments?.filter((appointment: any) => {
-              // Convert appointment time from UTC to Central Time for date comparison
-              const appointmentUtc = new Date(appointment.startTime);
-              const appointmentCentral = new Date(appointmentUtc.getTime() - (5 * 60 * 60 * 1000)); // UTC-5
+              // Only show appointments for the current date
+              const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
               
-              // Normalize dates to compare just year, month, and day using Central Time
-              const appointmentDateStr = appointmentCentral.getFullYear() + '-' + 
-                String(appointmentCentral.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentCentral.getDate()).padStart(2, '0');
+              // Normalize dates to compare just year, month, and day
+              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
+                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(appointmentDate.getDate()).padStart(2, '0');
               const currentDateStr = currentDateOnly.getFullYear() + '-' + 
                 String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
                 String(currentDateOnly.getDate()).padStart(2, '0');
@@ -892,67 +877,55 @@ const AppointmentsPage = () => {
               
               if (columnIndex === -1) return null;
 
-              // Calculate appointment position directly
-              const utcTime = new Date(appointment.startTime);
-              const centralTime = new Date(utcTime.getTime() - (5 * 60 * 60 * 1000));
-              const hour = centralTime.getHours();
-              const minute = centralTime.getMinutes();
+              const appointmentStyle = getAppointmentStyle(appointment);
               
-              // Skip appointments outside business hours
-              if (hour < 8 || hour >= 22) return null;
-              
-              // Calculate position
-              const minutesFromStart = (hour - 8) * 60 + minute;
-              const slotHeight = 30 * zoomLevel;
-              const topPosition = Math.round((minutesFromStart / 15) * slotHeight);
-              
-              // Get service and calculate height
+              // Find service and client information
               const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const duration = service?.duration || 60;
-              const height = Math.round((duration / 15) * slotHeight);
-              
-              // Get client info
               const client = users?.find((u: any) => u.id === appointment.clientId);
+
+              // Create a stable key based on appointment's immutable properties
+              const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
               
-              // Calculate proper column positioning
-              const timeColumnWidth = 80;
-              const availableWidth = 1200 - timeColumnWidth; // Use fixed width for now
-              const staffCount = Array.isArray(staff) ? staff.length : 1;
-              const staffColumnWidth = Math.floor(availableWidth / staffCount);
-              const leftPosition = timeColumnWidth + (columnIndex * staffColumnWidth) + 2;
-              const appointmentWidth = staffColumnWidth - 4;
+              // Debug the actual style being applied for recent appointments
+              if (appointment.id >= 110) {
+                console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
+                  appointmentStyle,
+                  finalStyle: {
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                    width: `${columnWidth - 8}px`,
+                    ...appointmentStyle,
+                    zIndex: 10
+                  }
+                });
+              }
               
               return (
                 <div
-                  key={appointment.id}
-                  className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg cursor-pointer"
+                  key={stableKey}
+                  className="absolute pointer-events-auto"
                   style={{
-                    left: `${leftPosition}px`,
-                    width: `${appointmentWidth}px`,
-                    top: `${topPosition}px`,
-                    height: `${height}px`,
-                    zIndex: 10,
-                    backgroundColor: service?.color || '#e2e8f0',
-                    borderLeftColor: service?.color || '#64748b'
-                  }}
-                  onClick={() => {
-                    setSelectedAppointmentId(appointment.id);
-                    setIsFormOpen(true);
+                    left: `${80 + (columnIndex * columnWidth) + 4}px`, // Time column + staff column offset + padding
+                    width: `${columnWidth - 8}px`,
+                    ...appointmentStyle,
+                    zIndex: 10
                   }}
                 >
-                  <div className="text-xs font-medium truncate">
-                    {service?.name || 'Unknown Service'}
-                  </div>
-                  <div className="text-xs opacity-90 truncate">
-                    {client?.firstName} {client?.lastName}
-                  </div>
-                  <div className="text-xs opacity-75">
-                    {centralTime.toLocaleTimeString('en-US', { 
-                      hour: 'numeric', 
-                      minute: '2-digit', 
-                      hour12: true 
-                    })}
-                  </div>
+                  <AppointmentBlock
+                    appointment={appointment}
+                    appointmentStyle={appointmentStyle}
+                    columnIndex={columnIndex}
+                    columnWidth={columnWidth}
+                    service={service}
+                    client={client}
+                    staff={staffMember}
+                    onAppointmentClick={(id: number) => {
+                      setSelectedAppointmentId(id);
+                      setIsFormOpen(true);
+                    }}
+                    draggedAppointment={draggedAppointment}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  />
                 </div>
               );
             })}
@@ -1072,16 +1045,13 @@ const AppointmentsPage = () => {
         </div>
 
         {/* Time Grid */}
-        <div 
-          className="relative origin-top-left"
-          style={{ transform: `scale(${zoomLevel})` }}
-        >
+        <div className="relative">
           {/* Appointment overlay container - positioned absolutely to float over time slots */}
           <div className="absolute inset-0 pointer-events-none z-10">
             {weekDays.map((day, dayIndex) => (
               <div 
                 key={dayIndex} 
-                className="absolute pointer-events-none"
+                className="absolute pointer-events-auto"
                 style={{
                   left: `${((dayIndex + 1) / 8) * 100}%`,
                   width: `${(1/8) * 100}%`,
@@ -1169,7 +1139,7 @@ const AppointmentsPage = () => {
                 {timeSlot}
               </div>
               
-              {/* Day Columns - clickable for appointment scheduling */}
+              {/* Day Columns - empty but provide grid structure */}
               {weekDays.map((day, dayIndex) => (
                 <div 
                   key={dayIndex} 
@@ -1177,17 +1147,6 @@ const AppointmentsPage = () => {
                   style={{ height: '60px' }}
                   onMouseMove={(e) => handleCalendarMouseMove(e, timeIndex)}
                   onMouseLeave={handleCalendarMouseLeave}
-                  onClick={(e) => {
-                    console.log('Week view time slot clicked:', { timeSlot, day: day.toDateString() });
-                    e.stopPropagation();
-                    // Set the selected date to the clicked day
-                    setCurrentDate(day);
-                    // Set the selected time to the clicked time slot
-                    setSelectedTime(timeSlot);
-                    // Open appointment form with pre-selected date and time
-                    setSelectedAppointmentId(null);
-                    setIsFormOpen(true);
-                  }}
                 >
                   {/* Empty - appointments are handled by the overlay above */}
                 </div>
@@ -1273,13 +1232,6 @@ const AppointmentsPage = () => {
                     setCurrentDate(day);
                     setViewMode('day');
                   }}
-                  onDoubleClick={() => {
-                    // Double-click to directly schedule an appointment
-                    setCurrentDate(day);
-                    setSelectedTime('9:00 AM'); // Default to 9 AM for month view scheduling
-                    setSelectedAppointmentId(null);
-                    setIsFormOpen(true);
-                  }}
                 >
                   {/* Date number */}
                   <div className={`text-sm font-semibold mb-1 ${
@@ -1358,13 +1310,6 @@ const AppointmentsPage = () => {
                 onClick={() => {
                   setCurrentDate(day);
                   setViewMode('day');
-                }}
-                onDoubleClick={() => {
-                  // Double-click to directly schedule an appointment
-                  setCurrentDate(day);
-                  setSelectedTime('9:00 AM'); // Default to 9 AM for month view scheduling
-                  setSelectedAppointmentId(null);
-                  setIsFormOpen(true);
                 }}
                 onMouseMove={(e) => {
                   const dateStr = day.toLocaleDateString('en-US', { 
@@ -1526,33 +1471,22 @@ const AppointmentsPage = () => {
                     </Select>
 
                     {/* Zoom Controls */}
-                    <div className="flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
+                    <div className="hidden lg:flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={zoomOut}
                         className="h-8 w-8 p-0 rounded-none border-r"
-                        disabled={zoomLevel <= 0.25}
-                        title="Zoom Out"
+                        disabled={zoomLevel <= 0.5}
                       >
                         <ZoomOut className="h-3 w-3" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={resetZoom}
-                        className="h-8 px-2 rounded-none border-r text-xs font-medium min-w-[40px]"
-                        title="Reset Zoom"
-                      >
-                        {getZoomLabel()}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={zoomIn}
                         className="h-8 w-8 p-0 rounded-none"
-                        disabled={zoomLevel >= 4}
-                        title="Zoom In"
+                        disabled={zoomLevel >= 3}
                       >
                         <ZoomIn className="h-3 w-3" />
                       </Button>
@@ -1597,27 +1531,17 @@ const AppointmentsPage = () => {
                 </div>
               </div>
             </div>
-            {/* Quick Tips */}
-            {(viewMode === 'week' || viewMode === 'month') && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-                <div className="text-sm text-blue-800 dark:text-blue-200">
-                  <strong>💡 Quick Tips:</strong>
-                  {viewMode === 'week' && (
-                    <span> Click any time slot to schedule an appointment for that specific time.</span>
-                  )}
-                  {viewMode === 'month' && (
-                    <span> Single-click a date to view that day, or double-click to schedule an appointment at 9:00 AM.</span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Calendar Views */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-              {viewMode === 'day' && renderDayView()}
-              {viewMode === 'week' && renderWeekView()}
-              {viewMode === 'month' && renderMonthView()}
-            </div>
+            {/* Simple Calendar */}
+            <SimpleCalendar
+              appointments={Array.isArray(appointments) ? appointments : []}
+              staff={Array.isArray(staff) ? staff : []}
+              users={Array.isArray(users) ? users : []}
+              services={Array.isArray(services) ? services : []}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              onAppointmentClick={handleAppointmentClick}
+              onAddAppointment={handleAddAppointment}
+            />
           </div>
         </main>
       </div>
@@ -1631,8 +1555,6 @@ const AppointmentsPage = () => {
         selectedTime={selectedTime}
         onAppointmentCreated={(appointment) => {
           console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
-          // Force manual refetch of appointments to ensure immediate display
-          refetchAppointments();
           // Navigate to the appointment's date when created
           if (appointment && appointment.startTime) {
             const appointmentDate = new Date(appointment.startTime);

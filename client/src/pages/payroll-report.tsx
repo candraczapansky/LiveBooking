@@ -161,7 +161,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         const service = services.find((s) => s.id === apt.serviceId);
         if (!service) return;
 
-        const serviceRevenue = service.price || 0;
+        const serviceRevenue = service.price;
         totalRevenue += serviceRevenue;
 
         // Find staff service assignment for custom rates
@@ -176,11 +176,6 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             // Use custom commission rate if available, otherwise use default
             let commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
             
-            // Ensure commission rate is a valid number
-            if (typeof commissionRate !== 'number' || isNaN(commissionRate)) {
-              commissionRate = 0;
-            }
-            
             // Convert percentage to decimal if it's a custom rate
             if (staffService?.customCommissionRate !== undefined && staffService?.customCommissionRate !== null) {
               commissionRate = commissionRate / 100;
@@ -190,13 +185,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             break;
           }
           case 'hourly': {
-            let hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
-            
-            // Ensure hourly rate is a valid number
-            if (typeof hourlyRate !== 'number' || isNaN(hourlyRate)) {
-              hourlyRate = 0;
-            }
-            
+            const hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
             const serviceDuration = service.duration || 60; // Duration in minutes
             const hours = serviceDuration / 60;
             appointmentEarnings = hourlyRate * hours;
@@ -205,36 +194,17 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             break;
           }
           case 'fixed': {
-            let fixedRate = staffService?.customRate ?? staffMember.fixedRate ?? 0;
-            
-            // Ensure fixed rate is a valid number
-            if (typeof fixedRate !== 'number' || isNaN(fixedRate)) {
-              fixedRate = 0;
-            }
-            
-            appointmentEarnings = fixedRate;
+            appointmentEarnings = staffService?.customRate ?? staffMember.fixedRate ?? 0;
             break;
           }
           case 'hourly_plus_commission': {
             // Calculate both hourly and commission
-            let hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
-            
-            // Ensure hourly rate is a valid number
-            if (typeof hourlyRate !== 'number' || isNaN(hourlyRate)) {
-              hourlyRate = 0;
-            }
-            
+            const hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
             const serviceDuration = service.duration || 60;
             const hours = serviceDuration / 60;
             const hourlyPortion = hourlyRate * hours;
             
             let commissionRate = staffMember.commissionRate ?? 0;
-            
-            // Ensure commission rate is a valid number
-            if (typeof commissionRate !== 'number' || isNaN(commissionRate)) {
-              commissionRate = 0;
-            }
-            
             const commissionPortion = serviceRevenue * commissionRate;
             
             appointmentEarnings = hourlyPortion + commissionPortion;
@@ -246,12 +216,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             appointmentEarnings = 0;
         }
 
-        // Ensure appointmentEarnings is a valid number before adding
-        if (typeof appointmentEarnings === 'number' && !isNaN(appointmentEarnings)) {
-          totalCommission += appointmentEarnings;
-        } else {
-          console.warn('Invalid appointmentEarnings detected:', appointmentEarnings, 'for appointment:', apt.id);
-        }
+        totalCommission += appointmentEarnings;
       });
 
       // Calculate total earnings
@@ -260,22 +225,19 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         totalEarnings = totalHourlyPay;
       }
 
-      // Ensure all calculated values are valid numbers
-      const safeNumber = (value: number) => (typeof value === 'number' && !isNaN(value)) ? value : 0;
-
       return {
         staffId: staffMember.id,
         staffName,
         title: staffMember.title,
         commissionType: staffMember.commissionType,
-        baseCommissionRate: safeNumber(staffMember.commissionRate),
+        baseCommissionRate: staffMember.commissionRate || 0,
         totalServices,
-        totalRevenue: safeNumber(totalRevenue),
-        totalCommission: safeNumber(totalCommission),
-        totalHours: safeNumber(totalHours),
-        hourlyWage: safeNumber(staffMember.hourlyRate),
-        totalHourlyPay: safeNumber(totalHourlyPay),
-        totalEarnings: safeNumber(totalEarnings),
+        totalRevenue,
+        totalCommission,
+        totalHours,
+        hourlyWage: staffMember.hourlyRate || 0,
+        totalHourlyPay,
+        totalEarnings,
         appointments: staffAppointments,
       };
     });

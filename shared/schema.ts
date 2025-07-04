@@ -223,6 +223,37 @@ export const insertAppointmentHistorySchema = createInsertSchema(appointmentHist
   createdAt: true,
 });
 
+// Cancelled Appointments schema - separate storage for cancelled appointments
+export const cancelledAppointments = pgTable("cancelled_appointments", {
+  id: serial("id").primaryKey(),
+  originalAppointmentId: integer("original_appointment_id").notNull(), // Reference to original appointment ID
+  clientId: integer("client_id").notNull(),
+  serviceId: integer("service_id").notNull(),
+  staffId: integer("staff_id").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  totalAmount: doublePrecision("total_amount"),
+  notes: text("notes"),
+  cancellationReason: text("cancellation_reason"),
+  cancelledBy: integer("cancelled_by"), // User ID who cancelled
+  cancelledByRole: text("cancelled_by_role"), // "admin", "staff", "client"
+  paymentStatus: text("payment_status").notNull().default("unpaid"), // For refund tracking
+  refundAmount: doublePrecision("refund_amount").default(0),
+  refundDate: timestamp("refund_date"),
+  originalCreatedAt: timestamp("original_created_at"), // When the original appointment was created
+  cancelledAt: timestamp("cancelled_at").defaultNow(), // When it was cancelled
+});
+
+export const insertCancelledAppointmentSchema = createInsertSchema(cancelledAppointments).omit({
+  id: true,
+  cancelledAt: true,
+}).extend({
+  startTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  originalCreatedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  refundDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+});
+
 // Memberships schema
 export const memberships = pgTable("memberships", {
   id: serial("id").primaryKey(),
@@ -423,6 +454,9 @@ export type InsertStaffService = z.infer<typeof insertStaffServiceSchema>;
 
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
+
+export type CancelledAppointment = typeof cancelledAppointments.$inferSelect;
+export type InsertCancelledAppointment = z.infer<typeof insertCancelledAppointmentSchema>;
 
 export type Membership = typeof memberships.$inferSelect;
 export type InsertMembership = z.infer<typeof insertMembershipSchema>;

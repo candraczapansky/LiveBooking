@@ -1426,27 +1426,78 @@ If you didn't request this password reset, please ignore this email and your pas
   
   app.delete("/api/appointments/:id", async (req, res) => {
     const id = parseInt(req.params.id);
+    const { reason, cancelledBy, cancelledByRole } = req.body;
     
-    // Get appointment data before deletion for automation trigger
-    const appointment = await storage.getAppointment(id);
-    if (!appointment) {
-      return res.status(404).json({ error: "Appointment not found" });
-    }
-    
-    const deleted = await storage.deleteAppointment(id);
-    
-    if (!deleted) {
-      return res.status(404).json({ error: "Appointment not found" });
-    }
-    
-    // Trigger cancellation automation
     try {
-      await triggerCancellation(appointment, storage);
-    } catch (error) {
-      console.error('Failed to trigger cancellation automation:', error);
+      // Move appointment to cancelled appointments table instead of hard delete
+      const cancelledAppointment = await storage.moveAppointmentToCancelled(
+        id, 
+        reason || 'Appointment cancelled',
+        cancelledBy,
+        cancelledByRole || 'admin'
+      );
+      
+      // Trigger cancellation automation using the original appointment data
+      try {
+        const originalAppointment = {
+          id: cancelledAppointment.originalAppointmentId,
+          clientId: cancelledAppointment.clientId,
+          serviceId: cancelledAppointment.serviceId,
+          staffId: cancelledAppointment.staffId,
+          startTime: cancelledAppointment.startTime,
+          endTime: cancelledAppointment.endTime,
+          status: 'cancelled',
+          paymentStatus: cancelledAppointment.paymentStatus,
+          totalAmount: cancelledAppointment.totalAmount,
+          notes: cancelledAppointment.notes
+        };
+        await triggerCancellation(originalAppointment, storage);
+      } catch (error) {
+        console.error('Failed to trigger cancellation automation:', error);
+      }
+      
+      return res.status(200).json({ 
+        success: true, 
+        message: "Appointment cancelled successfully",
+        cancelledAppointment 
+      });
+    } catch (error: any) {
+      console.error('Error cancelling appointment:', error);
+      return res.status(500).json({ error: "Failed to cancel appointment: " + error.message });
     }
-    
-    return res.status(204).end();
+  });
+
+  // Cancelled Appointment routes
+  app.get("/api/cancelled-appointments", async (req, res) => {
+    try {
+      const cancelledAppointments = await storage.getAllCancelledAppointments();
+      return res.status(200).json(cancelledAppointments);
+    } catch (error: any) {
+      console.error('Error fetching cancelled appointments:', error);
+      return res.status(500).json({ error: "Failed to fetch cancelled appointments: " + error.message });
+    }
+  });
+
+  app.get("/api/cancelled-appointments/client/:clientId", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+      const cancelledAppointments = await storage.getCancelledAppointmentsByClient(clientId);
+      return res.status(200).json(cancelledAppointments);
+    } catch (error: any) {
+      console.error('Error fetching client cancelled appointments:', error);
+      return res.status(500).json({ error: "Failed to fetch client cancelled appointments: " + error.message });
+    }
+  });
+
+  app.get("/api/cancelled-appointments/staff/:staffId", async (req, res) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      const cancelledAppointments = await storage.getCancelledAppointmentsByStaff(staffId);
+      return res.status(200).json(cancelledAppointments);
+    } catch (error: any) {
+      console.error('Error fetching staff cancelled appointments:', error);
+      return res.status(500).json({ error: "Failed to fetch staff cancelled appointments: " + error.message });
+    }
   });
 
   // External Data API - Provides staff schedules and services for external frontend apps

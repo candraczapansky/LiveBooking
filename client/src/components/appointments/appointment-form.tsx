@@ -465,32 +465,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
-    onSuccess: async (data: any) => {
-      console.log("[APPOINTMENT FORM] Create success - invalidating cache and refreshing");
-      
-      // Force complete cache refresh
-      await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      await queryClient.resetQueries({ queryKey: ['/api/appointments'] });
-      
-      console.log("[APPOINTMENT FORM] Cache invalidated and reset");
-      
-      // Call the callback with appointment data if provided
-      if (onAppointmentCreated) {
-        console.log("[APPOINTMENT FORM] Calling onAppointmentCreated callback");
-        onAppointmentCreated(data);
-      }
-      
-      // Small delay to ensure cache refresh completes before closing
-      setTimeout(() => {
-        onOpenChange(false);
-      }, 200);
-      
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      onOpenChange(false);
       toast({
         title: "Success",
         description: "Appointment created successfully.",
       });
-      
-      console.log("[APPOINTMENT FORM] Create success handler completed");
+      // Call the callback with appointment data if provided
+      console.log("[APPOINTMENT FORM] Success callback - appointment data:", data);
+      if (onAppointmentCreated) {
+        console.log("[APPOINTMENT FORM] Calling onAppointmentCreated with:", data);
+        onAppointmentCreated(data);
+      } else {
+        console.log("[APPOINTMENT FORM] No onAppointmentCreated callback provided");
+      }
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;
@@ -568,11 +557,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("PUT", `/api/appointments/${appointmentId}`, appointmentData);
     },
     onSuccess: () => {
-      // Force refresh all appointment-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
-      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
-      
       onOpenChange(false);
       toast({
         title: "Success",
@@ -605,10 +591,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("DELETE", `/api/appointments/${appointmentId}`);
     },
     onSuccess: () => {
-      // Force refresh all appointment-related queries
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
-      
       onOpenChange(false);
       toast({
         title: "Success",

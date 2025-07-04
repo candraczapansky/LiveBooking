@@ -9,6 +9,7 @@ import {
   staffServices, StaffService, InsertStaffService,
   appointments, Appointment, InsertAppointment,
   appointmentHistory, AppointmentHistory, InsertAppointmentHistory,
+  cancelledAppointments, CancelledAppointment, InsertCancelledAppointment,
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
@@ -116,6 +117,15 @@ export interface IStorage {
   createAppointmentHistory(history: InsertAppointmentHistory): Promise<AppointmentHistory>;
   getAppointmentHistory(appointmentId: number): Promise<AppointmentHistory[]>;
   getAllAppointmentHistory(): Promise<AppointmentHistory[]>;
+
+  // Cancelled Appointment operations
+  createCancelledAppointment(cancelledAppointment: InsertCancelledAppointment): Promise<CancelledAppointment>;
+  getCancelledAppointment(id: number): Promise<CancelledAppointment | undefined>;
+  getAllCancelledAppointments(): Promise<CancelledAppointment[]>;
+  getCancelledAppointmentsByClient(clientId: number): Promise<CancelledAppointment[]>;
+  getCancelledAppointmentsByStaff(staffId: number): Promise<CancelledAppointment[]>;
+  getCancelledAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<CancelledAppointment[]>;
+  moveAppointmentToCancelled(appointmentId: number, cancellationReason?: string, cancelledBy?: number, cancelledByRole?: string): Promise<CancelledAppointment>;
 
   // Membership operations
   createMembership(membership: InsertMembership): Promise<Membership>;
@@ -1165,6 +1175,92 @@ export class DatabaseStorage implements IStorage {
 
   async getAllAppointmentHistory(): Promise<AppointmentHistory[]> {
     return await db.select().from(appointmentHistory).orderBy(desc(appointmentHistory.createdAt));
+  }
+
+  // Cancelled Appointment operations
+  async createCancelledAppointment(cancelledAppointment: InsertCancelledAppointment): Promise<CancelledAppointment> {
+    const [newCancelledAppointment] = await db.insert(cancelledAppointments).values(cancelledAppointment).returning();
+    return newCancelledAppointment;
+  }
+
+  async getCancelledAppointment(id: number): Promise<CancelledAppointment | undefined> {
+    const [cancelled] = await db.select().from(cancelledAppointments).where(eq(cancelledAppointments.id, id));
+    return cancelled;
+  }
+
+  async getAllCancelledAppointments(): Promise<CancelledAppointment[]> {
+    return await db.select().from(cancelledAppointments).orderBy(desc(cancelledAppointments.cancelledAt));
+  }
+
+  async getCancelledAppointmentsByClient(clientId: number): Promise<CancelledAppointment[]> {
+    return await db.select().from(cancelledAppointments).where(eq(cancelledAppointments.clientId, clientId)).orderBy(desc(cancelledAppointments.cancelledAt));
+  }
+
+  async getCancelledAppointmentsByStaff(staffId: number): Promise<CancelledAppointment[]> {
+    return await db.select().from(cancelledAppointments).where(eq(cancelledAppointments.staffId, staffId)).orderBy(desc(cancelledAppointments.cancelledAt));
+  }
+
+  async getCancelledAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<CancelledAppointment[]> {
+    return await db.select().from(cancelledAppointments).where(
+      and(
+        gte(cancelledAppointments.startTime, startDate),
+        lte(cancelledAppointments.startTime, endDate)
+      )
+    ).orderBy(cancelledAppointments.startTime);
+  }
+
+  async moveAppointmentToCancelled(appointmentId: number, cancellationReason?: string, cancelledBy?: number, cancelledByRole?: string): Promise<CancelledAppointment> {
+    // Get the original appointment
+    const appointment = await this.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new Error('Appointment not found');
+    }
+
+    // Create the cancelled appointment record
+    const cancelledAppointmentData: InsertCancelledAppointment = {
+      originalAppointmentId: appointment.id,
+      clientId: appointment.clientId,
+      serviceId: appointment.serviceId,
+      staffId: appointment.staffId,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      totalAmount: appointment.totalAmount,
+      notes: appointment.notes,
+      cancellationReason: cancellationReason || 'No reason provided',
+      cancelledBy: cancelledBy || null,
+      cancelledByRole: cancelledByRole || 'system',
+      paymentStatus: appointment.paymentStatus,
+      refundAmount: 0,
+      originalCreatedAt: appointment.createdAt ?? undefined
+    };
+
+    const cancelledAppointment = await this.createCancelledAppointment(cancelledAppointmentData);
+
+    // Create appointment history entry for the cancellation
+    await this.createAppointmentHistory({
+      appointmentId: appointment.id,
+      action: 'cancelled',
+      actionBy: cancelledBy || null,
+      actionByRole: cancelledByRole || 'system',
+      previousValues: JSON.stringify(appointment),
+      newValues: JSON.stringify({ status: 'cancelled', reason: cancellationReason }),
+      clientId: appointment.clientId,
+      serviceId: appointment.serviceId,
+      staffId: appointment.staffId,
+      startTime: appointment.startTime,
+      endTime: appointment.endTime,
+      status: 'cancelled',
+      paymentStatus: appointment.paymentStatus,
+      totalAmount: appointment.totalAmount,
+      notes: appointment.notes,
+      reason: cancellationReason,
+      systemGenerated: false
+    });
+
+    // Remove the appointment from the active appointments table
+    await this.deleteAppointment(appointmentId);
+
+    return cancelledAppointment;
   }
 
   // Membership operations
