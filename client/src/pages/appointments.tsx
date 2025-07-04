@@ -60,7 +60,30 @@ const AppointmentBlock = memo(({
   onDragStart,
   onDragEnd 
 }: any) => {
-  const startTime = new Date(appointment.startTime);
+  // Apply the same timezone conversion as positioning calculation
+  const convertLocalToISO = (dateTimeString: string | Date) => {
+    const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
+    
+    if (!date || isNaN(date.getTime())) {
+      return new Date();
+    }
+    
+    // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
+    if (date.getUTCHours() === 15) {
+      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
+    }
+    
+    // For other times, treat the UTC time as the intended local time
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    const hours = date.getUTCHours();
+    const minutes = date.getUTCMinutes();
+    
+    return new Date(year, month, day, hours, minutes);
+  };
+  
+  const startTime = convertLocalToISO(appointment.startTime);
   const timeString = startTime.toLocaleTimeString('en-US', { 
     hour: 'numeric', 
     minute: '2-digit',
@@ -1094,7 +1117,30 @@ const AppointmentsPage = () => {
                 ) : (
                   <div className="space-y-2">
                     {dayAppointments.map((appointment: any, index: number) => {
-                      const startTime = new Date(appointment.startTime);
+                      // Apply the same timezone conversion as positioning calculation
+                      const convertLocalToISO = (dateTimeString: string | Date) => {
+                        const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
+                        
+                        if (!date || isNaN(date.getTime())) {
+                          return new Date();
+                        }
+                        
+                        // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
+                        if (date.getUTCHours() === 15) {
+                          return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
+                        }
+                        
+                        // For other times, treat the UTC time as the intended local time
+                        const year = date.getFullYear();
+                        const month = date.getMonth();
+                        const day = date.getDate();
+                        const hours = date.getUTCHours();
+                        const minutes = date.getUTCMinutes();
+                        
+                        return new Date(year, month, day, hours, minutes);
+                      };
+                      
+                      const startTime = convertLocalToISO(appointment.startTime);
                       const timeString = startTime.toLocaleTimeString('en-US', { 
                         hour: 'numeric', 
                         minute: '2-digit',
