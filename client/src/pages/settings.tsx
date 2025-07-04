@@ -460,15 +460,15 @@ export default function Settings() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 md:h-screen">
       <SidebarController />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-6 py-8">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-              <p className="mt-2 text-gray-600 dark:text-gray-400">
+          <div className="container mx-auto px-4 py-4 md:px-6 md:py-8">
+            <div className="mb-6 md:mb-8">
+              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+              <p className="mt-2 text-sm md:text-base text-gray-600 dark:text-gray-400">
                 Manage your account settings and preferences.
               </p>
             </div>
@@ -499,7 +499,7 @@ export default function Settings() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
                       <Input
@@ -507,6 +507,7 @@ export default function Settings() {
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         placeholder="Enter your first name"
+                        className="h-12"
                       />
                     </div>
                     <div className="space-y-2">
@@ -516,6 +517,7 @@ export default function Settings() {
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         placeholder="Enter your last name"
+                        className="h-12"
                       />
                     </div>
                     <div className="space-y-2">
@@ -526,6 +528,7 @@ export default function Settings() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="Enter your email"
+                        className="h-12"
                       />
                     </div>
                     <div className="space-y-2">
@@ -535,13 +538,14 @@ export default function Settings() {
                         value={phone}
                         onChange={(e) => setPhone(e.target.value)}
                         placeholder="Enter your phone number"
+                        className="h-12"
                       />
                     </div>
                   </div>
 
                   <Button 
                     onClick={handleSaveProfile} 
-                    className="w-full md:w-auto"
+                    className="w-full md:w-auto h-12"
                     disabled={updateProfileMutation.isPending}
                     style={{ 
                       backgroundColor: customColor,
@@ -591,7 +595,7 @@ export default function Settings() {
                         Choose your preferred accent color for buttons and highlights
                       </p>
                       
-                      <div className="flex items-center space-x-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
                         <div className="flex items-center space-x-3">
                           <input
                             type="color"
@@ -599,13 +603,13 @@ export default function Settings() {
                             onChange={(e) => handleCustomColorChange(e.target.value)}
                             className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
                           />
-                          <div className="space-y-1">
+                          <div className="space-y-1 flex-1">
                             <Label className="text-sm font-medium">Color Value</Label>
                             <Input
                               type="text"
                               value={customColor}
                               onChange={(e) => handleCustomColorChange(e.target.value)}
-                              className="w-32 text-sm"
+                              className="w-full sm:w-32 text-sm h-10"
                               placeholder="#8b5cf6"
                             />
                           </div>
@@ -1078,7 +1082,7 @@ export default function Settings() {
                   </div>
 
                   <Button 
-                    className="w-full"
+                    className="w-full h-12"
                     style={{ 
                       backgroundColor: customColor,
                       borderColor: customColor
@@ -1109,7 +1113,7 @@ export default function Settings() {
                         Add an extra layer of security to your account
                       </p>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" className="h-10 min-w-[80px]">
                       Enable
                     </Button>
                   </div>
@@ -1121,7 +1125,7 @@ export default function Settings() {
                         Control who can see your profile information
                       </p>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" className="h-10 min-w-[80px]">
                       Manage
                     </Button>
                   </div>
@@ -1133,7 +1137,7 @@ export default function Settings() {
                         Download a copy of your data
                       </p>
                     </div>
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" className="h-10 min-w-[80px]">
                       Export
                     </Button>
                   </div>
@@ -1145,7 +1149,7 @@ export default function Settings() {
                         Permanently delete your account and all data
                       </p>
                     </div>
-                    <Button variant="destructive" size="sm">
+                    <Button variant="destructive" className="h-10 min-w-[80px]">
                       Delete
                     </Button>
                   </div>
