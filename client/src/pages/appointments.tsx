@@ -569,34 +569,28 @@ const AppointmentsPage = () => {
     const sortedAppointments = [...appointments].sort((a, b) => a.id - b.id);
     
     sortedAppointments.forEach((appointment: any) => {
-      // Debug time conversion issue
+      // Parse the stored time and convert to local timezone for display
       const appointmentTime = new Date(appointment.startTime);
       
+      // Convert UTC time to Central Time (UTC-5) for proper positioning
+      // The issue is appointments are stored in UTC but need to display in local time
+      const centralOffset = 5 * 60; // Central Time is UTC-5 (in minutes)
+      const utcTime = appointmentTime.getTime();
+      const centralTime = new Date(utcTime - (centralOffset * 60 * 1000));
+      
+      // Use Central Time for positioning calculations
+      const startHour = centralTime.getHours();
+      const startMinute = centralTime.getMinutes();
+      
+      // Debug the timezone conversion
       if (appointment.id >= 100) {
-        console.log(`[TIME DEBUG] Appointment ${appointment.id} time conversion:`, {
-          stored: appointment.startTime,
-          parsed: appointmentTime,
-          localString: appointmentTime.toLocaleString(),
-          hours: appointmentTime.getHours(),
-          minutes: appointmentTime.getMinutes(),
-          timezoneOffset: appointmentTime.getTimezoneOffset(),
-          utcHours: appointmentTime.getUTCHours(),
-          utcMinutes: appointmentTime.getUTCMinutes()
-        });
-      }
-      
-      // Get local time components for positioning calculation 
-      const startHour = appointmentTime.getHours();
-      const startMinute = appointmentTime.getMinutes();
-      
-      // Debug positioning calculation for the new appointment
-      if (appointment.id >= 76) { // Debug recent appointments
-        console.log(`[DEBUG] Positioning appointment ${appointment.id}:`, {
-          appointmentStartTime: appointment.startTime,
-          appointmentTimeObject: appointmentTime,
-          startHour,
-          startMinute,
-          timeString: appointmentTime.toLocaleTimeString()
+        console.log(`[TIMEZONE DEBUG] Appointment ${appointment.id}:`, {
+          storedUTC: appointment.startTime,
+          utcTime: appointmentTime.toISOString(),
+          centralTime: centralTime.toISOString(),
+          displayHour: startHour,
+          displayMinute: startMinute,
+          shouldShowAt: `${startHour}:${startMinute.toString().padStart(2, '0')}`
         });
       }
       
@@ -610,30 +604,30 @@ const AppointmentsPage = () => {
       // Each time slot row is 30px * zoomLevel high
       const slotHeight = Math.round(30 * zoomLevel);
       
-      // Find the exact time slot this appointment should appear in
-      const timeSlotString = appointmentTime.toLocaleTimeString('en-US', { 
+      // Create time string for the converted Central Time
+      const timeSlotString = centralTime.toLocaleTimeString('en-US', { 
         hour: 'numeric', 
         minute: '2-digit',
-        hour12: true
+        hour12: true,
+        timeZone: 'America/Chicago'
       });
       
       // Find the index of this time in the timeSlots array
       const slotIndex = timeSlots.findIndex(slot => slot === timeSlotString);
       const topPosition = slotIndex >= 0 ? slotIndex * slotHeight : 0;
       
-      // Debug positioning calculation for the new appointment
-      if (appointment.id >= 110) {
-        console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
-          startHour,
-          startMinute,
+      // Debug positioning calculation
+      if (appointment.id >= 100) {
+        console.log(`[POSITION DEBUG] Appointment ${appointment.id}:`, {
+          centralHour: startHour,
+          centralMinute: startMinute,
           timeSlotString,
           slotIndex,
           foundInArray: slotIndex >= 0,
           timeSlotAtIndex: timeSlots[slotIndex],
           topPosition,
           finalTopPosition: `${topPosition}px`,
-          zoomLevel,
-          shouldAppearAt: timeSlotString
+          zoomLevel
         });
       }
       
