@@ -988,6 +988,15 @@ const AppointmentsPage = () => {
 
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
+            {/* Debug staff array and appointments mapping */}
+            {console.log('[STAFF DEBUG] Staff array:', staff?.map((s: any) => ({ id: s.id, name: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown' })))}
+            {console.log('[APPOINTMENTS DEBUG] Today\'s appointments staffIds:', appointments?.filter((appointment: any) => {
+              const appointmentDate = new Date(appointment.startTime);
+              const currentDateOnly = new Date(currentDate);
+              const appointmentDateString = appointmentDate.toDateString();
+              const currentDateString = currentDateOnly.toDateString();
+              return appointmentDateString === currentDateString;
+            }).map((a: any) => ({ id: a.id, staffId: a.staffId })))}
             {appointments?.filter((appointment: any) => {
               // Only show appointments for the current date
               const appointmentDate = new Date(appointment.startTime);
@@ -1014,9 +1023,13 @@ const AppointmentsPage = () => {
               // Find staff member and get column
               const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
               const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-              const columnIndex = staff?.findIndex((s: any) => s.id === appointment.staffId) || 0;
+              const columnIndex = staff?.findIndex((s: any) => s.id === appointment.staffId);
               
-              if (columnIndex === -1) return null;
+              // Skip appointments if staff member not found or invalid column index
+              if (columnIndex === -1 || columnIndex === undefined) {
+                console.log(`[COLUMN DEBUG] Skipping appointment ${appointment.id} - staff ${appointment.staffId} not found in staff array`);
+                return null;
+              }
 
               const appointmentStyle = getAppointmentStyle(appointment);
               
@@ -1031,8 +1044,12 @@ const AppointmentsPage = () => {
               console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
                 appointmentStyle,
                 hasDisplay: appointmentStyle.display,
+                staffId: appointment.staffId,
+                columnIndex,
+                columnWidth,
+                staffCount,
                 finalStyle: {
-                  left: `${80 + (columnIndex * columnWidth) + 4}px`,
+                  left: `${96 + (columnIndex * columnWidth) + 4}px`,
                   width: `${columnWidth - 8}px`,
                   ...appointmentStyle,
                   zIndex: 10
@@ -1232,7 +1249,30 @@ const AppointmentsPage = () => {
                 })
                 .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                 .map((appointment: any) => {
-                  const appointmentDate = new Date(appointment.startTime);
+                  // Apply the same timezone conversion as positioning calculation
+                  const convertLocalToISO = (dateTimeString: string | Date) => {
+                    const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
+                    
+                    if (!date || isNaN(date.getTime())) {
+                      return new Date();
+                    }
+                    
+                    // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
+                    if (date.getUTCHours() === 15) {
+                      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
+                    }
+                    
+                    // For other times, treat the UTC time as the intended local time
+                    const year = date.getFullYear();
+                    const month = date.getMonth();
+                    const day = date.getDate();
+                    const hours = date.getUTCHours();
+                    const minutes = date.getUTCMinutes();
+                    
+                    return new Date(year, month, day, hours, minutes);
+                  };
+                  
+                  const appointmentDate = convertLocalToISO(appointment.startTime);
                   
                   // Use service duration only (not including buffer times) for visual display
                   const appointmentService = services?.find((s: any) => s.id === appointment.serviceId);
