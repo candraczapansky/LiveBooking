@@ -691,14 +691,11 @@ const AppointmentsPage = () => {
               const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
               
-              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentDate.getDate()).padStart(2, '0');
-              const currentDateStr = currentDateOnly.getFullYear() + '-' + 
-                String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(currentDateOnly.getDate()).padStart(2, '0');
+              // Convert both dates to local timezone for comparison
+              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+              const currentLocalDate = new Date(currentDateOnly.getFullYear(), currentDateOnly.getMonth(), currentDateOnly.getDate());
               
-              return appointmentDateStr === currentDateStr && 
+              return appointmentLocalDate.getTime() === currentLocalDate.getTime() && 
                      appointment.staff?.id === staffMember.id;
             }) || [];
 
@@ -850,15 +847,12 @@ const AppointmentsPage = () => {
               const appointmentDate = new Date(appointment.startTime);
               const currentDateOnly = new Date(currentDate);
               
-              // Normalize dates to compare just year, month, and day
-              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentDate.getDate()).padStart(2, '0');
-              const currentDateStr = currentDateOnly.getFullYear() + '-' + 
-                String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(currentDateOnly.getDate()).padStart(2, '0');
+              // Convert both dates to local timezone for comparison
+              // This ensures appointments appear on the correct calendar date
+              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+              const currentLocalDate = new Date(currentDateOnly.getFullYear(), currentDateOnly.getMonth(), currentDateOnly.getDate());
               
-              return appointmentDateStr === currentDateStr;
+              return appointmentLocalDate.getTime() === currentLocalDate.getTime();
             })
             .sort((a: any, b: any) => {
               // Sort by start time first, then by ID for stable positioning
@@ -946,14 +940,12 @@ const AppointmentsPage = () => {
           {weekDays.map((day, dayIndex) => {
             const dayAppointments = appointments?.filter((appointment: any) => {
               const appointmentDate = new Date(appointment.startTime);
-              const dayStr = day.getFullYear() + '-' + 
-                String(day.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(day.getDate()).padStart(2, '0');
-              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentDate.getDate()).padStart(2, '0');
               
-              return appointmentDateStr === dayStr;
+              // Convert both dates to local timezone for comparison
+              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+              const dayLocalDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+              
+              return appointmentLocalDate.getTime() === dayLocalDate.getTime();
             }) || [];
 
             return (
@@ -1210,14 +1202,12 @@ const AppointmentsPage = () => {
               const isToday = day.toDateString() === new Date().toDateString();
               const dayAppointments = appointments?.filter((appointment: any) => {
                 const appointmentDate = new Date(appointment.startTime);
-                const dayStr = day.getFullYear() + '-' + 
-                  String(day.getMonth() + 1).padStart(2, '0') + '-' + 
-                  String(day.getDate()).padStart(2, '0');
-                const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                  String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                  String(appointmentDate.getDate()).padStart(2, '0');
                 
-                return appointmentDateStr === dayStr;
+                // Convert both dates to local timezone for comparison
+                const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
+                const dayLocalDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+                
+                return appointmentLocalDate.getTime() === dayLocalDate.getTime();
               }) || [];
               
               return (
