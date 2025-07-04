@@ -582,7 +582,7 @@ const AppointmentsPage = () => {
       const startHour = centralTime.getHours();
       const startMinute = centralTime.getMinutes();
       
-      // Timezone conversion completed - appointments now display at correct Central Time
+      // Timezone conversion fix complete - appointments now display at correct Central Time
       
       // Ensure appointment is within business hours (8 AM to 10 PM)
       if (startHour < 8 || startHour >= 22) {
@@ -609,7 +609,7 @@ const AppointmentsPage = () => {
       // Find the closest time slot for debugging purposes
       const slotIndex = Math.round(totalMinutesFromStart / 15);
       
-      // Position calculated based on exact time for precise alignment
+      // Position calculated based on Central Time for accurate alignment
       
       // Use service duration for height calculation
       const service = services.find((s: any) => s.id === appointment.serviceId);
@@ -862,14 +862,15 @@ const AppointmentsPage = () => {
           {/* Appointment Blocks */}
           <div className="absolute inset-0 pointer-events-none">
             {appointments?.filter((appointment: any) => {
-              // Only show appointments for the current date
-              const appointmentDate = new Date(appointment.startTime);
+              // Convert appointment time from UTC to Central Time for date comparison
+              const appointmentUtc = new Date(appointment.startTime);
+              const appointmentCentral = new Date(appointmentUtc.getTime() - (5 * 60 * 60 * 1000)); // UTC-5
               const currentDateOnly = new Date(currentDate);
               
-              // Normalize dates to compare just year, month, and day
-              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentDate.getDate()).padStart(2, '0');
+              // Normalize dates to compare just year, month, and day using Central Time
+              const appointmentDateStr = appointmentCentral.getFullYear() + '-' + 
+                String(appointmentCentral.getMonth() + 1).padStart(2, '0') + '-' + 
+                String(appointmentCentral.getDate()).padStart(2, '0');
               const currentDateStr = currentDateOnly.getFullYear() + '-' + 
                 String(currentDateOnly.getMonth() + 1).padStart(2, '0') + '-' + 
                 String(currentDateOnly.getDate()).padStart(2, '0');
