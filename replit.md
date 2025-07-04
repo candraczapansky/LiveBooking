@@ -13,7 +13,7 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### July 4, 2025 - Complete Calendar Display System Fix and Critical Timezone Conversion Resolution
+### July 4, 2025 - Complete Calendar Display System Fix, Critical Timezone Conversion Resolution, and Precise Appointment Positioning Enhancement
 
 - **Successfully resolved persistent calendar display issue preventing all appointments from showing:**
   - Root cause identified: getAppointmentStyle function returned `display: 'none'` for appointments not found in positioning Map
@@ -22,6 +22,16 @@ Preferred color scheme: Pink primary color with black text for better readabilit
   - Enhanced appointment style calculation with direct position computation based on time slots and service duration
   - Calendar now displays all valid appointments with proper positioning regardless of Map storage status
   - Fixed calendar container height to accommodate all time slots from 8:00 AM to 10:00 PM
+
+- **Fixed critical appointment positioning alignment issue with enhanced calculation precision:**
+  - Root cause identified: Appointment blocks were hanging halfway over time slots due to imprecise positioning calculations
+  - Replaced unreliable string-based time slot matching with precise hour/minute based positioning calculations
+  - Updated positioning system to properly align with enhanced 40px time slot height layout
+  - Fixed left margin calculation from 80px to 96px to account for wider time column design
+  - Implemented direct slot index calculation: (hoursPastBase * 60 + minutes) / 15 for 15-minute time slots
+  - Enhanced positioning validation with proper range limits (8 AM to 10 PM = 0 to 55 slots)
+  - Appointments now snap precisely to time slot boundaries with perfect visual alignment
+  - Eliminated positioning inconsistencies and improved calendar visual presentation quality
 
 - **Fixed critical timezone double-conversion bug causing appointments to appear at wrong times:**
   - Root cause identified: convertLocalToISO method was applying local timezone conversion twice
