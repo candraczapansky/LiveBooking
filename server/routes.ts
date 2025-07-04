@@ -1297,8 +1297,8 @@ If you didn't request this password reset, please ignore this email and your pas
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
     const { staffId, startTime, endTime } = req.body;
     
-    // Check for overlapping appointments for the same staff member
-    const existingAppointments = await storage.getAppointmentsByStaff(staffId);
+    // Check for overlapping appointments for the same staff member (excluding cancelled appointments)
+    const existingAppointments = await storage.getActiveAppointmentsByStaff(staffId);
     const newStart = new Date(startTime);
     const newEnd = new Date(endTime);
     
@@ -1458,7 +1458,7 @@ If you didn't request this password reset, please ignore this email and your pas
         const startTime = req.body.startTime || existingAppointment.startTime;
         const endTime = req.body.endTime || existingAppointment.endTime;
         
-        const staffAppointments = await storage.getAppointmentsByStaff(staffId);
+        const staffAppointments = await storage.getActiveAppointmentsByStaff(staffId);
         const newStart = new Date(startTime);
         const newEnd = new Date(endTime);
         
