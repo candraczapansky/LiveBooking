@@ -568,8 +568,8 @@ const AppointmentsPage = () => {
       }
       
       // Calculate position based on time slots starting from 8:00 AM
-      // Each time slot row is 40px * zoomLevel high
-      const slotHeight = Math.round(40 * zoomLevel);
+      // Each time slot row is consistently 40px high
+      const slotHeight = 40;
       
       // Calculate position based on hour/minute directly instead of string matching
       // This ensures precise positioning even if time format doesn't match exactly
@@ -587,18 +587,21 @@ const AppointmentsPage = () => {
       const topPosition = validSlotIndex * slotHeight;
       
       // Debug positioning calculation for the new appointment
-      if (appointment.id >= 110) {
+      if (appointment.id >= 130) {
         console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
           startHour,
           startMinute,
           appointmentHour,
           appointmentMinute,
+          hoursPastBase,
+          totalMinutesPastBase,
+          slotIndex,
           validSlotIndex,
           topPosition,
           finalTopPosition: `${topPosition}px`,
           zoomLevel,
-          totalMinutesPastBase,
-          slotHeight
+          slotHeight,
+          expectedSlotFor12PM: 'Should be slot 16 (240min ÷ 15 = 16)'
         });
       }
       
@@ -670,6 +673,26 @@ const AppointmentsPage = () => {
     const slotsNeeded = Math.ceil(serviceDuration / 15);
     const calculatedHeight = slotsNeeded * slotHeight;
     
+    // Debug fallback positioning for specific appointments
+    if (appointment.id >= 100) {
+      console.log(`[FALLBACK DEBUG] Appointment ${appointment.id} fallback calculation:`, {
+        startHour,
+        startMinute,
+        appointmentHour,
+        appointmentMinute,
+        hoursPastBase,
+        totalMinutesPastBase,
+        slotIndex,
+        validSlotIndex,
+        topPosition,
+        calculatedHeight,
+        zoomLevel,
+        slotHeight,
+        basicalculation: `40 * ${zoomLevel} = ${Math.round(40 * zoomLevel)}`,
+        expectedFor12PM: 'Should be slot 16 (640px) for 12:00 PM'
+      });
+    }
+
     const fallbackStyle = {
       top: `${topPosition}px`,
       height: `${calculatedHeight}px`
