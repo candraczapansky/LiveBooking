@@ -1363,15 +1363,15 @@ const AppointmentsPage = () => {
 
   if (appointmentsLoading || staffLoading || servicesLoading || usersLoading) {
     return (
-      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
         <div className="hidden lg:block">
           <SidebarController />
         </div>
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+        <div className={`min-h-screen lg:h-screen flex flex-col transition-all duration-300 ${
           sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
         }`}>
           <Header />
-          <main className="flex-1 overflow-auto p-4">
+          <main className="flex-1 lg:overflow-auto p-4">
             <div className="animate-pulse">
               <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
               <div className="space-y-3">
@@ -1387,17 +1387,17 @@ const AppointmentsPage = () => {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className={`h-screen flex flex-col transition-all duration-300 ${
+      <div className={`min-h-screen lg:h-screen flex flex-col transition-all duration-300 ${
         sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 overflow-auto">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 lg:overflow-auto">
           <div className="max-w-7xl mx-auto">
             {/* Top Controls */}
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
@@ -1406,7 +1406,7 @@ const AppointmentsPage = () => {
                 <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
                 <Button
                   onClick={() => handleAddAppointment()}
-                  className="min-h-[44px] justify-center"
+                  className="min-h-[48px] justify-center w-full sm:w-auto"
                   size="default"
                 >
                   <PlusCircle className="mr-2 h-4 w-4" />
@@ -1424,13 +1424,13 @@ const AppointmentsPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigateDate('prev')}
-                      className="h-9 w-9 p-0"
+                      className="h-10 w-10 p-0 min-h-[44px] min-w-[44px]"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
                     
                     <div className="text-center flex-1 mx-3">
-                      <span className="text-lg font-semibold block">
+                      <span className="text-sm sm:text-lg font-semibold block">
                         {formatDate(currentDate)}
                       </span>
                     </div>
@@ -1439,7 +1439,7 @@ const AppointmentsPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => navigateDate('next')}
-                      className="h-9 w-9 p-0"
+                      className="h-10 w-10 p-0 min-h-[44px] min-w-[44px]"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -1450,7 +1450,7 @@ const AppointmentsPage = () => {
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                   <div className="flex items-center justify-center space-x-3">
                     <Select value={viewMode} onValueChange={setViewMode}>
-                      <SelectTrigger className="w-24">
+                      <SelectTrigger className="w-28 min-h-[48px]">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1486,9 +1486,9 @@ const AppointmentsPage = () => {
 
                 {/* Filters Card */}
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                      <SelectTrigger>
+                      <SelectTrigger className="min-h-[48px]">
                         <SelectValue placeholder="All stylists" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1505,7 +1505,7 @@ const AppointmentsPage = () => {
                     </Select>
                     
                     <Select value={selectedService} onValueChange={setSelectedService}>
-                      <SelectTrigger>
+                      <SelectTrigger className="min-h-[48px]">
                         <SelectValue placeholder="All services" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1522,16 +1522,20 @@ const AppointmentsPage = () => {
               </div>
             </div>
             {/* Simple Calendar */}
-            <SimpleCalendar
-              appointments={Array.isArray(appointments) ? appointments : []}
-              staff={Array.isArray(staff) ? staff : []}
-              users={Array.isArray(users) ? users : []}
-              services={Array.isArray(services) ? services : []}
-              currentDate={currentDate}
-              onDateChange={setCurrentDate}
-              onAppointmentClick={handleAppointmentClick}
-              onAddAppointment={handleAddAppointment}
-            />
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm min-h-[400px] overflow-hidden">
+              <div className="h-full overflow-y-auto">
+                <SimpleCalendar
+                  appointments={Array.isArray(appointments) ? appointments : []}
+                  staff={Array.isArray(staff) ? staff : []}
+                  users={Array.isArray(users) ? users : []}
+                  services={Array.isArray(services) ? services : []}
+                  currentDate={currentDate}
+                  onDateChange={setCurrentDate}
+                  onAppointmentClick={handleAppointmentClick}
+                  onAddAppointment={handleAddAppointment}
+                />
+              </div>
+            </div>
           </div>
         </main>
       </div>

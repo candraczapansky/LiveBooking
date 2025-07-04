@@ -13,6 +13,28 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### July 4, 2025 - Mobile Appointments Page Improvements and Conflict Detection Fix
+
+- **Successfully resolved appointment conflict detection issue with cancelled appointments:**
+  - Root cause identified: Cancelled appointments were still being included in conflict detection despite being marked as "cancelled"
+  - Fixed by implementing proper active appointment filtering in all conflict detection points
+  - Updated appointment creation (POST) and editing (PUT) endpoints to use getActiveAppointmentsByStaff method
+  - Created new /api/appointments/active endpoint for frontend to fetch only non-cancelled appointments
+  - Enhanced appointment form frontend to use active appointments endpoint instead of all appointments
+  - Cancelled appointments now properly excluded from availability calculations while preserved in database for records
+  - Users can now successfully book appointments in time slots previously occupied by cancelled appointments
+
+- **Implemented comprehensive mobile-friendly improvements for appointments page:**
+  - Fixed critical mobile scrolling issue by updating container layout from fixed height to responsive design
+  - Changed h-screen overflow-hidden to min-h-screen on mobile while maintaining desktop layout integrity
+  - Enhanced touch targets throughout interface to meet 44px minimum accessibility standard
+  - Improved button sizing: New Appointment button now 48px height with full width on mobile
+  - Enhanced date navigation controls with 44px minimum touch targets and better mobile spacing
+  - Updated all form dropdowns (staff, service, view mode) with 48px minimum height for better mobile interaction
+  - Added proper calendar container with scrollable content area for better mobile calendar navigation
+  - Optimized spacing and padding throughout controls for improved mobile usability
+  - Mobile appointments page now scrolls properly and provides excellent touch interaction experience
+
 ### July 2, 2025 - Appointment Confirmation Timezone Fix
 
 - **Fixed critical timezone display issue in appointment confirmation messages:**

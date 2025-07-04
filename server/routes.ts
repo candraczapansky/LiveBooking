@@ -1297,27 +1297,10 @@ If you didn't request this password reset, please ignore this email and your pas
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
     const { staffId, startTime, endTime } = req.body;
     
-    console.log('DEBUG: Appointment creation request:', {
-      staffId,
-      startTime,
-      endTime,
-      startTimeLocal: new Date(startTime).toLocaleString('en-US', { timeZone: 'America/Chicago' }),
-      endTimeLocal: new Date(endTime).toLocaleString('en-US', { timeZone: 'America/Chicago' })
-    });
-    
     // Check for overlapping appointments for the same staff member (excluding cancelled appointments)
     const existingAppointments = await storage.getActiveAppointmentsByStaff(staffId);
     const newStart = new Date(startTime);
     const newEnd = new Date(endTime);
-    
-    console.log('DEBUG: Existing active appointments for staff', staffId, ':', existingAppointments.map(apt => ({
-      id: apt.id,
-      startTime: apt.startTime,
-      endTime: apt.endTime,
-      status: apt.status,
-      startTimeLocal: new Date(apt.startTime).toLocaleString('en-US', { timeZone: 'America/Chicago' }),
-      endTimeLocal: new Date(apt.endTime).toLocaleString('en-US', { timeZone: 'America/Chicago' })
-    })));
     
     const conflictingAppointment = existingAppointments.find(appointment => {
       const existingStart = new Date(appointment.startTime);
