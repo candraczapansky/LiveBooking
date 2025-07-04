@@ -1038,7 +1038,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllAppointments(): Promise<Appointment[]> {
-    return await db.select().from(appointments).orderBy(desc(appointments.startTime));
+    const appointmentList = await db.select().from(appointments).orderBy(desc(appointments.startTime));
+    
+    // Convert local datetime strings to ISO format for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToISO(appointment.startTime),
+      endTime: this.convertLocalToISO(appointment.endTime)
+    }));
+  }
+
+  private convertLocalToISO(localTimeString: string): string {
+    // If it's already an ISO string, return as-is
+    if (localTimeString.includes('T') || localTimeString.includes('Z')) {
+      return localTimeString;
+    }
+    
+    // Convert local datetime string (YYYY-MM-DD HH:MM:SS) to proper ISO format
+    // Parse as local time, then convert to ISO
+    const [datePart, timePart] = localTimeString.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hour, minute, second] = timePart.split(':').map(Number);
+    
+    // Create date in local timezone
+    const localDate = new Date(year, month - 1, day, hour, minute, second || 0);
+    return localDate.toISOString();
   }
 
   async getAppointmentsByClient(clientId: number): Promise<any[]> {
@@ -1066,7 +1090,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
-    return await db.select().from(appointments).where(
+    const appointmentList = await db.select().from(appointments).where(
       and(
         eq(appointments.staffId, staffId),
         or(
@@ -1076,6 +1100,13 @@ export class DatabaseStorage implements IStorage {
         )
       )
     ).orderBy(desc(appointments.startTime));
+    
+    // Convert local datetime strings to ISO format for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToISO(appointment.startTime),
+      endTime: this.convertLocalToISO(appointment.endTime)
+    }));
   }
 
   async getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]> {
@@ -1104,7 +1135,7 @@ export class DatabaseStorage implements IStorage {
     const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
     
-    return await db.select().from(appointments).where(
+    const appointmentList = await db.select().from(appointments).where(
       and(
         gte(appointments.startTime, startOfDay),
         lte(appointments.startTime, endOfDay),
@@ -1115,6 +1146,13 @@ export class DatabaseStorage implements IStorage {
         )
       )
     ).orderBy(appointments.startTime);
+    
+    // Convert local datetime strings to ISO format for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToISO(appointment.startTime),
+      endTime: this.convertLocalToISO(appointment.endTime)
+    }));
   }
 
   async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]> {

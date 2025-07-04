@@ -13,6 +13,16 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
+### July 4, 2025 - Complete Timezone Calendar Display Fix and Mobile Appointments Page Improvements
+
+- **Fixed critical timezone display issue preventing new appointments from appearing on calendar:**
+  - Root cause identified: Database now stores local time strings (YYYY-MM-DD HH:MM:SS) but frontend expected ISO format
+  - Created convertLocalToISO method in DatabaseStorage to properly format datetime strings for frontend consumption
+  - Updated getAllAppointments, getActiveAppointmentsByStaff, and getActiveAppointmentsByDate methods with time conversion
+  - Appointments now properly appear on calendar immediately after booking with correct time display
+  - Fixed TypeScript compilation errors with proper variable naming to avoid conflicts with schema imports
+  - New appointments (like ID 152 scheduled for 9:30 AM) now display correctly at their intended time slots
+
 ### July 4, 2025 - Mobile Appointments Page Improvements and Conflict Detection Fix
 
 - **Successfully resolved appointment conflict detection issue with cancelled appointments:**
