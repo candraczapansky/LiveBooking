@@ -49,12 +49,12 @@ const ServicesPage = () => {
       <SidebarController />
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
       }`}>
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto px-2 sm:px-0">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>
@@ -63,12 +63,12 @@ const ServicesPage = () => {
                   Manage your salon services and categories
                 </p>
               </div>
-              <div className="mt-4 sm:mt-0 flex gap-2">
-                <Button variant="outline" onClick={() => setIsCategoryFormOpen(true)} className="flex items-center justify-center">
+              <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row gap-3 sm:gap-2">
+                <Button variant="outline" onClick={() => setIsCategoryFormOpen(true)} className="flex items-center justify-center h-12 w-full sm:w-auto">
                   <FolderPlus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
-                <Button variant="default" onClick={() => setIsServiceFormOpen(true)} className="flex items-center justify-center">
+                <Button variant="default" onClick={() => setIsServiceFormOpen(true)} className="flex items-center justify-center h-12 w-full sm:w-auto">
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Service
                 </Button>
