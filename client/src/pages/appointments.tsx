@@ -630,7 +630,6 @@ const AppointmentsPage = () => {
     const storedPosition = appointmentPositions.get(appointment.id);
     
     if (storedPosition) {
-      console.log(`[STYLE DEBUG] Found stored position for appointment ${appointment.id}:`, storedPosition);
       return storedPosition;
     }
     
@@ -641,7 +640,6 @@ const AppointmentsPage = () => {
     
     // Skip appointments outside business hours (8 AM to 10 PM)
     if (startHour < 8 || startHour >= 22) {
-      console.log(`[STYLE DEBUG] Appointment ${appointment.id} outside business hours:`, { startHour });
       return { top: '0px', height: '0px', display: 'none' };
     }
     
@@ -667,12 +665,7 @@ const AppointmentsPage = () => {
       height: `${calculatedHeight}px`
     };
     
-    console.log(`[STYLE DEBUG] Calculated fallback position for appointment ${appointment.id}:`, {
-      timeSlotString,
-      slotIndex,
-      topPosition,
-      fallbackStyle
-    });
+
     
     return fallbackStyle;
   };
