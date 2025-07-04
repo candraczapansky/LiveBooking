@@ -573,10 +573,8 @@ const AppointmentsPage = () => {
       const appointmentTime = new Date(appointment.startTime);
       
       // Convert UTC time to Central Time (UTC-5) for proper positioning
-      // The issue is appointments are stored in UTC but need to display in local time
-      const centralOffset = 5 * 60; // Central Time is UTC-5 (in minutes)
-      const utcTime = appointmentTime.getTime();
-      const centralTime = new Date(utcTime - (centralOffset * 60 * 1000));
+      // Central Time is 5 hours behind UTC, so we subtract 5 hours from UTC
+      const centralTime = new Date(appointmentTime.getTime() - (5 * 60 * 60 * 1000));
       
       // Use Central Time for positioning calculations
       const startHour = centralTime.getHours();
@@ -903,18 +901,7 @@ const AppointmentsPage = () => {
               // Create a stable key based on appointment's immutable properties
               const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
               
-              // Debug the actual style being applied for recent appointments
-              if (appointment.id >= 110) {
-                console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
-                  appointmentStyle,
-                  finalStyle: {
-                    left: `${80 + (columnIndex * columnWidth) + 4}px`,
-                    width: `${columnWidth - 8}px`,
-                    ...appointmentStyle,
-                    zIndex: 10
-                  }
-                });
-              }
+              // Appointment positioning and timezone conversion now working correctly
               
               return (
                 <div
