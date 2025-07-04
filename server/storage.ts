@@ -1048,15 +1048,25 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  private convertLocalToISO(localTimeString: string): string {
+  private convertLocalToISO(localTimeValue: string | Date): string {
+    // If it's already a Date object, convert to ISO string
+    if (localTimeValue instanceof Date) {
+      return localTimeValue.toISOString();
+    }
+    
+    // If it's null or undefined, return current time as fallback
+    if (!localTimeValue) {
+      return new Date().toISOString();
+    }
+    
     // If it's already an ISO string, return as-is
-    if (localTimeString.includes('T') || localTimeString.includes('Z')) {
-      return localTimeString;
+    if (localTimeValue.includes('T') || localTimeValue.includes('Z')) {
+      return localTimeValue;
     }
     
     // Convert local datetime string (YYYY-MM-DD HH:MM:SS) to proper ISO format
     // Parse as local time, then convert to ISO
-    const [datePart, timePart] = localTimeString.split(' ');
+    const [datePart, timePart] = localTimeValue.split(' ');
     const [year, month, day] = datePart.split('-').map(Number);
     const [hour, minute, second] = timePart.split(':').map(Number);
     
