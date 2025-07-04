@@ -475,7 +475,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       return apiRequest("POST", "/api/appointments", appointmentData);
     },
     onSuccess: (data: any) => {
+      // Force refresh of appointments data with multiple cache invalidation strategies
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments/active'] });
+      
+      // Force refetch to ensure latest data is loaded
+      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      
       onOpenChange(false);
       toast({
         title: "Success",

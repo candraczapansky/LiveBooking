@@ -13,7 +13,21 @@ Preferred color scheme: Pink primary color with black text for better readabilit
 
 ## Recent Changes
 
-### July 4, 2025 - Complete Timezone Calendar Display Fix and Mobile Appointments Page Improvements
+### July 4, 2025 - Critical App Startup Fix and Complete Timezone Calendar Display Fix and Mobile Appointments Page Improvements
+
+- **Fixed critical application startup error preventing server from running:**
+  - Root cause identified: convertLocalToISO method expected string parameters but database returned Date objects
+  - Updated convertLocalToISO method to handle both Date objects and string parameters with proper type checking
+  - Added null/undefined handling to prevent runtime errors during appointment data processing
+  - Application now starts successfully without crashes during appointment data retrieval
+  - All database timezone conversion operations working properly with mixed data types
+
+- **Enhanced appointment creation cache invalidation to ensure immediate calendar display:**
+  - Fixed new appointments not appearing on calendar after successful creation
+  - Added multiple cache invalidation strategies including refetchQueries for immediate data refresh
+  - Updated onAppointmentCreated callback to force manual data refresh alongside cache invalidation
+  - New appointments now appear immediately on calendar without requiring page refresh
+  - Calendar automatically navigates to appointment date when new appointments are created
 
 - **Fixed critical timezone display issue preventing new appointments from appearing on calendar:**
   - Root cause identified: Database now stores local time strings (YYYY-MM-DD HH:MM:SS) but frontend expected ISO format
