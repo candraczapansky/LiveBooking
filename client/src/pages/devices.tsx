@@ -91,19 +91,29 @@ export default function DevicesPage() {
     return (
       <AppLayout>
         <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+            <Card key={i} className="animate-pulse mx-4 sm:mx-0">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-10 w-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                <div className="space-y-3">
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
                 </div>
               </CardContent>
             </Card>
@@ -117,44 +127,53 @@ export default function DevicesPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
         <Button 
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto h-12 text-base"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="h-5 w-5 mr-2" />
           Add Device
         </Button>
       </div>
 
       {devices.length === 0 ? (
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-gray-500 dark:text-gray-400">No devices found. Add your first device to get started.</p>
+        <Card className="mx-4 sm:mx-0">
+          <CardContent className="p-8 text-center">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+                <Wrench className="h-8 w-8 text-gray-500 dark:text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No devices found</h3>
+                <p className="text-gray-500 dark:text-gray-400">Add your first device to get started.</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6">
           {devices.map((device) => (
-            <Card key={device.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg text-gray-900 dark:text-gray-100">{device.name}</CardTitle>
+            <Card key={device.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 mx-4 sm:mx-0">
+              <CardHeader className="pb-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2 min-w-0 flex-1">
+                    <CardTitle className="text-lg md:text-xl text-gray-900 dark:text-gray-100 leading-tight">{device.name}</CardTitle>
                     <div className="flex items-center gap-2">
                       {getStatusIcon(device.status)}
-                      <Badge className={getStatusColor(device.status)}>
+                      <Badge className={`${getStatusColor(device.status)} text-xs`}>
                         {device.status.replace('_', ' ')}
                       </Badge>
                     </div>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-2">
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEdit(device)}
-                      className="h-8 w-8 p-0"
+                      className="h-10 w-10 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                      title="Edit device"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -162,7 +181,8 @@ export default function DevicesPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(device.id)}
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      className="h-10 w-10 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      title="Delete device"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -170,27 +190,27 @@ export default function DevicesPage() {
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <div className="space-y-2">
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
-                    <span className="font-medium">Type:</span> {device.deviceType.replace('_', ' ')}
+                <div className="space-y-3">
+                  <div className="text-sm md:text-base text-gray-600 dark:text-gray-300">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Type:</span> {device.deviceType.replace('_', ' ')}
                   </div>
                   {device.brand && (
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Brand:</span> {device.brand}
+                    <div className="text-sm md:text-base text-gray-600 dark:text-gray-300">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Brand:</span> {device.brand}
                     </div>
                   )}
                   {device.model && (
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
-                      <span className="font-medium">Model:</span> {device.model}
+                    <div className="text-sm md:text-base text-gray-600 dark:text-gray-300">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">Model:</span> {device.model}
                     </div>
                   )}
                   {device.description && (
-                    <div className="text-sm text-gray-600 dark:text-gray-300">
+                    <div className="text-sm md:text-base text-gray-600 dark:text-gray-300 leading-relaxed">
                       {device.description}
                     </div>
                   )}
                   {device.purchaseDate && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-100 dark:border-gray-700">
                       <span className="font-medium">Purchased:</span> {device.purchaseDate}
                     </div>
                   )}

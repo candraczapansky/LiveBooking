@@ -138,16 +138,16 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto mx-4 sm:mx-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-lg md:text-xl">
             {device ? "Edit Device" : "Add New Device"}
           </DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               <FormField
                 control={form.control}
                 name="name"
@@ -155,7 +155,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Device Name *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Hair Dryer Station 1" {...field} />
+                      <Input placeholder="e.g., Hair Dryer Station 1" className="h-12" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -170,7 +170,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                     <FormLabel>Device Type *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-12">
                           <SelectValue placeholder="Select device type" />
                         </SelectTrigger>
                       </FormControl>
@@ -373,16 +373,21 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
               )}
             />
 
-            <div className="flex justify-end space-x-2 pt-4">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-2 pt-6">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 disabled={isLoading}
+                className="w-full sm:w-auto h-12 order-2 sm:order-1"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button 
+                type="submit" 
+                disabled={isLoading}
+                className="w-full sm:w-auto h-12 order-1 sm:order-2"
+              >
                 {isLoading ? "Saving..." : device ? "Update Device" : "Create Device"}
               </Button>
             </div>
