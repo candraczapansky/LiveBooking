@@ -1302,9 +1302,25 @@ If you didn't request this password reset, please ignore this email and your pas
     const newStart = new Date(startTime);
     const newEnd = new Date(endTime);
     
+    console.log('Conflict detection debug:', {
+      requestedStartTime: startTime,
+      requestedEndTime: endTime,
+      newStartParsed: newStart.toISOString(),
+      newEndParsed: newEnd.toISOString(),
+      staffId: staffId,
+      existingAppointmentsCount: existingAppointments.length
+    });
+    
     const conflictingAppointment = existingAppointments.find(appointment => {
       const existingStart = new Date(appointment.startTime);
       const existingEnd = new Date(appointment.endTime);
+      
+      console.log('Checking appointment:', {
+        appointmentId: appointment.id,
+        existingStart: existingStart.toISOString(),
+        existingEnd: existingEnd.toISOString(),
+        overlap: newStart < existingEnd && newEnd > existingStart
+      });
       
       // Check for any overlap: new appointment starts before existing ends AND new appointment ends after existing starts
       return newStart < existingEnd && newEnd > existingStart;
@@ -1320,6 +1336,12 @@ If you didn't request this password reset, please ignore this email and your pas
         hour: 'numeric', 
         minute: '2-digit', 
         hour12: true 
+      });
+      
+      console.log('Conflict found with appointment:', {
+        conflictingAppointmentId: conflictingAppointment.id,
+        conflictingStartTime: conflictingAppointment.startTime,
+        conflictingEndTime: conflictingAppointment.endTime
       });
       
       return res.status(409).json({ 
