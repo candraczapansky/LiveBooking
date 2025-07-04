@@ -420,21 +420,31 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   const createMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
+      // Validate that time is selected
+      if (!values.time || values.time.trim() === '') {
+        throw new Error('Please select a time for the appointment');
+      }
+      
       const [hours, minutes] = values.time.split(':').map(Number);
       
-      // Create the date in Central Time and convert to UTC properly
+      // Create the date in local timezone
       const year = values.date.getFullYear();
       const month = values.date.getMonth();
       const day = values.date.getDate();
       
-      // Create appointment time correctly by treating input as Central Time
-      // The issue was that we were adding timezone offset when we should just create the Date normally
-      // JavaScript Date constructor already creates dates in local time
+      // Create appointment time in local time
       const localDate = new Date(year, month, day, hours, minutes, 0, 0);
       
-      // For database storage, we want UTC time, so just use toISOString()
-      // The calendar display will handle timezone conversion properly
-      const utcTime = localDate;
+      // Format as local time string for database storage (YYYY-MM-DD HH:MM:SS)
+      // This avoids timezone conversion issues by sending local time directly
+      const formatLocalDateTime = (date: Date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0') + ' ' +
+               String(date.getHours()).padStart(2, '0') + ':' +
+               String(date.getMinutes()).padStart(2, '0') + ':' +
+               String(date.getSeconds()).padStart(2, '0');
+      };
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
@@ -443,22 +453,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                            (selectedServiceData?.bufferTimeBefore || 0) + 
                            (selectedServiceData?.bufferTimeAfter || 0);
       
-      const endTime = addMinutes(utcTime, totalDuration);
+      const endTime = addMinutes(localDate, totalDuration);
 
-      console.log('Creating appointment with timezone conversion:', {
+      console.log('Creating appointment with local timezone:', {
         selectedTime: values.time,
         localDate: localDate,
-        utcTime: utcTime,
-        utcIsoString: utcTime.toISOString(),
-        endTimeIso: endTime.toISOString()
+        localDateString: formatLocalDateTime(localDate),
+        endTimeString: formatLocalDateTime(endTime)
       });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
-        startTime: utcTime.toISOString(),
-        endTime: endTime.toISOString(),
+        startTime: formatLocalDateTime(localDate),
+        endTime: formatLocalDateTime(endTime),
         status: "confirmed",
         notes: values.notes || null,
       };
@@ -516,18 +525,29 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         throw new Error("No appointment ID provided");
       }
 
+      // Validate that time is selected
+      if (!values.time || values.time.trim() === '') {
+        throw new Error('Please select a time for the appointment');
+      }
+
       const [hours, minutes] = values.time.split(':').map(Number);
       
-      // Create appointment time correctly by treating input as Central Time
+      // Create appointment time in local time
       const year = values.date.getFullYear();
       const month = values.date.getMonth();
       const day = values.date.getDate();
       
-      // JavaScript Date constructor already creates dates in local time
       const localDate = new Date(year, month, day, hours, minutes, 0, 0);
       
-      // For database storage, we want UTC time, so just use toISOString()
-      const utcTime = localDate;
+      // Format as local time string for database storage (YYYY-MM-DD HH:MM:SS)
+      const formatLocalDateTime = (date: Date) => {
+        return date.getFullYear() + '-' + 
+               String(date.getMonth() + 1).padStart(2, '0') + '-' + 
+               String(date.getDate()).padStart(2, '0') + ' ' +
+               String(date.getHours()).padStart(2, '0') + ':' +
+               String(date.getMinutes()).padStart(2, '0') + ':' +
+               String(date.getSeconds()).padStart(2, '0');
+      };
 
       const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
       
@@ -536,21 +556,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                            (selectedServiceData?.bufferTimeBefore || 0) + 
                            (selectedServiceData?.bufferTimeAfter || 0);
       
-      const endTime = addMinutes(utcTime, totalDuration);
+      const endTime = addMinutes(localDate, totalDuration);
 
-      console.log('Updating appointment with timezone conversion:', {
+      console.log('Updating appointment with local timezone:', {
         selectedTime: values.time,
         localDate: localDate,
-        utcTime: utcTime,
-        utcIsoString: utcTime.toISOString()
+        localDateString: formatLocalDateTime(localDate),
+        endTimeString: formatLocalDateTime(endTime)
       });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
-        startTime: utcTime.toISOString(),
-        endTime: endTime.toISOString(),
+        startTime: formatLocalDateTime(localDate),
+        endTime: formatLocalDateTime(endTime),
         status: "confirmed",
         notes: values.notes || null,
       };
