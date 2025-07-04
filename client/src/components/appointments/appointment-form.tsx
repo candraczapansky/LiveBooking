@@ -159,9 +159,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     enabled: open,
   });
 
-  // Fetch existing appointments to check for conflicts
+  // Fetch existing active appointments to check for conflicts (excludes cancelled appointments)
   const { data: existingAppointments = [] } = useQuery({
-    queryKey: ['/api/appointments'],
+    queryKey: ['/api/appointments/active'],
     enabled: open,
   });
   

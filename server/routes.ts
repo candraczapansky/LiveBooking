@@ -1186,6 +1186,113 @@ If you didn't request this password reset, please ignore this email and your pas
       return res.status(500).json({ error: 'Failed to fetch appointments' });
     }
   });
+
+  // New endpoint for active appointments (excluding cancelled)
+  app.get("/api/appointments/active", async (req, res) => {
+    try {
+      const { clientId, staffId, date } = req.query;
+      
+      let appointments;
+      if (staffId) {
+        appointments = await storage.getActiveAppointmentsByStaff(parseInt(staffId as string));
+      } else if (date) {
+        appointments = await storage.getActiveAppointmentsByDate(new Date(date as string));
+      } else {
+        // For general active appointments, filter from all appointments
+        const allAppointments = await storage.getAllAppointments();
+        appointments = allAppointments.filter(apt => 
+          apt.status === "pending" || apt.status === "confirmed" || apt.status === "completed"
+        );
+      }
+      
+      // Get detailed information for each appointment with controlled concurrency
+      const detailedAppointments: any[] = [];
+      const batchSize = 3; // Reduced batch size to prevent connection overload
+      
+      for (let i = 0; i < appointments.length; i += batchSize) {
+        const batch = appointments.slice(i, i + batchSize);
+        const batchResults = await Promise.all(
+          batch.map(async (appointment) => {
+            try {
+              const service = await storage.getService(appointment.serviceId);
+              const client = await storage.getUser(appointment.clientId);
+              const staffMember = await storage.getStaff(appointment.staffId);
+              const staffUser = staffMember ? await storage.getUser(staffMember.userId) : null;
+          
+              return {
+                ...appointment,
+                service,
+                client: client ? {
+                  id: client.id,
+                  username: client.username,
+                  email: client.email,
+                  firstName: client.firstName,
+                  lastName: client.lastName,
+                  phone: client.phone
+                } : null,
+                staff: staffMember ? {
+                  ...staffMember,
+                  user: staffUser ? {
+                    id: staffUser.id,
+                    username: staffUser.username,
+                    email: staffUser.email,
+                    firstName: staffUser.firstName,
+                    lastName: staffUser.lastName
+                  } : null
+                } : null
+              };
+            } catch (error) {
+              console.error('Error fetching appointment details:', error);
+              // Return appointment with null details if there's an error
+              return {
+                ...appointment,
+                service: null,
+                client: null,
+                staff: null
+              };
+            }
+          })
+        );
+        detailedAppointments.push(...batchResults);
+        
+        // Add a small delay between batches to prevent overwhelming the database
+        if (i + batchSize < appointments.length) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      
+      return res.status(200).json(detailedAppointments);
+    } catch (error) {
+      console.error('Error in appointments route:', error);
+      return res.status(500).json({ error: 'Failed to fetch appointments' });
+    }
+  });
+
+  // Endpoint for active appointments (excluding cancelled) - lightweight for availability checking
+  app.get("/api/appointments/active", async (req, res) => {
+    try {
+      const { staffId, date } = req.query;
+      
+      let appointments;
+      if (staffId) {
+        appointments = await storage.getActiveAppointmentsByStaff(parseInt(staffId as string));
+      } else if (date) {
+        appointments = await storage.getActiveAppointmentsByDate(new Date(date as string));
+      } else {
+        // For general active appointments, filter from all appointments
+        const allAppointments = await storage.getAllAppointments();
+        appointments = allAppointments.filter(apt => 
+          apt.status === "pending" || apt.status === "confirmed" || apt.status === "completed"
+        );
+      }
+      
+      // Return basic appointment data without detailed info to improve performance for availability checking
+      return res.status(200).json(appointments);
+    } catch (error) {
+      console.error('Error in active appointments route:', error);
+      return res.status(500).json({ error: 'Failed to fetch active appointments' });
+    }
+  });
   
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
     const { staffId, startTime, endTime } = req.body;
@@ -1815,9 +1922,9 @@ If you didn't request this password reset, please ignore this email and your pas
         }
       }
 
-      // Check for scheduling conflicts with existing appointments
+      // Check for scheduling conflicts with existing active appointments (exclude cancelled)
       if (finalStaffId) {
-        const staffAppointments = await storage.getAppointmentsByStaff(finalStaffId);
+        const staffAppointments = await storage.getActiveAppointmentsByStaff(finalStaffId);
         const newStart = new Date(startTime);
         const newEnd = new Date(endTime);
         

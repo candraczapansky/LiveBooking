@@ -107,8 +107,10 @@ export interface IStorage {
   getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
+  getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
+  getActiveAppointmentsByDate(date: Date): Promise<Appointment[]>;
   getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<Appointment[]>;
   updateAppointment(id: number, appointmentData: Partial<InsertAppointment>): Promise<Appointment>;
   deleteAppointment(id: number): Promise<boolean>;
@@ -1063,6 +1065,19 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(appointments).where(eq(appointments.staffId, staffId)).orderBy(desc(appointments.startTime));
   }
 
+  async getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
+    return await db.select().from(appointments).where(
+      and(
+        eq(appointments.staffId, staffId),
+        or(
+          eq(appointments.status, "pending"),
+          eq(appointments.status, "confirmed"),
+          eq(appointments.status, "completed")
+        )
+      )
+    ).orderBy(desc(appointments.startTime));
+  }
+
   async getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]> {
     return await db.select().from(appointments).where(
       and(
@@ -1081,6 +1096,23 @@ export class DatabaseStorage implements IStorage {
       and(
         gte(appointments.startTime, startOfDay),
         lte(appointments.startTime, endOfDay)
+      )
+    ).orderBy(appointments.startTime);
+  }
+
+  async getActiveAppointmentsByDate(date: Date): Promise<Appointment[]> {
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+    
+    return await db.select().from(appointments).where(
+      and(
+        gte(appointments.startTime, startOfDay),
+        lte(appointments.startTime, endOfDay),
+        or(
+          eq(appointments.status, "pending"),
+          eq(appointments.status, "confirmed"),
+          eq(appointments.status, "completed")
+        )
       )
     ).orderBy(appointments.startTime);
   }
