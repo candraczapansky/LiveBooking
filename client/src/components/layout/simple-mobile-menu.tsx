@@ -145,7 +145,7 @@ const SimpleMobileMenu = () => {
             {/* User Info */}
             <div className="flex flex-col items-center justify-center p-4 border-b border-gray-200 dark:border-gray-700">
               <Avatar className="h-16 w-16 mb-2">
-                <AvatarImage src={profilePicture || currentUser?.profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} />
+                <AvatarImage src={profilePicture || currentUser?.profilePicture || "/placeholder-avatar.svg"} />
                 <AvatarFallback>
                   {currentUser?.firstName?.[0] || ''}{currentUser?.lastName?.[0] || ''}
                 </AvatarFallback>

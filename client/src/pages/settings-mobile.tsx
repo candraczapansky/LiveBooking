@@ -2,12 +2,12 @@ import { useState, useContext, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { apiRequest } from "@/lib/queryClient";
@@ -41,8 +41,7 @@ const passwordChangeSchema = z.object({
 type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 
 export default function SettingsMobile() {
-  const { toast } = useToast();
-  const { user, updateUser } = useContext(AuthContext);
+  const { user, updateUser, colorPreferencesApplied } = useContext(AuthContext);
   const [localUser, setLocalUser] = useState<any>(null);
   
   // Use context user or fallback to localStorage user
@@ -149,21 +148,13 @@ export default function SettingsMobile() {
     if (file) {
       // Check if file is an image
       if (!file.type.startsWith('image/')) {
-        toast({
-          title: "Invalid file type",
-          description: "Please select an image file.",
-          variant: "destructive",
-        });
+        console.error("Invalid file type: Please select an image file.");
         return;
       }
 
       // Check file size (limit to 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Please select an image smaller than 5MB.",
-          variant: "destructive",
-        });
+        console.error("File too large: Please select an image smaller than 5MB.");
         return;
       }
 
@@ -230,18 +221,11 @@ export default function SettingsMobile() {
           }
         }
         
-        toast({
-          title: "Photo updated",
-          description: "Your profile photo has been changed successfully.",
-        });
+        console.log("Photo updated: Your profile photo has been changed successfully.");
       };
       
       reader.onerror = () => {
-        toast({
-          title: "Upload failed",
-          description: "Failed to process the image. Please try again.",
-          variant: "destructive",
-        });
+        console.error("Upload failed: Failed to process the image. Please try again.");
       };
       
       reader.readAsDataURL(file);
@@ -296,6 +280,12 @@ export default function SettingsMobile() {
 
   // Apply loaded color preferences from database
   useEffect(() => {
+    // Only load color preferences if they haven't been applied globally yet
+    if (colorPreferencesApplied) {
+      console.log('Color preferences already applied globally, skipping local load');
+      return;
+    }
+    
     if (savedColorPreferences && !colorPrefsLoading) {
       console.log('Applying loaded color preferences:', savedColorPreferences);
       
@@ -347,7 +337,7 @@ export default function SettingsMobile() {
       
       console.log('Color preferences applied successfully');
     }
-  }, [savedColorPreferences, colorPrefsLoading]);
+  }, [savedColorPreferences, colorPrefsLoading, colorPreferencesApplied]);
 
   const applyThemeColors = (primaryColor: string, isDark: boolean = false) => {
     const root = document.documentElement;
@@ -525,6 +515,12 @@ export default function SettingsMobile() {
 
   // Load color preferences from database when user is available
   useEffect(() => {
+    // Only load color preferences if they haven't been applied globally yet
+    if (colorPreferencesApplied) {
+      console.log('Color preferences already applied globally, skipping local load');
+      return;
+    }
+    
     const loadUserColorPreferences = async () => {
       if (user?.id) {
         try {
@@ -583,7 +579,7 @@ export default function SettingsMobile() {
     };
     
     loadUserColorPreferences();
-  }, [user?.id]); // Re-run when user ID changes
+  }, [user?.id, colorPreferencesApplied]); // Re-run when user ID or colorPreferencesApplied changes
 
   const handleSaveAppearance = () => {
     localStorage.setItem('theme', selectedTheme);
@@ -596,10 +592,7 @@ export default function SettingsMobile() {
     applyThemeColors(customColor, darkMode);
     applyTextColors(primaryTextColor, secondaryTextColor);
     
-    toast({
-      title: "Appearance saved",
-      description: "Your appearance preferences including text colors have been updated.",
-    });
+    console.log("Appearance saved: Your appearance preferences including text colors have been updated.");
   };
 
 
@@ -733,20 +726,13 @@ export default function SettingsMobile() {
       }));
       console.log('User data update event dispatched');
       
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been saved successfully.",
-      });
+      console.log("Profile updated: Your profile information has been saved successfully.");
       setIsEditingProfile(false);
       console.log('Profile update success flow completed');
     },
     onError: (error) => {
       console.error('Profile update error callback triggered:', error);
-      toast({
-        title: "Update failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive",
-      });
+      console.error("Update failed: Failed to update profile. Please try again.");
     },
   });
 
@@ -774,11 +760,7 @@ export default function SettingsMobile() {
     
     if (!userId) {
       console.error('No user ID available for profile save');
-      toast({
-        title: "Error",
-        description: "User session not found. Please log in again.",
-        variant: "destructive",
-      });
+      console.error("Error: User session not found. Please log in again.");
       return;
     }
     
@@ -878,7 +860,7 @@ export default function SettingsMobile() {
                 <div 
                   className="profile-circle"
                   style={{
-                    backgroundImage: `url(${profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300"})`
+                    backgroundImage: `url(${profilePicture || currentUser?.profilePicture || "/placeholder-avatar.svg"})`
                   }}
                 ></div>
                 <div style={{ textAlign: "center" }}>

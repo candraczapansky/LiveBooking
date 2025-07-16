@@ -11,6 +11,13 @@ export interface User {
   profilePicture?: string;
   createdAt?: string;
   stripeCustomerId?: string | null;
+  // Two-factor authentication fields
+  twoFactorEnabled?: boolean;
+  twoFactorSecret?: string | null;
+  twoFactorBackupCodes?: string | null;
+  twoFactorMethod?: string;
+  twoFactorEmailCode?: string | null;
+  twoFactorEmailCodeExpiry?: string | null;
 }
 
 interface AuthContextType {
@@ -20,6 +27,7 @@ interface AuthContextType {
   logout: () => void;
   updateUser: (updatedUserData: Partial<User>) => void;
   loading: boolean;
+  colorPreferencesApplied: boolean;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -29,12 +37,14 @@ export const AuthContext = createContext<AuthContextType>({
   logout: () => {},
   updateUser: () => {},
   loading: true,
+  colorPreferencesApplied: false,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [colorPreferencesApplied, setColorPreferencesApplied] = useState(false);
 
   // Function to fetch fresh user data from database
   const fetchFreshUserData = async (userId: number) => {
@@ -65,13 +75,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         if (response.status === 404) {
           console.log('No saved color preferences found');
+          setColorPreferencesApplied(true);
           return;
         }
-        throw new Error('Failed to load color preferences');
+        throw new Error(`Failed to load color preferences: ${response.status} ${response.statusText}`);
       }
       
-      const colorPrefs = await response.json();
+      const responseText = await response.text();
+      console.log('Raw response text:', responseText);
+      
+      // Handle empty response (no preferences exist)
+      if (responseText.trim() === '') {
+        console.log('No color preferences found for this user');
+        setColorPreferencesApplied(true);
+        return;
+      }
+      
+      let colorPrefs;
+      try {
+        colorPrefs = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('Failed to parse color preferences JSON:', parseError);
+        console.error('Response text was:', responseText);
+        setColorPreferencesApplied(true);
+        return;
+      }
+      
       console.log('Loaded color preferences:', colorPrefs);
+      
+      // Check if we have valid color preferences
+      if (!colorPrefs || (typeof colorPrefs === 'object' && Object.keys(colorPrefs).length === 0)) {
+        console.log('No valid color preferences found in response, applying default colors');
+        // Apply a sensible default color scheme instead of letting other components override with hot pink
+        applyThemeColors('#8b5cf6', false); // Default purple color
+        applyTextColors('#111827', '#6b7280'); // Default text colors
+        setColorPreferencesApplied(true);
+        return;
+      }
       
       // Apply the color preferences to the DOM
       if (colorPrefs.primaryColor) {
@@ -85,9 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
       }
       
+      setColorPreferencesApplied(true);
       console.log('Color preferences applied globally');
     } catch (error) {
       console.error('Failed to load color preferences:', error);
+      setColorPreferencesApplied(true);
     }
   };
 
@@ -148,8 +190,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Apply text colors function
   const applyTextColors = (primaryTextColor: string, secondaryTextColor: string) => {
     const root = document.documentElement;
-    root.style.setProperty('--text-primary', primaryTextColor);
-    root.style.setProperty('--text-secondary', secondaryTextColor);
+    
+    // Convert hex to HSL for CSS custom properties
+    const hexToHsl = (hex: string) => {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      let h = 0, s = 0, l = (max + min) / 2;
+      
+      if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+          case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+          case g: h = (b - r) / d + 2; break;
+          case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+      }
+      
+      return `${Math.round(h * 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%`;
+    };
+    
+    const primaryHsl = hexToHsl(primaryTextColor);
+    const secondaryHsl = hexToHsl(secondaryTextColor);
+    
+    root.style.setProperty('--text-primary', primaryHsl);
+    root.style.setProperty('--text-secondary', secondaryHsl);
   };
 
   useEffect(() => {
@@ -208,6 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("Login called with:", userData);
     setUser(userData);
     setIsAuthenticated(true);
+    setColorPreferencesApplied(false); // Reset flag on login
     localStorage.setItem('user', JSON.stringify(userData));
     
     // Also update profilePicture in localStorage for backward compatibility
@@ -226,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log("Logout function called");
     setUser(null);
     setIsAuthenticated(false);
+    setColorPreferencesApplied(false); // Reset flag on logout
     localStorage.removeItem('user');
     localStorage.removeItem('profilePicture');
     // Clear color preferences from the DOM
@@ -273,7 +345,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, login, logout, updateUser, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout, updateUser, loading, colorPreferencesApplied }}>
       {children}
     </AuthContext.Provider>
   );

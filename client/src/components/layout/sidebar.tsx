@@ -100,7 +100,7 @@ const Sidebar = () => {
           const response = await fetch(`/api/users/${user.id}/color-preferences`);
           if (response.ok) {
             const colorPrefs = await response.json();
-            if (colorPrefs.primaryColor) {
+            if (colorPrefs && colorPrefs.primaryColor) {
               setPrimaryColor(colorPrefs.primaryColor);
               
               // Force color update via DOM manipulation
@@ -214,7 +214,7 @@ const Sidebar = () => {
           <div className="flex items-center mb-4">
             <Avatar className="h-9 w-9 mr-3">
               <AvatarImage 
-                src={currentUser?.profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
+                src={currentUser?.profilePicture || "/placeholder-avatar.svg"} 
                 alt="User profile"
               />
               <AvatarFallback>

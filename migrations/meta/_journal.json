@@ -8,6 +8,20 @@
       "when": 1752651458850,
       "tag": "0000_wonderful_valkyrie",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1752659505399,
+      "tag": "0001_light_vulture",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1752660527028,
+      "tag": "0002_daffy_thing",
+      "breakpoints": true
     }
   ]
 }

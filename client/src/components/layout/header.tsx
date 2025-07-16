@@ -113,7 +113,7 @@ const Header = () => {
                   </span>
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0">
                     <AvatarImage 
-                      src={profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
+                      src={profilePicture || currentUser?.profilePicture || "/placeholder-avatar.svg"} 
                       alt="User profile"
                     />
                     <AvatarFallback>

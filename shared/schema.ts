@@ -28,6 +28,14 @@ export const users = pgTable("users", {
   smsAccountManagement: boolean("sms_account_management").default(false),
   smsAppointmentReminders: boolean("sms_appointment_reminders").default(true),
   smsPromotions: boolean("sms_promotions").default(false),
+  // Two-factor authentication fields
+  twoFactorEnabled: boolean("two_factor_enabled").default(false),
+  twoFactorSecret: text("two_factor_secret"),
+  twoFactorBackupCodes: text("two_factor_backup_codes"), // JSON array of backup codes
+  twoFactorMethod: text("two_factor_method").default("authenticator"), // "authenticator" or "email"
+  twoFactorEmailCode: text("two_factor_email_code"), // Temporary email verification code
+  twoFactorEmailCodeExpiry: timestamp("two_factor_email_code_expiry"), // When email code expires
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 

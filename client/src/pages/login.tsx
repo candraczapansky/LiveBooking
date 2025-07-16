@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Scissors } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
+
 // Login schema
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -39,8 +40,9 @@ const Login = () => {
   console.log("Login component - authContext:", authContext);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("login");
-  const [loginError, setLoginError] = useState<string | null>(null); // <-- Add this line
-  const [registerError, setRegisterError] = useState<string | null>(null); // <-- Add this line
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
 
   // Login form
   const loginForm = useForm<LoginValues>({
@@ -76,7 +78,7 @@ const Login = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setLoginError(errorData.error || "Login failed"); // <-- Set error for user
+        setLoginError(errorData.error || "Login failed");
         throw new Error(errorData.error || "Login failed");
       }
 
@@ -84,7 +86,6 @@ const Login = () => {
       console.log("Login successful, user data:", userData);
       
       // Use the auth context login function which will handle color preferences
-      // Type assertion to ensure userData matches User type
       authContext.login(userData as any);
       
       // Navigate to dashboard
@@ -98,6 +99,8 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+
 
   const handleRegister = async (values: RegisterValues) => {
     setIsLoading(true);
@@ -361,6 +364,8 @@ const Login = () => {
             )}
         </CardContent>
         </Card>
+
+
       </div>
     </div>
   );

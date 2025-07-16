@@ -45,6 +45,8 @@ import { PayrollAutoSync } from "./payroll-auto-sync";
 import { AutoRenewalService } from "./auto-renewal-service";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 import { registerExternalRoutes } from "./external-api";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -495,6 +497,10 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
+
+
+
+
   // Users routes
   app.get("/api/users", async (req, res) => {
     console.log("GET /api/users called");
@@ -661,7 +667,7 @@ If you didn't request this password reset, please ignore this email and your pas
     
     try {
       const preferences = await storage.getUserColorPreferences(userId);
-      return res.status(200).json(preferences);
+      return res.status(200).json(preferences || null);
     } catch (error: any) {
       console.error('Error fetching color preferences:', error);
       return res.status(500).json({ error: "Failed to fetch color preferences" });
@@ -5374,6 +5380,461 @@ Thank you for choosing Glo Head Spa!
 
   // Register external API routes
   registerExternalRoutes(app, storage);
+
+  // --- 2FA ROUTES ---
+
+  // 1. Setup 2FA: generate secret and QR (for authenticator app)
+  app.post("/api/2fa/setup", async (req, res) => {
+    const { userId, method = "authenticator" } = req.body;
+    if (!userId) return res.status(400).json({ error: "User ID required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (method === "email") {
+      // Email-based 2FA setup
+      if (!user.email) {
+        return res.status(400).json({ error: "Email address required for email-based 2FA" });
+      }
+
+      // Generate 6-digit code
+      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Save code temporarily
+      await storage.updateUser(userId, { 
+        twoFactorEmailCode: emailCode,
+        twoFactorEmailCodeExpiry: codeExpiry,
+        twoFactorMethod: "email"
+      });
+
+      // Send email with code
+      const emailSent = await sendEmail({
+        to: user.email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject: "Your Two-Factor Authentication Code",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #9532b8;">Glo Head Spa</h1>
+              <h2 style="color: #333;">Two-Factor Authentication Setup</h2>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Hello ${user.firstName || user.username},
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              You're setting up two-factor authentication for your Glo Head Spa account. 
+              Use the code below to complete the setup:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
+                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
+              </div>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              This code will expire in 10 minutes for security reasons.
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              If you didn't request this setup, please ignore this email and contact support immediately.
+            </p>
+            
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This email was sent from your Glo Head Spa salon management system.
+            </p>
+          </div>
+        `,
+        text: `
+Hello ${user.firstName || user.username},
+
+You're setting up two-factor authentication for your Glo Head Spa account.
+
+Your verification code is: ${emailCode}
+
+This code will expire in 10 minutes for security reasons.
+
+If you didn't request this setup, please ignore this email and contact support immediately.
+
+- Glo Head Spa Team
+        `
+      });
+
+      if (emailSent) {
+        res.json({ 
+          method: "email", 
+          message: "Verification code sent to your email",
+          email: user.email 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to send verification email" });
+      }
+    } else {
+      // Authenticator app setup (existing logic)
+      const secret = speakeasy.generateSecret({ name: `Glo Head Spa (${user.email})` });
+      await storage.updateUser(userId, { 
+        twoFactorSecret: secret.base32,
+        twoFactorMethod: "authenticator"
+      });
+      res.json({ 
+        method: "authenticator",
+        secret: secret.base32, 
+        qrCodeUrl: secret.otpauth_url 
+      });
+    }
+  });
+
+  // 2. Verify 2FA: verify code and enable 2FA
+  app.post("/api/2fa/verify", async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.twoFactorMethod === "email") {
+      // Email-based verification
+      if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
+        return res.status(404).json({ error: "Email verification code not found or expired" });
+      }
+
+      // Check if code is expired
+      if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
+        return res.status(401).json({ error: "Verification code has expired" });
+      }
+
+      // Verify email code
+      if (user.twoFactorEmailCode !== token) {
+        return res.status(401).json({ error: "Invalid verification code" });
+      }
+
+      // Enable 2FA and clear temporary code
+      await storage.updateUser(userId, { 
+        twoFactorEnabled: true,
+        twoFactorEmailCode: null,
+        twoFactorEmailCodeExpiry: null
+      });
+      res.json({ success: true });
+    } else {
+      // Authenticator app verification (existing logic)
+      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
+      
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: "base32",
+        token,
+        window: 1
+      });
+      if (!verified) return res.status(401).json({ error: "Invalid token" });
+      await storage.updateUser(userId, { twoFactorEnabled: true });
+      res.json({ success: true });
+    }
+  });
+
+  // 3. Disable 2FA: verify code and disable
+  app.post("/api/2fa/disable", async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.twoFactorMethod === "email") {
+      // For email 2FA, we need to send a new code for disabling
+      if (!user.email) {
+        return res.status(400).json({ error: "Email address required for email-based 2FA" });
+      }
+
+      // Generate 6-digit code for disabling
+      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Save code temporarily
+      await storage.updateUser(userId, { 
+        twoFactorEmailCode: emailCode,
+        twoFactorEmailCodeExpiry: codeExpiry
+      });
+
+      // Send email with code
+      const emailSent = await sendEmail({
+        to: user.email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject: "Disable Two-Factor Authentication",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #9532b8;">Glo Head Spa</h1>
+              <h2 style="color: #333;">Disable Two-Factor Authentication</h2>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Hello ${user.firstName || user.username},
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              You're attempting to disable two-factor authentication for your Glo Head Spa account. 
+              Use the code below to complete this action:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
+                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
+              </div>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              This code will expire in 10 minutes for security reasons.
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              If you didn't request to disable 2FA, please ignore this email and contact support immediately.
+            </p>
+            
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This email was sent from your Glo Head Spa salon management system.
+            </p>
+          </div>
+        `,
+        text: `
+Hello ${user.firstName || user.username},
+
+You're attempting to disable two-factor authentication for your Glo Head Spa account.
+
+Your verification code is: ${emailCode}
+
+This code will expire in 10 minutes for security reasons.
+
+If you didn't request to disable 2FA, please ignore this email and contact support immediately.
+
+- Glo Head Spa Team
+        `
+      });
+
+      if (emailSent) {
+        res.json({ 
+          method: "email", 
+          message: "Verification code sent to your email",
+          email: user.email 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to send verification email" });
+      }
+    } else {
+      // Authenticator app verification (existing logic)
+      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
+      
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: "base32",
+        token,
+        window: 1
+      });
+      if (!verified) return res.status(401).json({ error: "Invalid token" });
+      await storage.updateUser(userId, { 
+        twoFactorEnabled: false, 
+        twoFactorSecret: null,
+        twoFactorMethod: null
+      });
+      res.json({ success: true });
+    }
+  });
+
+  // 4. Verify email 2FA disable
+  app.post("/api/2fa/disable-email", async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.twoFactorMethod !== "email") {
+      return res.status(400).json({ error: "User is not using email-based 2FA" });
+    }
+
+    // Check if code is expired
+    if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
+      return res.status(404).json({ error: "Email verification code not found or expired" });
+    }
+
+    if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
+      return res.status(401).json({ error: "Verification code has expired" });
+    }
+
+    // Verify email code
+    if (user.twoFactorEmailCode !== token) {
+      return res.status(401).json({ error: "Invalid verification code" });
+    }
+
+    // Disable 2FA and clear all 2FA data
+    await storage.updateUser(userId, { 
+      twoFactorEnabled: false,
+      twoFactorEmailCode: null,
+      twoFactorEmailCodeExpiry: null,
+      twoFactorMethod: null
+    });
+    res.json({ success: true });
+  });
+
+  // 5. Serve QR code image
+  app.get("/api/2fa/qr-code", async (req, res) => {
+    const { qrCodeUrl } = req.query;
+    if (!qrCodeUrl) return res.status(400).json({ error: "qrCodeUrl required" });
+    try {
+      const qr = await QRCode.toDataURL(qrCodeUrl as string);
+      const img = Buffer.from(qr.split(",")[1], "base64");
+      res.writeHead(200, { "Content-Type": "image/png" });
+      res.end(img);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to generate QR code" });
+    }
+  });
+
+  // 6. Login 2FA: verify code at login
+  app.post("/api/login/2fa", async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user || !user.twoFactorEnabled) return res.status(404).json({ error: "2FA not enabled" });
+
+    if (user.twoFactorMethod === "email") {
+      // For email 2FA login, we need to send a new code
+      if (!user.email) {
+        return res.status(400).json({ error: "Email address required for email-based 2FA" });
+      }
+
+      // Generate 6-digit code for login
+      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      // Save code temporarily
+      await storage.updateUser(userId, { 
+        twoFactorEmailCode: emailCode,
+        twoFactorEmailCodeExpiry: codeExpiry
+      });
+
+      // Send email with code
+      const emailSent = await sendEmail({
+        to: user.email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject: "Your Login Verification Code",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #9532b8;">Glo Head Spa</h1>
+              <h2 style="color: #333;">Login Verification</h2>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              Hello ${user.firstName || user.username},
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              You're logging into your Glo Head Spa account. Use the code below to complete your login:
+            </p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
+                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
+              </div>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              This code will expire in 10 minutes for security reasons.
+            </p>
+            
+            <p style="color: #666; line-height: 1.6;">
+              If you didn't attempt to log in, please ignore this email and contact support immediately.
+            </p>
+            
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This email was sent from your Glo Head Spa salon management system.
+            </p>
+          </div>
+        `,
+        text: `
+Hello ${user.firstName || user.username},
+
+You're logging into your Glo Head Spa account.
+
+Your verification code is: ${emailCode}
+
+This code will expire in 10 minutes for security reasons.
+
+If you didn't attempt to log in, please ignore this email and contact support immediately.
+
+- Glo Head Spa Team
+        `
+      });
+
+      if (emailSent) {
+        res.json({ 
+          method: "email", 
+          message: "Verification code sent to your email",
+          email: user.email 
+        });
+      } else {
+        res.status(500).json({ error: "Failed to send verification email" });
+      }
+    } else {
+      // Authenticator app verification (existing logic)
+      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
+      
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorSecret,
+        encoding: "base32",
+        token,
+        window: 1
+      });
+      if (!verified) return res.status(401).json({ error: "Invalid token" });
+      // Remove sensitive fields
+      const { password, twoFactorSecret, ...userSafe } = user;
+      res.json(userSafe);
+    }
+  });
+
+  // 7. Verify email 2FA login
+  app.post("/api/login/2fa-email", async (req, res) => {
+    const { userId, token } = req.body;
+    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
+    
+    const user = await storage.getUser(userId);
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.twoFactorMethod !== "email") {
+      return res.status(400).json({ error: "User is not using email-based 2FA" });
+    }
+
+    // Check if code is expired
+    if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
+      return res.status(404).json({ error: "Email verification code not found or expired" });
+    }
+
+    if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
+      return res.status(401).json({ error: "Verification code has expired" });
+    }
+
+    // Verify email code
+    if (user.twoFactorEmailCode !== token) {
+      return res.status(401).json({ error: "Invalid verification code" });
+    }
+
+    // Clear temporary code and return user data
+    await storage.updateUser(userId, { 
+      twoFactorEmailCode: null,
+      twoFactorEmailCodeExpiry: null
+    });
+    
+    // Remove sensitive fields
+    const { password, twoFactorSecret, twoFactorEmailCode, twoFactorEmailCodeExpiry, ...userSafe } = user;
+    res.json(userSafe);
+  });
 
   const httpServer = createServer(app);
 

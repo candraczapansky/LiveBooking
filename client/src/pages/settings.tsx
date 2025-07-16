@@ -35,7 +35,10 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import timeZones from "@/lib/timezones"; // We'll add a list of IANA timezones
+
 import { useQuery } from "@tanstack/react-query";
+import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
+import TwoFactorDisableModal from "@/components/TwoFactorDisableModal";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -50,7 +53,7 @@ type PasswordChangeForm = z.infer<typeof passwordChangeSchema>;
 
 export default function Settings() {
   const { toast } = useToast();
-  const { user, updateUser } = useContext(AuthContext);
+  const { user, updateUser, colorPreferencesApplied } = useContext(AuthContext);
 
   // Theme states
   const [darkMode, setDarkMode] = useState(() => {
@@ -92,6 +95,45 @@ export default function Settings() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load profile picture from user data or localStorage on component mount
+  useEffect(() => {
+    console.log('Settings page - Loading profile picture...');
+    console.log('User from context:', user);
+    console.log('User profile picture from context:', user?.profilePicture);
+    
+    // Prioritize database profile picture from user context
+    if (user && user.profilePicture) {
+      console.log('Using profile picture from user context');
+      setProfilePicture(user.profilePicture);
+      // Also sync to localStorage as backup
+      localStorage.setItem('profilePicture', user.profilePicture);
+    } else {
+      // Fallback to localStorage if no database profile picture
+      const savedPicture = localStorage.getItem('profilePicture');
+      console.log('Profile picture from localStorage:', savedPicture ? 'Found' : 'Not found');
+      if (savedPicture) {
+        console.log('Using profile picture from localStorage');
+        setProfilePicture(savedPicture);
+      }
+    }
+  }, [user]);
+
+  // Listen for user data updates (includes profile picture updates)
+  useEffect(() => {
+    const handleUserDataUpdate = (event: CustomEvent) => {
+      console.log('Settings page received user data update:', event.detail);
+      if (event.detail && event.detail.profilePicture) {
+        setProfilePicture(event.detail.profilePicture);
+        localStorage.setItem('profilePicture', event.detail.profilePicture);
+      }
+    };
+
+    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    return () => {
+      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    };
+  }, []);
 
   // Notification states
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -166,6 +208,12 @@ export default function Settings() {
 
   // Effects
   useEffect(() => {
+    // Only load color preferences if they haven't been applied globally yet
+    if (colorPreferencesApplied) {
+      console.log('Color preferences already applied globally, skipping local load');
+      return;
+    }
+    
     // Load color preferences from database when user is available
     const loadUserColorPreferences = async () => {
       if (user?.id) {
@@ -237,7 +285,7 @@ export default function Settings() {
     };
     
     loadUserColorPreferences();
-  }, [user?.id]); // Re-run when user ID changes
+  }, [user?.id, colorPreferencesApplied]); // Re-run when user ID or color preferences applied status changes
 
   useEffect(() => {
     // Apply dark mode changes
@@ -504,7 +552,9 @@ export default function Settings() {
 
   // Profile picture upload handler
   const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('=== PROFILE PICTURE CHANGE HANDLER CALLED ===');
     const file = event.target.files?.[0];
+    console.log('File selected:', file);
     if (file) {
       if (!file.type.startsWith('image/')) {
         console.error("Invalid file type: Please select an image file.");
@@ -517,7 +567,11 @@ export default function Settings() {
       const reader = new FileReader();
       reader.onload = async (e) => {
         const base64String = e.target?.result as string;
+        console.log('Base64 string generated, length:', base64String.length);
+        console.log('Setting profile picture state...');
         setProfilePicture(base64String);
+        console.log('Profile picture state set, now saving to database...');
+        
         // Save to database
         if (user?.id) {
           try {
@@ -528,17 +582,53 @@ export default function Settings() {
             });
             if (response.ok) {
               const updatedUser = await response.json();
+              console.log('Database update successful, updated user:', updatedUser);
               localStorage.setItem('user', JSON.stringify(updatedUser));
               localStorage.setItem('profilePicture', base64String);
-              if (updateUser) updateUser({ profilePicture: base64String });
+              if (updateUser) {
+                console.log('Updating user context...');
+                updateUser({ profilePicture: base64String });
+              }
+              console.log('Dispatching userDataUpdated event...');
               window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: updatedUser }));
               console.log("Photo updated: Your profile photo has been changed successfully.");
             } else {
-              console.error("Upload failed: Failed to save profile picture.");
+              console.error("Upload failed: Failed to save profile picture to database.");
+              // Fallback: save to localStorage only
+              console.log("Saving to localStorage as fallback...");
+              localStorage.setItem('profilePicture', base64String);
+              if (updateUser) {
+                updateUser({ profilePicture: base64String });
+              }
+              window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+                detail: { ...user, profilePicture: base64String } 
+              }));
+              console.log("Photo updated locally: Your profile photo has been saved to local storage.");
             }
           } catch (error) {
             console.error("Upload failed: Failed to save profile picture.");
+            // Fallback: save to localStorage only
+            console.log("Saving to localStorage as fallback due to error...");
+            localStorage.setItem('profilePicture', base64String);
+            if (updateUser) {
+              updateUser({ profilePicture: base64String });
+            }
+            window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+              detail: { ...user, profilePicture: base64String } 
+            }));
+            console.log("Photo updated locally: Your profile photo has been saved to local storage.");
           }
+        } else {
+          // No user ID available, save to localStorage only
+          console.log("No user ID available, saving to localStorage only...");
+          localStorage.setItem('profilePicture', base64String);
+          if (updateUser) {
+            updateUser({ profilePicture: base64String });
+          }
+          window.dispatchEvent(new CustomEvent('userDataUpdated', { 
+            detail: { ...user, profilePicture: base64String } 
+          }));
+          console.log("Photo updated locally: Your profile photo has been saved to local storage.");
         }
       };
       reader.onerror = () => {
@@ -547,6 +637,13 @@ export default function Settings() {
       reader.readAsDataURL(file);
     }
   };
+
+  // 2FA modal states
+  const [show2faSetup, setShow2faSetup] = useState(false);
+  const [show2faDisable, setShow2faDisable] = useState(false);
+
+  // 2FA status helpers
+  const twoFactorEnabled = user?.twoFactorEnabled;
 
   return (
     <Layout>
@@ -573,11 +670,33 @@ export default function Settings() {
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-4">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={profilePicture || user?.profilePicture || "/placeholder-avatar.jpg"} />
+                  <AvatarImage 
+                    src={profilePicture || user?.profilePicture || "/placeholder-avatar.svg"}
+                    onLoad={() => console.log('Profile image loaded successfully')}
+                    onError={(e) => console.error('Profile image failed to load:', e)}
+                  />
                   <AvatarFallback className="text-lg">
                     {user?.firstName?.[0]}{user?.lastName?.[0]}
                   </AvatarFallback>
                 </Avatar>
+                <div className="text-xs text-gray-500">
+                  <div>State: {profilePicture ? 'Set' : 'Not set'}</div>
+                  <div>User: {user?.profilePicture ? 'Has' : 'None'}</div>
+                  <div>LocalStorage: {localStorage.getItem('profilePicture') ? 'Has' : 'None'}</div>
+                  <button 
+                    onClick={() => {
+                      console.log('Current profile picture state:', profilePicture);
+                      console.log('User profile picture:', user?.profilePicture);
+                      console.log('LocalStorage profile picture:', localStorage.getItem('profilePicture'));
+                      if (profilePicture) {
+                        console.log('Profile picture starts with:', profilePicture.substring(0, 50));
+                      }
+                    }}
+                    className="text-blue-500 underline"
+                  >
+                    Debug
+                  </button>
+                </div>
                 <input
                   type="file"
                   accept="image/*"
@@ -585,10 +704,49 @@ export default function Settings() {
                   style={{ display: "none" }}
                   onChange={handleProfilePictureChange}
                 />
-                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-                  <Camera className="h-4 w-4 mr-2" />
-                  Change Photo
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    Change Photo
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      console.log('Clearing profile picture cache...');
+                      localStorage.removeItem('profilePicture');
+                      setProfilePicture(null);
+                      console.log('Profile picture cache cleared');
+                    }}
+                  >
+                    Clear Cache
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={async () => {
+                      console.log('Refreshing profile picture from database...');
+                      if (user?.id) {
+                        try {
+                          const response = await fetch(`/api/users/${user.id}`);
+                          if (response.ok) {
+                            const userData = await response.json();
+                            console.log('Fresh user data:', userData);
+                            if (userData.profilePicture) {
+                              setProfilePicture(userData.profilePicture);
+                              localStorage.setItem('profilePicture', userData.profilePicture);
+                              console.log('Profile picture refreshed from database');
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Failed to refresh profile picture:', error);
+                        }
+                      }
+                    }}
+                  >
+                    Refresh
+                  </Button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
@@ -1071,12 +1229,28 @@ export default function Settings() {
                 <div className="space-y-0.5">
                   <Label className="text-base">Two-Factor Authentication</Label>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Add an extra layer of security to your account
+                    {twoFactorEnabled
+                      ? "Two-factor authentication is enabled for your account."
+                      : "Add an extra layer of security to your account."}
                   </p>
                 </div>
-                <Button variant="outline" className="h-10 min-w-[80px]">
-                  Enable
-                </Button>
+                {twoFactorEnabled ? (
+                  <Button
+                    variant="destructive"
+                    className="h-10 min-w-[120px]"
+                    onClick={() => setShow2faDisable(true)}
+                  >
+                    Disable 2FA
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="h-10 min-w-[120px]"
+                    onClick={() => setShow2faSetup(true)}
+                  >
+                    Enable 2FA
+                  </Button>
+                )}
               </div>
 
               <div className="flex items-center justify-between">
@@ -1143,6 +1317,36 @@ export default function Settings() {
 
         </div>
       </div>
+      {/* 2FA Modals */}
+      <TwoFactorSetupModal
+        isOpen={show2faSetup}
+        onClose={() => setShow2faSetup(false)}
+        userId={user?.id}
+        onSuccess={async () => {
+          setShow2faSetup(false);
+          // Refetch user or update context
+          const res = await fetch(`/api/users`);
+          const users = await res.json();
+          const updated = users.find((u: any) => u.id === user.id);
+          if (updated) updateUser(updated);
+          toast({ title: "2FA enabled!", description: "Two-factor authentication is now active." });
+        }}
+      />
+      <TwoFactorDisableModal
+        isOpen={show2faDisable}
+        onClose={() => setShow2faDisable(false)}
+        userId={user?.id}
+        twoFactorMethod={user?.twoFactorMethod}
+        onSuccess={async () => {
+          setShow2faDisable(false);
+          // Refetch user or update context
+          const res = await fetch(`/api/users`);
+          const users = await res.json();
+          const updated = users.find((u: any) => u.id === user.id);
+          if (updated) updateUser(updated);
+          toast({ title: "2FA disabled", description: "Two-factor authentication has been turned off." });
+        }}
+      />
     </Layout>
   );
 }
