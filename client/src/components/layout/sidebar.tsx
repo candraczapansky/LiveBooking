@@ -119,6 +119,18 @@ const Sidebar = () => {
     };
     
     loadUserColor();
+    
+    // Listen for color preference updates
+    const handleColorUpdate = () => {
+      console.log('Color preferences updated, reloading colors');
+      loadUserColor();
+    };
+    
+    window.addEventListener('colorPreferencesUpdated', handleColorUpdate);
+    
+    return () => {
+      window.removeEventListener('colorPreferencesUpdated', handleColorUpdate);
+    };
   }, [user?.id]);
 
   // Also update color when primaryColor state changes
@@ -179,6 +191,7 @@ const Sidebar = () => {
                 onClick={toggleSidebar}
               >
                 <Menu 
+                  ref={hamburgerRef}
                   data-hamburger="true"
                   className="h-5 w-5" 
                   style={{ color: primaryColor }}

@@ -18,6 +18,11 @@ export interface User {
   twoFactorMethod?: string;
   twoFactorEmailCode?: string | null;
   twoFactorEmailCodeExpiry?: string | null;
+  // Color preference fields
+  primaryColor?: string;
+  secondaryColor?: string;
+  textColor?: string;
+  textColorSecondary?: string;
 }
 
 interface AuthContextType {
@@ -70,65 +75,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadAndApplyColorPreferences = async (userId: number) => {
     try {
       console.log(`Loading color preferences for user ${userId}`);
+      
+      // Fetch color preferences from the dedicated API endpoint
       const response = await fetch(`/api/users/${userId}/color-preferences`);
       
       if (!response.ok) {
         if (response.status === 404) {
-          console.log('No saved color preferences found');
+          console.log('No saved color preferences found, using defaults');
+          // Apply default colors if no preferences exist
+          applyThemeColors('#8b5cf6', false);
+          applyTextColors('#111827', '#6b7280');
           setColorPreferencesApplied(true);
           return;
         }
         throw new Error(`Failed to load color preferences: ${response.status} ${response.statusText}`);
       }
       
-      const responseText = await response.text();
-      console.log('Raw response text:', responseText);
+      const colorPrefs = await response.json();
+      console.log('Loaded color preferences from API:', colorPrefs);
       
-      // Handle empty response (no preferences exist)
-      if (responseText.trim() === '') {
-        console.log('No color preferences found for this user');
-        setColorPreferencesApplied(true);
-        return;
-      }
-      
-      let colorPrefs;
-      try {
-        colorPrefs = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('Failed to parse color preferences JSON:', parseError);
-        console.error('Response text was:', responseText);
-        setColorPreferencesApplied(true);
-        return;
-      }
-      
-      console.log('Loaded color preferences:', colorPrefs);
-      
-      // Check if we have valid color preferences
       if (!colorPrefs || (typeof colorPrefs === 'object' && Object.keys(colorPrefs).length === 0)) {
-        console.log('No valid color preferences found in response, applying default colors');
-        // Apply a sensible default color scheme instead of letting other components override with hot pink
-        applyThemeColors('#8b5cf6', false); // Default purple color
-        applyTextColors('#111827', '#6b7280'); // Default text colors
+        console.log('No valid color preferences found, using defaults');
+        // Apply default colors if preferences are empty
+        applyThemeColors('#8b5cf6', false);
+        applyTextColors('#111827', '#6b7280');
         setColorPreferencesApplied(true);
         return;
       }
       
-      // Apply the color preferences to the DOM
+      // Apply the color preferences to the DOM with higher priority
       if (colorPrefs.primaryColor) {
+        console.log('Applying primary color:', colorPrefs.primaryColor);
         applyThemeColors(colorPrefs.primaryColor, colorPrefs.isDarkMode || false);
+      } else {
+        console.log('No primary color found, using default');
+        applyThemeColors('#8b5cf6', false);
       }
       
       if (colorPrefs.primaryTextColor || colorPrefs.secondaryTextColor) {
+        console.log('Applying text colors:', colorPrefs.primaryTextColor, colorPrefs.secondaryTextColor);
         applyTextColors(
           colorPrefs.primaryTextColor || '#111827',
           colorPrefs.secondaryTextColor || '#6b7280'
         );
+      } else {
+        console.log('No text colors found, using defaults');
+        applyTextColors('#111827', '#6b7280');
       }
       
       setColorPreferencesApplied(true);
       console.log('Color preferences applied globally');
+      
+      // Dispatch event to notify components of color update
+      window.dispatchEvent(new CustomEvent('colorPreferencesUpdated'));
+      
+      // Apply colors again after a short delay to ensure they stick
+      setTimeout(() => {
+        console.log('Re-applying colors to ensure they stick');
+        if (colorPrefs.primaryColor) {
+          applyThemeColors(colorPrefs.primaryColor, colorPrefs.isDarkMode || false);
+        }
+        if (colorPrefs.primaryTextColor || colorPrefs.secondaryTextColor) {
+          applyTextColors(
+            colorPrefs.primaryTextColor || '#111827',
+            colorPrefs.secondaryTextColor || '#6b7280'
+          );
+        }
+      }, 500);
+      
     } catch (error) {
       console.error('Failed to load color preferences:', error);
+      // Apply default colors on error
+      applyThemeColors('#8b5cf6', false);
+      applyTextColors('#111827', '#6b7280');
       setColorPreferencesApplied(true);
     }
   };
@@ -162,22 +181,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const hslColor = hexToHsl(primaryColor);
+    console.log('Setting primary color HSL:', hslColor);
     
-    // Apply CSS custom properties
-    root.style.setProperty('--primary', hslColor);
-    root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%');
-    
-    // Apply transparent button hover colors using the primary color with opacity
-    root.style.setProperty('--button-primary-hover', hslColor);
-    root.style.setProperty('--button-primary-hover-opacity', '0.1');
-    root.style.setProperty('--button-outline-hover', hslColor);
-    root.style.setProperty('--button-outline-hover-opacity', '0.1');
-    
-    // Update other color properties to match
-    root.style.setProperty('--dropdown-selected', hslColor);
-    root.style.setProperty('--accent', hslColor);
-    root.style.setProperty('--sidebar-primary', hslColor);
-    root.style.setProperty('--sidebar-accent-foreground', hslColor);
+    // Apply CSS custom properties with priority
+    root.style.setProperty('--primary', hslColor, 'important');
+    root.style.setProperty('--primary-foreground', isDark ? '210 40% 98%' : '222.2 84% 4.9%', 'important');
+    root.style.setProperty('--accent', hslColor, 'important');
+    root.style.setProperty('--ring', hslColor, 'important');
     
     // Apply dark/light mode styling
     if (isDark) {
@@ -185,6 +195,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       root.classList.remove('dark');
     }
+    
+    console.log('Theme colors applied successfully');
   };
 
   // Apply text colors function
@@ -218,9 +230,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const primaryHsl = hexToHsl(primaryTextColor);
     const secondaryHsl = hexToHsl(secondaryTextColor);
     
-    root.style.setProperty('--text-primary', primaryHsl);
-    root.style.setProperty('--text-secondary', secondaryHsl);
+    console.log('Setting text colors - Primary HSL:', primaryHsl, 'Secondary HSL:', secondaryHsl);
+    
+    root.style.setProperty('--text-primary', primaryHsl, 'important');
+    root.style.setProperty('--text-secondary', secondaryHsl, 'important');
+    
+    console.log('Text colors applied successfully');
   };
+
+  // Function to force refresh colors
+  const forceRefreshColors = () => {
+    if (user) {
+      console.log('Force refreshing colors for user:', user.id);
+      loadAndApplyColorPreferences(user.id);
+    }
+  };
+
+  // Add global event listeners for color refresh
+  useEffect(() => {
+    // Listen for color changes in settings
+    const handleColorChange = (event: CustomEvent) => {
+      if (event.detail && event.detail.type === 'colorChange') {
+        console.log('Color change detected:', event.detail);
+        const { primaryColor, textColor, textColorSecondary } = event.detail;
+        
+        if (primaryColor) {
+          console.log('Applying primary color change:', primaryColor);
+          applyThemeColors(primaryColor, false);
+        }
+        
+        if (textColor || textColorSecondary) {
+          console.log('Applying text color change:', textColor, textColorSecondary);
+          applyTextColors(
+            textColor || '#111827',
+            textColorSecondary || '#6b7280'
+          );
+        }
+      }
+    };
+    
+    // Add global function for manual color refresh (for debugging)
+    (window as any).refreshColors = forceRefreshColors;
+    (window as any).getCurrentColors = () => {
+      const root = document.documentElement;
+      return {
+        primary: root.style.getPropertyValue('--primary'),
+        textPrimary: root.style.getPropertyValue('--text-primary'),
+        textSecondary: root.style.getPropertyValue('--text-secondary'),
+        user: user
+      };
+    };
+
+    window.addEventListener('colorChange', handleColorChange as EventListener);
+
+    return () => {
+      window.removeEventListener('colorChange', handleColorChange as EventListener);
+      delete (window as any).refreshColors;
+      delete (window as any).getCurrentColors;
+    };
+  }, [user]);
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -248,8 +316,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Dispatch event to notify all components of the fresh user data
             window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: freshUserData }));
             
-            // Load and apply color preferences immediately after login
-            loadAndApplyColorPreferences(freshUserData.id);
+            // Apply color preferences immediately after setting user data
+            setTimeout(() => {
+              console.log('Applying color preferences immediately after login');
+              loadAndApplyColorPreferences(freshUserData.id);
+            }, 200);
           } else {
             // Fallback to localStorage data if API fails
             console.log('API failed, falling back to localStorage data');
@@ -260,8 +331,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // Dispatch event to notify all components of the fallback user data
             window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: userData }));
             
-            // Load and apply color preferences immediately after login
-            loadAndApplyColorPreferences(userData.id);
+            // Apply color preferences immediately after setting user data
+            setTimeout(() => {
+              console.log('Applying color preferences immediately after login (fallback)');
+              loadAndApplyColorPreferences(userData.id);
+            }, 200);
           }
         });
       } catch (error) {
@@ -273,6 +347,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
   }, []);
+
+  // Apply color preferences whenever user data changes
+  useEffect(() => {
+    if (user && !colorPreferencesApplied) {
+      console.log('User data changed, applying color preferences');
+      // Add a small delay to ensure DOM is ready and default CSS is applied
+      setTimeout(() => {
+        loadAndApplyColorPreferences(user.id);
+      }, 100);
+    }
+  }, [user, colorPreferencesApplied]);
 
   const login = (userData: User) => {
     console.log("Login called with:", userData);
@@ -289,8 +374,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Dispatch event to notify all components of the login
     window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: userData }));
     
-    // Load and apply color preferences after login
+    // Apply color preferences immediately after login with multiple attempts
+    console.log('Applying color preferences on login');
+    
+    // Immediate application
     loadAndApplyColorPreferences(userData.id);
+    
+    // Apply again after a short delay
+    setTimeout(() => {
+      console.log('Re-applying colors after login delay');
+      loadAndApplyColorPreferences(userData.id);
+    }, 100);
   };
 
   const logout = () => {
@@ -333,6 +427,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Also update profilePicture in localStorage for backward compatibility
       if (newUser.profilePicture) {
         localStorage.setItem('profilePicture', newUser.profilePicture);
+      }
+      
+      // Apply color preferences if they were updated
+      if (updatedUserData.primaryColor || updatedUserData.textColor || updatedUserData.textColorSecondary) {
+        console.log('Color preferences updated, applying new colors');
+        if (updatedUserData.primaryColor) {
+          applyThemeColors(updatedUserData.primaryColor, false);
+        }
+        if (updatedUserData.textColor || updatedUserData.textColorSecondary) {
+          applyTextColors(
+            updatedUserData.textColor || newUser.textColor || '#111827',
+            updatedUserData.textColorSecondary || newUser.textColorSecondary || '#6b7280'
+          );
+        }
+      }
+      
+      // If color preferences were updated, also reload them from the API to ensure consistency
+      if (updatedUserData.primaryColor || updatedUserData.textColor || updatedUserData.textColorSecondary) {
+        console.log('Color preferences updated, reloading from API');
+        setTimeout(() => {
+          loadAndApplyColorPreferences(newUser.id);
+        }, 100);
       }
       
       // Dispatch event to notify all components of the update

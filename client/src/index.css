@@ -188,6 +188,12 @@ button svg:not([data-hamburger]) {
   fill: currentColor !important;
 }
 
+/* Force hamburger menu to use primary color */
+[data-hamburger="true"] {
+  color: hsl(var(--primary)) !important;
+  fill: hsl(var(--primary)) !important;
+}
+
 .force-border-normal:focus,
 input.force-border-normal:focus,
 input.force-border-normal:focus:invalid,
@@ -1764,4 +1770,44 @@ div[style*="absolute" i][style*="bottom" i][style*="white" i] {
   background: none !important;
   background-color: transparent !important;
   border: none !important;
+}
+
+/* Force custom colors to override defaults with maximum specificity */
+html[style*="--primary"] {
+  --primary: var(--primary) !important;
+  --accent: var(--primary) !important;
+  --ring: var(--primary) !important;
+  --chart-1: var(--primary) !important;
+  --sidebar-primary: var(--primary) !important;
+  --sidebar-accent-foreground: var(--primary) !important;
+  --sidebar-ring: var(--primary) !important;
+  --dropdown-selected: var(--primary) !important;
+}
+
+/* Force text colors to override defaults */
+html[style*="--text-primary"] {
+  --text-primary: var(--text-primary) !important;
+  --text-secondary: var(--text-secondary) !important;
+}
+
+/* Only override specific purple/pink colors that are hardcoded, not all colors */
+html[style*="--primary"] [class*="text-purple-600"],
+html[style*="--primary"] [class*="text-purple-500"],
+html[style*="--primary"] [class*="bg-purple-600"],
+html[style*="--primary"] [class*="bg-purple-500"],
+html[style*="--primary"] [class*="text-pink-600"],
+html[style*="--primary"] [class*="text-pink-500"],
+html[style*="--primary"] [class*="bg-pink-600"],
+html[style*="--primary"] [class*="bg-pink-500"] {
+  color: hsl(var(--primary)) !important;
+  background-color: hsl(var(--primary)) !important;
+}
+
+/* Only override muted text colors, not all text */
+html[style*="--text-primary"] .text-muted-foreground,
+html[style*="--text-primary"] .text-gray-500,
+html[style*="--text-primary"] .text-gray-600,
+html[style*="--text-primary"] .text-slate-500,
+html[style*="--text-primary"] .text-slate-600 {
+  color: hsl(var(--text-secondary)) !important;
 }

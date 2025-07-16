@@ -682,22 +682,21 @@ If you didn't request this password reset, please ignore this email and your pas
     }
     
     try {
-      // Check if preferences exist for this user
-      const existingPreferences = await storage.getUserColorPreferences(userId);
+      console.log(`Saving color preferences for user ${userId}:`, req.body);
       
-      let updatedPreferences;
-      if (existingPreferences) {
-        // Update existing preferences
-        updatedPreferences = await storage.updateUserColorPreferences(userId, req.body);
-      } else {
-        // Create new preferences
-        updatedPreferences = await storage.createUserColorPreferences({
-          userId,
-          ...req.body
-        });
-      }
+      // Always delete ALL existing preferences first to ensure clean slate
+      const deleted = await storage.deleteUserColorPreferences(userId);
+      console.log(`Deleted existing color preferences for user ${userId}:`, deleted);
       
-      return res.status(200).json(updatedPreferences);
+      // Create new preferences with the provided data
+      const result = await storage.createUserColorPreferences({
+        userId,
+        ...req.body
+      });
+      
+      console.log(`Created new color preferences for user ${userId}:`, result);
+      
+      return res.status(200).json(result);
     } catch (error: any) {
       console.error('Error saving color preferences:', error);
       return res.status(500).json({ error: "Failed to save color preferences" });

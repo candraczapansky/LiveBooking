@@ -424,7 +424,7 @@ export const insertGiftCardTransactionSchema = createInsertSchema(giftCardTransa
 // User color preferences schema
 export const userColorPreferences = pgTable("user_color_preferences", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull().unique(),
   primaryColor: text("primary_color").notNull().default("#f4a4c0"), // HSL format
   primaryTextColor: text("primary_text_color").notNull().default("#000000"),
   secondaryTextColor: text("secondary_text_color").notNull().default("#6b7280"),

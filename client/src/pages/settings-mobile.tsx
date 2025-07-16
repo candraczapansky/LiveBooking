@@ -649,6 +649,9 @@ export default function SettingsMobile() {
     onSuccess: (data) => {
       console.log('Color preferences mutation success:', data);
       // Silently save to database - no toast needed for auto-save
+      
+      // Dispatch color preferences updated event
+      window.dispatchEvent(new CustomEvent('colorPreferencesUpdated'));
     },
     onError: (error) => {
       console.error('Failed to save color preferences:', error);

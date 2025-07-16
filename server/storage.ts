@@ -222,6 +222,7 @@ export interface IStorage {
   getUserColorPreferences(userId: number): Promise<UserColorPreferences | undefined>;
   createUserColorPreferences(preferences: InsertUserColorPreferences): Promise<UserColorPreferences>;
   updateUserColorPreferences(userId: number, preferences: Partial<InsertUserColorPreferences>): Promise<UserColorPreferences>;
+  deleteUserColorPreferences(userId: number): Promise<boolean>;
 
   // User filtering for campaigns
   getUsersByAudience(audience: string): Promise<User[]>;
@@ -2024,6 +2025,8 @@ export class DatabaseStorage implements IStorage {
   async getUserColorPreferences(userId: number): Promise<UserColorPreferences | undefined> {
     try {
       const result = await db.select().from(userColorPreferences).where(eq(userColorPreferences.userId, userId));
+      console.log(`Found ${result.length} color preference records for user ${userId}`);
+      console.log(result);
       return result[0];
     } catch (error) {
       console.error('Error getting user color preferences:', error);
@@ -2042,6 +2045,24 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userColorPreferences.userId, userId))
       .returning();
     return result[0];
+  }
+
+  async deleteUserColorPreferences(userId: number): Promise<boolean> {
+    try {
+      console.log(`Attempting to delete ALL color preferences for user ${userId}`);
+      
+      // Delete all records for this user
+      const result = await db.delete(userColorPreferences)
+        .where(eq(userColorPreferences.userId, userId));
+      
+      console.log(`Delete operation completed. Rows affected: ${result.rowCount}`);
+      
+      // Return true if any rows were deleted, false otherwise
+      return (result.rowCount ?? 0) > 0;
+    } catch (error) {
+      console.error('Error deleting user color preferences:', error);
+      return false;
+    }
   }
 
   // Notification operations
