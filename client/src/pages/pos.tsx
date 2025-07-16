@@ -47,6 +47,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useSidebar } from "@/contexts/SidebarContext";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -309,6 +311,9 @@ export default function PointOfSale() {
     isTaxable: true
   });
   const { toast } = useToast();
+  const { isOpen: sidebarOpen } = useSidebar();
+
+  useDocumentTitle("Point of Sale");
 
   const queryClient = useQueryClient();
 
@@ -617,7 +622,9 @@ export default function PointOfSale() {
         <SidebarController />
       </div>
       
-      <div className="flex-1 flex flex-col lg:ml-64">
+      <div className={`flex-1 flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 md:p-4 lg:p-6">

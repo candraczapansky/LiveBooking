@@ -310,7 +310,9 @@ const AppointmentsPage = () => {
         }
       `}</style>
       <SidebarController />
-      <div className={`flex flex-col ${sidebarOpen ? 'lg:ml-64' : ''} transition-all duration-300`}>
+      <div className={`flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         <Header />
         <main className="flex-1 p-6">
           <div className="max-w-7xl mx-auto flex gap-6 min-h-0" style={{height: 'calc(100vh - 48px)'}}>

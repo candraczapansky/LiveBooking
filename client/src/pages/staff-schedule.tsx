@@ -1,35 +1,24 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { SidebarController } from "@/components/layout/sidebar";
+import { useSidebar } from "@/contexts/SidebarContext";
+import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Calendar, Plus, Search, Filter, MoreHorizontal } from "lucide-react";
-import { Link, useLocation } from "wouter";
-import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Search, Filter, Calendar, MoreHorizontal } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffSchedulePage() {
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
-  const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [location, setLocation] = useLocation();
+  const { isOpen: sidebarOpen } = useSidebar();
 
   // Fetch staff for display
   const { data: staff = [], isLoading } = useQuery({
@@ -83,7 +72,9 @@ export default function StaffSchedulePage() {
         <SidebarController />
       </div>
       
-      <div className="lg:ml-64 min-h-screen flex flex-col">
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-x-hidden">

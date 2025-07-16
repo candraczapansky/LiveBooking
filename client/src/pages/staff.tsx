@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/use-document-title";
+import { SidebarController } from "@/components/layout/sidebar";
+import { useSidebar } from "@/contexts/SidebarContext";
+import Header from "@/components/layout/header";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
 import StaffForm from "@/components/staff/staff-form";
-import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import {
   Card,
@@ -63,19 +64,20 @@ const StaffPage = () => {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [staffToDelete, setStaffToDelete] = useState<StaffMember | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const { isOpen: sidebarOpen } = useSidebar();
 
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
+  // Remove the old sidebar state management since it's now handled by context
+  // useEffect(() => {
+  //   const checkSidebarState = () => {
+  //     const globalSidebarState = (window as any).sidebarIsOpen;
+  //     if (globalSidebarState !== undefined && globalSidebarState !== sidebarOpen) {
+  //       // Sidebar state is managed by the context now
+  //     }
+  //   };
 
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
+  //   const interval = setInterval(checkSidebarState, 100);
+  //   return () => clearInterval(interval);
+  // }, [sidebarOpen]);
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ['/api/staff'],
@@ -145,7 +147,9 @@ const StaffPage = () => {
         <SidebarController />
       </div>
       
-      <div className="lg:pl-64">
+      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         <Header />
         
         <main className="p-3 lg:p-6">
