@@ -63,9 +63,9 @@ interface AppointmentFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointmentId: number | null;
-  selectedDate?: Date;
-  selectedTime?: string;
   onAppointmentCreated?: (appointment: any) => void;
+  appointments: any[];
+  selectedDate?: Date;
 }
 
 const generateTimeSlots = () => {
@@ -116,7 +116,7 @@ const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => 
 
 
 
-const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated }: AppointmentFormProps) => {
+const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated, appointments }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const { toast } = useToast();
@@ -130,7 +130,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       serviceId: "",
       clientId: "",
       date: selectedDate || new Date(),
-      time: selectedTime || "10:00",
+      time: "10:00",
       notes: "",
     },
   });
@@ -159,12 +159,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     enabled: open,
   });
 
-  // Fetch existing active appointments to check for conflicts (excludes cancelled appointments)
-  const { data: existingAppointments = [] } = useQuery({
-    queryKey: ['/api/appointments/active'],
-    enabled: open,
-  });
-  
   // Get staff
   const { data: staff, isLoading: isLoadingStaff } = useQuery({
     queryKey: ['/api/staff'],
@@ -210,16 +204,22 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
 
   // Filter available time slots based on staff schedule and existing appointments
+  // getAvailableTimeSlots: Returns only time slots that are within the staff member's working hours and do not conflict with existing appointments (including buffer times). Shows no slots if staff is not available that day.
   const getAvailableTimeSlots = () => {
     if (!selectedStaffId || !selectedFormDate) {
-      return allTimeSlots; // Show all slots if no staff selected
+      return allTimeSlots;
     }
+
+    // Debug: Log the appointments prop, selectedStaffId, and selectedFormDate
+    console.log('[DEBUG] getAvailableTimeSlots called');
+    console.log('[DEBUG] appointments prop:', appointments);
+    console.log('[DEBUG] selectedStaffId:', selectedStaffId, 'typeof:', typeof selectedStaffId);
+    console.log('[DEBUG] selectedFormDate:', selectedFormDate, 'ISO:', selectedFormDate.toISOString());
 
     const dayName = getDayName(selectedFormDate);
     const currentDate = formatDateForComparison(selectedFormDate);
-    
-    // Find schedules for this staff member on this day
-    const staffSchedules = schedules.filter((schedule: any) => 
+
+    const staffSchedules = (schedules as any[]).filter((schedule: any) => 
       schedule.staffId === parseInt(selectedStaffId) && 
       schedule.dayOfWeek === dayName &&
       schedule.startDate <= currentDate &&
@@ -228,53 +228,68 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     );
 
     if (staffSchedules.length === 0) {
-      return []; // No schedule = no available slots
+      return [];
     }
 
-    // Filter time slots to only include those within scheduled hours and without conflicts
-    return allTimeSlots.filter(slot => {
+    // Only show slots that are within schedule and do not overlap with any existing appointment
+    const filteredSlots = allTimeSlots.filter(slot => {
       // Check if time is within staff schedule
       const isWithinSchedule = staffSchedules.some((schedule: any) => 
         isTimeInRange(slot.value, schedule.startTime, schedule.endTime)
       );
-      
       if (!isWithinSchedule) return false;
-      
-      // Check if there's no appointment conflict
+
       if (!selectedService) return true; // If no service selected, allow the slot
-      
-      // Create start and end times for the potential appointment
+
+      // Calculate the start and end time for this slot
       const [hours, minutes] = slot.value.split(':').map(Number);
       const appointmentStart = new Date(selectedFormDate);
       appointmentStart.setHours(hours, minutes, 0, 0);
-      
-      // Calculate appointment end time including buffer
       const totalDuration = selectedService.duration + 
                            (selectedService.bufferTimeBefore || 0) + 
                            (selectedService.bufferTimeAfter || 0);
       const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
-      
-      // Check for conflicts with existing appointments
-      const hasConflict = existingAppointments.some((appointment: any) => {
-        // Skip the current appointment if editing
-        if (appointmentId && appointment.id === appointmentId) {
+
+      // Get all existing appointments for this staff on this day, sorted by start time
+      const staffAppointments = (appointments as any[] || [])
+        .filter((appointment: any) => {
+          // Debug: Log staffId comparison
+          const match = appointment.staffId === parseInt(selectedStaffId);
+          if (!match) {
+            console.log('[DEBUG] Skipping appointment (staffId mismatch):', appointment.staffId, 'vs', selectedStaffId);
+          }
+          return match;
+        })
+        .filter((appointment: any) => {
+          const aptDate = new Date(appointment.startTime);
+          const match = aptDate.toDateString() === selectedFormDate.toDateString();
+          if (!match) {
+            console.log('[DEBUG] Skipping appointment (date mismatch):', aptDate.toDateString(), 'vs', selectedFormDate.toDateString());
+          }
+          return match;
+        })
+        .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    console.log('[DEBUG] staffAppointments for filtering:', staffAppointments);
+
+      // DEBUG LOGGING
+      console.log('Checking slot:', slot.label, 'for staff:', selectedStaffId, 'on', appointmentStart.toDateString());
+      console.log('Staff appointments for this day:', staffAppointments.map(a => ({start: a.startTime, end: a.endTime})));
+
+      // Check if this slot fits between existing appointments
+      for (let i = 0; i < staffAppointments.length; i++) {
+        const apt = staffAppointments[i];
+        if (appointmentId && apt.id === appointmentId) continue; // skip self when editing
+        const existingStart = new Date(apt.startTime);
+        const existingEnd = new Date(apt.endTime);
+        // If the new appointment overlaps with any existing one, exclude it
+        if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
+          console.log('Excluding slot', slot.label, 'because it overlaps with', existingStart.toLocaleTimeString(), '-', existingEnd.toLocaleTimeString());
           return false;
         }
-        
-        // Only check appointments for the same staff member
-        if (appointment.staffId !== parseInt(selectedStaffId)) {
-          return false;
-        }
-        
-        const existingStart = new Date(appointment.startTime);
-        const existingEnd = new Date(appointment.endTime);
-        
-        // Check if appointment times overlap
-        return (appointmentStart < existingEnd && appointmentEnd > existingStart);
-      });
-      
-      return !hasConflict;
+      }
+      return true;
     });
+    return filteredSlots;
   };
 
   const availableTimeSlots = getAvailableTimeSlots();
@@ -357,7 +372,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         serviceId: "",
         clientId: "",
         date: selectedDate || new Date(),
-        time: selectedTime || "10:00",
+        time: "10:00",
         notes: "",
       });
     } else if (!appointmentId) {
@@ -369,7 +384,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         serviceId: "",
         clientId: "",
         date: resetDate,
-        time: selectedTime || "10:00",
+        time: "10:00",
         notes: "",
       });
       // Force the date field to update and clear any validation errors
@@ -382,7 +397,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Just invalidate cache for existing appointments (form will be populated by appointment data)
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
-  }, [open, selectedDate, selectedTime, queryClient, appointmentId]);
+  }, [open, selectedDate, queryClient, appointmentId]);
 
   // Update time when selectedTime prop changes
   useEffect(() => {
@@ -466,8 +481,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
-        startTime: formatLocalDateTime(localDate),
-        endTime: formatLocalDateTime(endTime),
+        startTime: localDate.toISOString(),
+        endTime: endTime.toISOString(),
         status: "confirmed",
         notes: values.notes || null,
       };
@@ -575,8 +590,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
-        startTime: formatLocalDateTime(localDate),
-        endTime: formatLocalDateTime(endTime),
+        startTime: localDate.toISOString(),
+        endTime: endTime.toISOString(),
         status: "confirmed",
         notes: values.notes || null,
       };
@@ -915,36 +930,45 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
               <FormField
                 control={form.control}
                 name="time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Time</FormLabel>
-                    <FormControl>
-                      <Select 
-                        disabled={isLoading} 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                      >
+                render={({ field }) => {
+                  const staffSelected = !!selectedStaffId;
+                  const serviceSelected = !!selectedServiceId;
+                  const dateSelected = !!selectedFormDate;
+                  const canSelectTime = staffSelected && serviceSelected && dateSelected && availableTimeSlots.length > 0;
+                  let placeholder = "Select a time";
+                  if (!staffSelected) placeholder = "Select a staff member first";
+                  else if (!serviceSelected) placeholder = "Select a service first";
+                  else if (!dateSelected) placeholder = "Select a date first";
+                  else if (availableTimeSlots.length === 0) placeholder = "No available times";
+                  return (
+                    <FormItem>
+                      <FormLabel>Time</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!canSelectTime}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a time" />
+                          <SelectValue placeholder={placeholder} />
                         </SelectTrigger>
                         <SelectContent>
-                          {availableTimeSlots.length > 0 ? (
+                          {!staffSelected ? (
+                            <div className="p-2 text-gray-500 text-sm">Please select a staff member first.</div>
+                          ) : !serviceSelected ? (
+                            <div className="p-2 text-gray-500 text-sm">Please select a service first.</div>
+                          ) : !dateSelected ? (
+                            <div className="p-2 text-gray-500 text-sm">Please select a date first.</div>
+                          ) : availableTimeSlots.length === 0 ? (
+                            <div className="p-2 text-gray-500 text-sm">No available times for this staff member on this day. Please choose another date or staff member.</div>
+                          ) : (
                             availableTimeSlots.map((slot) => (
                               <SelectItem key={slot.value} value={slot.value}>
                                 {slot.label}
                               </SelectItem>
                             ))
-                          ) : (
-                            <SelectItem value="no-slots" disabled>
-                              {selectedStaffId ? "No available time slots for this staff member on this day" : "Select a staff member first"}
-                            </SelectItem>
                           )}
                         </SelectContent>
                       </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               
               {/* Appointment Duration Summary */}
@@ -1043,10 +1067,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   disabled={isLoading}
                   onClick={(e) => {
                     console.log('Button clicked!');
-                    console.log('Form errors before submit:', form.formState.errors);
                     console.log('Form values:', form.getValues());
                     console.log('Form is valid:', form.formState.isValid);
-                    
                     // Bypass form validation and call handleFormSubmit directly
                     const values = form.getValues();
                     handleFormSubmit(values);

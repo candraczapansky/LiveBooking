@@ -4,7 +4,6 @@ import Header from "@/components/layout/header";
 import CategoryList from "@/components/services/category-list";
 import ServiceList from "@/components/services/service-list";
 import ServiceForm from "@/components/services/service-form";
-import CategoryForm from "@/components/services/category-form";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, FolderPlus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -118,11 +117,6 @@ const ServicesPage = () => {
         onServiceCreated={(categoryId) => setSelectedCategoryId(categoryId)}
       />
       
-      {/* Category Form Modal */}
-      <CategoryForm 
-        open={isCategoryFormOpen} 
-        onOpenChange={setIsCategoryFormOpen} 
-      />
     </div>
   );
 };

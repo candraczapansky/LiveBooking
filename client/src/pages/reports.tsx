@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
   Select, 
@@ -26,9 +25,7 @@ import {
   Users, 
   Scissors, 
   Calendar, 
-  TrendingUp, 
   BarChart2,
-  PieChart,
   Clock,
   ArrowLeft,
   ChevronRight,
@@ -51,8 +48,6 @@ import {
   Pie,
   Cell
 } from "recharts";
-
-const COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 // Report configuration
 const reportCategories = [
@@ -115,6 +110,39 @@ const getReportTitle = (reportId: string) => {
 const getReportDescription = (reportId: string) => {
   const report = reportCategories.find(r => r.id === reportId);
   return report?.description || "View detailed analytics and insights";
+};
+
+// Helper function to calculate date range
+const getDateRange = (timePeriod: string, customStartDate?: string, customEndDate?: string) => {
+  if (timePeriod === "custom" && customStartDate && customEndDate) {
+    const startDate = new Date(customStartDate);
+    const endDate = new Date(customEndDate);
+    // Set end date to end of day (23:59:59.999) to include all transactions from that day
+    endDate.setHours(23, 59, 59, 999);
+    return { startDate, endDate };
+  }
+  
+  const now = new Date();
+  const startDate = new Date();
+  
+  switch (timePeriod) {
+    case "week":
+      startDate.setDate(now.getDate() - 7);
+      break;
+    case "month":
+      startDate.setMonth(now.getMonth() - 1);
+      break;
+    case "quarter":
+      startDate.setMonth(now.getMonth() - 3);
+      break;
+    case "year":
+      startDate.setFullYear(now.getFullYear() - 1);
+      break;
+    default:
+      startDate.setMonth(now.getMonth() - 1);
+  }
+  
+  return { startDate, endDate: now };
 };
 
 // Landing Page Component
@@ -189,39 +217,6 @@ const SpecificReportView = ({
 
 // Individual Report Components
 
-// Helper function to calculate date range
-const getDateRange = (timePeriod: string, customStartDate?: string, customEndDate?: string) => {
-  if (timePeriod === "custom" && customStartDate && customEndDate) {
-    const startDate = new Date(customStartDate);
-    const endDate = new Date(customEndDate);
-    // Set end date to end of day (23:59:59.999) to include all transactions from that day
-    endDate.setHours(23, 59, 59, 999);
-    return { startDate, endDate };
-  }
-  
-  const now = new Date();
-  const startDate = new Date();
-  
-  switch (timePeriod) {
-    case "week":
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case "month":
-      startDate.setMonth(now.getMonth() - 1);
-      break;
-    case "quarter":
-      startDate.setMonth(now.getMonth() - 3);
-      break;
-    case "year":
-      startDate.setFullYear(now.getFullYear() - 1);
-      break;
-    default:
-      startDate.setMonth(now.getMonth() - 1);
-  }
-  
-  return { startDate, endDate: now };
-};
-
 const SalesReport = ({ timePeriod, customStartDate, customEndDate }: { 
   timePeriod: string; 
   customStartDate?: string; 
@@ -266,15 +261,15 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
-                <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <div className="ml-3 md:ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Transactions
+                    Avg Transaction
                   </dt>
                   <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {totalTransactions}
+                    {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
                   </dd>
                 </dl>
               </div>
@@ -424,7 +419,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   const serviceMetrics = calculateServiceMetrics();
 
   // Calculate totals
-  const totalServices = services.length;
+  const totalServices = (services as any[]).length;
   const totalBookings = serviceMetrics.reduce((sum, service) => sum + service.totalBookings, 0);
   const totalCashedOut = serviceMetrics.reduce((sum, service) => sum + service.totalCashedOut, 0);
   const totalRevenue = serviceMetrics.reduce((sum, service) => sum + service.totalRevenue, 0);
@@ -567,7 +562,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
           <CardContent className="p-6">
             <div className="flex items-center">
               <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <TrendingUp className="h-5 w-5 text-primary" />
+                <BarChart2 className="h-5 w-5 text-primary" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -754,32 +749,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
   const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
 
-  // Calculate date range based on time period
-  const getDateRange = () => {
-    const now = new Date();
-    const startDate = new Date();
-    
-    switch (timePeriod) {
-      case "week":
-        startDate.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        startDate.setMonth(now.getMonth() - 1);
-        break;
-      case "quarter":
-        startDate.setMonth(now.getMonth() - 3);
-        break;
-      case "year":
-        startDate.setFullYear(now.getFullYear() - 1);
-        break;
-      default:
-        startDate.setMonth(now.getMonth() - 1);
-    }
-    
-    return { startDate, endDate: now };
-  };
-
-  const { startDate, endDate } = getDateRange();
+  const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
 
   // Filter data by date range
   const filteredAppointments = (appointments as any[]).filter((apt: any) => {
@@ -826,7 +796,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
                                timePeriod === "quarter" ? 480 : 640;
       
       const serviceHours = completedAppointments.reduce((sum: number, apt: any) => {
-        const service = services.find((s: any) => s.id === apt.serviceId);
+        const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
         const duration = Number(service?.duration) || 60;
         const hours = isNaN(duration) ? 1 : duration / 60; // Convert minutes to hours
         return sum + hours;
@@ -864,7 +834,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   const staffMetrics = calculateStaffMetrics();
 
   // Calculate overall stats
-  const totalStaff = staff.length;
+  const totalStaff = (staff as any[]).length;
   const totalRevenue = staffMetrics.reduce((sum, staff) => sum + staff.totalRevenue, 0);
   const totalAppointments = staffMetrics.reduce((sum, staff) => sum + staff.completedAppointments, 0);
   const averageUtilization = staffMetrics.length > 0 ? 
@@ -1155,7 +1125,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
     const now = new Date();
     const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
     
-    const weeklyEntries = timeEntries.filter((entry: any) => {
+    const weeklyEntries = (timeEntries as any[]).filter((entry: any) => {
       const entryDate = new Date(entry.clockInTime);
       return entryDate >= weekStart;
     });
@@ -1170,7 +1140,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
       return sum;
     }, 0);
     
-    const currentlyClocked = timeEntries.filter((entry: any) => entry.status === 'clocked_in').length;
+    const currentlyClocked = (timeEntries as any[]).filter((entry: any) => entry.status === 'clocked_in').length;
     const avgDaily = weeklyEntries.length > 0 ? totalHours / 7 : 0;
     
     return { totalHours, currentlyClocked, avgDaily };
@@ -1259,7 +1229,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
                             </div>
                           </td>
                         </tr>
-                      ) : timeEntries.length === 0 ? (
+                      ) : (timeEntries as any[]).length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                             <div className="flex flex-col items-center">
@@ -1270,7 +1240,7 @@ const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: {
                           </td>
                         </tr>
                       ) : (
-                        timeEntries.map((entry: any) => {
+                        (timeEntries as any[]).map((entry: any) => {
                           const clockIn = new Date(entry.clockInTime);
                           const clockOut = entry.clockOutTime ? new Date(entry.clockOutTime) : null;
                           const hours = clockOut ? ((clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60)).toFixed(1) : 'N/A';

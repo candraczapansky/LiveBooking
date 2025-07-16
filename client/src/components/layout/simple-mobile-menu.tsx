@@ -1,8 +1,9 @@
 import { useState, useContext, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 
 const SimpleMobileMenu = () => {
@@ -10,22 +11,70 @@ const SimpleMobileMenu = () => {
   const [isAnimating, setIsAnimating] = useState(false);
   const [location] = useLocation();
   const { logout } = useContext(AuthContext);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
+  const [localUser, setLocalUser] = useState<any>(null);
+  // Use context user or fallback to localStorage user
+  const user = useContext(AuthContext).user;
+  const currentUser = user || localUser;
+
+  useEffect(() => {
+    // Prioritize database profile picture from user context
+    if (user && user.profilePicture) {
+      setProfilePicture(user.profilePicture);
+      localStorage.setItem('profilePicture', user.profilePicture);
+    } else {
+      const savedProfilePicture = localStorage.getItem('profilePicture');
+      setProfilePicture(savedProfilePicture);
+    }
+    
+    // Load user from localStorage if context isn't ready
+    if (!user) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setLocalUser(userData);
+        } catch (e) {
+          // ignore
+        }
+      }
+    } else {
+      setLocalUser(user);
+    }
+    
+    // Listen for user data updates (includes profile picture updates)
+    const handleUserDataUpdate = (event: CustomEvent) => {
+      console.log('Mobile menu received user data update:', event.detail);
+      setLocalUser(event.detail);
+      if (event.detail && event.detail.profilePicture) {
+        setProfilePicture(event.detail.profilePicture);
+        localStorage.setItem('profilePicture', event.detail.profilePicture);
+      }
+    };
+    
+    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    return () => {
+      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    };
+  }, [user]);
 
   const navigationItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-    { icon: Calendar, label: "Appointments", href: "/appointments" },
-    { icon: CalendarDays, label: "Schedules", href: "/schedule" },
+    { icon: Calendar, label: "Client Appointments", href: "/appointments" },
+    { icon: CalendarDays, label: "Staff Working Hours", href: "/schedule" },
     { icon: Users, label: "Clients", href: "/clients" },
     { icon: UserCircle, label: "Staff", href: "/staff" },
     { icon: Scissors, label: "Services", href: "/services" },
     { icon: Package, label: "Products", href: "/products" },
     { icon: DollarSign, label: "Point of Sale", href: "/pos" },
+    { icon: Gift, label: "Gift Certificates", href: "/gift-certificates" },
     { icon: MapPin, label: "Rooms", href: "/rooms" },
     { icon: Monitor, label: "Devices", href: "/devices" },
     { icon: CreditCard, label: "Memberships", href: "/memberships" },
     { icon: BarChart3, label: "Reports", href: "/reports" },
     { icon: Megaphone, label: "Marketing", href: "/marketing" },
     { icon: Zap, label: "Automations", href: "/automations" },
+    { icon: Phone, label: "Phone", href: "/phone" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
@@ -93,6 +142,24 @@ const SimpleMobileMenu = () => {
               minHeight: "100vh"
             }}
           >
+            {/* User Info */}
+            <div className="flex flex-col items-center justify-center p-4 border-b border-gray-200 dark:border-gray-700">
+              <Avatar className="h-16 w-16 mb-2">
+                <AvatarImage src={profilePicture || currentUser?.profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} />
+                <AvatarFallback>
+                  {currentUser?.firstName?.[0] || ''}{currentUser?.lastName?.[0] || ''}
+                </AvatarFallback>
+              </Avatar>
+              <div className="text-center">
+                <div className="font-semibold text-base text-gray-900 dark:text-gray-100">
+                  {currentUser?.firstName || ''} {currentUser?.lastName || ''}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {currentUser?.email || ''}
+                </div>
+              </div>
+            </div>
+
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100" style={{ color: 'hsl(0 0% 0%)' }}>
@@ -163,8 +230,8 @@ const SimpleMobileMenu = () => {
                   logout();
                   closeMenu();
                 }}
-                className="flex items-center w-full px-3 py-2.5 bg-transparent border-none rounded-lg cursor-pointer text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                style={{ color: 'hsl(0 84% 60%)' }}
+                className="flex items-center w-full px-3 py-2.5 border border-red-500 bg-transparent text-red-600 dark:text-red-400 text-sm font-medium rounded-lg cursor-pointer transition-colors hover:border-2 hover:border-red-600 hover:text-red-700 focus:border-2 focus:border-red-600 focus:text-red-700"
+                style={{ color: 'hsl(0 84% 60%)', background: 'transparent' }}
               >
                 <LogOut className="w-4 h-4 mr-3" style={{ color: 'hsl(0 84% 60%)' }} />
                 <span style={{ color: 'hsl(0 84% 60%)' }}>Sign Out</span>

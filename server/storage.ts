@@ -1034,46 +1034,52 @@ export class DatabaseStorage implements IStorage {
 
   async getAppointment(id: number): Promise<Appointment | undefined> {
     const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
-    return appointment;
+    if (!appointment) return undefined;
+    
+    // Convert local datetime strings to Date objects for frontend
+    return {
+      ...appointment,
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
+    };
   }
 
   async getAllAppointments(): Promise<Appointment[]> {
     const appointmentList = await db.select().from(appointments).orderBy(desc(appointments.startTime));
     
-    // Convert local datetime strings to ISO format for frontend
+    // Convert local datetime strings to Date objects for frontend
     return appointmentList.map((appointment: any) => ({
       ...appointment,
-      startTime: this.convertLocalToISO(appointment.startTime),
-      endTime: this.convertLocalToISO(appointment.endTime)
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
     }));
   }
 
-  private convertLocalToISO(localTimeValue: string | Date): string {
-    // If it's already a Date object, return ISO string without conversion
+  private convertLocalToDate(localTimeValue: string | Date): Date {
+    // If it's already a Date object, return it
     if (localTimeValue instanceof Date) {
-      return localTimeValue.toISOString();
+      return localTimeValue;
     }
     
     // If it's null or undefined, return current time as fallback
     if (!localTimeValue) {
-      return new Date().toISOString();
+      return new Date();
     }
     
-    // If it's already an ISO string, return as-is
+    // If it's already an ISO string (UTC timestamp), parse it directly
+    // The database stores timestamps as UTC, so we can use them as-is
     if (localTimeValue.includes('T') || localTimeValue.includes('Z')) {
-      return localTimeValue;
+      return new Date(localTimeValue);
     }
     
-    // Convert local datetime string (YYYY-MM-DD HH:MM:SS) to proper ISO format
-    // IMPORTANT: Database stores local times as strings, but we need to return them as if they were UTC
-    // to prevent double timezone conversion in the frontend
+    // Convert local datetime string (YYYY-MM-DD HH:MM:SS) to Date object
+    // This is for legacy data or if we ever store local times as strings
     const [datePart, timePart] = localTimeValue.split(' ');
     const [year, month, day] = datePart.split('-').map(Number);
     const [hour, minute, second] = timePart.split(':').map(Number);
     
-    // Create date as if it were UTC to prevent timezone double-conversion
-    const utcDate = new Date(Date.UTC(year, month - 1, day, hour, minute, second || 0));
-    return utcDate.toISOString();
+    // Create date in local timezone
+    return new Date(year, month - 1, day, hour, minute, second || 0);
   }
 
   async getAppointmentsByClient(clientId: number): Promise<any[]> {
@@ -1097,7 +1103,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
-    return await db.select().from(appointments).where(eq(appointments.staffId, staffId)).orderBy(desc(appointments.startTime));
+    const appointmentList = await db.select().from(appointments).where(eq(appointments.staffId, staffId)).orderBy(desc(appointments.startTime));
+    
+    // Convert local datetime strings to Date objects for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
+    }));
   }
 
   async getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
@@ -1112,11 +1125,11 @@ export class DatabaseStorage implements IStorage {
       )
     ).orderBy(desc(appointments.startTime));
     
-    // Convert local datetime strings to ISO format for frontend
+    // Convert local datetime strings to Date objects for frontend
     return appointmentList.map((appointment: any) => ({
       ...appointment,
-      startTime: this.convertLocalToISO(appointment.startTime),
-      endTime: this.convertLocalToISO(appointment.endTime)
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
     }));
   }
 
@@ -1134,12 +1147,19 @@ export class DatabaseStorage implements IStorage {
     const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
     
-    return await db.select().from(appointments).where(
+    const appointmentList = await db.select().from(appointments).where(
       and(
         gte(appointments.startTime, startOfDay),
         lte(appointments.startTime, endOfDay)
       )
     ).orderBy(appointments.startTime);
+    
+    // Convert local datetime strings to Date objects for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
+    }));
   }
 
   async getActiveAppointmentsByDate(date: Date): Promise<Appointment[]> {
@@ -1158,11 +1178,11 @@ export class DatabaseStorage implements IStorage {
       )
     ).orderBy(appointments.startTime);
     
-    // Convert local datetime strings to ISO format for frontend
+    // Convert local datetime strings to Date objects for frontend
     return appointmentList.map((appointment: any) => ({
       ...appointment,
-      startTime: this.convertLocalToISO(appointment.startTime),
-      endTime: this.convertLocalToISO(appointment.endTime)
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
     }));
   }
 

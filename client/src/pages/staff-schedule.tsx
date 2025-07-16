@@ -26,7 +26,7 @@ import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffSchedulePage() {
-  useDocumentTitle("Staff Schedule | Glo Head Spa");
+  useDocumentTitle("Staff Working Hours | Glo Head Spa");
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -71,7 +71,7 @@ export default function StaffSchedulePage() {
   });
 
   // Get unique roles for filter
-  const uniqueRoles = [...new Set((staff as any[]).map((s: any) => s.title))];
+  const uniqueRoles = Array.from(new Set((staff as any[]).map((s: any) => s.title)));
 
   const handleRowClick = (staffId: number) => {
     setLocation(`/staff-schedule/${staffId}`);
@@ -90,8 +90,13 @@ export default function StaffSchedulePage() {
           <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h1 className="text-3xl font-bold">Staff Schedule</h1>
-                <p className="text-muted-foreground">Manage staff availability and schedules</p>
+                <h1 className="text-3xl font-bold">Staff Working Hours</h1>
+                <p className="text-muted-foreground">Set staff availability, working days, and time slots</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded">
+                    💡 Need to manage client appointments? Go to "Client Appointments" in the sidebar
+                  </div>
+                </div>
               </div>
               <Button 
                 className="flex items-center gap-2"

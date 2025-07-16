@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 
 const QuickActions = () => {
   const [, navigate] = useLocation();
@@ -34,11 +34,7 @@ const QuickActions = () => {
       navigate('/appointments?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast({
-        title: "Permission Denied",
-        description: "You don't have permission to create appointments.",
-        variant: "destructive",
-      });
+      toast();
     }
   };
 
@@ -50,11 +46,7 @@ const QuickActions = () => {
       navigate('/clients?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast({
-        title: "Permission Denied",
-        description: "You don't have permission to add clients.",
-        variant: "destructive",
-      });
+      toast();
     }
   };
 
@@ -66,11 +58,7 @@ const QuickActions = () => {
       navigate('/marketing?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast({
-        title: "Permission Denied",
-        description: "You don't have permission to send promotions.",
-        variant: "destructive",
-      });
+      toast();
     }
   };
 

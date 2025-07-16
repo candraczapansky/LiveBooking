@@ -188,15 +188,17 @@ export default function Settings() {
   const handleTextColorChange = (color: string) => {
     setTextColor(color);
     localStorage.setItem('textColor', color);
-    // Apply text color to root element
-    document.documentElement.style.setProperty('--text-primary', color);
+    // Convert hex to HSL and apply text color to root element
+    const hsl = hexToHsl(color);
+    document.documentElement.style.setProperty('--text-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
   };
 
   const handleTextColorSecondaryChange = (color: string) => {
     setTextColorSecondary(color);
     localStorage.setItem('textColorSecondary', color);
-    // Apply secondary text color to root element
-    document.documentElement.style.setProperty('--text-secondary', color);
+    // Convert hex to HSL and apply secondary text color to root element
+    const hsl = hexToHsl(color);
+    document.documentElement.style.setProperty('--text-secondary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
   };
 
   const savePrimaryColorPreset = () => {

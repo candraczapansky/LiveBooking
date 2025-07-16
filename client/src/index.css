@@ -1655,3 +1655,113 @@ button {
 .bg-pink-700 {
   background-color: rgb(219 39 119) !important;
 }
+
+/* Hide any persistent white rectangle at the bottom of the page */
+div[style*="background: white" i],
+div[style*="background-color: white" i],
+div[style*="background: #fff" i],
+div[style*="background-color: #fff" i],
+div[style*="background: #ffffff" i],
+div[style*="background-color: #ffffff" i],
+div[style*="box-shadow" i][style*="fixed" i],
+div[style*="box-shadow" i][style*="bottom" i],
+div[style*="fixed" i][style*="bottom" i][style*="white" i],
+div[style*="absolute" i][style*="bottom" i][style*="white" i] {
+  display: none !important;
+}
+
+/* Ultra-aggressive: Hide ANY element at the bottom of the viewport */
+*[style*="bottom: 0" i],
+*[style*="bottom:0" i],
+*[style*="bottom: 0px" i],
+*[style*="bottom:0px" i],
+*[style*="bottom: 1px" i],
+*[style*="bottom:1px" i],
+*[style*="bottom: 2px" i],
+*[style*="bottom:2px" i],
+*[style*="bottom: 3px" i],
+*[style*="bottom:3px" i],
+*[style*="bottom: 4px" i],
+*[style*="bottom:4px" i],
+*[style*="bottom: 5px" i],
+*[style*="bottom:5px" i],
+*[style*="bottom: 10px" i],
+*[style*="bottom:10px" i],
+*[style*="bottom: 20px" i],
+*[style*="bottom:20px" i],
+*[style*="bottom: 50px" i],
+*[style*="bottom:50px" i],
+*[style*="bottom: 100px" i],
+*[style*="bottom:100px" i],
+*[style*="position: fixed" i][style*="bottom" i],
+*[style*="position:absolute" i][style*="bottom" i],
+*[style*="position: fixed" i][style*="bottom" i],
+*[style*="position:absolute" i][style*="bottom" i],
+div[style*="position: fixed" i][style*="bottom" i],
+div[style*="position: absolute" i][style*="bottom" i],
+div[style*="position:fixed" i][style*="bottom" i],
+div[style*="position:absolute" i][style*="bottom" i],
+.fixed[style*="bottom" i],
+.absolute[style*="bottom" i],
+[class*="fixed"][style*="bottom" i],
+[class*="absolute"][style*="bottom" i],
+[class*="fixed"][class*="bottom" i],
+[class*="absolute"][class*="bottom" i] {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  position: static !important;
+  bottom: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  z-index: -9999 !important;
+}
+
+/* Also hide any pseudo-elements at the bottom */
+*::before[style*="bottom" i],
+*::after[style*="bottom" i],
+*::before[class*="bottom" i],
+*::after[class*="bottom" i] {
+  display: none !important;
+  content: none !important;
+}
+
+/* Nuclear option: Hide any fixed/absolute element at the bottom with a white background */
+.fixed[style*="bottom" i][style*="white" i],
+.absolute[style*="bottom" i][style*="white" i],
+div[style*="position: fixed" i][style*="bottom" i][style*="white" i],
+div[style*="position: absolute" i][style*="bottom" i][style*="white" i],
+div[style*="background: white" i],
+div[style*="background-color: white" i],
+div[style*="background: #fff" i],
+div[style*="background-color: #fff" i],
+div[style*="background: #ffffff" i],
+div[style*="background-color: #ffffff" i],
+div[style*="box-shadow" i][style*="fixed" i],
+div[style*="box-shadow" i][style*="bottom" i],
+div[style*="fixed" i][style*="bottom" i][style*="white" i],
+div[style*="absolute" i][style*="bottom" i][style*="white" i] {
+  display: none !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+/* Remove react-big-calendar current date highlight */
+.rbc-today {
+  background: none !important;
+  background-color: transparent !important;
+  border: none !important;
+}

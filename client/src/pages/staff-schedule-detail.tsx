@@ -9,6 +9,7 @@ import { AddEditScheduleDialog } from "@/components/staff/add-edit-schedule-dial
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +18,9 @@ export default function StaffScheduleDetailPage() {
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Set document title
+  useDocumentTitle("Staff Working Hours | Glo Head Spa");
 
   // Fetch staff member details
   const { data: staff = [] } = useQuery({

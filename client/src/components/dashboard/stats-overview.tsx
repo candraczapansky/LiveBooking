@@ -5,8 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 
 const StatsOverview = () => {
   // Fetch real appointment data
-  const { data: appointments, isLoading: appointmentsLoading } = useQuery({
+  const { data: appointments = [] as any[], isLoading: appointmentsLoading } = useQuery({
     queryKey: ['/api/appointments'],
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const { data: services } = useQuery({

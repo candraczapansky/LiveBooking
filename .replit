@@ -4,6 +4,7 @@ hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["psmisc"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -13,6 +14,18 @@ run = ["npm", "run", "start"]
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5050
+externalPort = 3000
+
+[[ports]]
+localPort = 5051
+externalPort = 3001
+
+[[ports]]
+localPort = 5052
+externalPort = 3002
 
 [workflows]
 runButton = "Project"

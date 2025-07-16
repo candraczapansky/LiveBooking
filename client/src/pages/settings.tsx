@@ -1,4 +1,4 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,10 +11,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation } from "@tanstack/react-query";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { apiRequest } from "@/lib/queryClient";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
+import Layout from "@/components/layout/layout";
 
 import { 
   Bell, 
@@ -30,10 +31,11 @@ import {
   Camera,
   User,
   Type,
-  Palette,
-  Trash2
+  Palette
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import timeZones from "@/lib/timezones"; // We'll add a list of IANA timezones
+import { useQuery } from "@tanstack/react-query";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -81,30 +83,15 @@ export default function Settings() {
     return localStorage.getItem('textColorSecondary') || '#6b7280';
   });
 
-  const [presetName, setPresetName] = useState('');
-  const [secondaryPresetName, setSecondaryPresetName] = useState('');
-  const [textPresetName, setTextPresetName] = useState('');
-  
-  const [savedPresets, setSavedPresets] = useState(() => {
-    const saved = localStorage.getItem('colorPresets');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [savedSecondaryPresets, setSavedSecondaryPresets] = useState(() => {
-    const saved = localStorage.getItem('secondaryColorPresets');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  const [savedTextPresets, setSavedTextPresets] = useState(() => {
-    const saved = localStorage.getItem('textColorPresets');
-    return saved ? JSON.parse(saved) : [];
-  });
+
 
   // Profile states
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || ''); 
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Notification states
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -126,37 +113,131 @@ export default function Settings() {
     },
   });
 
+  // Timezone state
+  const [timezone, setTimezone] = useState<string>("America/New_York");
+  type BusinessSettingsType = { timezone: string };
+  const { data: businessSettings, refetch: refetchBusinessSettings } = useQuery<BusinessSettingsType>({
+    queryKey: ["/api/business-settings"],
+    queryFn: async () => {
+      const res = await fetch("/api/business-settings");
+      if (!res.ok) throw new Error("Failed to fetch business settings");
+      return res.json();
+    },
+  });
+
+  // Update timezone state when businessSettings changes
+  useEffect(() => {
+    if (businessSettings && businessSettings.timezone) {
+      setTimezone(businessSettings.timezone);
+    }
+  }, [businessSettings]);
+
+  // Remove auto-save from handleTimezoneChange
+  const handleTimezoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTimezone(e.target.value);
+  };
+
+  // Add a save handler
+  const handleSaveTimezone = async () => {
+    console.log("[DEBUG] Save button clicked. Timezone:", timezone);
+    try {
+      const response = await fetch("/api/business-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("[DEBUG] API error:", response.status, errorData);
+        console.log("Error: Failed to save timezone. Please try again.");
+        return;
+      }
+      
+      const data = await response.json();
+      console.log("[DEBUG] API response:", response.status, data);
+      refetchBusinessSettings();
+      console.log("Timezone updated! Business timezone set to", timezone);
+    } catch (error) {
+      console.error("[DEBUG] Network error:", error);
+      console.log("Error: Network error. Please check your connection and try again.");
+    }
+  };
+
   // Effects
   useEffect(() => {
-    // Apply the saved dark mode on component mount
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    if (savedDarkMode !== darkMode) {
-      setDarkMode(savedDarkMode);
-    }
-    document.documentElement.classList.toggle('dark', savedDarkMode);
+    // Load color preferences from database when user is available
+    const loadUserColorPreferences = async () => {
+      if (user?.id) {
+        try {
+          const response = await fetch(`/api/users/${user.id}/color-preferences`);
+          if (response.ok) {
+            const preferences = await response.json();
+            if (preferences) {
+              // Apply database preferences
+              setCustomColor(preferences.primaryColor || '#8b5cf6');
+              setTextColor(preferences.primaryTextColor || '#1f2937');
+              setTextColorSecondary(preferences.secondaryTextColor || '#6b7280');
+              setDarkMode(preferences.isDarkMode || false);
+              
+
+
+              
+              // Apply text colors immediately
+              const primaryHsl = hexToHsl(preferences.primaryTextColor || '#1f2937');
+              const secondaryHsl = hexToHsl(preferences.secondaryTextColor || '#6b7280');
+              document.documentElement.style.setProperty('--text-primary', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+              document.documentElement.style.setProperty('--text-secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
+              
+              console.log('Loaded color preferences from database:', preferences);
+              return; // Exit early if database preferences were loaded
+            }
+          }
+        } catch (error) {
+          console.error('Failed to load color preferences from database:', error);
+        }
+      }
+      
+      // Fallback to localStorage if database loading fails or user not available
+      const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+      if (savedDarkMode !== darkMode) {
+        setDarkMode(savedDarkMode);
+      }
+      document.documentElement.classList.toggle('dark', savedDarkMode);
+      
+      // Apply saved colors on component mount
+      const savedPrimaryColor = localStorage.getItem('primaryColor') || '#8b5cf6';
+      const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#f3f4f6';
+      
+      const hsl = hexToHsl(savedPrimaryColor);
+      document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+      
+      // Apply transparent hover colors on mount
+      document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+      document.documentElement.style.setProperty('--button-primary-hover-opacity', '0.1');
+      document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
+      document.documentElement.style.setProperty('--button-outline-hover-opacity', '0.1');
+      
+      // Update other color properties
+      document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+      document.documentElement.style.setProperty('--accent', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+      document.documentElement.style.setProperty('--sidebar-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+      document.documentElement.style.setProperty('--sidebar-accent-foreground', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+      
+      const secondaryHsl = hexToHsl(savedSecondaryColor);
+      document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
+      
+      // Apply saved text colors from localStorage
+      const savedTextColor = localStorage.getItem('textColor') || '#1f2937';
+      const savedTextColorSecondary = localStorage.getItem('textColorSecondary') || '#6b7280';
+      const textPrimaryHsl = hexToHsl(savedTextColor);
+      const textSecondaryHsl = hexToHsl(savedTextColorSecondary);
+      document.documentElement.style.setProperty('--text-primary', `${textPrimaryHsl.h} ${textPrimaryHsl.s}% ${textPrimaryHsl.l}%`);
+      document.documentElement.style.setProperty('--text-secondary', `${textSecondaryHsl.h} ${textSecondaryHsl.s}% ${textSecondaryHsl.l}%`);
+    };
     
-    // Apply saved colors on component mount
-    const savedPrimaryColor = localStorage.getItem('primaryColor') || '#8b5cf6';
-    const savedSecondaryColor = localStorage.getItem('secondaryColor') || '#f3f4f6';
-    
-    const hsl = hexToHsl(savedPrimaryColor);
-    document.documentElement.style.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    
-    // Apply transparent hover colors on mount
-    document.documentElement.style.setProperty('--button-primary-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
-    document.documentElement.style.setProperty('--button-primary-hover-opacity', '0.1');
-    document.documentElement.style.setProperty('--button-outline-hover', `${hsl.h} ${hsl.s}% ${hsl.l}`);
-    document.documentElement.style.setProperty('--button-outline-hover-opacity', '0.1');
-    
-    // Update other color properties
-    document.documentElement.style.setProperty('--dropdown-selected', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    document.documentElement.style.setProperty('--accent', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    document.documentElement.style.setProperty('--sidebar-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    document.documentElement.style.setProperty('--sidebar-accent-foreground', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-    
-    const secondaryHsl = hexToHsl(savedSecondaryColor);
-    document.documentElement.style.setProperty('--secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
-  }, []);
+    loadUserColorPreferences();
+  }, [user?.id]); // Re-run when user ID changes
 
   useEffect(() => {
     // Apply dark mode changes
@@ -200,8 +281,10 @@ export default function Settings() {
 
   // Apply text colors on mount and when they change
   useEffect(() => {
-    document.documentElement.style.setProperty('--text-primary', textColor);
-    document.documentElement.style.setProperty('--text-secondary', textColorSecondary);
+    const primaryHsl = hexToHsl(textColor);
+    const secondaryHsl = hexToHsl(textColorSecondary);
+    document.documentElement.style.setProperty('--text-primary', `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+    document.documentElement.style.setProperty('--text-secondary', `${secondaryHsl.h} ${secondaryHsl.s}% ${secondaryHsl.l}%`);
   }, [textColor, textColorSecondary]);
 
   // Color conversion utility
@@ -244,6 +327,21 @@ export default function Settings() {
   // Handlers
   const handleCustomColorChange = (color: string) => {
     setCustomColor(color);
+    // Auto-save to database
+    if (user?.id) {
+      fetch(`/api/users/${user.id}/color-preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor: color,
+          primaryTextColor: textColor,
+          secondaryTextColor: textColorSecondary,
+          isDarkMode: darkMode
+        }),
+      }).catch(error => {
+        console.error('Error auto-saving color preferences:', error);
+      });
+    }
   };
 
   const handleSecondaryColorChange = (color: string) => {
@@ -253,88 +351,52 @@ export default function Settings() {
   const handleTextColorChange = (color: string) => {
     setTextColor(color);
     localStorage.setItem('textColor', color);
-    // Apply text color to root element
-    document.documentElement.style.setProperty('--text-primary', color);
+    // Convert hex to HSL and apply text color to root element
+    const hsl = hexToHsl(color);
+    document.documentElement.style.setProperty('--text-primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    // Auto-save to database
+    if (user?.id) {
+      fetch(`/api/users/${user.id}/color-preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor: customColor,
+          primaryTextColor: color,
+          secondaryTextColor: textColorSecondary,
+          isDarkMode: darkMode
+        }),
+      }).catch(error => {
+        console.error('Error auto-saving text color preferences:', error);
+      });
+    }
   };
 
   const handleTextColorSecondaryChange = (color: string) => {
     setTextColorSecondary(color);
     localStorage.setItem('textColorSecondary', color);
-    // Apply secondary text color to root element
-    document.documentElement.style.setProperty('--text-secondary', color);
-  };
-
-  const savePrimaryColorPreset = () => {
-    if (presetName.trim() && customColor) {
-      const newPreset = { name: presetName.trim(), color: customColor };
-      const updatedPresets = [...savedPresets, newPreset];
-      setSavedPresets(updatedPresets);
-      localStorage.setItem('colorPresets', JSON.stringify(updatedPresets));
-      setPresetName('');
-      toast({
-        title: "Preset Saved",
-        description: `Color preset "${newPreset.name}" has been saved.`,
+    // Convert hex to HSL and apply secondary text color to root element
+    const hsl = hexToHsl(color);
+    document.documentElement.style.setProperty('--text-secondary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+    // Auto-save to database
+    if (user?.id) {
+      fetch(`/api/users/${user.id}/color-preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryColor: customColor,
+          primaryTextColor: textColor,
+          secondaryTextColor: color,
+          isDarkMode: darkMode
+        }),
+      }).catch(error => {
+        console.error('Error auto-saving secondary text color preferences:', error);
       });
     }
   };
 
-  const saveSecondaryColorPreset = () => {
-    if (secondaryPresetName.trim() && secondaryColor) {
-      const newPreset = { name: secondaryPresetName.trim(), color: secondaryColor };
-      const updatedPresets = [...savedSecondaryPresets, newPreset];
-      setSavedSecondaryPresets(updatedPresets);
-      localStorage.setItem('secondaryColorPresets', JSON.stringify(updatedPresets));
-      setSecondaryPresetName('');
-      toast({
-        title: "Text Color Preset Saved",
-        description: `Text color preset "${newPreset.name}" has been saved.`,
-      });
-    }
-  };
 
-  const deletePrimaryColorPreset = (presetName: string) => {
-    const updatedPresets = savedPresets.filter((preset: any) => preset.name !== presetName);
-    setSavedPresets(updatedPresets);
-    localStorage.setItem('colorPresets', JSON.stringify(updatedPresets));
-    toast({
-      title: "Preset Deleted",
-      description: `Color preset "${presetName}" has been deleted.`,
-    });
-  };
 
-  const deleteSecondaryColorPreset = (presetName: string) => {
-    const updatedPresets = savedSecondaryPresets.filter((preset: any) => preset.name !== presetName);
-    setSavedSecondaryPresets(updatedPresets);
-    localStorage.setItem('secondaryColorPresets', JSON.stringify(updatedPresets));
-    toast({
-      title: "Text Color Preset Deleted",
-      description: `Text color preset "${presetName}" has been deleted.`,
-    });
-  };
 
-  const saveTextColorPreset = () => {
-    if (textPresetName.trim() && textColor) {
-      const newPreset = { name: textPresetName.trim(), color: textColor };
-      const updatedPresets = [...savedTextPresets, newPreset];
-      setSavedTextPresets(updatedPresets);
-      localStorage.setItem('textColorPresets', JSON.stringify(updatedPresets));
-      setTextPresetName('');
-      toast({
-        title: "Text Color Preset Saved",
-        description: `Text color preset "${newPreset.name}" has been saved.`,
-      });
-    }
-  };
-
-  const deleteTextColorPreset = (presetName: string) => {
-    const updatedPresets = savedTextPresets.filter((preset: any) => preset.name !== presetName);
-    setSavedTextPresets(updatedPresets);
-    localStorage.setItem('textColorPresets', JSON.stringify(updatedPresets));
-    toast({
-      title: "Text Color Preset Deleted",
-      description: `Text color preset "${presetName}" has been deleted.`,
-    });
-  };
 
   const handleSaveProfile = () => {
     console.log('handleSaveProfile called in main settings');
@@ -349,12 +411,7 @@ export default function Settings() {
     });
   };
 
-  const handleSaveAppearance = () => {
-    toast({
-      title: "Appearance Saved",
-      description: "Your appearance settings have been saved successfully.",
-    });
-  };
+
 
   // Profile update mutation
   const updateProfileMutation = useMutation({
@@ -408,18 +465,11 @@ export default function Settings() {
       }));
       console.log('User data update event dispatched');
       
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been saved successfully.",
-      });
+      console.log("Profile updated:", "Your profile information has been saved successfully.");
     },
     onError: (error) => {
       console.error('Profile update error callback triggered:', error);
-      toast({
-        title: "Update failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive",
-      });
+      console.log("Update failed:", "Failed to update profile. Please try again.");
     },
   });
 
@@ -440,18 +490,11 @@ export default function Settings() {
       return response.json();
     },
     onSuccess: () => {
-      toast({
-        title: "Password Changed",
-        description: "Your password has been updated successfully.",
-      });
+      console.log("Password Changed:", "Your password has been updated successfully.");
       passwordForm.reset();
     },
     onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      console.log("Error:", error.message);
     },
   });
 
@@ -459,707 +502,647 @@ export default function Settings() {
     changePasswordMutation.mutate(data);
   };
 
+  // Profile picture upload handler
+  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        console.error("Invalid file type: Please select an image file.");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        console.error("File too large: Please select an image smaller than 5MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64String = e.target?.result as string;
+        setProfilePicture(base64String);
+        // Save to database
+        if (user?.id) {
+          try {
+            const response = await fetch(`/api/users/${user.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ profilePicture: base64String })
+            });
+            if (response.ok) {
+              const updatedUser = await response.json();
+              localStorage.setItem('user', JSON.stringify(updatedUser));
+              localStorage.setItem('profilePicture', base64String);
+              if (updateUser) updateUser({ profilePicture: base64String });
+              window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: updatedUser }));
+              console.log("Photo updated: Your profile photo has been changed successfully.");
+            } else {
+              console.error("Upload failed: Failed to save profile picture.");
+            }
+          } catch (error) {
+            console.error("Upload failed: Failed to save profile picture.");
+          }
+        }
+      };
+      reader.onerror = () => {
+        console.error("Upload failed: Failed to process the image. Please try again.");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900 md:h-screen">
-      <SidebarController />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-          <div className="container mx-auto px-4 py-4 md:px-6 md:py-8">
-            <div className="mb-6 md:mb-8">
-              <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
-              <p className="mt-2 text-sm md:text-base text-gray-600 dark:text-gray-400">
-                Manage your account settings and preferences.
-              </p>
-            </div>
+    <Layout>
+      <div className="max-w-4xl mx-auto py-8">
+        <div className="mb-6 md:mb-8">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white">Settings</h1>
+          <p className="mt-2 text-sm md:text-base text-gray-600 dark:text-gray-400">
+            Manage your account settings and preferences.
+          </p>
+        </div>
 
-            <div className="space-y-6">
-              {/* Personal Information */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <User className="h-5 w-5 mr-2" />
-                    Personal Information
-                  </CardTitle>
-                  <CardDescription>
-                    Update your personal details and contact information.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center space-x-4">
-                    <Avatar className="h-20 w-20">
-                      <AvatarImage src="/placeholder-avatar.jpg" />
-                      <AvatarFallback className="text-lg">
-                        {user?.firstName?.[0]}{user?.lastName?.[0]}
-                      </AvatarFallback>
-                    </Avatar>
-                    <Button variant="outline" size="sm">
-                      <Camera className="h-4 w-4 mr-2" />
-                      Change Photo
-                    </Button>
-                  </div>
+        <div className="space-y-6">
+          {/* Personal Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <User className="h-5 w-5 mr-2" />
+                Personal Information
+              </CardTitle>
+              <CardDescription>
+                Update your personal details and contact information.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={profilePicture || user?.profilePicture || "/placeholder-avatar.jpg"} />
+                  <AvatarFallback className="text-lg">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  style={{ display: "none" }}
+                  onChange={handleProfilePictureChange}
+                />
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                  <Camera className="h-4 w-4 mr-2" />
+                  Change Photo
+                </Button>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        placeholder="Enter your first name"
-                        className="h-12"
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">First Name</Label>
+                  <Input
+                    id="firstName"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    placeholder="Enter your first name"
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    placeholder="Enter your last name"
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="h-12"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Enter your phone number"
+                    className="h-12"
+                  />
+                </div>
+              </div>
+
+              <Button 
+                onClick={handleSaveProfile} 
+                className="w-full md:w-auto h-12"
+                disabled={updateProfileMutation.isPending}
+                style={{ 
+                  backgroundColor: customColor,
+                  borderColor: customColor
+                }}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {updateProfileMutation.isPending ? "Saving..." : "Save Personal Information"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Appearance Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Sun className="h-5 w-5 mr-2" />
+                Appearance
+              </CardTitle>
+              <CardDescription>
+                Customize how the application looks and feels.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Dark Mode</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Use dark theme for better viewing in low light
+                  </p>
+                </div>
+                <Switch
+                  checked={darkMode}
+                  onCheckedChange={(checked) => {
+                    setDarkMode(checked);
+                    // Auto-save to database
+                    if (user?.id) {
+                      fetch(`/api/users/${user.id}/color-preferences`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          primaryColor: customColor,
+                          primaryTextColor: textColor,
+                          secondaryTextColor: textColorSecondary,
+                          isDarkMode: checked,
+
+                        }),
+                      }).catch(error => {
+                        console.error('Error auto-saving dark mode preferences:', error);
+                      });
+                    }
+                  }}
+                />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-6">
+                <div className="space-y-4">
+                  <Label className="text-base flex items-center">
+                    <Palette className="h-4 w-4 mr-2" />
+                    Primary Color
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Choose your preferred accent color for buttons and highlights
+                  </p>
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                    <div className="flex items-center space-x-3">
+                      <input
+                        type="color"
+                        value={customColor}
+                        onChange={(e) => handleCustomColorChange(e.target.value)}
+                        className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
                       />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        placeholder="Enter your last name"
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email Address</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="Enter your email"
-                        className="h-12"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone">Phone Number</Label>
-                      <Input
-                        id="phone"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="Enter your phone number"
-                        className="h-12"
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    onClick={handleSaveProfile} 
-                    className="w-full md:w-auto h-12"
-                    disabled={updateProfileMutation.isPending}
-                    style={{ 
-                      backgroundColor: customColor,
-                      borderColor: customColor
-                    }}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    {updateProfileMutation.isPending ? "Saving..." : "Save Personal Information"}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* Appearance Settings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Sun className="h-5 w-5 mr-2" />
-                    Appearance
-                  </CardTitle>
-                  <CardDescription>
-                    Customize how the application looks and feels.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Dark Mode</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Use dark theme for better viewing in low light
-                      </p>
-                    </div>
-                    <Switch
-                      checked={darkMode}
-                      onCheckedChange={setDarkMode}
-                    />
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      <Label className="text-base flex items-center">
-                        <Palette className="h-4 w-4 mr-2" />
-                        Primary Color
-                      </Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Choose your preferred accent color for buttons and highlights
-                      </p>
-                      
-                      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="color"
-                            value={customColor}
-                            onChange={(e) => handleCustomColorChange(e.target.value)}
-                            className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
-                          />
-                          <div className="space-y-1 flex-1">
-                            <Label className="text-sm font-medium">Color Value</Label>
-                            <Input
-                              type="text"
-                              value={customColor}
-                              onChange={(e) => handleCustomColorChange(e.target.value)}
-                              className="w-full sm:w-32 text-sm h-10"
-                              placeholder="#8b5cf6"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <div 
-                            className="w-12 h-8 rounded border-2 border-gray-300 dark:border-gray-600 cursor-pointer flex items-center justify-center text-white font-medium text-sm"
-                            style={{ backgroundColor: customColor }}
-                          >
-                            Demo
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Save Primary Color Preset */}
-                      <div className="space-y-3">
+                      <div className="space-y-1 flex-1">
+                        <Label className="text-sm font-medium">Color Value</Label>
                         <Input
                           type="text"
-                          placeholder="Enter color preset name..."
-                          value={presetName}
-                          onChange={(e) => setPresetName(e.target.value)}
-                          className="w-full"
+                          value={customColor}
+                          onChange={(e) => handleCustomColorChange(e.target.value)}
+                          className="w-full sm:w-32 text-sm h-10"
+                          placeholder="#8b5cf6"
                         />
-                        <Button
-                          onClick={savePrimaryColorPreset}
-                          disabled={!presetName.trim() || customColor === '#8b5cf6'}
-                          className="w-full"
-                          variant="outline"
-                        >
-                          <Save className="h-4 w-4 mr-2" />
-                          Save Primary Color Preset
-                        </Button>
                       </div>
-
-                      {/* Quick Color Presets */}
-                      <div className="space-y-4">
-                        <Label className="text-base">Quick Color Presets</Label>
-                        <div className="grid grid-cols-6 gap-3">
-                          {[
-                            { name: 'Blue', color: '#3b82f6', value: 'blue' },
-                            { name: 'Purple', color: '#8b5cf6', value: 'purple' },
-                            { name: 'Green', color: '#10b981', value: 'emerald' },
-                            { name: 'Orange', color: '#f59e0b', value: 'amber' },
-                            { name: 'Red', color: '#ef4444', value: 'red' },
-                            { name: 'Pink', color: '#ec4899', value: 'pink' },
-                          ].map((preset) => (
-                            <div key={preset.value} className="text-center">
-                              <div
-                                className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer mx-auto mb-2"
-                                style={{ backgroundColor: preset.color }}
-                                onClick={() => handleCustomColorChange(preset.color)}
-                              />
-                              <span className="text-xs text-gray-600 dark:text-gray-400">{preset.name}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Saved Primary Color Presets */}
-                      {savedPresets.length > 0 && (
-                        <div className="space-y-2">
-                          <Label className="text-base">Saved Primary Color Presets</Label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {savedPresets.map((preset: any, index: number) => (
-                              <div key={index} className="flex items-center justify-between p-2 border rounded-lg">
-                                <div className="flex items-center space-x-2">
-                                  <div 
-                                    className="w-4 h-4 rounded-full border cursor-pointer"
-                                    style={{ backgroundColor: preset.color }}
-                                    onClick={() => handleCustomColorChange(preset.color)}
-                                  />
-                                  <span className="text-sm font-medium">{preset.name}</span>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => deletePrimaryColorPreset(preset.name)}
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
                     </div>
-
-                    <Button 
-                      onClick={handleSaveAppearance} 
-                      className="w-full"
-                      style={{ 
-                        backgroundColor: customColor,
-                        borderColor: customColor
-                      }}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Appearance Settings
-                    </Button>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="w-12 h-8 rounded border-2 border-gray-300 dark:border-gray-600 cursor-pointer flex items-center justify-center text-white font-medium text-sm"
+                        style={{ backgroundColor: customColor }}
+                      >
+                        Demo
+                      </div>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Text Color Settings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Type className="h-5 w-5 mr-2" />
-                    Text Colors
-                  </CardTitle>
-                  <CardDescription>
-                    Customize the text colors used throughout the application.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Primary Text Color */}
-                  <div className="space-y-4">
-                    <Label className="text-base flex items-center">
-                      <Type className="h-4 w-4 mr-2" />
-                      Primary Text Color
-                    </Label>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Main text color for headings and primary content
-                    </p>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="color"
-                          value={textColor}
-                          onChange={(e) => handleTextColorChange(e.target.value)}
-                          className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
-                        />
-                        <div className="space-y-1">
-                          <Label className="text-sm font-medium">Color Value</Label>
-                          <Input
-                            type="text"
-                            value={textColor}
-                            onChange={(e) => handleTextColorChange(e.target.value)}
-                            className="w-32 text-sm"
-                            placeholder="#1f2937"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center font-semibold text-sm bg-white dark:bg-gray-800"
-                          style={{ color: textColor }}
-                        >
-                          Primary Text
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Save Primary Text Color Preset */}
-                    <div className="space-y-3">
+
+
+                </div>
+
+
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Text Color Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Type className="h-5 w-5 mr-2" />
+                Text Colors
+              </CardTitle>
+              <CardDescription>
+                Customize the text colors used throughout the application.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Primary Text Color */}
+              <div className="space-y-4">
+                <Label className="text-base flex items-center">
+                  <Type className="h-4 w-4 mr-2" />
+                  Primary Text Color
+                </Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Main text color for headings and primary content
+                </p>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={textColor}
+                      onChange={(e) => handleTextColorChange(e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Color Value</Label>
                       <Input
                         type="text"
-                        placeholder="Enter text color preset name..."
-                        value={textPresetName}
-                        onChange={(e) => setTextPresetName(e.target.value)}
-                        className="w-full"
+                        value={textColor}
+                        onChange={(e) => handleTextColorChange(e.target.value)}
+                        className="w-32 text-sm"
+                        placeholder="#1f2937"
                       />
-                      <Button
-                        onClick={saveTextColorPreset}
-                        disabled={!textPresetName.trim() || textColor === '#1f2937'}
-                        className="w-full"
-                        variant="outline"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        Save Primary Text Color Preset
-                      </Button>
                     </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div 
+                      className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center font-semibold text-sm bg-white dark:bg-gray-800"
+                      style={{ color: textColor }}
+                    >
+                      Primary Text
+                    </div>
+                  </div>
+                </div>
+                
 
-                    {/* Saved Primary Text Color Presets */}
-                    {savedTextPresets.length > 0 && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Saved Primary Text Color Presets</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {savedTextPresets.map((preset: any, index: number) => (
-                            <div key={index} className="flex items-center justify-between p-2 border rounded-lg">
-                              <div className="flex items-center space-x-2">
-                                <div 
-                                  className="w-4 h-4 rounded-full border"
-                                  style={{ backgroundColor: preset.color }}
-                                />
-                                <span className="text-sm" style={{ color: preset.color }}>
-                                  {preset.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleTextColorChange(preset.color)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Palette className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => deleteTextColorPreset(preset.name)}
-                                  className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+              </div>
+
+              <Separator />
+
+              {/* Secondary Text Color */}
+              <div className="space-y-4">
+                <Label className="text-base flex items-center">
+                  <Type className="h-4 w-4 mr-2" />
+                  Secondary Text Color
+                </Label>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Secondary text color for descriptions and less important content
+                </p>
+                
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="color"
+                      value={textColorSecondary}
+                      onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
+                      className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
+                    />
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Color Value</Label>
+                      <Input
+                        type="text"
+                        value={textColorSecondary}
+                        onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
+                        className="w-32 text-sm"
+                        placeholder="#6b7280"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <div 
+                      className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-sm bg-white dark:bg-gray-800"
+                      style={{ color: textColorSecondary }}
+                    >
+                      Secondary Text
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+
+            </CardContent>
+          </Card>
+
+          {/* Change Password */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Lock className="h-5 w-5 mr-2" />
+                Change Password
+              </CardTitle>
+              <CardDescription>
+                Update your password to keep your account secure.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...passwordForm}>
+                <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-6">
+                  <FormField
+                    control={passwordForm.control}
+                    name="currentPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showCurrentPassword ? "text" : "password"}
+                              placeholder="Enter your current password"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            >
+                              {showCurrentPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
                     )}
-                  </div>
-
-                  <Separator />
-
-                  {/* Secondary Text Color */}
-                  <div className="space-y-4">
-                    <Label className="text-base flex items-center">
-                      <Type className="h-4 w-4 mr-2" />
-                      Secondary Text Color
-                    </Label>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Secondary text color for descriptions and less important content
-                    </p>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="color"
-                          value={textColorSecondary}
-                          onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
-                          className="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600 cursor-pointer"
-                        />
-                        <div className="space-y-1">
-                          <Label className="text-sm font-medium">Color Value</Label>
-                          <Input
-                            type="text"
-                            value={textColorSecondary}
-                            onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
-                            className="w-32 text-sm"
-                            placeholder="#6b7280"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <div 
-                          className="w-32 h-10 rounded border-2 border-gray-300 dark:border-gray-600 flex items-center justify-center text-sm bg-white dark:bg-gray-800"
-                          style={{ color: textColorSecondary }}
-                        >
-                          Secondary Text
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
+                  />
+                  <FormField
+                    control={passwordForm.control}
+                    name="newPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>New Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showNewPassword ? "text" : "password"}
+                              placeholder="Enter your new password"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowNewPassword(!showNewPassword)}
+                            >
+                              {showNewPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={passwordForm.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Confirm New Password</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type={showConfirmPassword ? "text" : "password"}
+                              placeholder="Confirm your new password"
+                              {...field}
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? (
+                                <EyeOff className="h-4 w-4" />
+                              ) : (
+                                <Eye className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <Button 
-                    onClick={handleSaveAppearance} 
+                    type="submit" 
                     className="w-full"
+                    disabled={changePasswordMutation.isPending}
                     style={{ 
                       backgroundColor: customColor,
                       borderColor: customColor
                     }}
                   >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Text Color Settings
+                    {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
                   </Button>
-                </CardContent>
-              </Card>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
 
-              {/* Change Password */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Lock className="h-5 w-5 mr-2" />
-                    Change Password
-                  </CardTitle>
-                  <CardDescription>
-                    Update your password to keep your account secure.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...passwordForm}>
-                    <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-6">
-                      <FormField
-                        control={passwordForm.control}
-                        name="currentPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Current Password</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showCurrentPassword ? "text" : "password"}
-                                  placeholder="Enter your current password"
-                                  {...field}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                >
-                                  {showCurrentPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={passwordForm.control}
-                        name="newPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>New Password</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showNewPassword ? "text" : "password"}
-                                  placeholder="Enter your new password"
-                                  {...field}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowNewPassword(!showNewPassword)}
-                                >
-                                  {showNewPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={passwordForm.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Confirm New Password</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input
-                                  type={showConfirmPassword ? "text" : "password"}
-                                  placeholder="Confirm your new password"
-                                  {...field}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                >
-                                  {showConfirmPassword ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </Button>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <Button 
-                        type="submit" 
-                        className="w-full"
-                        disabled={changePasswordMutation.isPending}
-                        style={{ 
-                          backgroundColor: customColor,
-                          borderColor: customColor
-                        }}
-                      >
-                        {changePasswordMutation.isPending ? "Changing..." : "Change Password"}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
+          {/* Notifications */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Bell className="h-5 w-5 mr-2" />
+                Notifications
+              </CardTitle>
+              <CardDescription>
+                Control how you receive notifications from the platform.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base flex items-center">
+                    <Mail className="h-4 w-4 mr-2" />
+                    Email Notifications
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive notifications via email
+                  </p>
+                </div>
+                <Switch
+                  checked={emailNotifications}
+                  onCheckedChange={setEmailNotifications}
+                />
+              </div>
 
-              {/* Notifications */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Bell className="h-5 w-5 mr-2" />
-                    Notifications
-                  </CardTitle>
-                  <CardDescription>
-                    Control how you receive notifications from the platform.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base flex items-center">
-                        <Mail className="h-4 w-4 mr-2" />
-                        Email Notifications
-                      </Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive notifications via email
-                      </p>
-                    </div>
-                    <Switch
-                      checked={emailNotifications}
-                      onCheckedChange={setEmailNotifications}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base flex items-center">
+                    <Smartphone className="h-4 w-4 mr-2" />
+                    SMS Notifications
+                  </Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive notifications via SMS
+                  </p>
+                </div>
+                <Switch
+                  checked={smsNotifications}
+                  onCheckedChange={setSmsNotifications}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base flex items-center">
-                        <Smartphone className="h-4 w-4 mr-2" />
-                        SMS Notifications
-                      </Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive notifications via SMS
-                      </p>
-                    </div>
-                    <Switch
-                      checked={smsNotifications}
-                      onCheckedChange={setSmsNotifications}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Push Notifications</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive push notifications in your browser
+                  </p>
+                </div>
+                <Switch
+                  checked={pushNotifications}
+                  onCheckedChange={setPushNotifications}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Push Notifications</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive push notifications in your browser
-                      </p>
-                    </div>
-                    <Switch
-                      checked={pushNotifications}
-                      onCheckedChange={setPushNotifications}
-                    />
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Marketing Emails</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Receive promotional emails and updates
+                  </p>
+                </div>
+                <Switch
+                  checked={marketingEmails}
+                  onCheckedChange={setMarketingEmails}
+                />
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Marketing Emails</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Receive promotional emails and updates
-                      </p>
-                    </div>
-                    <Switch
-                      checked={marketingEmails}
-                      onCheckedChange={setMarketingEmails}
-                    />
-                  </div>
+              <Button 
+                className="w-full h-12"
+                style={{ 
+                  backgroundColor: customColor,
+                  borderColor: customColor
+                }}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Save Notification Preferences
+              </Button>
+            </CardContent>
+          </Card>
 
-                  <Button 
-                    className="w-full h-12"
-                    style={{ 
-                      backgroundColor: customColor,
-                      borderColor: customColor
-                    }}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Notification Preferences
-                  </Button>
-                </CardContent>
-              </Card>
+          {/* Privacy & Security */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Shield className="h-5 w-5 mr-2" />
+                Privacy & Security
+              </CardTitle>
+              <CardDescription>
+                Manage your privacy settings and security preferences.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Two-Factor Authentication</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Add an extra layer of security to your account
+                  </p>
+                </div>
+                <Button variant="outline" className="h-10 min-w-[80px]">
+                  Enable
+                </Button>
+              </div>
 
-              {/* Privacy & Security */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Shield className="h-5 w-5 mr-2" />
-                    Privacy & Security
-                  </CardTitle>
-                  <CardDescription>
-                    Manage your privacy settings and security preferences.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Two-Factor Authentication</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Add an extra layer of security to your account
-                      </p>
-                    </div>
-                    <Button variant="outline" className="h-10 min-w-[80px]">
-                      Enable
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Profile Visibility</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Control who can see your profile information
+                  </p>
+                </div>
+                <Button variant="outline" className="h-10 min-w-[80px]">
+                  Manage
+                </Button>
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Profile Visibility</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Control who can see your profile information
-                      </p>
-                    </div>
-                    <Button variant="outline" className="h-10 min-w-[80px]">
-                      Manage
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Data Export</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Download a copy of your data
+                  </p>
+                </div>
+                <Button variant="outline" className="h-10 min-w-[80px]">
+                  Export
+                </Button>
+              </div>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Data Export</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Download a copy of your data
-                      </p>
-                    </div>
-                    <Button variant="outline" className="h-10 min-w-[80px]">
-                      Export
-                    </Button>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-base text-red-600 dark:text-red-400">Delete Account</Label>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Permanently delete your account and all data
+                  </p>
+                </div>
+                <Button variant="destructive" className="h-10 min-w-[80px]">
+                  Delete
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label className="text-base text-red-600 dark:text-red-400">Delete Account</Label>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Permanently delete your account and all data
-                      </p>
-                    </div>
-                    <Button variant="destructive" className="h-10 min-w-[80px]">
-                      Delete
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Business Timezone */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Business Timezone</CardTitle>
+              <CardDescription>
+                Select the timezone for your business. All appointment times will be shown in this timezone.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Label htmlFor="timezone">Timezone</Label>
+              <select
+                id="timezone"
+                value={timezone}
+                onChange={handleTimezoneChange}
+                className="block w-full mt-2 p-2 border rounded"
+              >
+                {timeZones.map((tz) => (
+                  <option key={tz} value={tz}>{tz}</option>
+                ))}
+              </select>
+              <Button className="mt-4" onClick={handleSaveTimezone}>Save</Button>
+            </CardContent>
+          </Card>
 
-            </div>
-          </div>
-        </main>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

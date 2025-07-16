@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect } from "react";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import Header from "@/components/layout/header";

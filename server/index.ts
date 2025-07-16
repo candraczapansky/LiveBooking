@@ -9,6 +9,21 @@ import { AutoRenewalService } from "./auto-renewal-service";
 config();
 
 const app = express();
+
+// Add CORS support for external applications
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
@@ -70,10 +85,9 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // ALWAYS serve the app on port 5000
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = 5000;
+    // Use port 5000 for deployment (as expected by .replit)
+    // or port 5052 for development
+    const port = process.env.NODE_ENV === 'production' ? 5000 : 5052;
     server.listen({
       port,
       host: "0.0.0.0",

@@ -21,7 +21,7 @@ type StaffMember = {
 };
 
 const SchedulePage = () => {
-  useDocumentTitle("Staff Schedule | Glo Head Spa");
+  useDocumentTitle("Staff Working Hours | Glo Head Spa");
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
 
@@ -82,12 +82,12 @@ const SchedulePage = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                      Staff Schedules
-                    </h1>
-                    <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                      Click on a staff member to view and manage their schedule
-                    </p>
+                                      <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                    Staff Working Hours
+                  </h1>
+                  <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                    Click on a staff member to set their working days and hours
+                  </p>
                   </div>
                   <Button 
                     onClick={() => setLocation('/staff-schedule')}

@@ -1027,7 +1027,7 @@ export default function PointOfSale() {
                 <div className="flex-1 min-h-0">
                   {activeTab === 'services' ? (
                     servicesLoading ? (
-                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
                         {[1, 2, 3, 4, 5, 6].map((i) => (
                           <Card key={i} className="animate-pulse">
                             <CardContent className="p-3 sm:p-4">
@@ -1039,9 +1039,9 @@ export default function PointOfSale() {
                         ))}
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
+                      <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-2 sm:gap-3 lg:gap-4">
                         {filteredServices.map((service: Service) => (
-                          <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                          <Card key={service.id} className="cursor-pointer hover:shadow-md transition-shadow min-w-[260px]">
                             <CardContent className="p-3 sm:p-4">
                               <div className="flex justify-between items-start mb-2">
                                 <h3 className="font-semibold text-base sm:text-lg">{service.name}</h3>
@@ -1089,7 +1089,7 @@ export default function PointOfSale() {
                     ) : (
                       <div className="grid grid-cols-1 min-[480px]:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2 sm:gap-3 lg:gap-4">
                         {filteredProducts.map((product: Product) => (
-                          <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow">
+                          <Card key={product.id} className="cursor-pointer hover:shadow-md transition-shadow min-w-[260px]">
                             <CardContent className="p-3 sm:p-4">
                               <div className="flex justify-between items-start mb-2">
                                 <h3 className="font-semibold text-base sm:text-lg">{product.name}</h3>

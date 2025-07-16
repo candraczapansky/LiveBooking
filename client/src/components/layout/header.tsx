@@ -1,7 +1,7 @@
 import { useContext, useState, useEffect } from "react";
 import { Settings, User, LogOut, ChevronDown, Menu } from "lucide-react";
 import { Link } from "wouter";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,16 +53,11 @@ const Header = () => {
       setLocalUser(user);
     }
 
-    // Listen for profile picture changes via custom event
-    const handleProfilePictureUpdate = (event: CustomEvent) => {
-      setProfilePicture(event.detail);
-    };
-
-    // Listen for user data updates from settings page
+    // Listen for user data updates (includes profile picture updates)
     const handleUserDataUpdate = (event: CustomEvent) => {
       console.log('Header received user data update:', event.detail);
       setLocalUser(event.detail);
-      // Also update profile picture if included in the event
+      // Update profile picture if included in the event
       if (event.detail && event.detail.profilePicture) {
         setProfilePicture(event.detail.profilePicture);
         localStorage.setItem('profilePicture', event.detail.profilePicture);
@@ -86,12 +81,10 @@ const Header = () => {
       }
     };
 
-    window.addEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
     window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
     window.addEventListener('storage', handleStorageChange);
     
     return () => {
-      window.removeEventListener('profilePictureUpdated', handleProfilePictureUpdate as EventListener);
       window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
       window.removeEventListener('storage', handleStorageChange);
     };
@@ -149,7 +142,11 @@ const Header = () => {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={logout} className="text-red-600 focus:text-red-600">
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="text-red-600 focus:text-red-600 border border-red-500 bg-transparent hover:border-2 hover:border-red-600 hover:text-red-700 focus:border-2 focus:border-red-600 focus:text-red-700 rounded-md transition-colors"
+                  style={{ color: 'hsl(0 84% 60%)', background: 'transparent' }}
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span style={{ color: 'hsl(0 84% 60%)' }}>Sign out</span>
                 </DropdownMenuItem>

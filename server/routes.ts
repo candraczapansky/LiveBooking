@@ -44,6 +44,7 @@ import { PhoneService } from "./phone-service";
 import { PayrollAutoSync } from "./payroll-auto-sync";
 import { AutoRenewalService } from "./auto-renewal-service";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
+import { registerExternalRoutes } from "./external-api";
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -103,14 +104,17 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Auth routes
   app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
+    console.log("[DEBUG] Login attempt:", { username, password });
     
     if (!username || !password) {
       return res.status(400).json({ error: "Username and password are required" });
     }
     
     const user = await storage.getUserByUsername(username);
+    console.log("[DEBUG] User from DB:", user);
     
     if (!user || user.password !== password) { // In real app, compare hashed passwords
+      console.log("[DEBUG] Invalid credentials for:", { username, password, userPassword: user ? user.password : null });
       return res.status(401).json({ error: "Invalid credentials" });
     }
     
@@ -291,6 +295,67 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
+  // SMS Password reset request
+  app.post("/api/forgot-password-sms", async (req, res) => {
+    const { phone } = req.body;
+    
+    if (!phone) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+
+    // Check if SMS service is configured
+    if (!isTwilioConfigured()) {
+      return res.status(400).json({ 
+        error: "SMS service not configured. Please contact support." 
+      });
+    }
+
+    try {
+      // Find user by phone number
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.phone === phone);
+      
+      if (!user) {
+        // Return success even if user doesn't exist to prevent phone enumeration
+        return res.status(200).json({ 
+          success: true, 
+          message: "If an account with this phone number exists, you will receive password reset instructions." 
+        });
+      }
+
+      // Generate reset token (in production, use a proper secure token)
+      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+      await storage.setPasswordResetToken(user.id, resetToken, resetTokenExpiry);
+
+      // Create reset URL
+      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+
+      // Send password reset SMS
+      const smsMessage = `Glo Head Spa: Reset your password by visiting ${resetUrl}. This link expires in 1 hour. If you didn't request this, please ignore.`;
+
+      const smsResult = await sendSMS(phone, smsMessage);
+      
+      if (smsResult.success) {
+        res.status(200).json({ 
+          success: true, 
+          message: "If an account with this phone number exists, you will receive password reset instructions." 
+        });
+      } else {
+        res.status(500).json({ 
+          error: "Failed to send reset SMS. Please try again." 
+        });
+      }
+
+    } catch (error: any) {
+      console.error('SMS Password reset request error:', error);
+      res.status(500).json({ 
+        error: "Something went wrong. Please try again." 
+      });
+    }
+  });
+
   // Client registration route (without username/password)
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
     const { email } = req.body;
@@ -449,6 +514,8 @@ If you didn't request this password reset, please ignore this email and your pas
       return res.status(500).json({ error: "Failed to fetch users" });
     }
   });
+
+
 
   // Update user profile route
   app.put("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
@@ -1350,6 +1417,50 @@ If you didn't request this password reset, please ignore this email and your pas
       });
     }
     
+    // Check for blocked schedules
+    const appointmentDate = new Date(startTime);
+    const dayName = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateString = appointmentDate.toISOString().slice(0, 10);
+    
+    const staffSchedules = await storage.getStaffSchedulesByStaffId(staffId);
+    const blockedSchedules = staffSchedules.filter((schedule: any) => 
+      schedule.dayOfWeek === dayName &&
+      schedule.startDate <= dateString &&
+      (!schedule.endDate || schedule.endDate >= dateString) &&
+      schedule.isBlocked
+    );
+    
+    // Check if the appointment time falls within any blocked schedule
+    for (const blockedSchedule of blockedSchedules) {
+      const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+      const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+      
+      const blockStart = new Date(appointmentDate);
+      blockStart.setHours(blockStartHour, blockStartMinute, 0, 0);
+      
+      const blockEnd = new Date(appointmentDate);
+      blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
+      
+      // Check if the new appointment overlaps with the blocked time
+      if (newStart < blockEnd && newEnd > blockStart) {
+        const blockStartTime = blockStart.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true 
+        });
+        const blockEndTime = blockEnd.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true 
+        });
+        
+        return res.status(409).json({ 
+          error: "Blocked Time Slot",
+          message: `This time slot is blocked and unavailable for appointments (${blockStartTime} - ${blockEndTime}). Please choose a different time slot.`
+        });
+      }
+    }
+    
     // Get service details to calculate total amount
     const service = await storage.getService(req.body.serviceId);
     if (!service) {
@@ -1512,6 +1623,50 @@ If you didn't request this password reset, please ignore this email and your pas
             message: `The updated time slot conflicts with an existing appointment (${conflictStart} - ${conflictEnd}). Please choose a different time slot.`
           });
         }
+        
+        // Check for blocked schedules
+        const appointmentDate = new Date(startTime);
+        const dayName = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+        const dateString = appointmentDate.toISOString().slice(0, 10);
+        
+        const staffSchedules = await storage.getStaffSchedulesByStaffId(staffId);
+        const blockedSchedules = staffSchedules.filter((schedule: any) => 
+          schedule.dayOfWeek === dayName &&
+          schedule.startDate <= dateString &&
+          (!schedule.endDate || schedule.endDate >= dateString) &&
+          schedule.isBlocked
+        );
+        
+        // Check if the appointment time falls within any blocked schedule
+        for (const blockedSchedule of blockedSchedules) {
+          const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+          const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+          
+          const blockStart = new Date(appointmentDate);
+          blockStart.setHours(blockStartHour, blockStartMinute, 0, 0);
+          
+          const blockEnd = new Date(appointmentDate);
+          blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
+          
+          // Check if the new appointment overlaps with the blocked time
+          if (newStart < blockEnd && newEnd > blockStart) {
+            const blockStartTime = blockStart.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit', 
+              hour12: true 
+            });
+            const blockEndTime = blockEnd.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit', 
+              hour12: true 
+            });
+            
+            return res.status(409).json({ 
+              error: "Blocked Time Slot",
+              message: `The updated time slot is blocked and unavailable for appointments (${blockStartTime} - ${blockEndTime}). Please choose a different time slot.`
+            });
+          }
+        }
       }
       
       const updatedAppointment = await storage.updateAppointment(id, req.body);
@@ -1657,414 +1812,7 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
-  // External Data API - Provides staff schedules and services for external frontend apps
-  app.get("/api/external/staff-availability", async (req, res) => {
-    try {
-      const { date, staffId } = req.query;
-      
-      // Get all staff with their user details
-      const allStaff = await storage.getAllStaff();
-      const staffWithDetails = await Promise.all(
-        allStaff.map(async (staff) => {
-          const user = await storage.getUser(staff.userId);
-          const schedules = await storage.getStaffSchedulesByStaffId(staff.id);
-          const services = await storage.getStaffServices(staff.id);
-          
-          // Get detailed service information
-          const serviceDetails = await Promise.all(
-            services.map(async (staffService) => {
-              const service = await storage.getService(staffService.serviceId);
-              const category = service ? await storage.getServiceCategory(service.categoryId) : null;
-              return {
-                id: service?.id,
-                name: service?.name,
-                duration: service?.duration,
-                price: service?.price,
-                category: category?.name,
-                customRate: staffService.customRate,
-                customCommissionRate: staffService.customCommissionRate
-              };
-            })
-          );
-          
-          return {
-            id: staff.id,
-            userId: staff.userId,
-            title: staff.title,
-            commissionType: staff.commissionType,
-            commissionRate: staff.commissionRate,
-            hourlyRate: staff.hourlyRate,
-            fixedRate: staff.fixedRate,
-            user: user ? {
-              id: user.id,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              email: user.email,
-              phone: user.phone
-            } : null,
-            schedules: schedules,
-            services: serviceDetails.filter(s => s.id) // Remove null services
-          };
-        })
-      );
-      
-      // Filter by specific staff member if requested
-      const result = staffId 
-        ? staffWithDetails.filter(staff => staff.id === parseInt(staffId as string))
-        : staffWithDetails;
-      
-      res.json({
-        success: true,
-        data: result,
-        timestamp: new Date().toISOString(),
-        filters: { date, staffId }
-      });
-    } catch (error: any) {
-      console.error('Error fetching staff availability:', error);
-      res.status(500).json({ 
-        error: "Failed to fetch staff availability",
-        details: error.message 
-      });
-    }
-  });
-
-  app.get("/api/external/services", async (req, res) => {
-    try {
-      const { categoryId, staffId } = req.query;
-      
-      // Get all services with categories and assigned staff
-      const allServices = await storage.getAllServices();
-      const servicesWithDetails = await Promise.all(
-        allServices.map(async (service) => {
-          const category = await storage.getServiceCategory(service.categoryId);
-          const staffAssignments = await storage.getStaffServicesByService(service.id);
-          
-          // Get staff details for each assignment
-          const assignedStaff = await Promise.all(
-            staffAssignments.map(async (assignment) => {
-              const staff = await storage.getStaff(assignment.staffId);
-              const user = staff ? await storage.getUser(staff.userId) : null;
-              return {
-                staffId: staff?.id,
-                customRate: assignment.customRate,
-                customCommissionRate: assignment.customCommissionRate,
-                staff: staff ? {
-                  id: staff.id,
-                  title: staff.title,
-                  user: user ? {
-                    firstName: user.firstName,
-                    lastName: user.lastName,
-                    email: user.email
-                  } : null
-                } : null
-              };
-            })
-          );
-          
-          return {
-            id: service.id,
-            name: service.name,
-            description: service.description,
-            duration: service.duration,
-            price: service.price,
-            color: service.color,
-            bufferTimeBefore: service.bufferTimeBefore,
-            bufferTimeAfter: service.bufferTimeAfter,
-            category: category ? {
-              id: category.id,
-              name: category.name,
-              color: category.color
-            } : null,
-            assignedStaff: assignedStaff.filter(a => a.staff)
-          };
-        })
-      );
-      
-      // Apply filters
-      let filteredServices = servicesWithDetails;
-      
-      if (categoryId) {
-        filteredServices = filteredServices.filter(service => 
-          service.category?.id === parseInt(categoryId as string)
-        );
-      }
-      
-      if (staffId) {
-        filteredServices = filteredServices.filter(service =>
-          service.assignedStaff.some(assignment => 
-            assignment.staffId === parseInt(staffId as string)
-          )
-        );
-      }
-      
-      res.json({
-        success: true,
-        data: filteredServices,
-        timestamp: new Date().toISOString(),
-        filters: { categoryId, staffId }
-      });
-    } catch (error: any) {
-      console.error('Error fetching services:', error);
-      res.status(500).json({ 
-        error: "Failed to fetch services",
-        details: error.message 
-      });
-    }
-  });
-
-  app.get("/api/external/service-categories", async (req, res) => {
-    try {
-      const categories = await storage.getAllServiceCategories();
-      
-      res.json({
-        success: true,
-        data: categories,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      console.error('Error fetching service categories:', error);
-      res.status(500).json({ 
-        error: "Failed to fetch service categories",
-        details: error.message 
-      });
-    }
-  });
-
-  // External Appointment Webhook - Receives new appointments from external frontend app
-  app.post("/api/appointments/webhook", async (req, res) => {
-    try {
-      console.log('Received appointment webhook data:', req.body);
-      
-      const {
-        clientId,
-        serviceId,
-        staffId,
-        startTime,
-        endTime,
-        notes,
-        status = 'confirmed',
-        externalAppointmentId,
-        clientInfo,
-        serviceInfo,
-        staffInfo
-      } = req.body;
-
-      // Validate required fields
-      if (!startTime || !endTime) {
-        return res.status(400).json({ 
-          error: "Missing required fields: startTime and endTime are required" 
-        });
-      }
-
-      let finalClientId = clientId;
-      let finalServiceId = serviceId;
-      let finalStaffId = staffId;
-
-      // If client doesn't exist but clientInfo is provided, create the client
-      if (!clientId && clientInfo) {
-        try {
-          const newClient = await storage.createUser({
-            username: clientInfo.email || `client_${Date.now()}`,
-            email: clientInfo.email || '',
-            password: 'temp_password_' + Math.random().toString(36).substr(2, 9),
-            role: 'client',
-            firstName: clientInfo.firstName || '',
-            lastName: clientInfo.lastName || '',
-            phone: clientInfo.phone || '',
-            address: clientInfo.address || null,
-            city: clientInfo.city || null,
-            state: clientInfo.state || null,
-            zipCode: clientInfo.zipCode || null
-          });
-          finalClientId = newClient.id;
-          console.log('Created new client from webhook:', newClient);
-        } catch (error) {
-          console.error('Failed to create client from webhook:', error);
-          return res.status(400).json({ error: "Failed to create client" });
-        }
-      }
-
-      // If service doesn't exist but serviceInfo is provided, create the service
-      if (!serviceId && serviceInfo) {
-        try {
-          // First ensure we have a category
-          let categoryId = serviceInfo.categoryId;
-          if (!categoryId && serviceInfo.categoryName) {
-            const categories = await storage.getAllServiceCategories();
-            let category = categories.find(c => c.name.toLowerCase() === serviceInfo.categoryName.toLowerCase());
-            if (!category) {
-              category = await storage.createServiceCategory({
-                name: serviceInfo.categoryName,
-                description: `Category for ${serviceInfo.categoryName} services`
-              });
-            }
-            categoryId = category.id;
-          }
-
-          const newService = await storage.createService({
-            name: serviceInfo.name || 'External Service',
-            description: serviceInfo.description || 'Service from external app',
-            price: serviceInfo.price || 0,
-            duration: serviceInfo.duration || 60,
-            categoryId: categoryId || 1, // Default category if none provided
-            color: serviceInfo.color || '#3b82f6'
-          });
-          finalServiceId = newService.id;
-          console.log('Created new service from webhook:', newService);
-        } catch (error) {
-          console.error('Failed to create service from webhook:', error);
-          return res.status(400).json({ error: "Failed to create service" });
-        }
-      }
-
-      // If staff doesn't exist but staffInfo is provided, create the staff member
-      if (!staffId && staffInfo) {
-        try {
-          const newStaffUser = await storage.createUser({
-            username: staffInfo.email || `staff_${Date.now()}`,
-            email: staffInfo.email || '',
-            password: 'temp_password_' + Math.random().toString(36).substr(2, 9),
-            role: 'staff',
-            firstName: staffInfo.firstName || '',
-            lastName: staffInfo.lastName || ''
-          });
-
-          const newStaff = await storage.createStaff({
-            userId: newStaffUser.id,
-            title: staffInfo.title || 'Stylist',
-            bio: staffInfo.bio || null,
-            commissionType: 'commission',
-            commissionRate: 0.3
-          });
-          finalStaffId = newStaff.id;
-          console.log('Created new staff from webhook:', newStaff);
-        } catch (error) {
-          console.error('Failed to create staff from webhook:', error);
-          return res.status(400).json({ error: "Failed to create staff member" });
-        }
-      }
-
-      // Check for scheduling conflicts with existing active appointments (exclude cancelled)
-      if (finalStaffId) {
-        const staffAppointments = await storage.getActiveAppointmentsByStaff(finalStaffId);
-        const newStart = new Date(startTime);
-        const newEnd = new Date(endTime);
-        
-        const conflictingAppointment = staffAppointments.find(appointment => {
-          const existingStart = new Date(appointment.startTime);
-          const existingEnd = new Date(appointment.endTime);
-          
-          // Check for any overlap
-          return newStart < existingEnd && newEnd > existingStart;
-        });
-        
-        if (conflictingAppointment) {
-          return res.status(409).json({ 
-            error: "Scheduling Conflict",
-            message: "The requested time slot conflicts with an existing appointment",
-            conflictingAppointment: {
-              id: conflictingAppointment.id,
-              startTime: conflictingAppointment.startTime,
-              endTime: conflictingAppointment.endTime
-            }
-          });
-        }
-      }
-
-      // Calculate total amount from service if available
-      let totalAmount = 0;
-      if (finalServiceId) {
-        try {
-          const service = await storage.getService(finalServiceId);
-          totalAmount = service?.price || 0;
-        } catch (error) {
-          console.log('Could not fetch service price, using 0');
-        }
-      }
-
-      // Create the appointment
-      const appointmentData = {
-        clientId: finalClientId,
-        serviceId: finalServiceId,
-        staffId: finalStaffId,
-        startTime: new Date(startTime),
-        endTime: new Date(endTime),
-        status,
-        notes: notes || `Appointment from external app${externalAppointmentId ? ` (External ID: ${externalAppointmentId})` : ''}`,
-        totalAmount,
-        externalId: externalAppointmentId || null
-      };
-
-      const newAppointment = await storage.createAppointment(appointmentData);
-      
-      // Trigger booking confirmation automation
-      try {
-        await triggerBookingConfirmation(newAppointment, storage);
-        console.log('Booking automation triggered for webhook appointment');
-      } catch (error) {
-        console.error('Failed to trigger booking automation:', error);
-      }
-
-      // Create notification for new appointment
-      try {
-        const client = finalClientId ? await storage.getUser(finalClientId) : null;
-        const service = finalServiceId ? await storage.getService(finalServiceId) : null;
-        
-        await storage.createNotification({
-          type: 'new_appointment',
-          title: 'New Appointment from External App',
-          message: `New appointment scheduled${client ? ` for ${client.firstName} ${client.lastName}` : ''}${service ? ` - ${service.name}` : ''}`,
-          relatedId: newAppointment.id,
-          userId: null
-        });
-      } catch (error) {
-        console.error('Failed to create notification for webhook appointment:', error);
-      }
-
-      console.log('Successfully created appointment from webhook:', newAppointment);
-      
-      res.status(201).json({
-        success: true,
-        message: "Appointment created successfully",
-        appointment: newAppointment,
-        createdEntities: {
-          client: !clientId && clientInfo ? { id: finalClientId, created: true } : null,
-          service: !serviceId && serviceInfo ? { id: finalServiceId, created: true } : null,
-          staff: !staffId && staffInfo ? { id: finalStaffId, created: true } : null
-        }
-      });
-
-    } catch (error: any) {
-      console.error('Error processing appointment webhook:', error);
-      res.status(500).json({ 
-        error: "Failed to create appointment",
-        details: error.message 
-      });
-    }
-  });
-
-  // Webhook status and testing endpoint
-  app.get("/api/appointments/webhook", async (req, res) => {
-    res.json({
-      status: "Appointment webhook endpoint is active",
-      endpoint: "/api/appointments/webhook",
-      method: "POST",
-      description: "Receives new appointments from external frontend applications",
-      requiredFields: ["startTime", "endTime"],
-      optionalFields: [
-        "clientId", "serviceId", "staffId",
-        "notes", "status", "externalAppointmentId",
-        "clientInfo", "serviceInfo", "staffInfo"
-      ],
-      features: [
-        "Auto-creates clients, services, and staff if not found",
-        "Checks for scheduling conflicts",
-        "Triggers booking automation",
-        "Creates notifications",
-        "Calculates service pricing"
-      ]
-    });
-  });
+  // External API routes are now handled by external-api.ts module
 
   // Appointment History routes
   app.get("/api/appointment-history", async (req, res) => {
@@ -5623,6 +5371,9 @@ Thank you for choosing Glo Head Spa!
       res.status(500).json({ error: "Failed to download recording" });
     }
   });
+
+  // Register external API routes
+  registerExternalRoutes(app, storage);
 
   const httpServer = createServer(app);
 

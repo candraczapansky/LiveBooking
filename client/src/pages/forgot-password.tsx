@@ -94,6 +94,13 @@ const ForgotPassword = () => {
                     Try Different Email
                   </Button>
                   <Button
+                    variant="outline"
+                    onClick={() => navigate("/forgot-password-sms")}
+                    className="w-full"
+                  >
+                    Try SMS Instead
+                  </Button>
+                  <Button
                     variant="default"
                     onClick={() => navigate("/login")}
                     className="w-full flex items-center gap-2"
@@ -159,15 +166,24 @@ const ForgotPassword = () => {
               </form>
             </Form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <Button
                 variant="ghost"
-                onClick={() => navigate("/login")}
-                className="text-sm flex items-center gap-2 mx-auto"
+                onClick={() => navigate("/forgot-password-sms")}
+                className="text-sm text-primary hover:text-primary/80"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Login
+                Try SMS Instead
               </Button>
+              <div>
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate("/login")}
+                  className="text-sm flex items-center gap-2 mx-auto"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Login
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

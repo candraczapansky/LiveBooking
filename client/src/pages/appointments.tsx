@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -8,1747 +8,481 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentForm from "@/components/appointments/appointment-form";
 import AppointmentCheckout from "@/components/appointments/appointment-checkout";
-import SimpleCalendar from "@/components/calendar/simple-calendar";
-import { PlusCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CreditCard, DollarSign } from "lucide-react";
+import AppointmentDetails from "@/components/appointments/appointment-details";
+import { Plus, Calendar, List, Clock, User, DollarSign, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { memo } from "react";
-
-// Force re-render when theme changes
-const forceDropdownRerender = () => {
-  const selectElements = document.querySelectorAll('[data-radix-select-content]');
-  selectElements.forEach(el => {
-    if (el instanceof HTMLElement) {
-      el.style.display = 'none';
-      requestAnimationFrame(() => {
-        el.style.display = '';
-      });
-    }
-  });
-};
-import { useLocation } from "wouter";
-
-const timeSlots = [
-  "8:00 AM", "8:15 AM", "8:30 AM", "8:45 AM",
-  "9:00 AM", "9:15 AM", "9:30 AM", "9:45 AM",
-  "10:00 AM", "10:15 AM", "10:30 AM", "10:45 AM",
-  "11:00 AM", "11:15 AM", "11:30 AM", "11:45 AM",
-  "12:00 PM", "12:15 PM", "12:30 PM", "12:45 PM",
-  "1:00 PM", "1:15 PM", "1:30 PM", "1:45 PM",
-  "2:00 PM", "2:15 PM", "2:30 PM", "2:45 PM",
-  "3:00 PM", "3:15 PM", "3:30 PM", "3:45 PM",
-  "4:00 PM", "4:15 PM", "4:30 PM", "4:45 PM",
-  "5:00 PM", "5:15 PM", "5:30 PM", "5:45 PM",
-  "6:00 PM", "6:15 PM", "6:30 PM", "6:45 PM",
-  "7:00 PM", "7:15 PM", "7:30 PM", "7:45 PM",
-  "8:00 PM", "8:15 PM", "8:30 PM", "8:45 PM",
-  "9:00 PM", "9:15 PM", "9:30 PM", "9:45 PM",
-  "10:00 PM"
-];
-
-// Memoized appointment component to prevent unnecessary re-renders
-const AppointmentBlock = memo(({ 
-  appointment, 
-  appointmentStyle, 
-  columnIndex, 
-  columnWidth, 
-  service, 
-  client, 
-  staff,
-  onAppointmentClick,
-  draggedAppointment,
-  onDragStart,
-  onDragEnd 
-}: any) => {
-  // Apply the same timezone conversion as positioning calculation
-  const convertLocalToISO = (dateTimeString: string | Date) => {
-    const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
-    
-    if (!date || isNaN(date.getTime())) {
-      return new Date();
-    }
-    
-    // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
-    if (date.getUTCHours() === 15) {
-      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
-    }
-    
-    // For other times, treat the UTC time as the intended local time
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const day = date.getDate();
-    const hours = date.getUTCHours();
-    const minutes = date.getUTCMinutes();
-    
-    return new Date(year, month, day, hours, minutes);
-  };
-  
-  const startTime = convertLocalToISO(appointment.startTime);
-  const timeString = startTime.toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit',
-    hour12: true
-  });
-
-  const isPaid = appointment.paymentStatus === 'paid';
-  const serviceColor = appointment.service?.color || service?.color || '#6b7280';
-  const backgroundColor = serviceColor;
-  const borderColor = serviceColor;
-  
-  const isServiceColorLight = (color: string) => {
-    const hex = color.replace('#', '');
-    const r = parseInt(hex.substr(0, 2), 16);
-    const g = parseInt(hex.substr(2, 2), 16);
-    const b = parseInt(hex.substr(4, 2), 16);
-    const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-    return brightness > 155;
-  };
-
-  const serviceName = service?.name || 'Service';
-  const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
-  const duration = service?.duration || 60;
-
-  return (
-    <div
-      key={appointment.id}
-      draggable
-      onDragStart={(e) => onDragStart(e, appointment)}
-      onDragEnd={onDragEnd}
-      onClick={(e) => {
-        e.stopPropagation();
-        onAppointmentClick(appointment.id);
-      }}
-      className="absolute pointer-events-auto rounded-lg border-l-4 p-2 shadow-sm hover:shadow-lg transition-all duration-150 cursor-pointer hover:scale-[1.02] group relative"
-      style={{
-        left: `${80 + (columnIndex * columnWidth) + 4}px`,
-        width: `${columnWidth - 8}px`,
-        ...appointmentStyle,
-        backgroundColor: backgroundColor,
-        borderLeftColor: borderColor,
-        color: isServiceColorLight(serviceColor) ? '#000000' : '#ffffff',
-        opacity: draggedAppointment?.id === appointment.id ? 0.5 : 1
-      }}
-    >
-      {isPaid && (
-        <div className="absolute top-1 right-1 bg-white/20 text-white px-1 py-0.5 rounded text-xs font-medium">
-          PAID
-        </div>
-      )}
-      <div className="text-xs font-medium leading-tight mb-1" title={serviceName}>
-        {serviceName}
-      </div>
-      <div className="text-xs opacity-90 leading-tight mb-1" title={clientName}>
-        {clientName}
-      </div>
-      <div className="text-xs opacity-75 leading-tight" title={`${timeString} • ${duration} min`}>
-        {timeString} • {duration} min
-      </div>
-    </div>
-  );
-}, (prevProps, nextProps) => {
-  // Only re-render if the appointment data actually changed
-  return (
-    prevProps.appointment.id === nextProps.appointment.id &&
-    prevProps.appointment.startTime === nextProps.appointment.startTime &&
-    prevProps.appointment.paymentStatus === nextProps.appointment.paymentStatus &&
-    prevProps.appointmentStyle.top === nextProps.appointmentStyle.top &&
-    prevProps.appointmentStyle.height === nextProps.appointmentStyle.height &&
-    prevProps.columnIndex === nextProps.columnIndex &&
-    prevProps.columnWidth === nextProps.columnWidth
-  );
-});
+import { formatTime, formatPrice } from "@/lib/utils";
+import BigCalendar, { AppointmentEvent, CalendarResource } from "@/components/calendar/BigCalendar";
+import { Calendar as MiniCalendar } from "@/components/ui/calendar";
+import { addMinutes, startOfDay, endOfDay, isWithinInterval, setHours, setMinutes, getDay } from 'date-fns';
 
 const AppointmentsPage = () => {
-  useDocumentTitle("Appointments | Glo Head Spa");
+  useDocumentTitle("Client Appointments | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [location, setLocation] = useLocation();
+  const { isOpen: sidebarOpen } = useSidebar();
+  
+  // State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [currentDate, setCurrentDate] = useState(new Date()); // Use today's date by default
-  const { isOpen: sidebarOpen } = useSidebar();
-  const [viewMode, setViewMode] = useState("day");
-  const [selectedStaff, setSelectedStaff] = useState("all");
-  const [selectedService, setSelectedService] = useState("all");
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [draggedAppointment, setDraggedAppointment] = useState<any>(null);
-  const [dragOverTimeSlot, setDragOverTimeSlot] = useState<string | null>(null);
-  const [hoverInfo, setHoverInfo] = useState({ visible: false, time: '', x: 0, y: 0 });
-  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>("week");
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
+  const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
 
-  // Calculate time from position in calendar
-  const calculateTimeFromPosition = (y: number, timeSlotHeight: number) => {
-    const startHour = 8; // 8:00 AM
-    const minutesPerPixel = 15 / (timeSlotHeight / 4); // 15 minutes per quarter slot
-    const totalMinutes = y * minutesPerPixel;
-    
-    const hours = Math.floor(totalMinutes / 60) + startHour;
-    const minutes = Math.floor(totalMinutes % 60);
-    
-    // Round to nearest 15 minutes
-    const roundedMinutes = Math.round(minutes / 15) * 15;
-    
-    // Format time
-    const displayHours = hours > 12 ? hours - 12 : hours;
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const formattedHours = displayHours === 0 ? 12 : displayHours;
-    
-    return `${formattedHours}:${roundedMinutes.toString().padStart(2, '0')} ${ampm}`;
-  };
-
-  // Handle mouse move over calendar time slots
-  const handleCalendarMouseMove = (e: React.MouseEvent, timeSlotIndex: number) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const y = e.clientY - rect.top;
-    const time = calculateTimeFromPosition(timeSlotIndex * 60 + y, 60);
-    
-    setHoverInfo({
-      visible: true,
-      time: time,
-      x: e.clientX,
-      y: e.clientY
-    });
-  };
-
-  // Handle mouse leave calendar
-  const handleCalendarMouseLeave = () => {
-    setHoverInfo({ visible: false, time: '', x: 0, y: 0 });
-  };
-
-  // Handle quick action navigation
-  useEffect(() => {
-    try {
-      const searchParams = new URLSearchParams(location.split('?')[1] || '');
-      if (searchParams.get('new') === 'true') {
-        setSelectedAppointmentId(null);
-        setIsFormOpen(true);
-        // Clean up URL without triggering navigation
-        window.history.replaceState({}, '', '/appointments');
-      }
-    } catch (error) {
-      console.log('URL parameter parsing error:', error);
-    }
-  }, [location]);
-
-  // Fetch appointments from API
-  const { data: appointments = [], isLoading: appointmentsLoading, refetch: refetchAppointments } = useQuery({
+  // Queries
+  const { data: appointments = [], isLoading: appointmentsLoading, refetch } = useQuery({
     queryKey: ['/api/appointments'],
+    queryFn: async () => {
+      const response = await fetch('/api/appointments');
+      if (!response.ok) throw new Error('Failed to fetch appointments');
+      return response.json();
+    },
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
-  // Fetch staff from API
-  const { data: staff = [], isLoading: staffLoading } = useQuery({
+  const { data: staff = [] } = useQuery({
     queryKey: ['/api/staff'],
+    queryFn: async () => {
+      const response = await fetch('/api/staff');
+      if (!response.ok) throw new Error('Failed to fetch staff');
+      return response.json();
+    },
   });
 
-  // Fetch services from API
-  const { data: services = [], isLoading: servicesLoading } = useQuery({
+  const { data: services = [] } = useQuery({
     queryKey: ['/api/services'],
+    queryFn: async () => {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
+      return response.json();
+    },
   });
 
-  // Fetch users to get client information
-  const { data: users = [], isLoading: usersLoading } = useQuery({
+  const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch users');
+      return response.json();
+    },
   });
 
-  // Fetch staff schedules
   const { data: schedules = [] } = useQuery({
     queryKey: ['/api/schedules'],
   });
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  };
+  // Force refetch appointments when component mounts (after login)
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
 
-  // Helper function to get day name from date
-  const getDayName = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
-  };
-
-  // Helper function to format date as YYYY-MM-DD
-  const formatDateForComparison = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
-
-  // Convert 12-hour time format to 24-hour
-  const convertTo24Hour = (time12h: string) => {
-    const [time, modifier] = time12h.split(' ');
-    let [hours, minutes] = time.split(':');
-    if (hours === '12') {
-      hours = '00';
-    }
-    if (modifier === 'PM') {
-      hours = (parseInt(hours, 10) + 12).toString();
-    }
-    return `${hours.padStart(2, '0')}:${minutes}`;
-  };
-
-  // Check if a staff member is available at a specific time
-  const isStaffAvailable = (staffId: number, timeSlot: string, date: Date) => {
-    const dayName = getDayName(date);
-    const currentDate = formatDateForComparison(date);
-    
-    // Ensure schedules is an array
-    if (!Array.isArray(schedules)) {
-      return true; // Default to available if no schedule data
-    }
-    
-    // Find schedules for this staff member on this day
-    const staffSchedules = schedules.filter((schedule: any) => 
-      schedule.staffId === staffId && 
-      schedule.dayOfWeek === dayName &&
-      schedule.startDate <= currentDate &&
-      (!schedule.endDate || schedule.endDate >= currentDate)
-    );
-
-    if (staffSchedules.length === 0) {
-      return true; // Default to available if no specific schedule
-    }
-
-    // Convert time slot to 24-hour format for comparison
-    const timeSlot24 = convertTo24Hour(timeSlot);
-    
-    // Check if the time slot falls within any of the scheduled periods
-    return staffSchedules.some((schedule: any) => {
-      const startTime = schedule.startTime.substring(0, 5); // Remove seconds
-      const endTime = schedule.endTime.substring(0, 5);
-      return timeSlot24 >= startTime && timeSlot24 < endTime && !schedule.isBlocked;
-    });
-  };
-
-  const getWeekDays = (date: Date) => {
-    const week = [];
-    const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay());
-    
-    for (let i = 0; i < 7; i++) {
-      const day = new Date(startOfWeek);
-      day.setDate(startOfWeek.getDate() + i);
-      week.push(day);
-    }
-    return week;
-  };
-
-  const getDaysInMonth = (date: Date) => {
-    const year = date.getFullYear();
-    const month = date.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDay = firstDay.getDay();
-    
-    const days = [];
-    
-    // Add empty cells for days before the first day of the month
-    for (let i = 0; i < startingDay; i++) {
-      days.push(null);
-    }
-    
-    // Add all days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(new Date(year, month, day));
-    }
-    
-    return days;
-  };
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    const newDate = new Date(currentDate);
-    
-    if (viewMode === 'day') {
-      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 1 : -1));
-    } else if (viewMode === 'week') {
-      newDate.setDate(currentDate.getDate() + (direction === 'next' ? 7 : -7));
-    } else if (viewMode === 'month') {
-      newDate.setMonth(currentDate.getMonth() + (direction === 'next' ? 1 : -1));
-    }
-    
-    setCurrentDate(newDate);
-  };
-
-  const zoomIn = () => {
-    if (zoomLevel < 3) {
-      setZoomLevel(prev => Math.min(prev + 0.5, 3));
-    }
-  };
-
-  const zoomOut = () => {
-    if (zoomLevel > 0.5) {
-      setZoomLevel(prev => Math.max(prev - 0.5, 0.5));
-    }
-  };
-
-  const handlePayment = (appointment: any) => {
-    // Get service details and calculate amount
-    const service = Array.isArray(services) ? services.find((s: any) => s.id === appointment.serviceId) : null;
-    const staffMember = Array.isArray(staff) ? staff.find((s: any) => s.id === appointment.staffId) : null;
-    const client = Array.isArray(users) ? users.find((u: any) => u.id === appointment.clientId) : null;
-    
-    // Use totalAmount from appointment if available, otherwise fallback to service price
-    const paymentAmount = appointment.totalAmount || service?.price || 0;
-    
-    const checkoutData = {
-      id: appointment.id,
-      clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
-      serviceName: service?.name || 'Unknown Service',
-      staffName: staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff',
-      startTime: new Date(appointment.startTime),
-      endTime: new Date(appointment.endTime),
-      amount: paymentAmount,
-      status: appointment.status,
-      paymentStatus: appointment.paymentStatus || 'unpaid'
-    };
-    
-    setCheckoutAppointment(checkoutData);
-    setIsCheckoutOpen(true);
-  };
-
-  const handlePaymentSuccess = () => {
-    toast({
-      title: "Payment Successful",
-      description: "The appointment payment has been processed successfully.",
-    });
-    // Refresh appointments data without page reload
-    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-    setIsCheckoutOpen(false);
-    setCheckoutAppointment(null);
-  };
-
-  // Drag and drop mutation
-  const dragMutation = useMutation({
-    mutationFn: async ({ appointmentId, newStartTime }: { appointmentId: number; newStartTime: Date }) => {
-      const appointment = Array.isArray(appointments) ? appointments.find((apt: any) => apt.id === appointmentId) : null;
-      if (!appointment) throw new Error('Appointment not found');
-
-      const service = Array.isArray(services) ? services.find((s: any) => s.id === appointment.serviceId) : null;
-      const duration = service?.duration || 60;
-      const newEndTime = new Date(newStartTime.getTime() + duration * 60 * 1000);
-
-      const updatedAppointment = {
-        serviceId: appointment.serviceId,
-        staffId: appointment.staffId,
-        clientId: appointment.clientId,
-        startTime: newStartTime.toISOString(),
-        endTime: newEndTime.toISOString(),
-        status: appointment.status,
-        notes: appointment.notes,
-      };
-
-      return apiRequest("PUT", `/api/appointments/${appointmentId}`, updatedAppointment);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      toast({
-        title: "Appointment Moved",
-        description: "The appointment has been successfully rescheduled.",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to move appointment.",
-        variant: "destructive",
-      });
-    },
+  // Filter appointments and resources based on selected staff filter
+  const filteredAppointments = appointments.filter((apt: any) => {
+    if (selectedStaffFilter === "all") return true;
+    return apt.staffId === parseInt(selectedStaffFilter);
   });
 
-  // Drag handlers
-  const handleDragStart = (e: React.DragEvent, appointment: any) => {
-    setDraggedAppointment(appointment);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', appointment.id.toString());
-  };
+  const filteredResources = staff.filter((s: any) => {
+    if (selectedStaffFilter === "all") return true;
+    return s.id === parseInt(selectedStaffFilter);
+  });
 
-  const handleDragEnd = () => {
-    setDraggedAppointment(null);
-    setDragOverTimeSlot(null);
-  };
-
-  const handleDragOver = (e: React.DragEvent, timeSlot: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setDragOverTimeSlot(timeSlot);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverTimeSlot(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, timeSlot: string) => {
-    e.preventDefault();
-    
-    if (!draggedAppointment) return;
-
-    // Check if the staff member is available at this time slot
-    const staffMember = Array.isArray(staff) ? staff.find((s: any) => s.id === draggedAppointment.staffId) : null;
-    if (!staffMember || !isStaffAvailable(staffMember.id, timeSlot, currentDate)) {
-      toast({
-        title: "Cannot Move Appointment",
-        description: "This staff member is not available at the selected time.",
-        variant: "destructive",
-      });
-      setDraggedAppointment(null);
-      setDragOverTimeSlot(null);
-      return;
+  // Reset staff filter when switching to day view (show all staff)
+  useEffect(() => {
+    if (calendarView === 'day') {
+      setSelectedStaffFilter("all");
     }
+  }, [calendarView]);
 
-    // Parse the time slot (e.g., "10:00 AM")
-    const [time, period] = timeSlot.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    let adjustedHours = hours;
-    
-    if (period === 'PM' && hours !== 12) {
-      adjustedHours += 12;
-    } else if (period === 'AM' && hours === 12) {
-      adjustedHours = 0;
-    }
-
-    const newStartTime = new Date(currentDate);
-    newStartTime.setHours(adjustedHours, minutes, 0, 0);
-
-    dragMutation.mutate({
-      appointmentId: draggedAppointment.id,
-      newStartTime
-    });
-
-    setDraggedAppointment(null);
-    setDragOverTimeSlot(null);
-  };
-
-  // Create stable staff column mapping that doesn't change on re-renders
-  const getStaffColumn = useMemo(() => {
-    return (staffName: string) => {
-      if (!Array.isArray(staff) || staff.length === 0) return -1;
-      
-      // Sort staff by ID to ensure consistent ordering
-      const sortedStaff = [...staff].sort((a: any, b: any) => a.id - b.id);
-      
-      return sortedStaff.findIndex((staffMember: any) => {
-        const fullName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-        return fullName === staffName;
-      });
-    };
-  }, [staff]);
-
-  // Use a ref to maintain stable positioning across re-renders
-  const appointmentPositionsRef = useRef(new Map());
-  
-  // Memoized appointment positioning that preserves existing positions
-  const appointmentPositions = useMemo(() => {
-    if (!Array.isArray(appointments) || !Array.isArray(services) || !Array.isArray(staff)) {
-      return appointmentPositionsRef.current;
-    }
-    
-    // Get existing positions to preserve them
-    const existingPositions = appointmentPositionsRef.current;
-    const newPositionMap = new Map();
-    
-    // Sort appointments by ID to ensure consistent processing order
-    const sortedAppointments = [...appointments].sort((a, b) => a.id - b.id);
-    
-    sortedAppointments.forEach((appointment: any) => {
-      // Debug time conversion issue
-      const appointmentTime = new Date(appointment.startTime);
-      
-      if (appointment.id >= 100) {
-        console.log(`[TIME DEBUG] Appointment ${appointment.id} time conversion:`, {
-          stored: appointment.startTime,
-          parsed: appointmentTime,
-          localString: appointmentTime.toLocaleString(),
-          hours: appointmentTime.getHours(),
-          minutes: appointmentTime.getMinutes(),
-          timezoneOffset: appointmentTime.getTimezoneOffset(),
-          utcHours: appointmentTime.getUTCHours(),
-          utcMinutes: appointmentTime.getUTCMinutes()
-        });
-      }
-      
-      // Get local time components for positioning calculation 
-      const startHour = appointmentTime.getHours();
-      const startMinute = appointmentTime.getMinutes();
-      
-      // Debug positioning calculation for the new appointment
-      if (appointment.id >= 76) { // Debug recent appointments
-        console.log(`[DEBUG] Positioning appointment ${appointment.id}:`, {
-          appointmentStartTime: appointment.startTime,
-          appointmentTimeObject: appointmentTime,
-          startHour,
-          startMinute,
-          timeString: appointmentTime.toLocaleTimeString()
-        });
-      }
-      
-      // Ensure appointment is within business hours (8 AM to 10 PM)
-      if (startHour < 8 || startHour >= 22) {
-        newPositionMap.set(appointment.id, { top: '0px', height: '0px', display: 'none' });
-        return;
-      }
-      
-      // Calculate position based on time slots starting from 8:00 AM
-      // Each time slot row is consistently 40px high
-      const slotHeight = 40;
-      
-      // Calculate position based on hour/minute directly instead of string matching
-      // This ensures precise positioning even if time format doesn't match exactly
-      const appointmentHour = startHour;
-      const appointmentMinute = startMinute;
-      
-      // Calculate slots from 8:00 AM (each slot is 15 minutes)
-      const baseHour = 8; // 8:00 AM start
-      const hoursPastBase = appointmentHour - baseHour;
-      const totalMinutesPastBase = (hoursPastBase * 60) + appointmentMinute;
-      const slotIndex = Math.floor(totalMinutesPastBase / 15); // 15-minute slots
-      
-      // Ensure we're within valid range (8 AM to 10 PM = 0 to 55 slots)
-      const validSlotIndex = Math.max(0, Math.min(slotIndex, 55));
-      const topPosition = validSlotIndex * slotHeight;
-      
-      // Debug positioning calculation for ALL appointments to find the issue
-      if (appointment.id >= 76) {
-        console.log(`[POSITION DEBUG] Appointment ${appointment.id} calculation:`, {
-          appointmentTime: appointment.startTime,
-          startHour,
-          startMinute,
-          appointmentHour,
-          appointmentMinute,
-          hoursPastBase,
-          totalMinutesPastBase,
-          slotIndex,
-          validSlotIndex,
-          topPosition,
-          finalTopPosition: `${topPosition}px`,
-          zoomLevel,
-          slotHeight,
-          calculationCheck: `${hoursPastBase}h * 60min + ${appointmentMinute}min = ${totalMinutesPastBase}min ÷ 15 = slot ${slotIndex}`,
-          expectedFor12PM: 'Should be slot 16 (640px) for 12:00 PM',
-          actualVsExpected: topPosition === 640 ? 'CORRECT' : 'WRONG - Half expected value!'
-        });
-      }
-      
-      // Use service duration for height calculation
-      const service = services.find((s: any) => s.id === appointment.serviceId);
-      const serviceDuration = service?.duration || 60;
-      const slotsNeeded = Math.ceil(serviceDuration / 15);
-      const calculatedHeight = slotsNeeded * slotHeight;
-      
-      // Calculate new position for this appointment
-      const newPosition = {
-        top: `${topPosition}px`,
-        height: `${calculatedHeight}px`
-      };
-      
-      // Check if position has changed, if not preserve existing
-      const existingPosition = existingPositions.get(appointment.id);
-      if (existingPosition && 
-          existingPosition.top === newPosition.top && 
-          existingPosition.height === newPosition.height) {
-        newPositionMap.set(appointment.id, existingPosition);
-      } else {
-        newPositionMap.set(appointment.id, newPosition);
-      }
-    });
-    
-    // Update the ref with the new positions
-    appointmentPositionsRef.current = newPositionMap;
-    return newPositionMap;
-  }, [appointments, services, staff, zoomLevel]);
-
-  const getAppointmentStyle = (appointment: any) => {
-    // Temporarily bypass stored positions to use fixed calculation
-    // const storedPosition = appointmentPositions.get(appointment.id);
-    // if (storedPosition) {
-    //   return storedPosition;
-    // }
-    
-    // Fallback: Calculate position directly if not in Map
-    // Handle timezone conversion properly - the database stores UTC time
-    // but we need to interpret it as local time for display purposes
-    
-    // Create a helper function to convert stored UTC time to intended local time
-    const convertLocalToISO = (dateTimeString: string | Date) => {
-      // Handle both string and Date inputs
-      const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
-      
-      if (!date || isNaN(date.getTime())) {
-        return new Date(); // Return current date as fallback
-      }
-      
-      // For appointment 149 specifically, we know it should be 12:00 PM, not 3:00 PM
-      // This is a timezone issue from the creation process
-      if (date.getUTCHours() === 15) {
-        // Convert 15:00 UTC (3:00 PM) to 12:00 PM local (the intended time)
-        const correctedDate = new Date(date);
-        correctedDate.setUTCHours(12); // Set to 12:00 PM UTC which will display as 12:00 PM local
-        return new Date(correctedDate.getFullYear(), correctedDate.getMonth(), correctedDate.getDate(), 12, 0);
-      }
-      
-      // For other times, treat the UTC time as the intended local time
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const day = date.getDate();
-      const hours = date.getUTCHours();
-      const minutes = date.getUTCMinutes();
-      
-      return new Date(year, month, day, hours, minutes);
-    };
-    
-    const appointmentTime = convertLocalToISO(appointment.startTime);
-    
-    // Debug timezone handling for appointment 149
-    if (appointment.id === 149) {
-      console.log(`[TIMEZONE FIXED DEBUG] Appointment ${appointment.id}:`, {
-        rawStartTime: appointment.startTime,
-        convertedLocalTime: `${appointmentTime.getHours()}:${appointmentTime.getMinutes().toString().padStart(2, '0')}`,
-        expectedLocalTime: '12:00 PM (user expects)',
-        correctTime: appointmentTime.getHours() === 15 ? '3:00 PM (Correct)' : `${appointmentTime.getHours()}:00 (Wrong)`,
-        willUseForPositioning: appointmentTime
-      });
-    }
-    
-    // Use the converted appointment time for positioning
-    const startHour = appointmentTime.getHours();
-    const startMinute = appointmentTime.getMinutes();
-    
-    // Skip appointments outside business hours (8 AM to 10 PM)
-    if (startHour < 8 || startHour >= 22) {
-      return { top: '0px', height: '0px', display: 'none' };
-    }
-    
-    // Calculate position based on time slots  
-    // Use consistent 40px slot height to match calendar layout
-    const slotHeight = 40;
-    
-    // Calculate position based on hour/minute directly for precise positioning
-    const appointmentHour = startHour;
-    const appointmentMinute = startMinute;
-    
-    // Calculate slots from 8:00 AM (each slot is 15 minutes)
-    const baseHour = 8; // 8:00 AM start
-    const hoursPastBase = appointmentHour - baseHour;
-    const totalMinutesPastBase = (hoursPastBase * 60) + appointmentMinute;
-    const slotIndex = Math.floor(totalMinutesPastBase / 15); // 15-minute slots
-    
-    // Ensure we're within valid range (8 AM to 10 PM = 0 to 55 slots)
-    const validSlotIndex = Math.max(0, Math.min(slotIndex, 55));
-    const topPosition = validSlotIndex * slotHeight;
-    
-    // Use service duration for height
-    const service = services?.find((s: any) => s.id === appointment.serviceId);
-    const serviceDuration = service?.duration || 60;
-    const slotsNeeded = Math.ceil(serviceDuration / 15);
-    const calculatedHeight = slotsNeeded * slotHeight;
-    
-    // Debug fallback positioning for specific appointments
-    if (appointment.id >= 100) {
-      console.log(`[FALLBACK DEBUG] Appointment ${appointment.id} fallback calculation:`, {
-        startHour,
-        startMinute,
-        appointmentHour,
-        appointmentMinute,
-        hoursPastBase,
-        totalMinutesPastBase,
-        slotIndex,
-        validSlotIndex,
-        topPosition,
-        calculatedHeight,
-        zoomLevel,
-        slotHeight,
-        basicalculation: `40 * ${zoomLevel} = ${Math.round(40 * zoomLevel)}`,
-        expectedFor12PM: 'Should be slot 16 (640px) for 12:00 PM'
-      });
-    }
-
-    const fallbackStyle = {
-      top: `${topPosition}px`,
-      height: `${calculatedHeight}px`
-    };
-    
-
-    
-    return fallbackStyle;
-  };
-
-
-
-  const handleAddAppointment = (timeSlot?: string) => {
+  // Handlers
+  const handleAddAppointment = () => {
     setSelectedAppointmentId(null);
-    
-    // Convert time slot format to match appointment form format
-    if (timeSlot) {
-      const [timeStr, period] = timeSlot.split(' ');
-      const [hours, minutes] = timeStr.split(':');
-      let hour = parseInt(hours);
-      if (period === 'PM' && hour !== 12) hour += 12;
-      if (period === 'AM' && hour === 12) hour = 0;
-      
-      const formattedTime = `${hour.toString().padStart(2, '0')}:${minutes}`;
-      setSelectedTime(formattedTime);
-    } else {
-      setSelectedTime(undefined);
-    }
-    
     setIsFormOpen(true);
   };
 
+  // New: handle slot selection from calendar
+  const handleSelectSlot = (slotInfo: any) => {
+    setSelectedAppointmentId(null);
+    setIsFormOpen(true);
+    if (slotInfo.start) {
+      setSelectedDate(slotInfo.start);
+    }
+  };
+
   const handleAppointmentClick = (appointmentId: number) => {
+    // Open appointment details instead of form
+    setDetailsAppointmentId(appointmentId);
+    setIsDetailsOpen(true);
+  };
+
+  const handleEditAppointment = (appointmentId: number) => {
     setSelectedAppointmentId(appointmentId);
     setIsFormOpen(true);
   };
 
-  const getStatusColor = (appointment: any) => {
-    if (appointment.paymentStatus === 'paid') {
-      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100';
-    }
-    switch (appointment.status) {
-      case 'confirmed':
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100';
-      case 'completed':
-        return 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100';
+  const handleDeleteAppointment = (appointmentId: number) => {
+    // Refresh the appointments list after deletion
+    refetch();
+  };
+
+  const handlePayment = (appointment: any) => {
+    setCheckoutAppointment(appointment);
+    setIsCheckoutOpen(true);
+  };
+
+  const handlePaymentSuccess = () => {
+    setIsCheckoutOpen(false);
+    setCheckoutAppointment(null);
+    refetch();
+    // toast notification removed (toast system is currently disabled)
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'pending': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'completed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
   };
 
-  const renderDayView = () => {
-    console.log(`[DAY VIEW] Rendering day view for date: ${currentDate}, viewMode: ${viewMode}`);
-    const staffArray = Array.isArray(staff) ? staff : [];
-    const staffCount = staffArray.length || 1;
-    const isMobileView = window.innerWidth < 768;
-    console.log(`[DAY VIEW] Mobile view: ${isMobileView}, staff count: ${staffCount}, appointments count: ${appointments?.length || 0}`);
-    
-    // For mobile, use a simpler card-based layout
-    if (isMobileView) {
-      return (
-        <div className="space-y-4 p-4">
-          {staffArray.map((staffMember: any) => {
-            const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-            const appointmentsArray = Array.isArray(appointments) ? appointments : [];
-            const staffAppointments = appointmentsArray.filter((appointment: any) => {
-              const appointmentDate = new Date(appointment.startTime);
-              const currentDateOnly = new Date(currentDate);
-              
-              // Convert both dates to local timezone for comparison
-              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
-              const currentLocalDate = new Date(currentDateOnly.getFullYear(), currentDateOnly.getMonth(), currentDateOnly.getDate());
-              
-              return appointmentLocalDate.getTime() === currentLocalDate.getTime() && 
-                     appointment.staff?.id === staffMember.id;
-            }) || [];
-
-            return (
-              <div key={staffMember.id} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                <h3 className="font-semibold text-lg mb-3 text-gray-900 dark:text-gray-100">{staffName}</h3>
-                <div className="space-y-2">
-                  {staffAppointments.length > 0 ? (
-                    staffAppointments.map((appointment: any) => {
-                      const startTime = new Date(appointment.startTime);
-                      const endTime = new Date(appointment.endTime);
-                      const timeString = `${startTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} - ${endTime.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
-                      const client = users?.find((u: any) => u.id === appointment.clientId);
-                      const clientName = client ? `${client.firstName} ${client.lastName}` : `Client ${appointment.clientId}`;
-                      const serviceName = appointment.service?.name || 'Unknown Service';
-                      const serviceColor = appointment.service?.color || '#6b7280';
-
-                      // Check if appointment is paid
-                      const isPaid = appointment.paymentStatus === 'paid';
-                      const cardBackgroundClass = isPaid 
-                        ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800" 
-                        : "bg-white dark:bg-gray-800";
-
-                      return (
-                        <div
-                          key={appointment.id}
-                          className={`${cardBackgroundClass} rounded-lg p-3 border-l-4 shadow-sm relative`}
-                          style={{ borderLeftColor: isPaid ? '#10b981' : serviceColor }}
-                          onClick={() => {
-                            setSelectedAppointmentId(appointment.id);
-                            setIsFormOpen(true);
-                          }}
-                        >
-                          {isPaid && (
-                            <div className="absolute top-2 right-2 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 px-2 py-1 rounded-full text-xs font-medium">
-                              Paid
-                            </div>
-                          )}
-                          <div className="font-medium text-sm text-gray-900 dark:text-gray-100">{serviceName}</div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">{clientName}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-500">{timeString}</div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-gray-500 dark:text-gray-400 text-sm italic">No appointments scheduled</div>
-                  )}
-                  <Button
-                    onClick={() => handleAddAppointment()}
-                    variant="default"
-                    className="w-full"
-                  >
-                    + Add appointment for {staffName}
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
+  const getPaymentStatusColor = (status: string) => {
+    switch (status) {
+      case 'paid': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'unpaid': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'refunded': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
-
-    // Desktop grid view
-    const availableWidth = window.innerWidth - 280 - 100; // Sidebar + padding
-    const columnWidth = Math.max(300, Math.floor(availableWidth / staffCount));
-    
-    return (
-      <div className="relative overflow-x-auto bg-white dark:bg-gray-800">
-        {/* Header with staff names */}
-        <div className="flex border-b bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 min-w-max">
-          <div className="w-24 flex-shrink-0 border-r border-gray-200 dark:border-gray-600 p-3 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800">
-            Time
-          </div>
-          {staff?.map((staffMember: any) => {
-            const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-            return (
-              <div 
-                key={staffMember.id}
-                className="border-r border-gray-200 dark:border-gray-600 p-3 text-sm font-semibold text-gray-900 dark:text-gray-100 flex-shrink-0 text-center" 
-                style={{ width: columnWidth, minWidth: '300px' }}
-              >
-                <span className="truncate block">{staffName}</span>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Time grid */}
-        <div className="relative min-w-max bg-white dark:bg-gray-900" style={{ height: `${timeSlots.length * Math.round(40 * zoomLevel)}px` }}>
-          {/* Time labels and grid lines */}
-          <div className="flex">
-            <div className="w-24 flex-shrink-0 bg-gray-50 dark:bg-gray-800">
-              {timeSlots.map((time, index) => (
-                <div 
-                  key={time} 
-                  className="border-r border-b border-gray-200 dark:border-gray-600 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center justify-end"
-                  style={{ height: Math.round(40 * zoomLevel) }}
-                >
-                  <span>{time}</span>
-                </div>
-              ))}
-            </div>
-            
-            {/* Staff columns */}
-            {staff?.map((staffMember: any) => (
-              <div key={staffMember.id} className="flex-shrink-0 border-r border-gray-200 dark:border-gray-600 relative bg-white dark:bg-gray-900" style={{ width: columnWidth, minWidth: '300px' }}>
-                {timeSlots.map((time, index) => {
-                  const isAvailable = isStaffAvailable(staffMember.id, time, currentDate);
-                  
-                  return (
-                    <div 
-                      key={time} 
-                      className={`border-b transition-colors ${
-                        isAvailable
-                          ? `hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer ${
-                              dragOverTimeSlot === time ? 'bg-blue-100 dark:bg-blue-900' : ''
-                            }`
-                          : 'bg-gray-300 dark:bg-gray-700 cursor-not-allowed opacity-50'
-                      }`}
-                      style={{ height: Math.round(40 * zoomLevel) }}
-                      onDragOver={isAvailable ? (e) => handleDragOver(e, time) : undefined}
-                      onDragLeave={isAvailable ? handleDragLeave : undefined}
-                      onDrop={isAvailable ? (e) => handleDrop(e, time) : undefined}
-                      onMouseMove={(e) => {
-                        if (isAvailable) {
-                          setHoverInfo({
-                            visible: true,
-                            time: time,
-                            x: e.clientX,
-                            y: e.clientY
-                          });
-                        }
-                      }}
-                      onMouseLeave={handleCalendarMouseLeave}
-                      onClick={isAvailable ? () => {
-                        handleAddAppointment(time);
-                      } : undefined}
-                    />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* Appointment Blocks */}
-          <div className="absolute inset-0 pointer-events-none">
-            {/* Debug staff array and appointments mapping */}
-            {console.log('[STAFF DEBUG] Staff array:', staff?.map((s: any) => ({ id: s.id, name: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown' })))}
-            {console.log('[APPOINTMENTS DEBUG] Today\'s appointments staffIds:', appointments?.filter((appointment: any) => {
-              const appointmentDate = new Date(appointment.startTime);
-              const currentDateOnly = new Date(currentDate);
-              const appointmentDateString = appointmentDate.toDateString();
-              const currentDateString = currentDateOnly.toDateString();
-              return appointmentDateString === currentDateString;
-            }).map((a: any) => ({ id: a.id, staffId: a.staffId })))}
-            {appointments?.filter((appointment: any) => {
-              // Only show appointments for the current date
-              const appointmentDate = new Date(appointment.startTime);
-              const currentDateOnly = new Date(currentDate);
-              
-              // Simple date string comparison to avoid timezone issues
-              const appointmentDateString = appointmentDate.toDateString();
-              const currentDateString = currentDateOnly.toDateString();
-              
-              console.log(`[DATE FILTER] Appointment ${appointment.id}: ${appointmentDateString} vs Current: ${currentDateString}`, appointmentDateString === currentDateString);
-              
-              return appointmentDateString === currentDateString;
-            })
-            .sort((a: any, b: any) => {
-              // Sort by start time first, then by ID for stable positioning
-              const timeA = new Date(a.startTime).getTime();
-              const timeB = new Date(b.startTime).getTime();
-              if (timeA !== timeB) return timeA - timeB;
-              return a.id - b.id;
-            })
-            .map((appointment: any, index: number) => {
-              const startTime = new Date(appointment.startTime);
-              
-              // Find staff member and get column
-              const staffMember = staff?.find((s: any) => s.id === appointment.staffId);
-              const staffName = staffMember?.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-              const columnIndex = staff?.findIndex((s: any) => s.id === appointment.staffId);
-              
-              // Skip appointments if staff member not found or invalid column index
-              if (columnIndex === -1 || columnIndex === undefined) {
-                console.log(`[COLUMN DEBUG] Skipping appointment ${appointment.id} - staff ${appointment.staffId} not found in staff array`);
-                return null;
-              }
-
-              const appointmentStyle = getAppointmentStyle(appointment);
-              
-              // Find service and client information
-              const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const client = users?.find((u: any) => u.id === appointment.clientId);
-
-              // Create a stable key based on appointment's immutable properties
-              const stableKey = `apt-${appointment.id}-${appointment.staffId}-${new Date(appointment.startTime).getTime()}`;
-              
-              // Debug the actual style being applied for all appointments
-              console.log(`[STYLE DEBUG] Appointment ${appointment.id} style:`, {
-                appointmentStyle,
-                hasDisplay: appointmentStyle.display,
-                staffId: appointment.staffId,
-                columnIndex,
-                columnWidth,
-                staffCount,
-                finalStyle: {
-                  left: `${96 + (columnIndex * columnWidth) + 4}px`,
-                  width: `${columnWidth - 8}px`,
-                  ...appointmentStyle,
-                  zIndex: 10
-                }
-              });
-              
-              return (
-                <div
-                  key={stableKey}
-                  className="absolute pointer-events-auto"
-                  style={{
-                    left: `${96 + (columnIndex * columnWidth) + 4}px`, // Time column (24*4=96) + staff column offset + padding
-                    width: `${columnWidth - 8}px`,
-                    ...appointmentStyle,
-                    zIndex: 10
-                  }}
-                >
-                  <AppointmentBlock
-                    appointment={appointment}
-                    appointmentStyle={appointmentStyle}
-                    columnIndex={columnIndex}
-                    columnWidth={columnWidth}
-                    service={service}
-                    client={client}
-                    staff={staffMember}
-                    onAppointmentClick={(id: number) => {
-                      setSelectedAppointmentId(id);
-                      setIsFormOpen(true);
-                    }}
-                    draggedAppointment={draggedAppointment}
-                    onDragStart={handleDragStart}
-                    onDragEnd={handleDragEnd}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    );
   };
 
-  const renderWeekView = () => {
-    const weekDays = getWeekDays(currentDate);
-    const isMobile = window.innerWidth < 768;
+  // Helper: Get unavailable (gray) times for each staff/resource for the current view and date
+  function getBackgroundEvents() {
+    if (!schedules || !staff) return [];
+    const events: any[] = [];
     
-    // Mobile: Show simplified card-based week view
-    if (isMobile) {
-      return (
-        <div className="p-4 space-y-4">
-          {weekDays.map((day, dayIndex) => {
-            const dayAppointments = appointments?.filter((appointment: any) => {
-              const appointmentDate = new Date(appointment.startTime);
-              
-              // Convert both dates to local timezone for comparison
-              const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
-              const dayLocalDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-              
-              return appointmentLocalDate.getTime() === dayLocalDate.getTime();
-            }) || [];
-
-            return (
-              <div key={dayIndex} className="border rounded-lg p-4 bg-white dark:bg-gray-800">
-                <div className="flex justify-between items-center mb-3">
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-gray-100">
-                      {day.toLocaleDateString('en-US', { weekday: 'long' })}
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400">
-                      {day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {dayAppointments.length} appointment{dayAppointments.length !== 1 ? 's' : ''}
-                  </div>
-                </div>
-                
-                {dayAppointments.length === 0 ? (
-                  <div className="text-center py-4 text-gray-400 text-sm">
-                    No appointments
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {dayAppointments.map((appointment: any, index: number) => {
-                      // Apply the same timezone conversion as positioning calculation
-                      const convertLocalToISO = (dateTimeString: string | Date) => {
-                        const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
-                        
-                        if (!date || isNaN(date.getTime())) {
-                          return new Date();
-                        }
-                        
-                        // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
-                        if (date.getUTCHours() === 15) {
-                          return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
-                        }
-                        
-                        // For other times, treat the UTC time as the intended local time
-                        const year = date.getFullYear();
-                        const month = date.getMonth();
-                        const day = date.getDate();
-                        const hours = date.getUTCHours();
-                        const minutes = date.getUTCMinutes();
-                        
-                        return new Date(year, month, day, hours, minutes);
-                      };
-                      
-                      const startTime = convertLocalToISO(appointment.startTime);
-                      const timeString = startTime.toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true
-                      });
-                      const staffName = appointment.staff?.user ? 
-                        `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
-                        'Unknown Staff';
-
-                      return (
-                        <div 
-                          key={index}
-                          className="p-2 rounded border-l-4 border-primary bg-primary/5 cursor-pointer hover:bg-primary/10"
-                          onClick={() => handleAppointmentClick(appointment.id)}
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="font-medium text-sm">
-                                {timeString} - {appointment.service?.name}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {appointment.client?.firstName} {appointment.client?.lastName}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {staffName}
-                              </div>
-                            </div>
-                            <div className={`px-2 py-1 rounded text-xs ${getStatusColor(appointment)}`}>
-                              {appointment.paymentStatus === 'paid' ? 'Paid' : appointment.status}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    // Desktop: Full calendar grid view
-    return (
-      <div className="min-h-[600px]">
-        {/* Week Header */}
-        <div className="grid grid-cols-8 border-b border-gray-200 dark:border-gray-700">
-          <div className="p-3 border-r border-gray-200 dark:border-gray-700"></div>
-          {weekDays.map((day, index) => (
-            <div key={index} className="p-3 text-center border-r border-gray-200 dark:border-gray-700 last:border-r-0">
-              <div className="font-semibold text-sm text-gray-900 dark:text-gray-100">
-                {day.toLocaleDateString('en-US', { weekday: 'short' })}
-              </div>
-              <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                {day.getDate()}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {day.toLocaleDateString('en-US', { month: 'short' })}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Time Grid */}
-        <div className="relative">
-          {/* Appointment overlay container - positioned absolutely to float over time slots */}
-          <div className="absolute inset-0 pointer-events-none z-10">
-            {weekDays.map((day, dayIndex) => (
-              <div 
-                key={dayIndex} 
-                className="absolute pointer-events-auto"
-                style={{
-                  left: `${((dayIndex + 1) / 8) * 100}%`,
-                  width: `${(1/8) * 100}%`,
-                  height: '100%'
-                }}
-              >
-                {appointments?.filter((appointment: any) => {
-                  const appointmentDate = new Date(appointment.startTime);
-                  
-                  // Use toDateString() for reliable date comparison
-                  const dayDateString = day.toDateString();
-                  const appointmentDateString = appointmentDate.toDateString();
-                  
-
-                  
-                  return dayDateString === appointmentDateString;
-                })
-                .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                .map((appointment: any) => {
-                  // Apply the same timezone conversion as positioning calculation
-                  const convertLocalToISO = (dateTimeString: string | Date) => {
-                    const date = typeof dateTimeString === 'string' ? new Date(dateTimeString) : dateTimeString;
-                    
-                    if (!date || isNaN(date.getTime())) {
-                      return new Date();
-                    }
-                    
-                    // For appointment 149 specifically, convert 15:00 UTC to 12:00 PM local
-                    if (date.getUTCHours() === 15) {
-                      return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0);
-                    }
-                    
-                    // For other times, treat the UTC time as the intended local time
-                    const year = date.getFullYear();
-                    const month = date.getMonth();
-                    const day = date.getDate();
-                    const hours = date.getUTCHours();
-                    const minutes = date.getUTCMinutes();
-                    
-                    return new Date(year, month, day, hours, minutes);
-                  };
-                  
-                  const appointmentDate = convertLocalToISO(appointment.startTime);
-                  
-                  // Use service duration only (not including buffer times) for visual display
-                  const appointmentService = services?.find((s: any) => s.id === appointment.serviceId);
-                  const duration = appointmentService?.duration || 60; // Only the actual service time
-                  
-                  // Calculate position relative to 8:00 AM start
-                  const appointmentHour = appointmentDate.getHours();
-                  const appointmentMinute = appointmentDate.getMinutes();
-                  
-                  // Skip appointments outside business hours (8 AM to 10 PM)
-                  if (appointmentHour < 8 || appointmentHour >= 22) {
-                    return null;
-                  }
-                  
-                  // Calculate exact top position based on minutes from 8:00 AM (fixed calculation)
-                  const totalMinutesFromStart = (appointmentHour - 8) * 60 + appointmentMinute;
-                  const topPosition = (totalMinutesFromStart / 30) * 60; // 60px per 30-minute slot
-                  
-                  // Calculate height based on duration (minimum 30px to be visible)
-                  const heightInPixels = Math.max(30, (duration / 30) * 60);
-                  
-                  const staffName = appointment.staff?.user ? 
-                    `${appointment.staff.user.firstName} ${appointment.staff.user.lastName}` : 
-                    'Unknown Staff';
-
-                  return (
-                    <div
-                      key={`appointment-${appointment.id}`}
-                      className="absolute text-white rounded p-1 text-xs cursor-pointer"
-                      style={{
-                        backgroundColor: appointment.service?.color || '#6b7280',
-                        color: '#ffffff',
-                        height: `${heightInPixels - 4}px`,
-                        top: `${topPosition + 2}px`,
-                        left: '4px',
-                        right: '4px',
-                        zIndex: 20
-                      }}
-                      onClick={() => handleAppointmentClick(appointment.id)}
-                    >
-                      <div className="font-medium truncate">
-                        {appointment.service?.name}
-                      </div>
-                      <div className="truncate opacity-90">
-                        {appointment.client?.firstName} {appointment.client?.lastName}
-                      </div>
-                      <div className="truncate opacity-75 text-xs">
-                        {staffName}
-                      </div>
-                      {appointment.paymentStatus === 'paid' && (
-                        <div className="text-xs opacity-90">✓ Paid</div>
-                      )}
-                    </div>
-                  );
-                }).filter(Boolean)}
-              </div>
-            ))}
-          </div>
-          
-          {/* Time slot grid - this provides the visual structure and time labels */}
-          {timeSlots.map((timeSlot, timeIndex) => (
-            <div key={timeIndex} className="grid grid-cols-8 min-h-[60px] border-b border-gray-100 dark:border-gray-800">
-              {/* Time Label */}
-              <div className="p-2 text-right text-sm text-gray-500 dark:text-gray-400 border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-                {timeSlot}
-              </div>
-              
-              {/* Day Columns - empty but provide grid structure */}
-              {weekDays.map((day, dayIndex) => (
-                <div 
-                  key={dayIndex} 
-                  className="relative border-r border-gray-100 dark:border-gray-800 last:border-r-0 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer" 
-                  style={{ height: '60px' }}
-                  onMouseMove={(e) => handleCalendarMouseMove(e, timeIndex)}
-                  onMouseLeave={handleCalendarMouseLeave}
-                >
-                  {/* Empty - appointments are handled by the overlay above */}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const renderMonthView = () => {
-    const monthDays = getDaysInMonth(currentDate);
-    const isMobile = window.innerWidth < 768;
+    // Use filtered staff for background events
+    const staffToShow = selectedStaffFilter === "all" ? staff : staff.filter((s: any) => s.id === parseInt(selectedStaffFilter));
     
-    // Mobile: Use a more spacious card-based layout
-    if (isMobile) {
-      return (
-        <div className="p-3 space-y-4">
-          {/* Month header with navigation */}
-          <div className="flex items-center justify-between bg-gray-50 dark:bg-gray-700 rounded-lg p-3">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate('prev')}
-              className="h-9 w-9 p-0"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </h2>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigateDate('next')}
-              className="h-9 w-9 p-0"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Simplified day headers */}
-          <div className="grid grid-cols-7 gap-1 mb-3">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
-              <div key={index} className="text-center text-sm font-medium text-gray-600 dark:text-gray-300 py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-          
-          {/* Calendar grid with better spacing */}
-          <div className="grid grid-cols-7 gap-2">
-            {monthDays.map((day, index) => {
-              if (!day) {
-                return <div key={index} className="h-20"></div>;
-              }
-              
-              const isToday = day.toDateString() === new Date().toDateString();
-              const dayAppointments = appointments?.filter((appointment: any) => {
-                const appointmentDate = new Date(appointment.startTime);
-                
-                // Convert both dates to local timezone for comparison
-                const appointmentLocalDate = new Date(appointmentDate.getFullYear(), appointmentDate.getMonth(), appointmentDate.getDate());
-                const dayLocalDate = new Date(day.getFullYear(), day.getMonth(), day.getDate());
-                
-                return appointmentLocalDate.getTime() === dayLocalDate.getTime();
-              }) || [];
-              
-              return (
-                <div 
-                  key={index} 
-                  className={`h-20 border-2 rounded-lg p-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all ${
-                    isToday 
-                      ? 'bg-blue-50 dark:bg-blue-900 border-blue-300 dark:border-blue-600' 
-                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600'
-                  } active:scale-95`}
-                  onClick={() => {
-                    setCurrentDate(day);
-                    setViewMode('day');
-                  }}
-                >
-                  {/* Date number */}
-                  <div className={`text-sm font-semibold mb-1 ${
-                    isToday 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : 'text-gray-700 dark:text-gray-300'
-                  }`}>
-                    {day.getDate()}
-                  </div>
-                  
-                  {/* Appointment indicators */}
-                  {dayAppointments.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {dayAppointments.slice(0, 2).map((appointment: any, i: number) => (
-                        <div 
-                          key={i}
-                          className="w-2 h-2 rounded-full"
-                          style={{
-                            backgroundColor: appointment.service?.color || '#6b7280'
-                          }}
-                        />
-                      ))}
-                      {dayAppointments.length > 2 && (
-                        <div className="text-xs text-gray-500 font-medium">
-                          +{dayAppointments.length - 2}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      );
-    }
-
-    // Desktop: Use original compact layout
-    return (
-      <div className="p-4">
-        {/* Compact day headers for desktop */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="p-2 text-center text-xs font-medium text-gray-600 dark:text-gray-300">
-              {day}
-            </div>
-          ))}
-        </div>
+    // For each staff member
+    staffToShow.forEach((s: any) => {
+      // For each day in the current view (for now, just use selectedDate or today)
+      const baseDate = selectedDate || new Date();
+      // For week view, show for all 7 days; for day view, just one day
+      const days = calendarView === 'week'
+        ? Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(baseDate);
+            d.setDate(baseDate.getDate() - d.getDay() + i); // start from Sunday
+            return d;
+          })
+        : [baseDate];
+      
+      days.forEach((date) => {
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
         
-        {/* Calendar grid - compact for desktop */}
-        <div className="grid grid-cols-7 gap-1">
-          {monthDays.map((day, index) => {
-            if (!day) {
-              return <div key={index} className="h-24"></div>;
+        // Find all schedules for this staff on this day (including blocked ones)
+        const allStaffSchedules = (schedules as any[]).filter((sch: any) =>
+          sch.staffId === s.id &&
+          sch.dayOfWeek === dayName &&
+          sch.startDate <= date.toISOString().slice(0, 10) &&
+          (!sch.endDate || sch.endDate >= date.toISOString().slice(0, 10))
+        );
+        
+        // Separate blocked and non-blocked schedules
+        const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
+        const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
+        
+        // Get existing appointments for this staff on this day
+        const staffAppointments = appointments.filter((apt: any) => {
+          const aptDate = new Date(apt.startTime);
+          return apt.staffId === s.id && 
+                 aptDate.toDateString() === date.toDateString();
+        });
+        
+        // If no schedule at all, gray out the whole day
+        if (allStaffSchedules.length === 0) {
+          events.push({
+            start: startOfDay(date),
+            end: endOfDay(date),
+            resourceId: s.id,
+            allDay: false,
+            title: '',
+            type: 'unavailable',
+            style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+          });
+        } else {
+          // Handle blocked schedules - show them as grayed out areas
+          blockedSchedules.forEach((sch: any) => {
+            const [startHour, startMinute] = sch.startTime.split(':').map(Number);
+            const [endHour, endMinute] = sch.endTime.split(':').map(Number);
+            const blockStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
+            const blockEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+            
+            events.push({
+              start: blockStart,
+              end: blockEnd,
+              resourceId: s.id,
+              allDay: false,
+              title: 'Blocked',
+              type: 'unavailable',
+              style: { backgroundColor: '#6b7280', opacity: 0.8 }, // Darker gray for blocked slots
+            });
+          });
+          
+          // Handle available schedules - gray out before/after working hours
+          availableSchedules.forEach((sch: any) => {
+            const [startHour, startMinute] = sch.startTime.split(':').map(Number);
+            const [endHour, endMinute] = sch.endTime.split(':').map(Number);
+            const workStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
+            const workEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+            
+            // Before work
+            if (startHour > 0 || startMinute > 0) {
+              events.push({
+                start: startOfDay(date),
+                end: workStart,
+                resourceId: s.id,
+                allDay: false,
+                title: '',
+                type: 'unavailable',
+                style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+              });
             }
             
-            const isToday = day.toDateString() === new Date().toDateString();
-            const dayAppointments = appointments?.filter((appointment: any) => {
-              const appointmentDate = new Date(appointment.startTime);
-              const dayStr = day.getFullYear() + '-' + 
-                String(day.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(day.getDate()).padStart(2, '0');
-              const appointmentDateStr = appointmentDate.getFullYear() + '-' + 
-                String(appointmentDate.getMonth() + 1).padStart(2, '0') + '-' + 
-                String(appointmentDate.getDate()).padStart(2, '0');
-              
-              return appointmentDateStr === dayStr;
-            }) || [];
+            // After work
+            if (endHour < 23 || endMinute < 59) {
+              events.push({
+                start: workEnd,
+                end: endOfDay(date),
+                resourceId: s.id,
+                allDay: false,
+                title: '',
+                type: 'unavailable',
+                style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+              });
+            }
             
-            return (
-              <div 
-                key={index} 
-                className={`h-24 border rounded-lg p-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${
-                  isToday ? 'bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-700' : 'bg-white dark:bg-gray-800'
-                } transition-colors`}
-                onClick={() => {
-                  setCurrentDate(day);
-                  setViewMode('day');
-                }}
-                onMouseMove={(e) => {
-                  const dateStr = day.toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  });
-                  setHoverInfo({
-                    visible: true,
-                    time: dateStr,
-                    x: e.clientX,
-                    y: e.clientY
-                  });
-                }}
-                onMouseLeave={handleCalendarMouseLeave}
-              >
-                {/* Date number */}
-                <div className={`text-sm ${isToday ? 'font-bold text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}>
-                  {day.getDate()}
-                </div>
-                
-                {/* Desktop appointment indicators */}
-                {dayAppointments.length > 0 && (
-                  <div className="space-y-1 mt-1">
-                    {dayAppointments.slice(0, 2).map((appointment: any, i: number) => {
-                      const startTime = new Date(appointment.startTime);
-                      const timeString = startTime.toLocaleTimeString('en-US', { 
-                        hour: 'numeric', 
-                        minute: '2-digit',
-                        hour12: true
-                      });
-                      
-                      return (
-                        <div 
-                          key={i}
-                          className="text-xs p-1 rounded truncate"
-                          style={{
-                            backgroundColor: appointment.service?.color + '20' || '#6b728020',
-                            color: appointment.service?.color || '#6b7280'
-                          }}
-                        >
-                          {timeString} {appointment.service?.name}
-                        </div>
-                      );
-                    })}
-                    {dayAppointments.length > 2 && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                        +{dayAppointments.length - 2} more
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  if (appointmentsLoading || staffLoading || servicesLoading || usersLoading) {
-    return (
-      <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
-        <div className="hidden lg:block">
-          <SidebarController />
-        </div>
-        <div className={`min-h-screen lg:h-screen flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-        }`}>
-          <Header />
-          <main className="flex-1 lg:overflow-auto p-4">
-            <div className="animate-pulse">
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4 mb-4"></div>
-              <div className="space-y-3">
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
-                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
+            // Gray out time slots that conflict with existing appointments
+            staffAppointments.forEach((apt: any) => {
+              const aptStart = new Date(apt.startTime);
+              const aptEnd = new Date(apt.endTime || apt.startTime);
+              
+              // Only gray out if the appointment is within working hours
+              if (aptStart >= workStart && aptEnd <= workEnd) {
+                events.push({
+                  start: aptStart,
+                  end: aptEnd,
+                  resourceId: s.id,
+                  allDay: false,
+                  title: 'Booked',
+                  type: 'unavailable',
+                  style: { backgroundColor: '#9ca3af', opacity: 0.7 }, // Darker gray for booked slots
+                });
+              }
+            });
+          });
+        }
+      });
+    });
+    return events;
   }
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
-        <SidebarController />
-      </div>
-      
-      <div className={`min-h-screen lg:h-screen flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <style>{`
+        div[style*='position: fixed'][style*='bottom'][style*='white'],
+        div[style*='position: absolute'][style*='bottom'][style*='white'],
+        div[style*='background: white'],
+        div[style*='background-color: white'],
+        div[style*='background: #fff'],
+        div[style*='background-color: #fff'],
+        div[style*='background: #ffffff'],
+        div[style*='background-color: #ffffff'] {
+          display: none !important;
+        }
+      `}</style>
+      <SidebarController />
+      <div className={`flex flex-col ${sidebarOpen ? 'lg:ml-64' : ''} transition-all duration-300`}>
         <Header />
-        
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 md:p-6 lg:overflow-auto">
-          <div className="max-w-7xl mx-auto">
-            {/* Top Controls */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
-              {/* Header with Title and New Button */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-100">Appointments</h1>
-                <Button
-                  onClick={() => handleAddAppointment()}
-                  className="min-h-[48px] justify-center w-full sm:w-auto"
-                  size="default"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">New Appointment</span>
-                  <span className="sm:hidden">New</span>
+        <main className="flex-1 p-6">
+          <div className="max-w-7xl mx-auto flex gap-6 min-h-0" style={{height: 'calc(100vh - 48px)'}}>
+            {/* Left Sidebar: Mini Calendar */}
+            <div className="hidden md:flex flex-col w-72 gap-6 flex-shrink-0">
+              <MiniCalendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date as Date);
+                  setCalendarView('day');
+                }}
+                className="rounded-lg border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm"
+              />
+            </div>
+            {/* Main Content */}
+            <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-y-auto">
+              {/* Header */}
+              <div className="mb-0 flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                    Client Appointments
+                  </h1>
+                  <p className="text-gray-600 dark:text-gray-400 mt-2">
+                    Manage and view all client appointments
+                  </p>
+                </div>
+                <Button onClick={handleAddAppointment} className="flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  New Appointment
                 </Button>
               </div>
-              
-              {/* Controls organized in cards */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Date Navigation Card */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+              {/* Stats Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center">
+                      <Calendar className="h-6 w-6 text-blue-600" />
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Appointments</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {appointments.length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center">
+                      <Clock className="h-6 w-6 text-green-600" />
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Today</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {appointments.filter((apt: any) => {
+                            const today = new Date().toDateString();
+                            const aptDate = new Date(apt.startTime).toDateString();
+                            return aptDate === today;
+                          }).length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center">
+                      <User className="h-6 w-6 text-purple-600" />
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Staff Members</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {staff.length}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center">
+                      <DollarSign className="h-6 w-6 text-yellow-600" />
+                      <div className="ml-3">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Revenue</p>
+                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                          {formatPrice(appointments.reduce((total: number, apt: any) => {
+                            return total + (apt.totalAmount || 0);
+                          }, 0))}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              {/* Appointments Calendar */}
+              <Card>
+                <CardHeader>
                   <div className="flex items-center justify-between">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDate('prev')}
-                      className="h-10 w-10 p-0 min-h-[44px] min-w-[44px]"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    
-                    <div className="text-center flex-1 mx-3">
-                      <span className="text-sm sm:text-lg font-semibold block">
-                        {formatDate(currentDate)}
-                      </span>
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calendar className="h-5 w-5" />
+                        Appointments Calendar
+                      </CardTitle>
+                      <CardDescription>
+                        View appointments by staff in day, week, or month view. Click an event to edit or view details.
+                      </CardDescription>
                     </div>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigateDate('next')}
-                      className="h-10 w-10 p-0 min-h-[44px] min-w-[44px]"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
+                    {/* Staff Filter Dropdown - Only show for week and month views */}
+                    {(calendarView === 'week' || calendarView === 'month') && (
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue placeholder="Filter by staff" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Staff</SelectItem>
+                            {staff.map((s: any) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>
+                                {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
-                </div>
-
-                {/* View and Zoom Controls Card */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center justify-center space-x-3">
-                    <Select value={viewMode} onValueChange={setViewMode}>
-                      <SelectTrigger className="w-28 min-h-[48px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="day">Day</SelectItem>
-                        <SelectItem value="week">Week</SelectItem>
-                        <SelectItem value="month">Month</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    {/* Zoom Controls */}
-                    <div className="hidden lg:flex border rounded-lg overflow-hidden bg-white dark:bg-gray-800">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={zoomOut}
-                        className="h-8 w-8 p-0 rounded-none border-r"
-                        disabled={zoomLevel <= 0.5}
-                      >
-                        <ZoomOut className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={zoomIn}
-                        className="h-8 w-8 p-0 rounded-none"
-                        disabled={zoomLevel >= 3}
-                      >
-                        <ZoomIn className="h-3 w-3" />
-                      </Button>
-                    </div>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    className="overflow-x-auto w-full"
+                    style={{ minWidth: `${filteredResources.length * 300}px` }}
+                  >
+                    <BigCalendar
+                      events={filteredAppointments.map((apt: any) => {
+                        const client = users.find((u: any) => u.id === apt.clientId);
+                        const service = services.find((s: any) => s.id === apt.serviceId);
+                        
+                        // Always convert to Date objects to avoid calendar errors
+                        const startDate = apt.startTime ? new Date(apt.startTime) : new Date();
+                        const endDate = apt.endTime ? new Date(apt.endTime) : startDate;
+                        
+                        return {
+                          id: apt.id,
+                          title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || 'Unknown Service'}`,
+                          start: startDate,
+                          end: endDate,
+                          resourceId: apt.staffId,
+                          resource: {
+                            ...apt,
+                            serviceColor: service?.color || '#3B82F6', // Use service color or default blue
+                          },
+                        };
+                      })}
+                      resources={filteredResources.map((s: any) => ({
+                        resourceId: s.id,
+                        resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
+                      }))}
+                      backgroundEvents={getBackgroundEvents()}
+                      onSelectEvent={(event) => handleAppointmentClick(event.id)}
+                      onSelectSlot={handleSelectSlot}
+                      view={calendarView}
+                      date={selectedDate}
+                      onView={(view) => {
+                        if (view === 'day' || view === 'week' || view === 'month') {
+                          setCalendarView(view);
+                        }
+                      }}
+                      onNavigate={(date) => setSelectedDate(date)}
+                    />
                   </div>
-                </div>
-
-                {/* Filters Card */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                      <SelectTrigger className="min-h-[48px]">
-                        <SelectValue placeholder="All stylists" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All stylists</SelectItem>
-                        {staff?.map((staffMember: any) => {
-                          const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
-                          return (
-                            <SelectItem key={staffMember.id} value={staffName}>
-                              {staffName}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={selectedService} onValueChange={setSelectedService}>
-                      <SelectTrigger className="min-h-[48px]">
-                        <SelectValue placeholder="All services" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All services</SelectItem>
-                        {services?.map((service: any) => (
-                          <SelectItem key={service.id} value={service.name}>
-                            {service.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Calendar Views */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm min-h-[400px] overflow-hidden">
-              <div className="h-full overflow-y-auto">
-                {viewMode === 'day' && renderDayView()}
-                {viewMode === 'week' && renderWeekView()}
-                {viewMode === 'month' && renderMonthView()}
-                {!viewMode && (
-                  <SimpleCalendar
-                    appointments={Array.isArray(appointments) ? appointments : []}
-                    staff={Array.isArray(staff) ? staff : []}
-                    users={Array.isArray(users) ? users : []}
-                    services={Array.isArray(services) ? services : []}
-                    currentDate={currentDate}
-                    onDateChange={setCurrentDate}
-                    onAppointmentClick={handleAppointmentClick}
-                    onAddAppointment={handleAddAppointment}
-                  />
-                )}
-              </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </main>
@@ -1759,23 +493,20 @@ const AppointmentsPage = () => {
         open={isFormOpen}
         onOpenChange={setIsFormOpen}
         appointmentId={selectedAppointmentId}
-        selectedDate={currentDate}
-        selectedTime={selectedTime}
         onAppointmentCreated={(appointment) => {
           console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
-          
-          // Force refresh appointments data
-          refetchAppointments();
-          
-          // Navigate to the appointment's date when created
-          if (appointment && appointment.startTime) {
-            const appointmentDate = new Date(appointment.startTime);
-            console.log("[APPOINTMENTS PAGE] Navigating to date:", appointmentDate);
-            setCurrentDate(appointmentDate);
-          } else {
-            console.log("[APPOINTMENTS PAGE] No startTime found in appointment data");
-          }
+          refetch();
         }}
+        appointments={appointments} // Pass appointments to form for consistent filtering
+      />
+
+      {/* Appointment Details */}
+      <AppointmentDetails
+        open={isDetailsOpen}
+        onOpenChange={setIsDetailsOpen}
+        appointmentId={detailsAppointmentId}
+        onEdit={handleEditAppointment}
+        onDelete={handleDeleteAppointment}
       />
 
       {/* Checkout Component */}
@@ -1786,21 +517,6 @@ const AppointmentsPage = () => {
           onClose={() => setIsCheckoutOpen(false)}
           onSuccess={handlePaymentSuccess}
         />
-      )}
-
-      {/* Time Hover Tooltip */}
-      {hoverInfo.visible && (
-        <div
-          className="fixed z-50 text-sm px-3 py-2 rounded-lg shadow-lg pointer-events-none"
-          style={{
-            left: hoverInfo.x + 10,
-            top: hoverInfo.y - 40,
-            backgroundColor: 'var(--primary)',
-            color: 'var(--primary-foreground)',
-          }}
-        >
-          {hoverInfo.time}
-        </div>
       )}
     </div>
   );

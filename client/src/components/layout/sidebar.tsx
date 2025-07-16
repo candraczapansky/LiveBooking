@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { 
   LayoutDashboard, 
@@ -58,6 +58,39 @@ const Sidebar = () => {
   const { user, logout } = useContext(AuthContext);
   const [primaryColor, setPrimaryColor] = useState('#d38301');
   const hamburgerRef = useRef<SVGSVGElement>(null);
+  const [localUser, setLocalUser] = useState<any>(null);
+
+  // Use context user or fallback to localStorage user
+  const currentUser = user || localUser;
+
+  useEffect(() => {
+    // Load user from localStorage if context isn't ready
+    if (!user) {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setLocalUser(userData);
+        } catch (e) {
+          console.error('Error parsing stored user data:', e);
+        }
+      }
+    } else {
+      setLocalUser(user);
+    }
+
+    // Listen for user data updates (includes profile picture updates)
+    const handleUserDataUpdate = (event: CustomEvent) => {
+      console.log('Sidebar received user data update:', event.detail);
+      setLocalUser(event.detail);
+    };
+
+    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    
+    return () => {
+      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
+    };
+  }, [user]);
 
   useEffect(() => {
     // Load user's color preferences
@@ -110,8 +143,8 @@ const Sidebar = () => {
 
   const navigationItems = [
     { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
-    { icon: <Calendar />, label: "Appointments", href: "/appointments" },
-    { icon: <CalendarDays />, label: "Staff Schedule", href: "/staff-schedule" },
+    { icon: <Calendar />, label: "Client Appointments", href: "/appointments" },
+    { icon: <CalendarDays />, label: "Staff Working Hours", href: "/staff-schedule" },
     { icon: <Users />, label: "Clients", href: "/clients" },
     { icon: <UserCircle />, label: "Staff", href: "/staff" },
     { icon: <Scissors />, label: "Services", href: "/services" },
@@ -175,25 +208,36 @@ const Sidebar = () => {
             ))}
           </div>
         </nav>
-        
+        {/* User info and sign out */}
         <div className="p-4 border-t border-sidebar-border">
-          <Button 
-            variant="ghost" 
-            className="flex items-center text-sm font-medium text-destructive w-full justify-center"
-            onClick={() => {
-              console.log("Sign out button clicked");
-              console.log("Logout function:", logout);
-              console.log("Logout function type:", typeof logout);
-              if (logout) {
-                logout();
-              } else {
-                console.error("Logout function is not available");
-              }
-            }}
-            title={!isOpen ? "Sign Out" : undefined}
+          {/* User avatar and name */}
+          <div className="flex items-center mb-4">
+            <Avatar className="h-9 w-9 mr-3">
+              <AvatarImage 
+                src={currentUser?.profilePicture || "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?ixlib=rb-4.0.3&auto=format&fit=crop&w=120&h=120"} 
+                alt="User profile"
+              />
+              <AvatarFallback>
+                {getInitials(currentUser?.firstName, currentUser?.lastName) || (currentUser?.username ? currentUser.username[0].toUpperCase() : '?')}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col">
+              <span className="font-medium text-gray-900 dark:text-gray-100 text-base truncate">
+                {getFullName(currentUser?.firstName, currentUser?.lastName) || currentUser?.username || 'User'}
+              </span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                {currentUser?.email || ''}
+              </span>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            className="w-full mt-4 border border-red-500 bg-transparent text-red-600 dark:text-red-400 text-sm font-medium rounded-lg cursor-pointer transition-colors hover:border-2 hover:border-red-600 hover:text-red-700 focus:border-2 focus:border-red-600 focus:text-red-700"
+            style={{ color: 'hsl(0 84% 60%)', background: 'transparent' }}
+            onClick={logout}
           >
-            <LogOut className={`w-5 h-5 ${isOpen ? 'mr-3' : ''}`} />
-            {isOpen && "Sign Out"}
+            <LogOut className="h-5 w-5 mr-2" style={{ color: 'hsl(0 84% 60%)' }} />
+            <span style={{ color: 'hsl(0 84% 60%)' }}>Sign Out</span>
           </Button>
         </div>
       </div>

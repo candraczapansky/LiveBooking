@@ -35,6 +35,8 @@ const AppointmentsTable = () => {
 
   const { data: allAppointments, isLoading } = useQuery({
     queryKey: ['/api/appointments'],
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   const { data: services } = useQuery({
@@ -80,7 +82,7 @@ const AppointmentsTable = () => {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
       <div className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-6 sm:py-5">
-        <h3 className="text-base sm:text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Today's Schedule</h3>
+        <h3 className="text-base sm:text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">Today's Client Appointments</h3>
       </div>
       
       {/* Mobile Card Layout - Hidden on desktop */}

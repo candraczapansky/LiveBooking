@@ -413,52 +413,6 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
             <FormField
               control={form.control}
-              name="serviceCategories"
-              render={() => (
-                <FormItem>
-                  <FormLabel>Service Categories (Optional)</FormLabel>
-                  <div className="grid grid-cols-2 gap-2">
-                    {serviceCategories.map((category: any) => (
-                      <FormField
-                        key={category.id}
-                        control={form.control}
-                        name="serviceCategories"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={category.id}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(category.name)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), category.name])
-                                      : field.onChange(
-                                          field.value?.filter(
-                                            (value: string) => value !== category.name
-                                          )
-                                        )
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="text-sm font-normal">
-                                {category.name}
-                              </FormLabel>
-                            </FormItem>
-                          )
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="isBlocked"
               render={({ field }) => (
                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">

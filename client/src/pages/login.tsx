@@ -1,10 +1,9 @@
 import { useContext, useState } from "react";
 import { useLocation } from "wouter";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,12 +35,12 @@ const Login = () => {
   useDocumentTitle("Login | Glo Head Spa");
   const [, navigate] = useLocation();
   const authContext = useContext(AuthContext);
-  const { login } = authContext;
   
   console.log("Login component - authContext:", authContext);
-  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("login");
+  const [loginError, setLoginError] = useState<string | null>(null); // <-- Add this line
+  const [registerError, setRegisterError] = useState<string | null>(null); // <-- Add this line
 
   // Login form
   const loginForm = useForm<LoginValues>({
@@ -67,6 +66,7 @@ const Login = () => {
 
   const handleLogin = async (values: LoginValues) => {
     setIsLoading(true);
+    setLoginError(null); // Clear previous error
     try {
       const response = await fetch("/api/login", {
         method: "POST",
@@ -76,35 +76,24 @@ const Login = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        setLoginError(errorData.error || "Login failed"); // <-- Set error for user
         throw new Error(errorData.error || "Login failed");
       }
 
       const userData = await response.json();
       console.log("Login successful, user data:", userData);
       
-      // Clear any stale localStorage data first
-      localStorage.removeItem('user');
+      // Use the auth context login function which will handle color preferences
+      // Type assertion to ensure userData matches User type
+      authContext.login(userData as any);
       
-      // Store fresh user data from database in localStorage
-      localStorage.setItem('user', JSON.stringify(userData));
-      console.log("Fresh user data stored in localStorage:", JSON.stringify(userData, null, 2));
-      
-      // Show success toast
-      toast({
-        title: "Login Successful", 
-        description: "Welcome back to Glo Head Spa!",
-      });
-      
-      // Force page reload to reinitialize auth context with fresh data
-      window.location.href = "/dashboard";
+      // Navigate to dashboard
+      navigate("/dashboard");
       
     } catch (error: any) {
       console.error("Login error:", error);
-      toast({
-        title: "Login Failed",
-        description: error.message || "Invalid credentials",
-        variant: "destructive",
-      });
+      // loginError is already set above if response is not ok
+      if (!loginError) setLoginError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +101,7 @@ const Login = () => {
 
   const handleRegister = async (values: RegisterValues) => {
     setIsLoading(true);
+    setRegisterError(null); // Clear previous error
     try {
       const response = await fetch("/api/register", {
         method: "POST",
@@ -121,25 +111,19 @@ const Login = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        setRegisterError(errorData.error || "Registration failed"); // <-- Set error for user
         throw new Error(errorData.error || "Registration failed");
       }
 
       const userData = await response.json();
       
-      toast({
-        title: "Registration Successful",
-        description: "Your account has been created. You can now log in.",
-      });
-      
       // Switch to login tab
       setActiveTab("login");
       loginForm.setValue("username", values.username);
     } catch (error: any) {
-      toast({
-        title: "Registration Failed",
-        description: error.message || "Something went wrong",
-        variant: "destructive",
-      });
+      console.error("Registration error:", error);
+      // registerError is already set above if response is not ok
+      if (!registerError) setRegisterError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -188,6 +172,11 @@ const Login = () => {
             
             {activeTab === "login" && (
               <>
+                {loginError && (
+                  <div className="mb-4 text-center text-sm text-red-600 dark:text-red-400 font-medium">
+                    {loginError}
+                  </div>
+                )}
                 <Form {...loginForm}>
                   <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5" noValidate>
                     <FormField
@@ -233,30 +222,77 @@ const Login = () => {
                   </form>
                 </Form>
                 
-                <div className="mt-4 text-center">
-                  <Button
-                    variant="ghost"
-                    onClick={() => navigate("/forgot-password")}
-                    className="text-sm text-primary hover:text-primary/80"
-                  >
+                <div className="mt-4 text-center space-y-2">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
                     Forgot your password?
-                  </Button>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigate("/forgot-password")}
+                      className="text-xs text-primary hover:text-primary/80 h-8"
+                    >
+                      Reset via Email
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={() => navigate("/forgot-password-sms")}
+                      className="text-xs text-primary hover:text-primary/80 h-8"
+                    >
+                      Reset via SMS
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
             
             {activeTab === "register" && (
-              <Form {...registerForm}>
-                <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
-                  <div className="grid grid-cols-2 gap-2">
+              <>
+                {registerError && (
+                  <div className="mb-4 text-center text-sm text-red-600 dark:text-red-400 font-medium">
+                    {registerError}
+                  </div>
+                )}
+                <Form {...registerForm}>
+                  <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4" noValidate>
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField
+                        control={registerForm.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="John" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Doe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    
                     <FormField
                       control={registerForm.control}
-                      name="firstName"
+                      name="username"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                            <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -265,91 +301,63 @@ const Login = () => {
                     
                     <FormField
                       control={registerForm.control}
-                      name="lastName"
+                      name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Email</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                            <Input 
+                              type="text" 
+                              placeholder="Enter email address" 
+                              className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all"
+                              autoComplete="off"
+                              autoCorrect="off"
+                              autoCapitalize="off"
+                              spellCheck="false"
+                              data-lpignore="true"
+                              data-form-type="other"
+                              {...field} 
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="username"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
-                        <FormControl>
-                          <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Email</FormLabel>
-                        <FormControl>
-                          <Input 
-                            type="text" 
-                            placeholder="Enter email address" 
-                            className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all"
-                            autoComplete="off"
-                            autoCorrect="off"
-                            autoCapitalize="off"
-                            spellCheck="false"
-                            data-lpignore="true"
-                            data-form-type="other"
-                            {...field} 
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={registerForm.control}
-                    name="phone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
-                    {isLoading ? "Registering..." : "Register"}
-                  </Button>
-                </form>
-              </Form>
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <FormField
+                      control={registerForm.control}
+                      name="phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Phone (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="(123) 456-7890" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    
+                    <Button type="submit" className="w-full h-11 text-sm font-medium mt-6 rounded-md" disabled={isLoading}>
+                      {isLoading ? "Registering..." : "Register"}
+                    </Button>
+                  </form>
+                </Form>
+              </>
             )}
         </CardContent>
         </Card>

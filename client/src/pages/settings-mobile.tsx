@@ -205,7 +205,7 @@ export default function SettingsMobile() {
                 localStorage.setItem('user', JSON.stringify(freshUserData));
                 
                 if (updateUser) {
-                  updateUser(freshUserData);
+                  updateUser({ profilePicture: base64String });
                   console.log('Updated auth context with fresh user data');
                 } else {
                   console.log('updateUser function not available');

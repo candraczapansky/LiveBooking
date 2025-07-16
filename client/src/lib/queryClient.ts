@@ -19,12 +19,21 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+function withBaseUrl(url: string) {
+  if (url.startsWith('/')) {
+    return API_BASE_URL.replace(/\/$/, '') + url;
+  }
+  return url;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const res = await fetch(withBaseUrl(url), {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -41,7 +50,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey[0] as string, {
+    const res = await fetch(withBaseUrl(queryKey[0] as string), {
       credentials: "include",
     });
 
@@ -58,8 +67,8 @@ export const queryClient = new QueryClient({
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
+      refetchOnWindowFocus: true, // Enable refetch when window gains focus
+      staleTime: 5 * 60 * 1000, // 5 minutes - data becomes stale after 5 minutes
       retry: false,
     },
     mutations: {

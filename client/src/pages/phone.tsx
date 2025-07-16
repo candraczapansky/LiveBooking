@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
 import Header from "@/components/layout/header";
@@ -97,19 +97,12 @@ export default function PhonePage() {
   const makeCallMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/phone/outbound', data),
     onSuccess: () => {
-      toast({
-        title: "Call initiated",
-        description: "Your outbound call has been started successfully.",
-      });
+      toast();
       queryClient.invalidateQueries({ queryKey: ['/api/phone/recent'] });
       setOutboundForm({ toNumber: '', staffId: '', userId: '', purpose: 'outbound' });
     },
     onError: (error: any) => {
-      toast({
-        title: "Call failed",
-        description: error.message || "Failed to initiate the call.",
-        variant: "destructive",
-      });
+      toast();
     },
   });
 
@@ -118,10 +111,7 @@ export default function PhonePage() {
     mutationFn: ({ callId, notes, staffId }: { callId: number; notes: string; staffId: number }) =>
       apiRequest('PUT', `/api/phone/notes/${callId}`, { notes, staffId }),
     onSuccess: () => {
-      toast({
-        title: "Notes saved",
-        description: "Call notes have been saved successfully.",
-      });
+      toast();
       queryClient.invalidateQueries({ queryKey: ['/api/phone/recent'] });
       setCallNotes('');
       setSelectedCall(null);
