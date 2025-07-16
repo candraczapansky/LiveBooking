@@ -75,18 +75,10 @@ export default function Settings() {
   const [customColor, setCustomColor] = useState(() => {
     return localStorage.getItem('primaryColor') || '#8b5cf6';
   });
-  
-  const [secondaryColor, setSecondaryColor] = useState(() => {
-    return localStorage.getItem('secondaryColor') || '#6b7280';
-  });
 
   // Text color states
   const [textColor, setTextColor] = useState(() => {
     return localStorage.getItem('textColor') || '#1f2937';
-  });
-  
-  const [textColorSecondary, setTextColorSecondary] = useState(() => {
-    return localStorage.getItem('textColorSecondary') || '#6b7280';
   });
 
   // Profile states
@@ -233,10 +225,6 @@ export default function Settings() {
             setTextColor(colorPrefs.primaryTextColor);
             localStorage.setItem('textColor', colorPrefs.primaryTextColor);
           }
-          if (colorPrefs.secondaryTextColor) {
-            setTextColorSecondary(colorPrefs.secondaryTextColor);
-            localStorage.setItem('textColorSecondary', colorPrefs.secondaryTextColor);
-          }
         }
       } else if (response.status === 404) {
         console.log("No color preferences found, using defaults");
@@ -279,12 +267,7 @@ export default function Settings() {
     }
   }, [textColor]);
 
-  useEffect(() => {
-    if (textColorSecondary) {
-      // Don't apply colors directly - let AuthProvider handle it
-      console.log('Secondary text color effect triggered:', textColorSecondary);
-    }
-  }, [textColorSecondary]);
+
 
   // Color utility functions
   function hexToHsl(hex: string): { h: number; s: number; l: number } {
@@ -316,7 +299,7 @@ export default function Settings() {
   }
 
   // Function to save color preferences immediately
-  const saveColorPreferences = async (primaryColor: string, textColor: string, textColorSecondary: string) => {
+  const saveColorPreferences = async (primaryColor: string, textColor: string) => {
     if (!user?.id) {
       console.log("No user ID available for saving color preferences");
       return;
@@ -331,7 +314,6 @@ export default function Settings() {
         body: JSON.stringify({
           primaryColor,
           primaryTextColor: textColor,
-          secondaryTextColor: textColorSecondary,
           isDarkMode: false
         }),
       });
@@ -355,7 +337,7 @@ export default function Settings() {
     localStorage.setItem('primaryColor', color);
     
     // Save color preferences immediately
-    saveColorPreferences(color, textColor, textColorSecondary);
+    saveColorPreferences(color, textColor);
     
     // Dispatch color change event for immediate application
     window.dispatchEvent(new CustomEvent('colorChange', {
@@ -368,17 +350,12 @@ export default function Settings() {
     console.log('Primary color changed to:', color);
   };
 
-  const handleSecondaryColorChange = (color: string) => {
-    setSecondaryColor(color);
-    localStorage.setItem('secondaryColor', color);
-  };
-
   const handleTextColorChange = (color: string) => {
     setTextColor(color);
     localStorage.setItem('textColor', color);
     
     // Save color preferences immediately
-    saveColorPreferences(customColor, color, textColorSecondary);
+    saveColorPreferences(customColor, color);
     
     // Dispatch color change event for immediate application
     window.dispatchEvent(new CustomEvent('colorChange', {
@@ -391,23 +368,7 @@ export default function Settings() {
     console.log('Text color changed to:', color);
   };
 
-  const handleTextColorSecondaryChange = (color: string) => {
-    setTextColorSecondary(color);
-    localStorage.setItem('textColorSecondary', color);
-    
-    // Save color preferences immediately
-    saveColorPreferences(customColor, textColor, color);
-    
-    // Dispatch color change event for immediate application
-    window.dispatchEvent(new CustomEvent('colorChange', {
-      detail: {
-        type: 'colorChange',
-        textColorSecondary: color
-      }
-    }));
-    
-    console.log('Secondary text color changed to:', color);
-  };
+
 
   const handleSaveProfile = () => {
     console.log("Saving profile...");
@@ -419,9 +380,7 @@ export default function Settings() {
       phone,
       profilePicture,
       primaryColor: customColor,
-      secondaryColor,
-      textColor,
-      textColorSecondary
+      textColor
     });
 
     if (!user?.id) {
@@ -956,25 +915,6 @@ export default function Settings() {
                       </div>
                     </div>
 
-                    {/* Secondary Color */}
-                    <div>
-                      <Label htmlFor="secondaryColor">Secondary Color</Label>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Input
-                          id="secondaryColor"
-                          type="color"
-                          value={secondaryColor}
-                          onChange={(e) => handleSecondaryColorChange(e.target.value)}
-                          className="w-16 h-10 p-1"
-                        />
-                        <Input
-                          value={secondaryColor}
-                          onChange={(e) => handleSecondaryColorChange(e.target.value)}
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-
                     {/* Text Color */}
                     <div>
                       <Label htmlFor="textColor">Text Color</Label>
@@ -989,25 +929,6 @@ export default function Settings() {
                         <Input
                           value={textColor}
                           onChange={(e) => handleTextColorChange(e.target.value)}
-                          className="flex-1"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Secondary Text Color */}
-                    <div>
-                      <Label htmlFor="textColorSecondary">Secondary Text Color</Label>
-                      <div className="flex items-center space-x-2 mt-2">
-                        <Input
-                          id="textColorSecondary"
-                          type="color"
-                          value={textColorSecondary}
-                          onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
-                          className="w-16 h-10 p-1"
-                        />
-                        <Input
-                          value={textColorSecondary}
-                          onChange={(e) => handleTextColorSecondaryChange(e.target.value)}
                           className="flex-1"
                         />
                       </div>

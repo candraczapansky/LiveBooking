@@ -45,7 +45,7 @@ const staffFormSchema = z.object({
   commissionRate: z.number().min(0).max(100).default(0),
   hourlyRate: z.number().min(0).optional(),
   fixedSalary: z.number().min(0).optional(),
-  email: z.string(),
+  email: z.string().email("Please enter a valid email address"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -144,6 +144,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
+      console.log("createStaffMutation.mutationFn called with data:", data);
+      
       // Always create a new user for staff
       let userId;
       
@@ -161,58 +163,91 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         password: defaultPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
+        phone: data.phone || "",
         role: "staff",
       };
 
-      const userResponse = await apiRequest("POST", "/api/register", userData);
-      if (!userResponse.ok) {
-        const errorData = await userResponse.json();
-        console.log(`Failed to create user with username: ${username}, error: ${errorData.error}`);
-        throw new Error(errorData.error || "Failed to create user");
+      console.log("Sending user data to /api/register/staff:", userData);
+
+      try {
+        const userResponse = await apiRequest("POST", "/api/register/staff", userData);
+        console.log("User creation response status:", userResponse.status);
+        
+        if (!userResponse.ok) {
+          const errorData = await userResponse.json();
+          console.log(`Failed to create user with username: ${username}, error: ${errorData.error}`);
+          
+          // Provide more specific error messages
+          if (errorData.error?.includes("Username already taken")) {
+            throw new Error("Username already exists. Please try again.");
+          } else if (errorData.error?.includes("Email already registered")) {
+            throw new Error("Email address is already registered. Please use a different email.");
+          } else if (errorData.error?.includes("Phone number already registered")) {
+            throw new Error("Phone number is already registered. Please use a different phone number.");
+          } else {
+            throw new Error(errorData.error || "Failed to create user account");
+          }
+        }
+
+        const user = await userResponse.json();
+        userId = user.id;
+        console.log(`Successfully created user with username: ${username}, userId: ${userId}`);
+      } catch (error) {
+        console.error("User creation error:", error);
+        throw error; // Re-throw to be handled by onError
       }
-
-      const user = await userResponse.json();
-      userId = user.id;
-      console.log(`Successfully created user with username: ${username}`);
-
 
       // Create staff member
       const staffData = {
         userId: userId,
         title: data.title,
-        bio: data.bio,
+        bio: data.bio || "",
         commissionType: data.commissionType,
-        commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : undefined,
-        hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : undefined,
-        fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : undefined,
+        commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
+        hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
+        fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
       };
 
-      const staffResponse = await apiRequest("POST", "/api/staff", staffData);
-      if (!staffResponse.ok) {
-        const errorData = await staffResponse.json();
-        throw new Error(errorData.error || "Failed to create staff member");
-      }
+      console.log("Sending staff data to /api/staff:", staffData);
 
-      const staff = await staffResponse.json();
-      return staff;
+      try {
+        const staffResponse = await apiRequest("POST", "/api/staff", staffData);
+        console.log("Staff creation response status:", staffResponse.status);
+        
+        if (!staffResponse.ok) {
+          const errorData = await staffResponse.json();
+          console.log("Staff creation failed with error:", errorData);
+          throw new Error(errorData.error || "Failed to create staff member");
+        }
+
+        const staff = await staffResponse.json();
+        console.log("Staff creation successful:", staff);
+        return staff;
+      } catch (error) {
+        console.error("Staff creation error:", error);
+        // If staff creation fails, we should clean up the user we just created
+        // This is a basic cleanup - in production you might want more robust error handling
+        if (userId) {
+          try {
+            await apiRequest("DELETE", `/api/users/${userId}`);
+            console.log("Cleaned up user after staff creation failure");
+          } catch (cleanupError) {
+            console.error("Failed to cleanup user after staff creation failure:", cleanupError);
+          }
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      toast({
-        title: "Success",
-        description: "Staff member created successfully!",
-      });
+      console.log("Staff member created successfully!");
       onOpenChange(false);
       form.reset();
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to create staff member: ${error.message}`,
-        variant: "destructive",
-      });
+      console.error("Staff creation mutation error:", error);
+      console.error("Failed to create staff member:", error instanceof Error ? error.message : "Unknown error");
     }
   });
 
@@ -269,18 +304,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
       queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId] });
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      toast({
-        title: "Success",
-        description: "Staff member updated successfully!",
-      });
+      console.log("Staff member updated successfully!");
       onOpenChange(false);
     },
     onError: (error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update staff member: ${error.message}`,
-        variant: "destructive",
-      });
+      console.error("Failed to update staff member:", error instanceof Error ? error.message : "Unknown error");
     }
   });
 
@@ -289,6 +317,49 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     console.log("Form errors:", form.formState.errors);
     console.log("Current form values from watch:", form.getValues());
     console.log("StaffData in state:", staffData);
+    console.log("Form is valid:", form.formState.isValid);
+    console.log("Form is dirty:", form.formState.isDirty);
+    
+    // Enhanced validation with detailed error messages
+    const validationErrors = [];
+    
+    if (!data.email?.trim()) {
+      validationErrors.push("Email is required");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      validationErrors.push("Please enter a valid email address");
+    }
+    
+    if (!data.firstName?.trim()) {
+      validationErrors.push("First name is required");
+    }
+    
+    if (!data.lastName?.trim()) {
+      validationErrors.push("Last name is required");
+    }
+    
+    if (!data.title?.trim()) {
+      validationErrors.push("Job title is required");
+    }
+    
+    // Check commission rate based on commission type
+    if (data.commissionType === 'commission' && (data.commissionRate <= 0 || data.commissionRate > 100)) {
+      validationErrors.push("Commission rate must be between 0 and 100%");
+    }
+    
+    if (data.commissionType === 'hourly' && (!data.hourlyRate || data.hourlyRate <= 0)) {
+      validationErrors.push("Hourly rate must be greater than 0");
+    }
+    
+    if (data.commissionType === 'fixed' && (!data.fixedSalary || data.fixedSalary <= 0)) {
+      validationErrors.push("Fixed salary must be greater than 0");
+    }
+    
+    if (validationErrors.length > 0) {
+      console.error("Validation errors:", validationErrors);
+      // Toast system is disabled, so we'll just log the errors
+      console.error("Validation Error:", validationErrors.join(", "));
+      return;
+    }
     
     try {
       if (staffId) {
@@ -300,11 +371,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
     } catch (error) {
       console.error("Error in onSubmit:", error);
-      toast({
-        title: "Error",
-        description: `Form submission failed: ${error.message}`,
-        variant: "destructive",
-      });
+      // Toast system is disabled, so we'll just log the error
+      console.error("Form submission failed:", error instanceof Error ? error.message : "Unknown error");
     }
   };
 
@@ -316,21 +384,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file type",
-        description: "Please select an image file (JPEG, PNG, GIF, etc.)",
-        variant: "destructive",
-      });
+      console.error("Invalid file type: Please select an image file (JPEG, PNG, GIF, etc.)");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB",
-        variant: "destructive",
-      });
+      console.error("File too large: Please select an image smaller than 5MB");
       return;
     }
 
@@ -345,20 +405,12 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         setUploadingPhoto(false);
       };
       reader.onerror = () => {
-        toast({
-          title: "Upload failed",
-          description: "Failed to read the image file",
-          variant: "destructive",
-        });
+        console.error("Upload failed: Failed to read the image file");
         setUploadingPhoto(false);
       };
       reader.readAsDataURL(file);
     } catch (error) {
-      toast({
-        title: "Upload failed",
-        description: "Failed to process the image file",
-        variant: "destructive",
-      });
+      console.error("Upload failed: Failed to process the image file");
       setUploadingPhoto(false);
     }
   };
@@ -465,7 +517,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
-                        name="field_def_789"
                         {...field} 
                       />
                     </FormControl>
@@ -489,7 +540,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         spellCheck="false"
                         data-lpignore="true"
                         data-form-type="other"
-                        name="field_ghi_101"
                         {...field} 
                       />
                     </FormControl>

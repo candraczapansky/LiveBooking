@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Clock, DollarSign, User } from "lucide-react";
+
+
 import { format } from "date-fns";
 
 type Appointment = {

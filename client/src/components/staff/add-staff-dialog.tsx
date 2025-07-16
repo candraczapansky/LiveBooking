@@ -87,7 +87,7 @@ export default function AddStaffDialog({ open, onOpenChange }: AddStaffDialogPro
         role: "staff",
       };
 
-      const userResponse = await apiRequest("POST", "/api/register", userData);
+      const userResponse = await apiRequest("POST", "/api/register/staff", userData);
       if (!userResponse.ok) {
         const errorData = await userResponse.json();
         throw new Error(errorData.error || "Failed to create user account");

@@ -87,6 +87,19 @@ function validateBody<T>(schema: z.ZodType<T>) {
       next();
     } catch (error) {
       console.log("Validation failed:", error);
+      
+      // Provide more detailed error messages for Zod validation errors
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => {
+          const field = err.path.join('.');
+          return `${field}: ${err.message}`;
+        });
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: errorMessages.join(', ')
+        });
+      }
+      
       res.status(400).json({ error: "Invalid request body" });
     }
   };
@@ -127,12 +140,26 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   });
   
   app.post("/api/register", validateBody(insertUserSchema), async (req, res) => {
-    const { username, email } = req.body;
+    const { username, email, phone } = req.body;
     
     // Check if username already exists
     const existingUser = await storage.getUserByUsername(username);
     if (existingUser) {
       return res.status(400).json({ error: "Username already taken" });
+    }
+    
+    // Check if email already exists
+    const existingUserByEmail = await storage.getUserByEmail(email);
+    if (existingUserByEmail) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+    
+    // Check if phone number already exists (if provided)
+    if (phone) {
+      const existingUserByPhone = await storage.getUserByPhone(phone);
+      if (existingUserByPhone) {
+        return res.status(400).json({ error: "Phone number already registered" });
+      }
     }
     
     // Create new user with client role by default
@@ -145,6 +172,78 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     const { password, ...userWithoutPassword } = newUser;
     
     return res.status(201).json(userWithoutPassword);
+  });
+
+  // Staff user creation endpoint
+  app.post("/api/register/staff", validateBody(insertUserSchema), async (req, res) => {
+    try {
+      console.log("POST /api/register/staff received data:", req.body);
+      const { username, email, phone, firstName, lastName } = req.body;
+      
+      // Enhanced validation
+      if (!username?.trim()) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+      
+      if (!email?.trim()) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      if (!firstName?.trim()) {
+        return res.status(400).json({ error: "First name is required" });
+      }
+      
+      if (!lastName?.trim()) {
+        return res.status(400).json({ error: "Last name is required" });
+      }
+      
+      // Email format validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Please enter a valid email address" });
+      }
+      
+      // Check if username already exists
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already taken" });
+      }
+      
+      // Check if email already exists
+      const existingUserByEmail = await storage.getUserByEmail(email);
+      if (existingUserByEmail) {
+        return res.status(400).json({ error: "Email already registered" });
+      }
+      
+      // Check if phone number already exists (if provided)
+      if (phone?.trim()) {
+        const existingUserByPhone = await storage.getUserByPhone(phone);
+        if (existingUserByPhone) {
+          return res.status(400).json({ error: "Phone number already registered" });
+        }
+      }
+      
+      console.log("Creating new staff user with validated data");
+      
+      // Create new user with staff role
+      const newUser = await storage.createUser({
+        ...req.body,
+        role: "staff"
+      });
+      
+      console.log("Successfully created staff user:", { id: newUser.id, username: newUser.username, email: newUser.email });
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = newUser;
+      
+      return res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error in /api/register/staff:", error);
+      return res.status(500).json({ 
+        error: "Failed to create staff user account",
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined
+      });
+    }
   });
 
   // Password reset request
@@ -934,21 +1033,66 @@ If you didn't request this password reset, please ignore this email and your pas
   });
   
   app.post("/api/staff", validateBody(insertStaffSchema), async (req, res) => {
-    const { userId } = req.body;
-    
-    // Verify user exists
-    const user = await storage.getUser(userId);
-    if (!user) {
-      return res.status(400).json({ error: "User not found" });
+    try {
+      console.log("POST /api/staff received data:", req.body);
+      const { userId, title, commissionType, commissionRate, hourlyRate, fixedRate } = req.body;
+      
+      // Enhanced validation
+      if (!userId) {
+        return res.status(400).json({ error: "User ID is required" });
+      }
+      
+      if (!title?.trim()) {
+        return res.status(400).json({ error: "Job title is required" });
+      }
+      
+      // Validate commission type and related fields
+      if (commissionType === 'commission' && (commissionRate === null || commissionRate === undefined || commissionRate < 0 || commissionRate > 1)) {
+        return res.status(400).json({ error: "Commission rate must be between 0 and 100%" });
+      }
+      
+      if (commissionType === 'hourly' && (!hourlyRate || hourlyRate <= 0)) {
+        return res.status(400).json({ error: "Hourly rate must be greater than 0" });
+      }
+      
+      if (commissionType === 'fixed' && (!fixedRate || fixedRate <= 0)) {
+        return res.status(400).json({ error: "Fixed salary must be greater than 0" });
+      }
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        console.log("User not found for ID:", userId);
+        return res.status(400).json({ error: "User not found" });
+      }
+      
+      console.log("Found user:", user);
+      
+      // Check if staff already exists for this user
+      const existingStaff = await storage.getStaffByUserId(userId);
+      if (existingStaff) {
+        console.log("Staff already exists for user ID:", userId);
+        return res.status(400).json({ error: "Staff member already exists for this user" });
+      }
+      
+      // Update user role to staff if it's not already
+      if (user.role !== "staff") {
+        console.log("Updating user role from", user.role, "to staff");
+        await storage.updateUser(userId, { role: "staff" });
+      }
+      
+      console.log("Creating staff with validated data:", req.body);
+      const newStaff = await storage.createStaff(req.body);
+      console.log("Successfully created staff:", newStaff);
+      
+      return res.status(201).json(newStaff);
+    } catch (error) {
+      console.error("Error in /api/staff:", error);
+      return res.status(500).json({ 
+        error: "Failed to create staff member",
+        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined
+      });
     }
-    
-    // Update user role to staff if it's not already
-    if (user.role !== "staff") {
-      await storage.updateUser(userId, { role: "staff" });
-    }
-    
-    const newStaff = await storage.createStaff(req.body);
-    return res.status(201).json(newStaff);
   });
   
   app.get("/api/staff/:id", async (req, res) => {

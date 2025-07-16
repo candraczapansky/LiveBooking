@@ -1,7 +1,25 @@
-import { Calendar, DollarSign, UserPlus, CreditCard } from "lucide-react";
+import { Calendar, DollarSign, UserPlus } from "lucide-react";
 import StatsCard from "@/components/ui/stats-card";
 import { formatPrice } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
+
+// Custom Membership Icon Component
+const MembershipIcon = ({ className }: { className?: string }) => (
+  <svg 
+    className={className} 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth="2" 
+    strokeLinecap="round" 
+    strokeLinejoin="round"
+  >
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
 
 const StatsOverview = () => {
   // Fetch real appointment data
@@ -78,7 +96,7 @@ const StatsOverview = () => {
       />
       
       <StatsCard 
-        icon={<CreditCard className="h-4 w-4 sm:h-5 sm:w-5 text-pink-600" />}
+        icon={<MembershipIcon className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />}
         title="Active Memberships"
         value={activeMemberships}
         linkText="Manage memberships"

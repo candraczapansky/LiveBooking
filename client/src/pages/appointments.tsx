@@ -345,67 +345,7 @@ const AppointmentsPage = () => {
                   New Appointment
                 </Button>
               </div>
-              {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center">
-                      <Calendar className="h-6 w-6 text-blue-600" />
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Total Appointments</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                          {appointments.length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center">
-                      <Clock className="h-6 w-6 text-green-600" />
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Today</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                          {appointments.filter((apt: any) => {
-                            const today = new Date().toDateString();
-                            const aptDate = new Date(apt.startTime).toDateString();
-                            return aptDate === today;
-                          }).length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center">
-                      <User className="h-6 w-6 text-purple-600" />
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Staff Members</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                          {staff.length}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center">
-                      <DollarSign className="h-6 w-6 text-yellow-600" />
-                      <div className="ml-3">
-                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400">Revenue</p>
-                        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
-                          {formatPrice(appointments.reduce((total: number, apt: any) => {
-                            return total + (apt.totalAmount || 0);
-                          }, 0))}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+
               {/* Appointments Calendar */}
               <Card>
                 <CardHeader>
