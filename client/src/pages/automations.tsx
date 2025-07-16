@@ -841,24 +841,6 @@ export default function Automations() {
                               Cancel
                             </Button>
                             <Button 
-                              type="button" 
-                              variant="outline"
-                              onClick={() => {
-                                console.log('Testing API directly...');
-                                const testData = {
-                                  name: "Test SMS Rule",
-                                  type: "sms" as const,
-                                  trigger: "booking_confirmation",
-                                  timing: "immediately",
-                                  template: "Test message",
-                                  active: true
-                                };
-                                createRuleMutation.mutate(testData);
-                              }}
-                            >
-                              Test API
-                            </Button>
-                            <Button 
                               type="submit" 
                               disabled={createRuleMutation.isPending || updateRuleMutation.isPending}
                               onClick={() => {

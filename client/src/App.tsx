@@ -35,6 +35,7 @@ import Products from "@/pages/products";
 import EmailTest from "@/pages/email-test";
 import GiftCertificatesPage from "@/pages/gift-certificates";
 import PhonePage from "@/pages/phone";
+import FormsPage from "@/pages/forms";
 
 function Router() {
   const { isAuthenticated, user } = useAuth();
@@ -77,6 +78,7 @@ function Router() {
       <Route path="/marketing" component={Marketing} />
       <Route path="/automations" component={Automations} />
       <Route path="/phone" component={PhonePage} />
+      <Route path="/forms" component={FormsPage} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />

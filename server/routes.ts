@@ -45,6 +45,7 @@ import { PayrollAutoSync } from "./payroll-auto-sync";
 import { AutoRenewalService } from "./auto-renewal-service";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 import { registerExternalRoutes } from "./external-api";
+import { JotformIntegration } from "./jotform-integration";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 
@@ -5524,6 +5525,73 @@ Thank you for choosing Glo Head Spa!
   // Register external API routes
   registerExternalRoutes(app, storage);
 
+  // Initialize Jotform integration
+  const jotformIntegration = new JotformIntegration(storage, {
+    // Map Jotform question IDs to field names
+    // You'll need to update these based on your actual Jotform field IDs
+    '1': 'clientFirstName',      // Example: Question ID 1 = First Name
+    '2': 'clientLastName',       // Example: Question ID 2 = Last Name
+    '3': 'clientEmail',          // Example: Question ID 3 = Email
+    '4': 'clientPhone',          // Example: Question ID 4 = Phone
+    '5': 'serviceName',          // Example: Question ID 5 = Service
+    '6': 'appointmentDate',      // Example: Question ID 6 = Date
+    '7': 'appointmentTime',      // Example: Question ID 7 = Time
+    '8': 'appointmentNotes',     // Example: Question ID 8 = Notes
+    '9': 'staffName',            // Example: Question ID 9 = Staff Member
+  });
+
+  // Jotform webhook endpoint
+  app.post("/api/jotform/webhook", async (req, res) => {
+    try {
+      console.log('Jotform webhook received:', req.body);
+      
+      const result = await jotformIntegration.processSubmission(req.body);
+      
+      if (result.success) {
+        console.log('Successfully processed Jotform submission:', result.appointment);
+        res.status(200).json({
+          success: true,
+          message: 'Submission processed successfully',
+          appointment: result.appointment
+        });
+      } else {
+        console.error('Failed to process Jotform submission:', result.error);
+        res.status(400).json({
+          success: false,
+          error: result.error
+        });
+      }
+    } catch (error) {
+      console.error('Error in Jotform webhook:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error'
+      });
+    }
+  });
+
+  // Jotform webhook status endpoint
+  app.get("/api/jotform/webhook", async (req, res) => {
+    res.json({
+      status: "Jotform webhook endpoint is active",
+      endpoint: "/api/jotform/webhook",
+      method: "POST",
+      description: "Receives form submissions from Jotform and creates appointments",
+      features: [
+        "Processes Jotform submissions",
+        "Creates appointments automatically",
+        "Creates clients, services, and staff if needed",
+        "Deletes submissions from Jotform after processing",
+        "Field mapping support"
+      ],
+      setup: {
+        webhookUrl: `${process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
+        requiredFields: ["Client information", "Service information", "Appointment date/time"],
+        fieldMapping: "Configure field mappings in the JotformIntegration constructor"
+      }
+    });
+  });
+
   // --- 2FA ROUTES ---
 
   // 1. Setup 2FA: generate secret and QR (for authenticator app)
@@ -5977,6 +6045,45 @@ If you didn't attempt to log in, please ignore this email and contact support im
     // Remove sensitive fields
     const { password, twoFactorSecret, twoFactorEmailCode, twoFactorEmailCodeExpiry, ...userSafe } = user;
     res.json(userSafe);
+  });
+
+  // Test SMS endpoint for debugging
+  app.post("/api/test-sms", async (req, res) => {
+    const { phone, message } = req.body;
+    
+    if (!phone || !message) {
+      return res.status(400).json({ error: "Missing required fields: phone, message" });
+    }
+
+    try {
+      console.log(`Testing SMS to ${phone}: ${message}`);
+      
+      const result = await sendSMS(phone, message);
+      
+      if (result.success) {
+        res.json({ 
+          success: true, 
+          message: `Test SMS sent to ${phone}`,
+          messageId: result.messageId,
+          details: "Check your phone for the test message. If using a trial account, make sure the number is verified in Twilio."
+        });
+      } else {
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to send test SMS",
+          error: result.error,
+          details: "Check Twilio dashboard for error logs and account status"
+        });
+      }
+    } catch (error: any) {
+      console.error('Test SMS error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Error sending test SMS",
+        error: error.message,
+        details: "Check server logs and Twilio dashboard"
+      });
+    }
   });
 
   const httpServer = createServer(app);

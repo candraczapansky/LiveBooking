@@ -50,6 +50,11 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
     smsPromotions: client.smsPromotions
   });
   
+  // For after_payment triggers, be more lenient - allow if any SMS preference is enabled
+  if (rule.trigger === 'after_payment') {
+    return client.smsAccountManagement === true || client.smsAppointmentReminders === true || client.smsPromotions === true;
+  }
+  
   switch (rule.trigger) {
     case 'booking_confirmation':
       return client.smsAppointmentReminders === true;
@@ -59,8 +64,6 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
       return client.smsAccountManagement === true;
     case 'follow_up':
       return client.smsPromotions === true;
-    case 'after_payment':
-      return client.smsAccountManagement === true;
     default:
       return true;
   }
