@@ -1,47 +1,28 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { FormBuilder } from "@/components/forms/form-builder";
+import { SendFormSMSDialog } from "@/components/forms/send-form-sms-dialog";
+import { getForms } from "@/api/forms";
 
 const FormsPage = () => {
   useDocumentTitle("Forms | Glo Head Spa");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [forms, setForms] = useState([
-    {
-      id: 1,
-      title: "Client Intake Form",
-      description: "New client information and preferences",
-      type: "intake",
-      status: "active",
-      submissions: 24,
-      lastSubmission: "2024-01-15",
-      createdAt: "2024-01-01"
-    },
-    {
-      id: 2,
-      title: "Service Feedback",
-      description: "Post-service satisfaction survey",
-      type: "feedback",
-      status: "active",
-      submissions: 156,
-      lastSubmission: "2024-01-16",
-      createdAt: "2024-01-05"
-    },
-    {
-      id: 3,
-      title: "Appointment Request",
-      description: "Online appointment booking form",
-      type: "booking",
-      status: "draft",
-      submissions: 0,
-      lastSubmission: null,
-      createdAt: "2024-01-10"
-    }
-  ]);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [selectedForm, setSelectedForm] = useState<{ id: number; title: string } | null>(null);
+
+  // Fetch forms from API using React Query
+  const { data: forms = [], isLoading, error } = useQuery({
+    queryKey: ["/api/forms"],
+    queryFn: getForms,
+  });
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -94,6 +75,65 @@ const FormsPage = () => {
     }
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <SidebarController />
+        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+          sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
+        }`}>
+          <Header />
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+            <div className="max-w-7xl mx-auto px-2 sm:px-0">
+              <div className="flex items-center justify-center h-64">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto"></div>
+                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">Loading forms...</p>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+        <SidebarController />
+        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
+          sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
+        }`}>
+          <Header />
+          <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+            <div className="max-w-7xl mx-auto px-2 sm:px-0">
+              <div className="text-center py-12">
+                <div className="mx-auto h-12 w-12 text-red-400">
+                  <FileText className="h-12 w-12" />
+                </div>
+                <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Error loading forms</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {error instanceof Error ? error.message : "Failed to load forms"}
+                </p>
+                <div className="mt-6">
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    variant="default"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
@@ -110,13 +150,17 @@ const FormsPage = () => {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Forms</h1>
                 <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                  Create and manage client forms and surveys
+                  Build and manage client forms and surveys with our drag-and-drop form builder
                 </p>
               </div>
               <div className="mt-4 sm:mt-0">
-                <Button variant="default" className="flex items-center justify-center h-12 w-full sm:w-auto">
+                <Button 
+                  onClick={() => setIsFormOpen(true)}
+                  variant="default" 
+                  className="flex items-center justify-center h-12 w-full sm:w-auto"
+                >
                   <PlusCircle className="h-4 w-4 mr-2" />
-                  Create New Form
+                  Build New Form
                 </Button>
               </div>
             </div>
@@ -162,7 +206,7 @@ const FormsPage = () => {
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Submissions</p>
                       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {forms.reduce((sum, form) => sum + form.submissions, 0)}
+                        {forms.reduce((sum, form) => sum + (form.submissions || 0), 0)}
                       </p>
                     </div>
                   </div>
@@ -216,7 +260,7 @@ const FormsPage = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Submissions:</span>
-                        <span className="font-medium">{form.submissions}</span>
+                        <span className="font-medium">{form.submissions || 0}</span>
                       </div>
                       
                       {form.lastSubmission && (
@@ -240,6 +284,18 @@ const FormsPage = () => {
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => {
+                            setSelectedForm({ id: form.id, title: form.title });
+                            setSmsDialogOpen(true);
+                          }}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          Send SMS
+                        </Button>
                         <Button variant="outline" size="sm" className="flex-1">
                           <Trash2 className="h-4 w-4 mr-1" />
                           Delete
@@ -262,9 +318,12 @@ const FormsPage = () => {
                   Get started by creating your first form.
                 </p>
                 <div className="mt-6">
-                  <Button variant="default">
+                  <Button 
+                    onClick={() => setIsFormOpen(true)}
+                    variant="default"
+                  >
                     <PlusCircle className="h-4 w-4 mr-2" />
-                    Create Form
+                    Build Form
                   </Button>
                 </div>
               </div>
@@ -272,6 +331,22 @@ const FormsPage = () => {
           </div>
         </main>
       </div>
+      
+      {/* Form Builder Modal */}
+      <FormBuilder 
+        open={isFormOpen} 
+        onOpenChange={setIsFormOpen}
+      />
+
+      {/* Send SMS Dialog */}
+      {selectedForm && (
+        <SendFormSMSDialog
+          open={smsDialogOpen}
+          onOpenChange={setSmsDialogOpen}
+          formId={selectedForm.id}
+          formTitle={selectedForm.title}
+        />
+      )}
     </div>
   );
 };

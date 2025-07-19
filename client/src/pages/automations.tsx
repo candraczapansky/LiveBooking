@@ -275,12 +275,49 @@ export default function Automations() {
   };
 
   // Other utility functions
-  const toggleRuleStatus = (id: number) => {
-    // TODO: Implement rule status toggle API call
+  const toggleRuleStatus = async (id: number) => {
+    try {
+      const rule = automationRules?.find((r: any) => r.id === id);
+      if (!rule) return;
+
+      const response = await fetch(`/api/automation-rules/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ active: !rule.active }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle rule status');
+      }
+
+      // Refetch automation rules
+      refetch();
+    } catch (error) {
+      console.error('Error toggling rule status:', error);
+    }
   };
 
-  const deleteRule = (id: number) => {
-    // TODO: Implement rule deletion API call
+  const deleteRule = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this automation rule?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/automation-rules/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete rule');
+      }
+
+      // Refetch automation rules
+      refetch();
+    } catch (error) {
+      console.error('Error deleting rule:', error);
+    }
   };
 
   const formatTriggerLabel = (trigger: string, customTriggerName?: string) => {

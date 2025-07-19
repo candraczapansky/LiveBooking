@@ -211,10 +211,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     }
 
     // Debug: Log the appointments prop, selectedStaffId, and selectedFormDate
-    console.log('[DEBUG] getAvailableTimeSlots called');
-    console.log('[DEBUG] appointments prop:', appointments);
-    console.log('[DEBUG] selectedStaffId:', selectedStaffId, 'typeof:', typeof selectedStaffId);
-    console.log('[DEBUG] selectedFormDate:', selectedFormDate, 'ISO:', selectedFormDate.toISOString());
+
 
     const dayName = getDayName(selectedFormDate);
     const currentDate = formatDateForComparison(selectedFormDate);
@@ -256,7 +253,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           // Debug: Log staffId comparison
           const match = appointment.staffId === parseInt(selectedStaffId);
           if (!match) {
-            console.log('[DEBUG] Skipping appointment (staffId mismatch):', appointment.staffId, 'vs', selectedStaffId);
+    
           }
           return match;
         })
@@ -264,12 +261,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           const aptDate = new Date(appointment.startTime);
           const match = aptDate.toDateString() === selectedFormDate.toDateString();
           if (!match) {
-            console.log('[DEBUG] Skipping appointment (date mismatch):', aptDate.toDateString(), 'vs', selectedFormDate.toDateString());
+    
           }
           return match;
         })
         .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-    console.log('[DEBUG] staffAppointments for filtering:', staffAppointments);
+    
 
       // DEBUG LOGGING
       console.log('Checking slot:', slot.label, 'for staff:', selectedStaffId, 'on', appointmentStart.toDateString());

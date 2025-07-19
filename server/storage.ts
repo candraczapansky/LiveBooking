@@ -13,23 +13,23 @@ import {
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
-  staffEarnings, insertStaffEarningsSchema,
   savedPaymentMethods, SavedPaymentMethod, InsertSavedPaymentMethod,
-  savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   giftCards, GiftCard, InsertGiftCard,
   giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction,
+  savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
   promoCodes, PromoCode, InsertPromoCode,
   staffSchedules, StaffSchedule, InsertStaffSchedule,
-  timeClockEntries, TimeClockEntry, InsertTimeClockEntry,
   userColorPreferences, UserColorPreferences, InsertUserColorPreferences,
   notifications, Notification, InsertNotification,
+  timeClockEntries, TimeClockEntry, InsertTimeClockEntry,
   payrollHistory, PayrollHistory, InsertPayrollHistory,
   salesHistory, SalesHistory, InsertSalesHistory,
   businessSettings, BusinessSettings, InsertBusinessSettings,
-  automationRules, AutomationRule, InsertAutomationRule
+  automationRules, AutomationRule, InsertAutomationRule,
+  forms, Form, InsertForm
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -283,14 +283,25 @@ export interface IStorage {
   deleteAutomationRule(id: number): Promise<boolean>;
   updateAutomationRuleSentCount(id: number, sentCount: number): Promise<void>;
   updateAutomationRuleLastRun(id: number, lastRun: Date): Promise<void>;
+
+  // Forms operations
+  createForm(form: InsertForm): Promise<Form>;
+  getForm(id: number): Promise<Form | undefined>;
+  getAllForms(): Promise<Form[]>;
+  updateForm(id: number, formData: Partial<InsertForm>): Promise<Form>;
+  deleteForm(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
   constructor() {
     // PostgreSQL storage - no in-memory structures needed
-    // Initialize with sample data for demo purposes - DISABLED to prevent service duplication
-    // this.initializeSampleData();
+    // Initialize with sample data for demo purposes
     this.initializeConnection();
+    // Initialize sample data asynchronously without blocking
+    this.initializeSampleData().catch(error => {
+      console.error('Sample data initialization failed:', error);
+      // Don't throw error to prevent server startup failure
+    });
   }
 
   private async initializeConnection() {
@@ -305,250 +316,236 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async initializeSampleData() {
-    // Create admin user if not exists
-    const existingAdmin = await this.getUserByUsername('admin');
-    if (!existingAdmin) {
-      await this.createUser({
-        username: 'admin',
-        password: 'password',
-        email: 'admin@beautybook.com',
-        role: 'admin',
-        firstName: 'Sarah',
-        lastName: 'Johnson',
-        phone: '555-123-4567'
-      });
-    }
+    try {
+      console.log('Starting sample data initialization...');
+      
+      // Create admin user if not exists
+      const existingAdmin = await this.getUserByUsername('admin');
+      if (!existingAdmin) {
+        console.log('Creating admin user...');
+        await this.createUser({
+          username: 'admin',
+          password: 'password',
+          email: 'admin@admin.com',
+          role: 'admin',
+          firstName: 'Sarah',
+          lastName: 'Johnson',
+          phone: '555-123-4567'
+        });
+        console.log('Admin user created successfully');
+      } else {
+        console.log('Admin user already exists');
+      }
 
-    // Create sample service categories only if they don't exist
-    const existingCategories = await this.getAllServiceCategories();
-    
-    if (!existingCategories.find(c => c.name === 'Hair Services')) {
-      this.createServiceCategory({
-        name: 'Hair Services',
-        description: 'Professional hair styling, cutting, and coloring services'
-      });
-    }
+      // Create sample service categories only if they don't exist
+      const existingCategories = await this.getAllServiceCategories();
+      
+      if (!existingCategories.find(c => c.name === 'Hair Services')) {
+        console.log('Creating Hair Services category...');
+        await this.createServiceCategory({
+          name: 'Hair Services',
+          description: 'Professional hair styling, cutting, and coloring services'
+        });
+      }
 
-    if (!existingCategories.find(c => c.name === 'Facial Treatments')) {
-      this.createServiceCategory({
-        name: 'Facial Treatments',
-        description: 'Skincare and facial rejuvenation treatments'
-      });
-    }
+      if (!existingCategories.find(c => c.name === 'Facial Treatments')) {
+        console.log('Creating Facial Treatments category...');
+        await this.createServiceCategory({
+          name: 'Facial Treatments',
+          description: 'Skincare and facial rejuvenation treatments'
+        });
+      }
 
-    // Create sample rooms
-    this.createRoom({
-      name: 'Treatment Room 1',
-      description: 'Main treatment room for facials and individual services',
-      capacity: 1,
-      isActive: true
-    });
+      // Create sample rooms only if they don't exist
+      const existingRooms = await this.getAllRooms();
+      
+      if (!existingRooms.find(r => r.name === 'Treatment Room 1')) {
+        console.log('Creating Treatment Room 1...');
+        await this.createRoom({
+          name: 'Treatment Room 1',
+          description: 'Main treatment room for facials and individual services',
+          capacity: 1,
+          isActive: true
+        });
+      }
 
-    this.createRoom({
-      name: 'Treatment Room 2', 
-      description: 'Secondary treatment room for massages and body treatments',
-      capacity: 1,
-      isActive: true
-    });
+      if (!existingRooms.find(r => r.name === 'Treatment Room 2')) {
+        console.log('Creating Treatment Room 2...');
+        await this.createRoom({
+          name: 'Treatment Room 2', 
+          description: 'Secondary treatment room for massages and body treatments',
+          capacity: 1,
+          isActive: true
+        });
+      }
 
-    this.createRoom({
-      name: 'Styling Station Area',
-      description: 'Open area with multiple styling stations',
-      capacity: 4,
-      isActive: true
-    });
+      if (!existingRooms.find(r => r.name === 'Styling Station Area')) {
+        console.log('Creating Styling Station Area...');
+        await this.createRoom({
+          name: 'Styling Station Area',
+          description: 'Open area with multiple styling stations',
+          capacity: 4,
+          isActive: true
+        });
+      }
 
-    // Create sample devices
-    this.createDevice({
-      name: 'Professional Hair Dryer Station 1',
-      description: 'High-speed ionic hair dryer for quick styling',
-      deviceType: 'hair_dryer',
-      brand: 'Dyson',
-      model: 'Supersonic HD07',
-      serialNumber: 'DYS001234',
-      purchaseDate: '2024-01-15',
-      warrantyExpiry: '2026-01-15',
-      status: 'available',
-      isActive: true
-    });
+      // Create sample devices only if they don't exist
+      const existingDevices = await this.getAllDevices();
+      
+      if (!existingDevices.find(d => d.name === 'Professional Hair Dryer Station 1')) {
+        console.log('Creating Professional Hair Dryer Station 1...');
+        await this.createDevice({
+          name: 'Professional Hair Dryer Station 1',
+          description: 'High-speed ionic hair dryer for quick styling',
+          deviceType: 'hair_dryer',
+          brand: 'Dyson',
+          model: 'Supersonic HD07',
+          serialNumber: 'DYS001234',
+          purchaseDate: '2024-01-15',
+          warrantyExpiry: '2026-01-15',
+          status: 'available',
+          isActive: true
+        });
+      }
 
-    this.createDevice({
-      name: 'Luxury Massage Table 1',
-      description: 'Electric height-adjustable massage table with heating',
-      deviceType: 'massage_table',
-      brand: 'Earthlite',
-      model: 'Ellora Vista',
-      serialNumber: 'EL789456',
-      purchaseDate: '2023-08-20',
-      warrantyExpiry: '2025-08-20',
-      status: 'available',
-      isActive: true
-    });
+      if (!existingDevices.find(d => d.name === 'Luxury Massage Table 1')) {
+        console.log('Creating Luxury Massage Table 1...');
+        await this.createDevice({
+          name: 'Luxury Massage Table 1',
+          description: 'Electric height-adjustable massage table with heating',
+          deviceType: 'massage_table',
+          brand: 'Earthlite',
+          model: 'Ellora Vista',
+          serialNumber: 'EL789456',
+          purchaseDate: '2023-08-20',
+          warrantyExpiry: '2025-08-20',
+          status: 'available',
+          isActive: true
+        });
+      }
 
-    this.createDevice({
-      name: 'Hydraulic Styling Chair A',
-      description: 'Professional salon chair with 360-degree rotation',
-      deviceType: 'styling_chair',
-      brand: 'Takara Belmont',
-      model: 'Apollo II',
-      serialNumber: 'TB345678',
-      purchaseDate: '2023-05-10',
-      warrantyExpiry: '2028-05-10',
-      status: 'in_use',
-      isActive: true
-    });
+      if (!existingDevices.find(d => d.name === 'Hydraulic Styling Chair A')) {
+        console.log('Creating Hydraulic Styling Chair A...');
+        await this.createDevice({
+          name: 'Hydraulic Styling Chair A',
+          description: 'Professional salon chair with 360-degree rotation',
+          deviceType: 'styling_chair',
+          brand: 'Takara Belmont',
+          model: 'Apollo II',
+          serialNumber: 'TB345678',
+          purchaseDate: '2023-05-10',
+          warrantyExpiry: '2028-05-10',
+          status: 'in_use',
+          isActive: true
+        });
+      }
 
-    this.createDevice({
-      name: 'Facial Steamer Pro',
-      description: 'Professional ozone facial steamer for deep cleansing',
-      deviceType: 'facial_steamer',
-      brand: 'Lucas',
-      model: 'Champagne 701',
-      serialNumber: 'LC112233',
-      purchaseDate: '2024-03-01',
-      status: 'maintenance',
-      isActive: true
-    });
+      if (!existingDevices.find(d => d.name === 'Facial Steamer Pro')) {
+        console.log('Creating Facial Steamer Pro...');
+        await this.createDevice({
+          name: 'Facial Steamer Pro',
+          description: 'Professional ozone facial steamer for deep cleansing',
+          deviceType: 'facial_steamer',
+          brand: 'Lucas',
+          model: 'Champagne 701',
+          serialNumber: 'LC112233',
+          purchaseDate: '2024-03-01',
+          status: 'maintenance',
+          isActive: true
+        });
+      }
 
-    // Create sample staff user (if not exists)
-    this.getUserByUsername('stylist1').then(existingUser => {
-      if (!existingUser) {
-        this.createUser({
+      // Create sample staff user (if not exists)
+      const existingStylist = await this.getUserByUsername('stylist1');
+      if (!existingStylist) {
+        console.log('Creating stylist1 user...');
+        await this.createUser({
           username: 'stylist1',
           password: 'password',
-          email: 'emma.martinez@beautybook.com',
+          email: 'emma.martinez@example.com',
           role: 'staff',
           firstName: 'Emma',
           lastName: 'Martinez',
           phone: '555-234-5678'
         });
+        console.log('Stylist user created successfully');
+      } else {
+        console.log('Stylist user already exists');
       }
-    });
 
-    // Create staff member profile after creating the staff user
-    this.getUserByUsername('stylist1').then(async existingUser => {
-      if (existingUser) {
-        // Check if staff profile already exists
-        const existingStaff = await this.getStaffByUserId(existingUser.id);
+      // Create staff member profile after creating the staff user
+      const stylistUser = await this.getUserByUsername('stylist1');
+      if (stylistUser) {
+        const existingStaff = await this.getStaffByUserId(stylistUser.id);
         if (!existingStaff) {
-          this.createStaff({
-            userId: existingUser.id,
+          console.log('Creating staff profile for stylist1...');
+          await this.createStaff({
+            userId: stylistUser.id,
             title: 'Senior Hair Stylist',
             bio: 'Emma has over 8 years of experience in hair styling and coloring. She specializes in modern cuts and color correction.',
             commissionType: 'commission',
             commissionRate: 0.45, // 45% commission
             photoUrl: null
           });
+          console.log('Staff profile created successfully');
+        } else {
+          console.log('Staff profile already exists');
         }
       }
-    });
 
-    // Create sample services only if they don't exist
-    const existingServices = await this.getAllServices();
-    
-    if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style')) {
-      this.createService({
-        name: 'Women\'s Haircut & Style',
-        description: 'Professional haircut with wash, cut, and styling',
-        duration: 60,
-        price: 85.00,
-        categoryId: 1, // Hair Services category
-        roomId: 3, // Styling Station Area
-        bufferTimeBefore: 10,
-        bufferTimeAfter: 10,
-        color: '#FF6B9D'
-      });
+      // Create sample services only if they don't exist
+      const existingServices = await this.getAllServices();
+      
+      if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style')) {
+        console.log('Creating Women\'s Haircut & Style service...');
+        await this.createService({
+          name: 'Women\'s Haircut & Style',
+          description: 'Professional haircut with wash, cut, and styling',
+          duration: 60,
+          price: 85.00,
+          categoryId: 1, // Hair Services category
+          roomId: 3, // Styling Station Area
+          bufferTimeBefore: 10,
+          bufferTimeAfter: 10,
+          color: '#FF6B9D'
+        });
+      }
+
+      if (!existingServices.find(s => s.name === 'Color & Highlights')) {
+        console.log('Creating Color & Highlights service...');
+        await this.createService({
+          name: 'Color & Highlights',
+          description: 'Full color service with highlights and toning',
+          duration: 120,
+          price: 150.00,
+          categoryId: 1, // Hair Services category
+          roomId: 3, // Styling Station Area
+          bufferTimeBefore: 15,
+          bufferTimeAfter: 15,
+          color: '#8B5CF6'
+        });
+      }
+
+      if (!existingServices.find(s => s.name === 'Deep Cleansing Facial')) {
+        console.log('Creating Deep Cleansing Facial service...');
+        await this.createService({
+          name: 'Deep Cleansing Facial',
+          description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
+          duration: 90,
+          price: 95.00,
+          categoryId: 2, // Facial Treatments category
+          roomId: 1, // Treatment Room 1
+          bufferTimeBefore: 10,
+          bufferTimeAfter: 10,
+          color: '#10B981'
+        });
+      }
+
+      console.log('Sample data initialization completed successfully');
+    } catch (error) {
+      console.error('Error during sample data initialization:', error);
+      // Don't throw error to prevent server startup failure
     }
-
-    if (!existingServices.find(s => s.name === 'Color & Highlights')) {
-      this.createService({
-        name: 'Color & Highlights',
-        description: 'Full color service with highlights and toning',
-        duration: 120,
-        price: 150.00,
-        categoryId: 1, // Hair Services category
-        roomId: 3, // Styling Station Area
-        bufferTimeBefore: 15,
-        bufferTimeAfter: 15,
-        color: '#8B5CF6'
-      });
-    }
-
-    if (!existingServices.find(s => s.name === 'Deep Cleansing Facial')) {
-      this.createService({
-        name: 'Deep Cleansing Facial',
-        description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
-        duration: 90,
-        price: 95.00,
-        categoryId: 2, // Facial Treatments category
-        roomId: 1, // Treatment Room 1
-        bufferTimeBefore: 10,
-        bufferTimeAfter: 10,
-        color: '#10B981'
-      });
-    }
-
-    // Assign services to staff member
-    this.assignServiceToStaff({
-      staffId: 1, // Emma Martinez
-      serviceId: 1, // Women's Haircut & Style
-      customRate: null,
-      customCommissionRate: null
-    });
-
-    this.assignServiceToStaff({
-      staffId: 1, // Emma Martinez  
-      serviceId: 2, // Color & Highlights
-      customRate: null,
-      customCommissionRate: 0.50 // Higher commission for complex color work
-    });
-
-    // Create sample completed appointments for payroll testing
-    const now = new Date();
-    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    
-    // Create some appointments this month
-    this.createAppointment({
-      clientId: 1, // Admin user as client for testing
-      serviceId: 1, // Women's Haircut & Style
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000), // 5 days into month
-      endTime: new Date(thisMonth.getTime() + 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
-      status: 'completed',
-      notes: 'Regular haircut and style service'
-    });
-
-    this.createAppointment({
-      clientId: 1,
-      serviceId: 2, // Color & Highlights
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000), // 10 days into month
-      endTime: new Date(thisMonth.getTime() + 10 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // +2 hours
-      status: 'completed',
-      notes: 'Full color and highlights treatment'
-    });
-
-    this.createAppointment({
-      clientId: 1,
-      serviceId: 1, // Women's Haircut & Style
-      staffId: 1, // Emma Martinez
-      startTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000), // 15 days into month
-      endTime: new Date(thisMonth.getTime() + 15 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // +1 hour
-      status: 'completed',
-      notes: 'Follow-up styling appointment'
-    });
-
-    // Create sample membership
-    this.createMembership({
-      name: 'Premium',
-      description: 'Monthly premium membership with discounts',
-      price: 49.99,
-      duration: 30, // 30 days
-      benefits: 'Includes 10% off all services, one free blowout per month'
-    });
-
-    // Create sample gift cards
-    // Gift cards will be created through the purchase system
   }
 
   // User operations
@@ -572,18 +569,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
-    console.log('updateUser called with id:', id, 'data:', userData);
-    
     try {
       // First attempt with Drizzle ORM
       const [updatedUser] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
       if (!updatedUser) {
         throw new Error('User not found');
       }
-      console.log('Drizzle update successful:', updatedUser);
       return updatedUser;
     } catch (error) {
-      console.error('Drizzle update failed, trying direct SQL approach:', error);
       
       // Fallback to direct SQL for field mapping issues
       const updateFields: string[] = [];
@@ -690,9 +683,6 @@ export class DatabaseStorage implements IStorage {
       values.push(id);
       const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${values.length} RETURNING *`;
       
-      console.log('Executing fallback SQL:', updateQuery);
-      console.log('With values:', values);
-      
       // Use sql template literal for Drizzle with proper parameterized query
       try {
         const result = await db.execute(sql.raw(updateQuery, values));
@@ -701,10 +691,8 @@ export class DatabaseStorage implements IStorage {
           throw new Error('User not found');
         }
         
-        console.log('SQL fallback successful:', result.rows[0]);
         return result.rows[0] as User;
       } catch (sqlError) {
-        console.error('SQL fallback also failed:', sqlError);
         
         // Final fallback - let's try a simpler approach with individual field updates
         try {
@@ -727,17 +715,14 @@ export class DatabaseStorage implements IStorage {
           if (Object.keys(simpleUpdate).length > 0) {
             const [updatedUser] = await db.update(users).set(simpleUpdate).where(eq(users.id, id)).returning();
             if (updatedUser) {
-              console.log('Simple update successful:', updatedUser);
               return updatedUser;
             }
           }
           
           // If still failing, return the original user (at least no crash)
-          console.log('Returning original user data as fallback');
           return user;
           
         } catch (finalError) {
-          console.error('All update attempts failed:', finalError);
           throw new Error('Failed to update user profile');
         }
       }
@@ -759,15 +744,9 @@ export class DatabaseStorage implements IStorage {
       
       const result = await db.delete(users).where(eq(users.id, id));
       const success = result.rowCount ? result.rowCount > 0 : false;
-      console.log(`DatabaseStorage: Delete user ${id} result:`, success);
-      
-      // Verify deletion
-      const userAfterDelete = await db.select().from(users).where(eq(users.id, id));
-      console.log(`DatabaseStorage: User exists after deletion:`, userAfterDelete.length > 0);
       
       return success;
     } catch (error) {
-      console.error(`DatabaseStorage: Error deleting user ${id}:`, error);
       throw error; // Re-throw to bubble up the specific error message
     }
   }
@@ -940,24 +919,13 @@ export class DatabaseStorage implements IStorage {
 
   // Staff operations
   async createStaff(staffMember: InsertStaff): Promise<Staff> {
-    try {
-      const [result] = await db.insert(staff).values(staffMember).returning();
-      console.log('Created staff record:', result);
-      return result;
-    } catch (error) {
-      console.error('Error creating staff:', error);
-      throw error;
-    }
+    const [result] = await db.insert(staff).values(staffMember).returning();
+    return result;
   }
 
   async getStaff(id: number): Promise<Staff | undefined> {
-    try {
-      const [result] = await db.select().from(staff).where(eq(staff.id, id));
-      return result;
-    } catch (error) {
-      console.error('Error getting staff by id:', error);
-      return undefined;
-    }
+    const [result] = await db.select().from(staff).where(eq(staff.id, id));
+    return result;
   }
 
   async getStaffByUserId(userId: number): Promise<Staff | undefined> {
@@ -2357,6 +2325,35 @@ export class DatabaseStorage implements IStorage {
       .update(automationRules)
       .set({ lastRun, updatedAt: new Date() })
       .where(eq(automationRules.id, id));
+  }
+
+  // Forms operations
+  async createForm(form: InsertForm): Promise<Form> {
+    const result = await db.insert(forms).values(form).returning();
+    return result[0];
+  }
+
+  async getForm(id: number): Promise<Form | undefined> {
+    const result = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAllForms(): Promise<Form[]> {
+    return await db.select().from(forms).orderBy(desc(forms.createdAt));
+  }
+
+  async updateForm(id: number, formData: Partial<InsertForm>): Promise<Form> {
+    const result = await db
+      .update(forms)
+      .set(formData)
+      .where(eq(forms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteForm(id: number): Promise<boolean> {
+    const result = await db.delete(forms).where(eq(forms.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

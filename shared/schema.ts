@@ -883,3 +883,25 @@ export const insertAutomationRuleSchema = createInsertSchema(automationRules).om
 
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;
+
+// Forms schema
+export const forms = pgTable("forms", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  type: text("type").notNull(), // intake, feedback, booking, etc.
+  status: text("status").notNull().default("active"), // active, draft, inactive
+  submissions: integer("submissions").default(0),
+  lastSubmission: date("last_submission"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormSchema = createInsertSchema(forms).omit({
+  id: true,
+  createdAt: true,
+  submissions: true,
+  lastSubmission: true,
+});
+
+export type Form = typeof forms.$inferSelect;
+export type InsertForm = z.infer<typeof insertFormSchema>;

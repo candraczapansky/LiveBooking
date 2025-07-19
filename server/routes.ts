@@ -22,7 +22,8 @@ import {
   insertMarketingCampaignSchema,
   insertPromoCodeSchema,
   insertStaffScheduleSchema,
-  insertUserColorPreferencesSchema
+  insertUserColorPreferencesSchema,
+  insertFormSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 
@@ -107,30 +108,20 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
-  // Temporarily disable PayrollAutoSync to isolate the crash issue
-  const payrollAutoSync = {
-    triggerPayrollSync: async () => {
-      console.log('PayrollAutoSync temporarily disabled for debugging');
-    }
-  } as any;
-  console.log('PayrollAutoSync system disabled for debugging');
-
-  // Simple request logging middleware (removed problematic middleware)
+  // Initialize PayrollAutoSync
+  const payrollAutoSync = new PayrollAutoSync(storage);
 
   // Auth routes
   app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
-    console.log("[DEBUG] Login attempt:", { username, password });
     
     if (!username || !password) {
       return res.status(400).json({ error: "Username and password are required" });
     }
     
     const user = await storage.getUserByUsername(username);
-    console.log("[DEBUG] User from DB:", user);
     
     if (!user || user.password !== password) { // In real app, compare hashed passwords
-      console.log("[DEBUG] Invalid credentials for:", { username, password, userPassword: user ? user.password : null });
       return res.status(401).json({ error: "Invalid credentials" });
     }
     
@@ -1519,25 +1510,11 @@ If you didn't request this password reset, please ignore this email and your pas
     const newStart = new Date(startTime);
     const newEnd = new Date(endTime);
     
-    console.log('Conflict detection debug:', {
-      requestedStartTime: startTime,
-      requestedEndTime: endTime,
-      newStartParsed: newStart.toISOString(),
-      newEndParsed: newEnd.toISOString(),
-      staffId: staffId,
-      existingAppointmentsCount: existingAppointments.length
-    });
+
     
     const conflictingAppointment = existingAppointments.find(appointment => {
       const existingStart = new Date(appointment.startTime);
       const existingEnd = new Date(appointment.endTime);
-      
-      console.log('Checking appointment:', {
-        appointmentId: appointment.id,
-        existingStart: existingStart.toISOString(),
-        existingEnd: existingEnd.toISOString(),
-        overlap: newStart < existingEnd && newEnd > existingStart
-      });
       
       // Check for any overlap: new appointment starts before existing ends AND new appointment ends after existing starts
       return newStart < existingEnd && newEnd > existingStart;
@@ -1553,12 +1530,6 @@ If you didn't request this password reset, please ignore this email and your pas
         hour: 'numeric', 
         minute: '2-digit', 
         hour12: true 
-      });
-      
-      console.log('Conflict found with appointment:', {
-        conflictingAppointmentId: conflictingAppointment.id,
-        conflictingStartTime: conflictingAppointment.startTime,
-        conflictingEndTime: conflictingAppointment.endTime
       });
       
       return res.status(409).json({ 
@@ -4107,53 +4078,7 @@ Thank you for choosing Glo Head Spa!
     }
   });
 
- // Test email endpoint for debugging
-  app.post("/api/test-email", async (req, res) => {
-    const { to, subject, content } = req.body;
-    
-    if (!to || !subject || !content) {
-      return res.status(400).json({ error: "Missing required fields: to, subject, content" });
-    }
 
-    try {
-      const emailParams = {
-        to: to,
-        from: process.env.SENDGRID_FROM_EMAIL || 'test@example.com',
-        subject: subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Test Email from Glo Head Spa</h2>
-            <p style="color: #666; line-height: 1.6;">${content}</p>
-            <hr style="border: 1px solid #eee; margin: 20px 0;">
-            <p style="color: #999; font-size: 12px;">This is a test email sent from your salon management system.</p>
-          </div>
-        `,
-        text: `Test Email from Glo Head Spa\n\n${content}\n\nThis is a test email sent from your salon management system.`
-      };
-
-      const success = await sendEmail(emailParams);
-      
-      if (success) {
-        res.json({ 
-          success: true, 
-          message: `Test email sent to ${to}`,
-          details: "Check your inbox and spam folder. If using Gmail, check the Promotions tab."
-        });
-      } else {
-        res.status(500).json({ 
-          success: false, 
-          message: "Failed to send test email",
-          details: "Check server logs for SendGrid error details"
-        });
-      }
-    } catch (error: any) {
-      res.status(500).json({ 
-        success: false, 
-        message: "Email sending error", 
-        error: error.message 
-      });
-    }
-  });
 
   // Promo codes API endpoints
   app.get("/api/promo-codes", async (req, res) => {
@@ -6047,42 +5972,141 @@ If you didn't attempt to log in, please ignore this email and contact support im
     res.json(userSafe);
   });
 
-  // Test SMS endpoint for debugging
-  app.post("/api/test-sms", async (req, res) => {
-    const { phone, message } = req.body;
-    
-    if (!phone || !message) {
-      return res.status(400).json({ error: "Missing required fields: phone, message" });
-    }
 
+
+  // Get all forms
+  app.get("/api/forms", async (req, res) => {
     try {
-      console.log(`Testing SMS to ${phone}: ${message}`);
+      const forms = await storage.getAllForms();
+      res.json(forms);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch forms" });
+    }
+  });
+
+  // Get a single form by ID
+  app.get("/api/forms/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const form = await storage.getForm(id);
       
-      const result = await sendSMS(phone, message);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
       
-      if (result.success) {
-        res.json({ 
-          success: true, 
-          message: `Test SMS sent to ${phone}`,
-          messageId: result.messageId,
-          details: "Check your phone for the test message. If using a trial account, make sure the number is verified in Twilio."
+      res.json(form);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch form" });
+    }
+  });
+
+  // Create new form
+  app.post("/api/forms", validateBody(insertFormSchema), async (req, res) => {
+    try {
+      const newForm = await storage.createForm(req.body);
+      res.status(201).json(newForm);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create form" });
+    }
+  });
+
+  // Send form to client via SMS
+  app.post("/api/forms/:id/send-sms", async (req, res) => {
+    try {
+      const formId = parseInt(req.params.id);
+      const { clientId, phone, customMessage } = req.body;
+
+      // Validate required fields
+      if (!clientId && !phone) {
+        return res.status(400).json({ error: "Either clientId or phone is required" });
+      }
+
+      // Get the form
+      const form = await storage.getForm(formId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+
+      let targetPhone = phone;
+      let clientName = "";
+
+      // If clientId is provided, get client details
+      if (clientId) {
+        const client = await storage.getUser(clientId);
+        if (!client) {
+          return res.status(404).json({ error: "Client not found" });
+        }
+        if (!client.phone) {
+          return res.status(400).json({ error: "Client does not have a phone number" });
+        }
+        targetPhone = client.phone;
+        clientName = `${client.firstName || ""} ${client.lastName || ""}`.trim();
+      }
+
+      // Check if SMS is configured
+      if (!isTwilioConfigured()) {
+        return res.status(400).json({ 
+          error: "SMS service not configured. Please configure Twilio credentials." 
+        });
+      }
+
+      // Create the SMS message
+      const baseUrl = process.env.REPLIT_DOMAINS || 'http://localhost:5000';
+      const formUrl = `${baseUrl}/forms/${formId}`;
+      
+      let message = customMessage || `Hi${clientName ? ` ${clientName}` : ""}! You have a new form from Glo Head Spa: ${form.title}`;
+      
+      if (form.description) {
+        message += `\n\n${form.description}`;
+      }
+      
+      message += `\n\nPlease complete the form here: ${formUrl}`;
+      
+      // Check if this is a test number (for development)
+      const isTestNumber = targetPhone.includes('555') || targetPhone.includes('test');
+      
+      if (isTestNumber) {
+        // Simulate successful SMS for test numbers
+        console.log(`[TEST MODE] Would send SMS to ${targetPhone}: ${message}`);
+        
+        // Update form submission count
+        await storage.updateForm(formId, {
+          submissions: (form.submissions || 0) + 1,
+          lastSubmission: new Date().toISOString().split('T')[0]
+        });
+
+        return res.json({
+          success: true,
+          message: "Form sent successfully via SMS (test mode)",
+          messageId: "test-message-id",
+          testMode: true
+        });
+      }
+
+      // Send the SMS for real numbers
+      const smsResult = await sendSMS(targetPhone, message);
+      
+      if (smsResult.success) {
+        // Update form submission count
+        await storage.updateForm(formId, {
+          submissions: (form.submissions || 0) + 1,
+          lastSubmission: new Date().toISOString().split('T')[0] // Convert to date string
+        });
+
+        res.json({
+          success: true,
+          message: "Form sent successfully via SMS",
+          messageId: smsResult.messageId
         });
       } else {
-        res.status(500).json({ 
-          success: false, 
-          message: "Failed to send test SMS",
-          error: result.error,
-          details: "Check Twilio dashboard for error logs and account status"
+        res.status(500).json({
+          success: false,
+          error: smsResult.error || "Failed to send SMS"
         });
       }
     } catch (error: any) {
-      console.error('Test SMS error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Error sending test SMS",
-        error: error.message,
-        details: "Check server logs and Twilio dashboard"
-      });
+      console.error("Error sending form via SMS:", error);
+      res.status(500).json({ error: "Failed to send form via SMS: " + error.message });
     }
   });
 

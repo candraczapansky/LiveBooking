@@ -36,7 +36,6 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
     // Multiple monitoring strategies
     const interval1 = setInterval(() => {
       if (input.value !== value && input.value !== internalValue) {
-        console.log(`AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
         input.value = value;
         setInternalValue(value);
       }
@@ -52,7 +51,6 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
     // Listen for various events that might indicate autofill
     const handleInput = () => {
       if (input.value !== value && input.value !== internalValue) {
-        console.log(`INPUT EVENT - AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
         setTimeout(() => {
           input.value = value;
           setInternalValue(value);
@@ -64,7 +62,6 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
       // Delay to let autofill happen first, then override
       setTimeout(() => {
         if (input.value !== value) {
-          console.log(`FOCUS EVENT - AUTOFILL BLOCKED: "${input.value}" → "${value}"`);
           input.value = value;
           setInternalValue(value);
         }
@@ -86,7 +83,6 @@ const AntiAutofillInput: React.FC<AntiAutofillInputProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
-    console.log(`User typing: "${newValue}"`);
     setInternalValue(newValue);
     onChange(newValue);
   };

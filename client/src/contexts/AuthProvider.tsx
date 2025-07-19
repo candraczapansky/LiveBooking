@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await fetch(`/api/users/${userId}`);
       
       if (!response.ok) {
-        console.error('Failed to fetch fresh user data');
+        console.error('Failed to fetch fresh user data:', response.status, response.statusText);
         return null;
       }
       
@@ -280,6 +280,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user: user
       };
     };
+    
+    // Add global function to clear auth state (for debugging)
+    (window as any).clearAuth = () => {
+      console.log('Clearing auth state manually');
+      localStorage.removeItem('user');
+      localStorage.removeItem('profilePicture');
+      setUser(null);
+      setIsAuthenticated(false);
+      setLoading(false);
+    };
 
     window.addEventListener('colorChange', handleColorChange as EventListener);
 
@@ -287,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('colorChange', handleColorChange as EventListener);
       delete (window as any).refreshColors;
       delete (window as any).getCurrentColors;
+      delete (window as any).clearAuth;
     };
   }, [user]);
 
@@ -297,12 +308,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData: User = JSON.parse(storedUser);
         console.log('Parsed user data:', userData);
         
+        // Add a timeout to prevent infinite loading
+        const timeoutId = setTimeout(() => {
+          console.log('Timeout reached, falling back to localStorage data');
+          setUser(userData);
+          setIsAuthenticated(true);
+          setLoading(false);
+        }, 5000); // 5 second timeout
+        
         // Fetch fresh user data from database to ensure we have latest profile picture
         fetchFreshUserData(userData.id).then((freshUserData) => {
+          clearTimeout(timeoutId); // Clear timeout if API call completes
           if (freshUserData) {
             console.log('Using fresh user data from database:', freshUserData);
             setUser(freshUserData);
             setIsAuthenticated(true);
+            setLoading(false); // Set loading to false when API succeeds
             // Update localStorage with fresh data
             localStorage.setItem('user', JSON.stringify(freshUserData));
             
@@ -326,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             console.log('API failed, falling back to localStorage data');
             setUser(userData);
             setIsAuthenticated(true);
+            setLoading(false); // Set loading to false when falling back to localStorage
             console.log('User context set from localStorage fallback');
             
             // Dispatch event to notify all components of the fallback user data
@@ -337,15 +359,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               loadAndApplyColorPreferences(userData.id);
             }, 200);
           }
+        }).catch((error) => {
+          clearTimeout(timeoutId); // Clear timeout if API call fails
+          console.error('Error fetching fresh user data:', error);
+          // If API fails, clear localStorage and show login
+          console.log('API failed, clearing localStorage and showing login');
+          localStorage.removeItem('user');
+          localStorage.removeItem('profilePicture');
+          setUser(null);
+          setIsAuthenticated(false);
+          setLoading(false);
         });
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
+        setLoading(false);
       }
     } else {
-      console.log('No user data found in localStorage');
+      console.log('No user data found in localStorage - showing login page');
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   // Apply color preferences whenever user data changes

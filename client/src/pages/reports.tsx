@@ -382,17 +382,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
       const averagePrice = totalCashedOut > 0 ? totalRevenue / totalCashedOut : Number(service.price) || 0;
       const conversionRate = totalBookings > 0 ? (totalCashedOut / totalBookings) * 100 : 0;
 
-      // Debug logging for problematic values
-      if (isNaN(totalRevenue) || isNaN(averagePrice) || isNaN(conversionRate)) {
-        console.warn(`Service ${service.name} has invalid calculations:`, {
-          totalRevenue,
-          averagePrice,
-          conversionRate,
-          totalBookings,
-          totalCashedOut,
-          servicePrice: service.price
-        });
-      }
+
 
       // Ensure all calculated values are valid numbers with strict validation
       const safeTotalRevenue = Number.isFinite(totalRevenue) && totalRevenue >= 0 ? totalRevenue : 0;
@@ -439,10 +429,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
       cashedOut: Math.max(0, Math.floor(cashedOut)) // Ensure positive integer
     };
     
-    // Debug log any invalid chart data
-    if (!Number.isFinite(chartItem.revenue) || !Number.isFinite(chartItem.bookings) || !Number.isFinite(chartItem.cashedOut)) {
-      console.warn(`Invalid chart data for service ${service.name}:`, chartItem);
-    }
+
     
     return chartItem;
   }).filter(item => {
@@ -474,10 +461,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
       cashedOut: Math.max(0, Math.floor(cashedOut)) // Ensure positive integer
     };
     
-    // Debug log any invalid chart data
-    if (!Number.isFinite(chartItem.conversionRate) || !Number.isFinite(chartItem.bookings) || !Number.isFinite(chartItem.cashedOut)) {
-      console.warn(`Invalid conversion chart data for service ${service.name}:`, chartItem);
-    }
+
     
     return chartItem;
   }).filter(item => {
@@ -490,9 +474,7 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
            item.cashedOut >= 0;
   });
 
-  // Final debug check
-  console.log('Top Services Chart Data:', topServicesData);
-  console.log('Conversion Chart Data:', conversionData);
+
 
   return (
     <div className="space-y-6">

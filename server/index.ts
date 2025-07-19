@@ -4,6 +4,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { PgStorage } from "./storage";
 import { AutoRenewalService } from "./auto-renewal-service";
+import { createServer } from "http";
 
 // Load environment variables
 config();
@@ -57,6 +58,29 @@ app.use((req, res, next) => {
   next();
 });
 
+// Function to find an available port
+async function findAvailablePort(startPort: number): Promise<number> {
+  const net = await import('net');
+  
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    
+    server.listen(startPort, () => {
+      const port = (server.address() as any)?.port;
+      server.close(() => resolve(port));
+    });
+    
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        // Try the next port
+        findAvailablePort(startPort + 1).then(resolve).catch(reject);
+      } else {
+        reject(err);
+      }
+    });
+  });
+}
+
 (async () => {
   try {
     const storage = new PgStorage();
@@ -85,18 +109,37 @@ app.use((req, res, next) => {
       serveStatic(app);
     }
 
-    // Use port 5000 for both development and production (as expected by .replit)
-    // but allow PORT env var to override
-    const port = process.env.PORT || 5000;
+    // Find an available port starting from 5000
+    const preferredPort = parseInt(process.env.PORT || '5000');
+    const port = await findAvailablePort(preferredPort);
+    
+    if (port !== preferredPort) {
+      console.log(`⚠️  Port ${preferredPort} was in use, using port ${port} instead`);
+    }
+
     server.listen({
       port,
       host: "0.0.0.0",
-      reusePort: true,
     }, () => {
-      log(`serving on port ${port}`);
+      log(`✅ Server running on port ${port}`);
+      if (port !== preferredPort) {
+        log(`📝 Note: Original port ${preferredPort} was busy, using ${port}`);
+      }
     });
+
+    // Handle server errors gracefully
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use. Please try again.`);
+        process.exit(1);
+      } else {
+        console.error('❌ Server error:', err);
+        process.exit(1);
+      }
+    });
+
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error('❌ Failed to start server:', error);
     process.exit(1);
   }
 })();

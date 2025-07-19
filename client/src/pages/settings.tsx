@@ -179,7 +179,7 @@ export default function Settings() {
 
   // Add a save handler
   const handleSaveTimezone = async () => {
-    console.log("[DEBUG] Save button clicked. Timezone:", timezone);
+
     try {
       const response = await fetch("/api/business-settings", {
         method: "PUT",
@@ -195,7 +195,7 @@ export default function Settings() {
       }
       
       const data = await response.json();
-      console.log("[DEBUG] API success:", data);
+      
       console.log("Success: Timezone saved successfully");
       refetchBusinessSettings();
     } catch (error) {

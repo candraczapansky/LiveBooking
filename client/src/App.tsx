@@ -38,9 +38,21 @@ import PhonePage from "@/pages/phone";
 import FormsPage from "@/pages/forms";
 
 function Router() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
 
-  console.log("Router render - isAuthenticated:", isAuthenticated, "user:", user);
+  console.log("Router render - isAuthenticated:", isAuthenticated, "user:", user, "loading:", loading);
+
+  // Show loading indicator while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading Glo Head Spa...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Public routes that don't require authentication
   if (!isAuthenticated) {

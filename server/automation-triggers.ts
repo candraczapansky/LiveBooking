@@ -191,7 +191,7 @@ export async function triggerAutomations(
           smsPromotions: client.smsPromotions
         });
         
-        console.log(`SMS Template Debug - Rule: ${rule.name}, Original template: "${rule.template}", Processed template: "${processedTemplate}"`);
+  
         
         const smsResult = await sendSMS(client.phone, processedTemplate);
         
