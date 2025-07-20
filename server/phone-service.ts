@@ -25,10 +25,10 @@ export class PhoneService {
     try {
       // Create TwiML for call with recording
       const call = await client.calls.create({
-        twiml: `<Response><Say voice="alice">Hello, this is BeautyBook Salon. Please hold while we connect you.</Say><Dial record="record-from-ringing" recordingStatusCallback="${process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status"><Number>${toNumber}</Number></Dial></Response>`,
+        twiml: `<Response><Say voice="alice">Hello, this is BeautyBook Salon. Please hold while we connect you.</Say><Dial record="record-from-ringing" recordingStatusCallback="${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status"><Number>${toNumber}</Number></Dial></Response>`,
         from: twilioPhoneNumber,
         to: toNumber,
-        statusCallback: `${process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/call-status`,
+        statusCallback: `${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
         record: true,
       });
@@ -80,7 +80,7 @@ export class PhoneService {
       const twiml = `
         <Response>
           <Say voice="alice">Thank you for calling ${process.env.BUSINESS_NAME || 'BeautyBook Salon'}. Your call is being recorded for quality assurance. Please hold while we connect you to our staff.</Say>
-          <Dial record="record-from-ringing" recordingStatusCallback="${process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status">
+          <Dial record="record-from-ringing" recordingStatusCallback="${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status">
             <Queue>salon-queue</Queue>
           </Dial>
         </Response>

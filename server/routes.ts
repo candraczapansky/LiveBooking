@@ -5510,7 +5510,7 @@ Thank you for choosing Glo Head Spa!
         "Field mapping support"
       ],
       setup: {
-        webhookUrl: `${process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
+        webhookUrl: `${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
         requiredFields: ["Client information", "Service information", "Appointment date/time"],
         fieldMapping: "Configure field mappings in the JotformIntegration constructor"
       }
@@ -6071,24 +6071,38 @@ If you didn't attempt to log in, please ignore this email and contact support im
         });
       }
 
-      // Create the SMS message
-      const baseUrl = process.env.REPLIT_DOMAINS || 'http://localhost:5002';
+      // Create the SMS messages
+      // Use custom domain if available, otherwise fall back to Replit domain
+      const customDomain = process.env.CUSTOM_DOMAIN || process.env.VITE_API_BASE_URL;
+      const baseUrl = customDomain || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5002';
       const formUrl = `${baseUrl}/forms/${formId}`;
       
-      let message = customMessage || `Hi${clientName ? ` ${clientName}` : ""}! You have a new form from Glo Head Spa: ${form.title}`;
+      console.log(`[SMS DEBUG] Using domain: ${baseUrl}`);
       
-      if (form.description) {
-        message += `\n\n${form.description}`;
+      // First message: Custom message or default message with call-to-action
+      let firstMessage = customMessage || `Hi${clientName ? ` ${clientName}` : ""}! You have a new form from Glo Head Spa: ${form.title}`;
+      
+      if (form.description && !customMessage) {
+        firstMessage += `\n\n${form.description}`;
       }
       
-      message += `\n\nPlease complete the form here: ${formUrl}`;
+      // Add call-to-action to first message
+      firstMessage += `\n\nComplete your form here:`;
+      
+      // Second message: Form link with custom title
+      const secondMessage = `Complete your form: ${formUrl}`;
       
       // Check if this is a test number (for development)
       const isTestNumber = targetPhone.includes('555') || targetPhone.includes('test');
       
+      console.log(`[SMS DEBUG] Phone: ${targetPhone}, isTestNumber: ${isTestNumber}`);
+      console.log(`[SMS DEBUG] First message: ${firstMessage}`);
+      console.log(`[SMS DEBUG] Second message: ${secondMessage}`);
+      
       if (isTestNumber) {
         // Simulate successful SMS for test numbers
-        console.log(`[TEST MODE] Would send SMS to ${targetPhone}: ${message}`);
+        console.log(`[TEST MODE] Would send first SMS to ${targetPhone}: ${firstMessage}`);
+        console.log(`[TEST MODE] Would send second SMS to ${targetPhone}: ${secondMessage}`);
         
         // Update form submission count
         await storage.updateForm(formId, {
@@ -6104,10 +6118,24 @@ If you didn't attempt to log in, please ignore this email and contact support im
         });
       }
 
-      // Send the SMS for real numbers
-      const smsResult = await sendSMS(targetPhone, message);
+      // Send the first SMS (custom message)
+      console.log(`[SMS DEBUG] Sending first SMS to ${targetPhone}`);
+      const firstSmsResult = await sendSMS(targetPhone, firstMessage);
+      console.log(`[SMS DEBUG] First SMS result:`, firstSmsResult);
       
-      if (smsResult.success) {
+      if (!firstSmsResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: firstSmsResult.error || "Failed to send first SMS"
+        });
+      }
+      
+      // Send the second SMS (form link)
+      console.log(`[SMS DEBUG] Sending second SMS to ${targetPhone}`);
+      const secondSmsResult = await sendSMS(targetPhone, secondMessage);
+      console.log(`[SMS DEBUG] Second SMS result:`, secondSmsResult);
+      
+      if (secondSmsResult.success) {
         // Update form submission count
         await storage.updateForm(formId, {
           submissions: (form.submissions || 0) + 1,
@@ -6117,12 +6145,12 @@ If you didn't attempt to log in, please ignore this email and contact support im
         res.json({
           success: true,
           message: "Form sent successfully via SMS",
-          messageId: smsResult.messageId
+          messageId: `${firstSmsResult.messageId}, ${secondSmsResult.messageId}`
         });
       } else {
         res.status(500).json({
           success: false,
-          error: smsResult.error || "Failed to send SMS"
+          error: secondSmsResult.error || "Failed to send second SMS"
         });
       }
     } catch (error: any) {

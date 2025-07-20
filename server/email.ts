@@ -113,9 +113,9 @@ export function createMarketingCampaignEmail(
   salonEmail: string,
   trackingToken?: string
 ): EmailParams {
-  const baseUrl = process.env.REPLIT_DOMAINS ? 
+  const baseUrl = process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || (process.env.REPLIT_DOMAINS ? 
     `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
-    'http://localhost:5000';
+    'http://localhost:5000');
   
   const trackingPixel = trackingToken ? 
     `<img src="${baseUrl}/api/track/open/${trackingToken}" width="1" height="1" style="display:none;" alt="">` : 

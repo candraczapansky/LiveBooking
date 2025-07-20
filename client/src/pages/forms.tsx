@@ -282,19 +282,19 @@ const FormsPage = () => {
                         <span className="font-medium">{form.createdAt}</span>
                       </div>
                       
-                      <div className="flex space-x-2 pt-3 border-t">
-                        <Button variant="outline" size="sm" className="flex-1">
+                      <div className="grid grid-cols-2 gap-2 pt-3 border-t">
+                        <Button variant="outline" size="sm" className="w-full">
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          className="flex-1"
+                          className="w-full"
                           onClick={() => {
                             setSelectedForm({ id: form.id, title: form.title });
                             setSmsDialogOpen(true);
@@ -306,7 +306,7 @@ const FormsPage = () => {
                         <Button 
                           variant="outline" 
                           size="sm" 
-                          className="flex-1"
+                          className="w-full"
                           onClick={() => {
                             setSelectedForm({ id: form.id, title: form.title });
                             setSubmissionsDialogOpen(true);
@@ -315,7 +315,7 @@ const FormsPage = () => {
                           <FileText className="h-4 w-4 mr-1" />
                           Submissions
                         </Button>
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full col-span-2">
                           <Trash2 className="h-4 w-4 mr-1" />
                           Delete
                         </Button>
