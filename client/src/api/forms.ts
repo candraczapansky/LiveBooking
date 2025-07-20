@@ -5,6 +5,7 @@ export interface CreateFormData {
   description?: string;
   type: 'intake' | 'feedback' | 'booking';
   status: 'active' | 'draft' | 'inactive';
+  fields?: any[];
 }
 
 export interface Form {
@@ -13,6 +14,7 @@ export interface Form {
   description?: string;
   type: string;
   status: string;
+  fields?: any[];
   submissions: number;
   lastSubmission?: string;
   createdAt: string;

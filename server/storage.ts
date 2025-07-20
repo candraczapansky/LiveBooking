@@ -29,7 +29,8 @@ import {
   salesHistory, SalesHistory, InsertSalesHistory,
   businessSettings, BusinessSettings, InsertBusinessSettings,
   automationRules, AutomationRule, InsertAutomationRule,
-  forms, Form, InsertForm
+  forms, Form, InsertForm,
+  formSubmissions, FormSubmission, InsertFormSubmission
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
@@ -290,6 +291,15 @@ export interface IStorage {
   getAllForms(): Promise<Form[]>;
   updateForm(id: number, formData: Partial<InsertForm>): Promise<Form>;
   deleteForm(id: number): Promise<boolean>;
+  saveFormSubmission(submission: any): Promise<void>;
+  getFormSubmissions(formId: number): Promise<Array<{
+    id: string;
+    formId: number;
+    formData: Record<string, any>;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2329,13 +2339,32 @@ export class DatabaseStorage implements IStorage {
 
   // Forms operations
   async createForm(form: InsertForm): Promise<Form> {
-    const result = await db.insert(forms).values(form).returning();
+    // Convert fields array to JSON string if it exists
+    const formData = {
+      ...form,
+      fields: form.fields ? JSON.stringify(form.fields) : null
+    };
+    
+    const result = await db.insert(forms).values(formData).returning();
     return result[0];
   }
 
   async getForm(id: number): Promise<Form | undefined> {
     const result = await db.select().from(forms).where(eq(forms.id, id)).limit(1);
-    return result[0];
+    if (!result[0]) return undefined;
+    
+    // Parse fields JSON if it exists
+    const form = result[0];
+    if (form.fields) {
+      try {
+        form.fields = JSON.parse(form.fields);
+      } catch (error) {
+        console.error('Error parsing form fields JSON:', error);
+        form.fields = [];
+      }
+    }
+    
+    return form;
   }
 
   async getAllForms(): Promise<Form[]> {
@@ -2354,6 +2383,42 @@ export class DatabaseStorage implements IStorage {
   async deleteForm(id: number): Promise<boolean> {
     const result = await db.delete(forms).where(eq(forms.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async saveFormSubmission(submission: any): Promise<void> {
+    const submissionData: InsertFormSubmission = {
+      formId: submission.formId,
+      formData: JSON.stringify(submission.formData),
+      submittedAt: new Date(submission.submittedAt),
+      ipAddress: submission.ipAddress,
+      userAgent: submission.userAgent,
+    };
+
+    await db.insert(formSubmissions).values(submissionData);
+  }
+
+  async getFormSubmissions(formId: number): Promise<Array<{
+    id: string;
+    formId: number;
+    formData: Record<string, any>;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }>> {
+    const submissions = await db
+      .select()
+      .from(formSubmissions)
+      .where(eq(formSubmissions.formId, formId))
+      .orderBy(desc(formSubmissions.submittedAt));
+
+    return submissions.map(submission => ({
+      id: submission.id.toString(),
+      formId: submission.formId,
+      formData: JSON.parse(submission.formData),
+      submittedAt: submission.submittedAt.toISOString(),
+      ipAddress: submission.ipAddress || undefined,
+      userAgent: submission.userAgent || undefined,
+    }));
   }
 }
 

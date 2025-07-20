@@ -5984,6 +5984,27 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Get form submissions (MUST come before /api/forms/:id to avoid route conflicts)
+  app.get("/api/forms/:id/submissions", async (req, res) => {
+    try {
+      const formId = parseInt(req.params.id);
+
+      // Get the form
+      const form = await storage.getForm(formId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+
+      // Get submissions for this form
+      const submissions = await storage.getFormSubmissions(formId);
+      
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch form submissions: " + error.message });
+    }
+  });
+
   // Get a single form by ID
   app.get("/api/forms/:id", async (req, res) => {
     try {
@@ -6051,7 +6072,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
       }
 
       // Create the SMS message
-      const baseUrl = process.env.REPLIT_DOMAINS || 'http://localhost:5000';
+      const baseUrl = process.env.REPLIT_DOMAINS || 'http://localhost:5002';
       const formUrl = `${baseUrl}/forms/${formId}`;
       
       let message = customMessage || `Hi${clientName ? ` ${clientName}` : ""}! You have a new form from Glo Head Spa: ${form.title}`;
@@ -6109,6 +6130,54 @@ If you didn't attempt to log in, please ignore this email and contact support im
       res.status(500).json({ error: "Failed to send form via SMS: " + error.message });
     }
   });
+
+  // Submit form data
+  app.post("/api/forms/:id/submit", async (req, res) => {
+    try {
+      const formId = parseInt(req.params.id);
+      const { formData, submittedAt } = req.body;
+
+      // Get the form
+      const form = await storage.getForm(formId);
+      if (!form) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+
+      // Validate form data
+      if (!formData || typeof formData !== 'object') {
+        return res.status(400).json({ error: "Invalid form data" });
+      }
+
+      // Store form submission
+      const submission = {
+        formId,
+        formData,
+        submittedAt: submittedAt || new Date().toISOString(),
+        ipAddress: req.ip || req.connection.remoteAddress,
+        userAgent: req.get('User-Agent'),
+      };
+
+      // Save submission to storage (you'll need to implement this method)
+      await storage.saveFormSubmission(submission);
+
+      // Update form submission count
+      await storage.updateForm(formId, {
+        submissions: (form.submissions || 0) + 1,
+        lastSubmission: new Date().toISOString().split('T')[0]
+      });
+
+      res.json({
+        success: true,
+        message: "Form submitted successfully",
+        submissionId: submission.submittedAt // Using timestamp as ID for now
+      });
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      res.status(500).json({ error: "Failed to submit form: " + error.message });
+    }
+  });
+
+
 
   const httpServer = createServer(app);
 

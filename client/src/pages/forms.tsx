@@ -9,6 +9,7 @@ import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, Mes
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FormBuilder } from "@/components/forms/form-builder";
 import { SendFormSMSDialog } from "@/components/forms/send-form-sms-dialog";
+import { FormSubmissionsDialog } from "@/components/forms/form-submissions-dialog";
 import { getForms } from "@/api/forms";
 
 const FormsPage = () => {
@@ -16,6 +17,7 @@ const FormsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [submissionsDialogOpen, setSubmissionsDialogOpen] = useState(false);
   const [selectedForm, setSelectedForm] = useState<{ id: number; title: string } | null>(null);
 
   // Fetch forms from API using React Query
@@ -242,9 +244,14 @@ const FormsPage = () => {
                         </div>
                         <div>
                           <CardTitle className="text-lg">{form.title}</CardTitle>
-                          <Badge variant="secondary" className="mt-1">
-                            {getTypeLabel(form.type)}
-                          </Badge>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary">
+                              {getTypeLabel(form.type)}
+                            </Badge>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              {form.submissions || 0} submissions
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                       <Badge className={getStatusColor(form.status)}>
@@ -296,6 +303,18 @@ const FormsPage = () => {
                           <MessageSquare className="h-4 w-4 mr-1" />
                           Send SMS
                         </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => {
+                            setSelectedForm({ id: form.id, title: form.title });
+                            setSubmissionsDialogOpen(true);
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-1" />
+                          Submissions
+                        </Button>
                         <Button variant="outline" size="sm" className="flex-1">
                           <Trash2 className="h-4 w-4 mr-1" />
                           Delete
@@ -343,6 +362,16 @@ const FormsPage = () => {
         <SendFormSMSDialog
           open={smsDialogOpen}
           onOpenChange={setSmsDialogOpen}
+          formId={selectedForm.id}
+          formTitle={selectedForm.title}
+        />
+      )}
+
+      {/* Form Submissions Dialog */}
+      {selectedForm && (
+        <FormSubmissionsDialog
+          open={submissionsDialogOpen}
+          onOpenChange={setSubmissionsDialogOpen}
           formId={selectedForm.id}
           formTitle={selectedForm.title}
         />

@@ -891,6 +891,7 @@ export const forms = pgTable("forms", {
   description: text("description"),
   type: text("type").notNull(), // intake, feedback, booking, etc.
   status: text("status").notNull().default("active"), // active, draft, inactive
+  fields: text("fields"), // JSON string of form fields
   submissions: integer("submissions").default(0),
   lastSubmission: date("last_submission"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -903,5 +904,26 @@ export const insertFormSchema = createInsertSchema(forms).omit({
   lastSubmission: true,
 });
 
-export type Form = typeof forms.$inferSelect;
+// Form submissions schema
+export const formSubmissions = pgTable("form_submissions", {
+  id: serial("id").primaryKey(),
+  formId: integer("form_id").notNull(),
+  formData: text("form_data").notNull(), // JSON string of form data
+  submittedAt: timestamp("submitted_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+export type InsertFormSubmission = typeof formSubmissions.$inferInsert;
+
+export type Form = typeof forms.$inferSelect & {
+  fields?: any[] | string; // Can be either parsed array or JSON string
+};
 export type InsertForm = z.infer<typeof insertFormSchema>;

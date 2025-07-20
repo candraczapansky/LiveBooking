@@ -812,6 +812,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         description: data.description,
         type: data.type,
         status: data.status,
+        fields: fields,
       });
       return savedForm;
     },

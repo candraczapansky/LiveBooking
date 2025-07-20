@@ -213,7 +213,7 @@ export function SendFormSMSDialog({
                       </FormControl>
                       <SelectContent>
                         {clientsWithPhone.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="no-clients" disabled>
                             No clients with phone numbers found
                           </SelectItem>
                         ) : (

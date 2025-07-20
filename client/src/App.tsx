@@ -36,11 +36,14 @@ import EmailTest from "@/pages/email-test";
 import GiftCertificatesPage from "@/pages/gift-certificates";
 import PhonePage from "@/pages/phone";
 import FormsPage from "@/pages/forms";
+import FormDisplay from "@/pages/form-display";
 
 function Router() {
   const { isAuthenticated, user, loading } = useAuth();
 
   console.log("Router render - isAuthenticated:", isAuthenticated, "user:", user, "loading:", loading);
+
+
 
   // Show loading indicator while checking authentication
   if (loading) {
@@ -64,6 +67,7 @@ function Router() {
         <Route path="/forgot-password-sms" component={ForgotPasswordSMS} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/booking" component={ClientBooking} />
+        <Route path="/forms/:id" component={FormDisplay} />
         <Route path="/" component={Login} />
         <Route component={Login} />
       </Switch>
@@ -91,6 +95,7 @@ function Router() {
       <Route path="/automations" component={Automations} />
       <Route path="/phone" component={PhonePage} />
       <Route path="/forms" component={FormsPage} />
+      <Route path="/forms/:id" component={FormDisplay} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />
