@@ -908,6 +908,7 @@ export const insertFormSchema = createInsertSchema(forms).omit({
 export const formSubmissions = pgTable("form_submissions", {
   id: serial("id").primaryKey(),
   formId: integer("form_id").notNull(),
+  clientId: integer("client_id"), // Links to users table for client identification
   formData: text("form_data").notNull(), // JSON string of form data
   submittedAt: timestamp("submitted_at").notNull(),
   ipAddress: text("ip_address"),

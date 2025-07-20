@@ -1,16 +1,25 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FormBuilder } from "@/components/forms/form-builder";
 import { SendFormSMSDialog } from "@/components/forms/send-form-sms-dialog";
 import { FormSubmissionsDialog } from "@/components/forms/form-submissions-dialog";
 import { getForms } from "@/api/forms";
+import { useToast } from "@/hooks/use-toast";
 
 const FormsPage = () => {
   useDocumentTitle("Forms | Glo Head Spa");
@@ -19,11 +28,45 @@ const FormsPage = () => {
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [submissionsDialogOpen, setSubmissionsDialogOpen] = useState(false);
   const [selectedForm, setSelectedForm] = useState<{ id: number; title: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [formToDelete, setFormToDelete] = useState<{ id: number; title: string } | null>(null);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch forms from API using React Query
   const { data: forms = [], isLoading, error } = useQuery({
     queryKey: ["/api/forms"],
-    queryFn: getForms,
+    queryFn: () => getForms(),
+  });
+
+  // Delete form mutation
+  const deleteFormMutation = useMutation({
+    mutationFn: async (formId: number) => {
+      const response = await fetch(`/api/forms/${formId}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to delete form");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      toast({
+        title: "Success",
+        description: "Form deleted successfully",
+      });
+      setDeleteDialogOpen(false);
+      setFormToDelete(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete form",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -74,6 +117,17 @@ const FormsPage = () => {
         return 'Booking Form';
       default:
         return 'Form';
+    }
+  };
+
+  const handleDeleteForm = (form: any) => {
+    setFormToDelete({ id: form.id, title: form.title });
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (formToDelete) {
+      deleteFormMutation.mutate(formToDelete.id);
     }
   };
 
@@ -315,7 +369,12 @@ const FormsPage = () => {
                           <FileText className="h-4 w-4 mr-1" />
                           Submissions
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full col-span-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full col-span-2"
+                          onClick={() => handleDeleteForm(form)}
+                        >
                           <Trash2 className="h-4 w-4 mr-1" />
                           Delete
                         </Button>
@@ -375,6 +434,38 @@ const FormsPage = () => {
           formId={selectedForm.id}
           formTitle={selectedForm.title}
         />
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {formToDelete && (
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Delete Form</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{formToDelete.title}"? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={deleteFormMutation.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={confirmDelete}
+                disabled={deleteFormMutation.isPending}
+              >
+                {deleteFormMutation.isPending ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

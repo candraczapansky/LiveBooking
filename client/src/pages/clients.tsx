@@ -68,6 +68,7 @@ import { z } from "zod";
 import { getInitials, getFullName } from "@/lib/utils";
 import ClientPaymentMethods from "@/components/payment/client-payment-methods";
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
+import ClientFormSubmissions from "@/components/client/client-form-submissions";
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
@@ -656,6 +657,16 @@ const ClientsPage = () => {
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Client
                     </Button>
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        // Navigate to forms page with client context
+                        window.location.href = '/forms';
+                      }}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Send Form
+                    </Button>
                   </div>
                 </div>
               </>
@@ -955,6 +966,14 @@ const ClientsPage = () => {
 
                 {/* Appointment History */}
                 {clientDetail && <ClientAppointmentHistory clientId={clientDetail.id} />}
+
+                {/* Form Submissions */}
+                {clientDetail && (
+                  <ClientFormSubmissions 
+                    clientId={clientDetail.id} 
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
+                  />
+                )}
               </div>
             )}
           </div>

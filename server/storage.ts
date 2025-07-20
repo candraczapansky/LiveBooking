@@ -300,6 +300,16 @@ export interface IStorage {
     ipAddress?: string;
     userAgent?: string;
   }>>;
+  getClientFormSubmissions(clientId: number): Promise<Array<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    formData: Record<string, any>;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2388,6 +2398,7 @@ export class DatabaseStorage implements IStorage {
   async saveFormSubmission(submission: any): Promise<void> {
     const submissionData: InsertFormSubmission = {
       formId: submission.formId,
+      clientId: submission.clientId || null,
       formData: JSON.stringify(submission.formData),
       submittedAt: new Date(submission.submittedAt),
       ipAddress: submission.ipAddress,
@@ -2414,6 +2425,44 @@ export class DatabaseStorage implements IStorage {
     return submissions.map(submission => ({
       id: submission.id.toString(),
       formId: submission.formId,
+      formData: JSON.parse(submission.formData),
+      submittedAt: submission.submittedAt.toISOString(),
+      ipAddress: submission.ipAddress || undefined,
+      userAgent: submission.userAgent || undefined,
+    }));
+  }
+
+  async getClientFormSubmissions(clientId: number): Promise<Array<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    formData: Record<string, any>;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+  }>> {
+    const submissions = await db
+      .select({
+        id: formSubmissions.id,
+        formId: formSubmissions.formId,
+        formTitle: forms.title,
+        formType: forms.type,
+        formData: formSubmissions.formData,
+        submittedAt: formSubmissions.submittedAt,
+        ipAddress: formSubmissions.ipAddress,
+        userAgent: formSubmissions.userAgent,
+      })
+      .from(formSubmissions)
+      .innerJoin(forms, eq(formSubmissions.formId, forms.id))
+      .where(eq(formSubmissions.clientId, clientId))
+      .orderBy(desc(formSubmissions.submittedAt));
+
+    return submissions.map(submission => ({
+      id: submission.id.toString(),
+      formId: submission.formId,
+      formTitle: submission.formTitle,
+      formType: submission.formType,
       formData: JSON.parse(submission.formData),
       submittedAt: submission.submittedAt.toISOString(),
       ipAddress: submission.ipAddress || undefined,

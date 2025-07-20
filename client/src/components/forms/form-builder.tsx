@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   DragDropContext, 
@@ -58,13 +57,38 @@ import {
   CheckSquare,
   List,
   Image,
-  FileText
+  FileText,
+  User
 } from "lucide-react";
 import { ImageUploadField } from "./image-upload-field";
 import { createForm } from "@/api/forms";
 
+// Custom debounce hook
+const useDebounce = (callback: Function, delay: number) => {
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  return useCallback((...args: any[]) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => callback(...args), delay);
+  }, [callback, delay]);
+};
+
 // Field types and their configurations
 const FIELD_TYPES = [
+  {
+    id: "name",
+    label: "Name",
+    icon: User,
+    description: "Name input field",
+    defaultConfig: {
+      label: "Full Name",
+      placeholder: "Enter your full name...",
+      required: false,
+      includeFirstLast: false
+    }
+  },
   {
     id: "text",
     label: "Text Input",
@@ -270,7 +294,6 @@ interface FormBuilderProps {
 }
 
 export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"builder" | "preview">("builder");
   const [fields, setFields] = useState<FormField[]>([]);
@@ -354,6 +377,21 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     const { config } = field;
     
     switch (field.type) {
+      case "name":
+        return (
+          <div className="space-y-2">
+            <Label>{config.label}</Label>
+            {config.includeFirstLast ? (
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="First Name" disabled />
+                <Input placeholder="Last Name" disabled />
+              </div>
+            ) : (
+              <Input placeholder={config.placeholder} disabled />
+            )}
+          </div>
+        );
+      
       case "text":
         return (
           <div className="space-y-2">
@@ -540,20 +578,61 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   // Field configuration component
   const FieldConfig = ({ field }: { field: FormField }) => {
     const [config, setConfig] = useState(field.config);
+    const [inputValues, setInputValues] = useState({
+      label: field.config.label || "",
+      placeholder: field.config.placeholder || "",
+      rows: field.config.rows || 3,
+      maxStars: field.config.maxStars || 5,
+      maxSize: field.config.maxSize || 5,
+      min: field.config.min || "",
+      max: field.config.max || "",
+      options: field.config.options || ["Option 1", "Option 2", "Option 3"]
+    });
+
+    // Debounced update function
+    const debouncedUpdate = useDebounce((updates: any) => {
+      const newConfig = { ...config, ...updates };
+      updateFieldConfig(field.id, newConfig);
+    }, 1000); // 1000ms delay
 
     const updateConfig = (updates: any) => {
       const newConfig = { ...config, ...updates };
       setConfig(newConfig);
-      updateFieldConfig(field.id, newConfig);
+      debouncedUpdate(updates);
     };
+
+    const handleInputChange = (field: string, value: any) => {
+      setInputValues(prev => ({ ...prev, [field]: value }));
+      
+      // Update config with debounce
+      if (field === 'options' && Array.isArray(value)) {
+        debouncedUpdate({ [field]: value });
+      } else {
+        debouncedUpdate({ [field]: value });
+      }
+    };
+
+    // Sync input values when field config changes
+    useEffect(() => {
+      setInputValues({
+        label: field.config.label || "",
+        placeholder: field.config.placeholder || "",
+        rows: field.config.rows || 3,
+        maxStars: field.config.maxStars || 5,
+        maxSize: field.config.maxSize || 5,
+        min: field.config.min || "",
+        max: field.config.max || "",
+        options: field.config.options || ["Option 1", "Option 2", "Option 3"]
+      });
+    }, [field.id]); // Only update when field ID changes (switching fields)
 
     return (
       <div className="space-y-4">
         <div>
           <Label>Field Label</Label>
           <Input
-            value={config.label}
-            onChange={(e) => updateConfig({ label: e.target.value })}
+            value={inputValues.label}
+            onChange={(e) => handleInputChange('label', e.target.value)}
             placeholder="Enter field label"
           />
         </div>
@@ -562,11 +641,33 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           <div>
             <Label>Placeholder</Label>
             <Input
-              value={config.placeholder}
-              onChange={(e) => updateConfig({ placeholder: e.target.value })}
+              value={inputValues.placeholder}
+              onChange={(e) => handleInputChange('placeholder', e.target.value)}
               placeholder="Enter placeholder text"
             />
           </div>
+        )}
+
+        {field.type === "name" && (
+          <>
+            <div>
+              <Label>Placeholder</Label>
+              <Input
+                value={inputValues.placeholder}
+                onChange={(e) => handleInputChange('placeholder', e.target.value)}
+                placeholder="Enter placeholder text"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                checked={config.includeFirstLast}
+                onCheckedChange={(checked) => 
+                  updateConfig({ includeFirstLast: checked })
+                }
+              />
+              <Label>Split into First and Last Name fields</Label>
+            </div>
+          </>
         )}
 
         {field.type === "textarea" && (
@@ -574,8 +675,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
             <div>
               <Label>Placeholder</Label>
               <Input
-                value={config.placeholder}
-                onChange={(e) => updateConfig({ placeholder: e.target.value })}
+                value={inputValues.placeholder}
+                onChange={(e) => handleInputChange('placeholder', e.target.value)}
                 placeholder="Enter placeholder text"
               />
             </div>
@@ -583,8 +684,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
               <Label>Rows</Label>
               <Input
                 type="number"
-                value={config.rows}
-                onChange={(e) => updateConfig({ rows: parseInt(e.target.value) })}
+                value={inputValues.rows}
+                onChange={(e) => handleInputChange('rows', parseInt(e.target.value))}
                 min="1"
                 max="10"
               />
@@ -596,8 +697,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           <div>
             <Label>Placeholder</Label>
             <Input
-              value={config.placeholder}
-              onChange={(e) => updateConfig({ placeholder: e.target.value })}
+              value={inputValues.placeholder}
+              onChange={(e) => handleInputChange('placeholder', e.target.value)}
               placeholder="Enter placeholder text"
             />
           </div>
@@ -652,8 +753,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
             <div>
               <Label>Placeholder</Label>
               <Input
-                value={config.placeholder}
-                onChange={(e) => updateConfig({ placeholder: e.target.value })}
+                value={inputValues.placeholder}
+                onChange={(e) => handleInputChange('placeholder', e.target.value)}
                 placeholder="Enter placeholder text"
               />
             </div>
@@ -662,8 +763,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                 <Label>Minimum Value</Label>
                 <Input
                   type="number"
-                  value={config.min}
-                  onChange={(e) => updateConfig({ min: e.target.value })}
+                  value={inputValues.min}
+                  onChange={(e) => handleInputChange('min', e.target.value)}
                   placeholder="Min"
                 />
               </div>
@@ -671,8 +772,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                 <Label>Maximum Value</Label>
                 <Input
                   type="number"
-                  value={config.max}
-                  onChange={(e) => updateConfig({ max: e.target.value })}
+                  value={inputValues.max}
+                  onChange={(e) => handleInputChange('max', e.target.value)}
                   placeholder="Max"
                 />
               </div>
@@ -685,8 +786,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
             <Label>Maximum Stars</Label>
             <Input
               type="number"
-              value={config.maxStars}
-              onChange={(e) => updateConfig({ maxStars: parseInt(e.target.value) })}
+              value={inputValues.maxStars}
+              onChange={(e) => handleInputChange('maxStars', parseInt(e.target.value))}
               min="1"
               max="10"
             />
@@ -697,10 +798,10 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           <div>
             <Label>Options (one per line)</Label>
             <Textarea
-              value={config.options.join('\n')}
-              onChange={(e) => updateConfig({ 
-                options: e.target.value.split('\n').filter(opt => opt.trim()) 
-              })}
+              value={inputValues.options.join('\n')}
+              onChange={(e) => handleInputChange('options', 
+                e.target.value.split('\n').filter(opt => opt.trim())
+              )}
               placeholder="Option 1&#10;Option 2&#10;Option 3"
               rows={4}
             />
@@ -713,8 +814,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
               <Label>Maximum File Size (MB)</Label>
               <Input
                 type="number"
-                value={config.maxSize}
-                onChange={(e) => updateConfig({ maxSize: parseInt(e.target.value) })}
+                value={inputValues.maxSize}
+                onChange={(e) => handleInputChange('maxSize', parseInt(e.target.value))}
                 min="1"
                 max="50"
               />
@@ -818,18 +919,10 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
-      toast({
-        title: "Success",
-        description: "Form created successfully",
-      });
       onOpenChange(false);
     },
     onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create form",
-        variant: "destructive",
-      });
+      console.error("Failed to create form:", error.message || "Unknown error");
     },
   });
 

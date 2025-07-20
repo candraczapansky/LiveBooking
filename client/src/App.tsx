@@ -10,7 +10,6 @@ import { AuthProvider, useAuth } from "@/contexts/AuthProvider";
 
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
-import MobileDashboard from "@/pages/mobile-dashboard";
 import Login from "@/pages/login";
 import ForgotPassword from "@/pages/forgot-password";
 import ForgotPasswordSMS from "@/pages/forgot-password-sms";
@@ -39,11 +38,7 @@ import FormsPage from "@/pages/forms";
 import FormDisplay from "@/pages/form-display";
 
 function Router() {
-  const { isAuthenticated, user, loading } = useAuth();
-
-  console.log("Router render - isAuthenticated:", isAuthenticated, "user:", user, "loading:", loading);
-
-
+  const { isAuthenticated, loading } = useAuth();
 
   // Show loading indicator while checking authentication
   if (loading) {
@@ -59,7 +54,6 @@ function Router() {
 
   // Public routes that don't require authentication
   if (!isAuthenticated) {
-    console.log("Showing public routes (not authenticated)");
     return (
       <Switch>
         <Route path="/login" component={Login} />
@@ -75,7 +69,6 @@ function Router() {
   }
 
   // Protected routes that require authentication
-  console.log("Showing protected routes (authenticated)");
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -95,7 +88,6 @@ function Router() {
       <Route path="/automations" component={Automations} />
       <Route path="/phone" component={PhonePage} />
       <Route path="/forms" component={FormsPage} />
-      <Route path="/forms/:id" component={FormDisplay} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />

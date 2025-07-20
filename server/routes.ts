@@ -6031,6 +6031,52 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Update existing form
+  app.put("/api/forms/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const existingForm = await storage.getForm(id);
+      if (!existingForm) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      
+      const updatedForm = await storage.updateForm(id, req.body);
+      res.json(updatedForm);
+    } catch (error: any) {
+      console.error("Error updating form:", error);
+      res.status(500).json({ error: "Failed to update form: " + error.message });
+    }
+  });
+
+  // Delete form
+  app.delete("/api/forms/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      if (!id) {
+        return res.status(400).json({ error: "Form ID is required" });
+      }
+      
+      // Check if form exists before deletion
+      const existingForm = await storage.getForm(id);
+      if (!existingForm) {
+        return res.status(404).json({ error: "Form not found" });
+      }
+      
+      // Delete the form
+      const deleted = await storage.deleteForm(id);
+      
+      if (!deleted) {
+        return res.status(500).json({ error: "Failed to delete form" });
+      }
+      
+      res.status(200).json({ success: true, message: "Form deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting form:", error);
+      res.status(500).json({ error: "Failed to delete form: " + error.message });
+    }
+  });
+
   // Send form to client via SMS
   app.post("/api/forms/:id/send-sms", async (req, res) => {
     try {
@@ -6075,7 +6121,8 @@ If you didn't attempt to log in, please ignore this email and contact support im
       // Use custom domain if available, otherwise fall back to Replit domain
       const customDomain = process.env.CUSTOM_DOMAIN || process.env.VITE_API_BASE_URL;
       const baseUrl = customDomain || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5002';
-      const formUrl = `${baseUrl}/forms/${formId}`;
+      // Include clientId in form URL if sending to a specific client
+      const formUrl = clientId ? `${baseUrl}/forms/${formId}?clientId=${clientId}` : `${baseUrl}/forms/${formId}`;
       
       console.log(`[SMS DEBUG] Using domain: ${baseUrl}`);
       
@@ -6089,8 +6136,8 @@ If you didn't attempt to log in, please ignore this email and contact support im
       // Add call-to-action to first message
       firstMessage += `\n\nComplete your form here:`;
       
-      // Second message: Form link with custom title
-      const secondMessage = `Complete your form: ${formUrl}`;
+      // Second message: Form link only
+      const secondMessage = formUrl;
       
       // Check if this is a test number (for development)
       const isTestNumber = targetPhone.includes('555') || targetPhone.includes('test');
@@ -6159,11 +6206,32 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Get client form submissions
+  app.get("/api/clients/:id/form-submissions", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+
+      // Verify the client exists
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Get form submissions for this client
+      const submissions = await storage.getClientFormSubmissions(clientId);
+      
+      res.json(submissions);
+    } catch (error: any) {
+      console.error("Error fetching client form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch client form submissions: " + error.message });
+    }
+  });
+
   // Submit form data
   app.post("/api/forms/:id/submit", async (req, res) => {
     try {
       const formId = parseInt(req.params.id);
-      const { formData, submittedAt } = req.body;
+      const { formData, submittedAt, clientId } = req.body;
 
       // Get the form
       const form = await storage.getForm(formId);
@@ -6176,16 +6244,34 @@ If you didn't attempt to log in, please ignore this email and contact support im
         return res.status(400).json({ error: "Invalid form data" });
       }
 
+      // Try to identify client from form data if clientId not provided
+      let identifiedClientId = clientId;
+      if (!identifiedClientId) {
+        // Look for email in form data to match with existing client
+        const email = formData.email || formData.Email || formData.clientEmail;
+        if (email) {
+          const users = await storage.getAllUsers();
+          const matchingClient = users.find(user => 
+            user.role === 'client' && 
+            user.email.toLowerCase() === email.toLowerCase()
+          );
+          if (matchingClient) {
+            identifiedClientId = matchingClient.id;
+          }
+        }
+      }
+
       // Store form submission
       const submission = {
         formId,
+        clientId: identifiedClientId,
         formData,
         submittedAt: submittedAt || new Date().toISOString(),
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('User-Agent'),
       };
 
-      // Save submission to storage (you'll need to implement this method)
+      // Save submission to storage
       await storage.saveFormSubmission(submission);
 
       // Update form submission count
@@ -6197,7 +6283,8 @@ If you didn't attempt to log in, please ignore this email and contact support im
       res.json({
         success: true,
         message: "Form submitted successfully",
-        submissionId: submission.submittedAt // Using timestamp as ID for now
+        submissionId: submission.submittedAt, // Using timestamp as ID for now
+        clientId: identifiedClientId
       });
     } catch (error: any) {
       console.error("Error submitting form:", error);
