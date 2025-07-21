@@ -48,6 +48,7 @@ import { AutoRenewalService } from "./auto-renewal-service";
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 import { registerExternalRoutes } from "./external-api";
 import { JotformIntegration } from "./jotform-integration";
+import { LLMService } from "./llm-service";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 
@@ -109,6 +110,8 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
+  // Initialize LLM Service
+  const llmService = new LLMService(storage);
   // Initialize PayrollAutoSync
   const payrollAutoSync = new PayrollAutoSync(storage);
 
@@ -6371,7 +6374,525 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // LLM Messaging API Routes
+  // Generate AI response for client message
+  app.post("/api/llm/generate-response", async (req, res) => {
+    try {
+      const { clientMessage, clientId, channel = 'email' } = req.body;
 
+
+
+      if (!clientMessage) {
+        return res.status(400).json({ error: "Client message is required" });
+      }
+
+      // Get client information
+      let client = null;
+      if (clientId) {
+        client = await storage.getUser(clientId);
+      }
+
+      // Get business settings
+      const businessSettings = await storage.getBusinessSettings();
+
+      // Get available services
+      const services = await storage.getAllServices();
+
+      // Get available staff
+      const staff = await storage.getAllStaff();
+      const staffUsers = await Promise.all(
+        staff.map(async (s) => {
+          const user = await storage.getUser(s.userId);
+          return {
+            name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Unknown',
+            title: s.title,
+            bio: s.bio
+          };
+        })
+      );
+
+      // Get business knowledge for context
+      const businessKnowledge = await storage.getBusinessKnowledge();
+
+
+      // Build context for LLM
+      const context = {
+        clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username : undefined,
+        clientEmail: client?.email,
+        clientPhone: client?.phone,
+        businessName: businessSettings?.businessName || 'Glo Head Spa',
+        businessType: 'salon and spa',
+        clientPreferences: client ? {
+          emailAccountManagement: client.emailAccountManagement,
+          emailAppointmentReminders: client.emailAppointmentReminders,
+          emailPromotions: client.emailPromotions,
+          smsAccountManagement: client.smsAccountManagement,
+          smsAppointmentReminders: client.smsAppointmentReminders,
+          smsPromotions: client.smsPromotions,
+        } : undefined,
+        availableServices: services.map(s => ({
+          name: s.name,
+          description: s.description,
+          price: s.price,
+          duration: s.duration
+        })),
+        availableStaff: staffUsers,
+        businessKnowledge: businessKnowledge
+      };
+
+      // Generate response using LLM
+      const llmResponse = await llmService.generateResponse(clientMessage, context, channel);
+
+      if (!llmResponse.success) {
+        return res.status(500).json({ error: llmResponse.error });
+      }
+
+      // Save conversation if client exists
+      if (client) {
+        await llmService.saveConversation(
+          client.id,
+          clientMessage,
+          llmResponse.message || '',
+          channel,
+          {
+            suggestedActions: llmResponse.suggestedActions,
+            confidence: llmResponse.confidence
+          }
+        );
+      }
+
+
+      
+      res.json({
+        success: true,
+        response: llmResponse.message,
+        suggestedActions: llmResponse.suggestedActions,
+        confidence: llmResponse.confidence
+      });
+
+    } catch (error: any) {
+      console.error("Error generating LLM response:", error);
+      res.status(500).json({ error: "Failed to generate response: " + error.message });
+    }
+  });
+
+  // Send AI-generated response via email
+  app.post("/api/llm/send-email", async (req, res) => {
+    try {
+      const { clientId, clientMessage, aiResponse, subject } = req.body;
+
+      if (!clientId || !clientMessage || !aiResponse) {
+        return res.status(400).json({ error: "Client ID, message, and AI response are required" });
+      }
+
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      if (!client.email) {
+        return res.status(400).json({ error: "Client does not have an email address" });
+      }
+
+      // Send email with AI response
+      const emailSent = await sendEmail({
+        to: client.email,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject: subject || 'Response from Glo Head Spa',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Response from Glo Head Spa</h2>
+            <p><strong>Your message:</strong></p>
+            <p style="background-color: #f5f5f5; padding: 10px; border-left: 4px solid #ddd;">${clientMessage}</p>
+            <p><strong>Our response:</strong></p>
+            <p style="background-color: #e8f5e8; padding: 10px; border-left: 4px solid #4CAF50;">${aiResponse.replace(/\n/g, '<br>')}</p>
+            <p style="margin-top: 20px; font-size: 12px; color: #666;">
+              This response was generated by our AI assistant. If you need further assistance, please don't hesitate to contact us directly.
+            </p>
+          </div>
+        `
+      });
+
+      if (emailSent) {
+        res.json({
+          success: true,
+          message: "Email sent successfully"
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: "Failed to send email"
+        });
+      }
+
+    } catch (error: any) {
+      console.error("Error sending AI email:", error);
+      res.status(500).json({ error: "Failed to send email: " + error.message });
+    }
+  });
+
+  // Send AI-generated response via SMS
+  app.post("/api/llm/send-sms", async (req, res) => {
+    try {
+      const { clientId, clientMessage, aiResponse } = req.body;
+
+      if (!clientId || !clientMessage || !aiResponse) {
+        return res.status(400).json({ error: "Client ID, message, and AI response are required" });
+      }
+
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      if (!client.phone) {
+        return res.status(400).json({ error: "Client does not have a phone number" });
+      }
+
+      // Send SMS with AI response
+      const smsResult = await sendSMS(client.phone, aiResponse);
+
+      if (smsResult.success) {
+        res.json({
+          success: true,
+          message: "SMS sent successfully",
+          messageId: smsResult.messageId
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: smsResult.error || "Failed to send SMS"
+        });
+      }
+
+    } catch (error: any) {
+      console.error("Error sending AI SMS:", error);
+      res.status(500).json({ error: "Failed to send SMS: " + error.message });
+    }
+  });
+
+  // Get conversation history for a client
+  app.get("/api/llm/conversations/:clientId", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.clientId);
+
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // For now, return mock conversation history
+      // In a real implementation, this would fetch from a conversations table
+      const conversations = [
+        {
+          id: 1,
+          timestamp: new Date().toISOString(),
+          channel: 'email',
+          clientMessage: "Hi, I'd like to book an appointment",
+          aiResponse: "Hello! I'd be happy to help you book an appointment. What service are you interested in?",
+          confidence: 0.9
+        }
+      ];
+
+      res.json(conversations);
+
+    } catch (error: any) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations: " + error.message });
+    }
+  });
+
+  // Business Knowledge (FAQ) endpoints
+  app.get('/api/business-knowledge', async (req, res) => {
+    try {
+      const entries = await storage.getBusinessKnowledge();
+      res.json(entries);
+    } catch (error) {
+      console.error('Error fetching business knowledge:', error);
+      res.status(500).json({ error: 'Failed to fetch business knowledge' });
+    }
+  });
+
+  app.post('/api/business-knowledge', async (req, res) => {
+    try {
+      const { question, answer, category, priority } = req.body;
+      const entry = await storage.createBusinessKnowledge({
+        title: question,
+        content: answer,
+        category,
+        priority: priority || 1
+      });
+      res.json(entry);
+    } catch (error) {
+      console.error('Error adding business knowledge:', error);
+      res.status(500).json({ error: 'Failed to add business knowledge' });
+    }
+  });
+
+  app.put('/api/business-knowledge/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { question, answer, category, priority } = req.body;
+      const entry = await storage.updateBusinessKnowledge(parseInt(id), {
+        title: question,
+        content: answer,
+        category,
+        priority: priority || 1
+      });
+      res.json(entry);
+    } catch (error) {
+      console.error('Error updating business knowledge:', error);
+      res.status(500).json({ error: 'Failed to update business knowledge' });
+    }
+  });
+
+  app.delete('/api/business-knowledge/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteBusinessKnowledge(parseInt(id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting business knowledge:', error);
+      res.status(500).json({ error: 'Failed to delete business knowledge' });
+    }
+  });
+
+  // Business Knowledge Categories endpoints
+  app.get('/api/business-knowledge/categories', async (req, res) => {
+    try {
+      const categories = await storage.getBusinessKnowledgeCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error('Error fetching business knowledge categories:', error);
+      res.status(500).json({ error: 'Failed to fetch business knowledge categories' });
+    }
+  });
+
+  app.post('/api/business-knowledge/categories', async (req, res) => {
+    try {
+      const { name, description, color } = req.body;
+      const category = await storage.createBusinessKnowledgeCategory({
+        name,
+        description,
+        color: color || '#3B82F6'
+      });
+      res.json(category);
+    } catch (error) {
+      console.error('Error adding business knowledge category:', error);
+      res.status(500).json({ error: 'Failed to add business knowledge category' });
+    }
+  });
+
+  app.put('/api/business-knowledge/categories/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, color } = req.body;
+      const category = await storage.updateBusinessKnowledgeCategory(parseInt(id), {
+        name,
+        description,
+        color: color || '#3B82F6'
+      });
+      res.json(category);
+    } catch (error) {
+      console.error('Error updating business knowledge category:', error);
+      res.status(500).json({ error: 'Failed to update business knowledge category' });
+    }
+  });
+
+  app.delete('/api/business-knowledge/categories/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteBusinessKnowledgeCategory(parseInt(id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting business knowledge category:', error);
+      res.status(500).json({ error: 'Failed to delete business knowledge category' });
+    }
+  });
+
+  // LLM Test endpoint
+  app.post('/api/llm/test', async (req, res) => {
+    try {
+      const { message, businessKnowledge } = req.body;
+      
+      if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+      }
+
+
+
+      // Create context from business knowledge
+      let context = "You are a helpful AI assistant for a business. Use the following business information to answer questions:\n\n";
+      
+      if (businessKnowledge && businessKnowledge.length > 0) {
+        context += "Business Knowledge:\n";
+        businessKnowledge.forEach((item: any) => {
+          context += `Q: ${item.question}\nA: ${item.answer}\n\n`;
+        });
+      } else {
+        context += "No specific business knowledge available. Provide general helpful responses.\n\n";
+      }
+
+      context += `User Question: ${message}\n\nPlease provide a helpful, professional response based on the business knowledge above.`;
+
+      // For now, we'll use a simple response generation
+      // In a real implementation, this would call OpenAI or another LLM service
+      const response = generateTestResponse(message, businessKnowledge);
+      
+
+      
+      res.json({
+        response: response.text,
+        confidence: response.confidence,
+        sources: response.sources
+      });
+    } catch (error) {
+      console.error('Error testing LLM:', error);
+      res.status(500).json({ error: 'Failed to generate AI response' });
+    }
+  });
+
+  // Helper function to generate test responses
+  function generateTestResponse(message: string, businessKnowledge: any[]) {
+    const lowerMessage = message.toLowerCase();
+    
+    // First, check for specific question types that should have priority
+    // These should override general business knowledge matches
+    
+    // Hours/Operating hours questions - check business knowledge first
+    if (lowerMessage.includes('hours') || 
+        lowerMessage.includes('open') || 
+        lowerMessage.includes('time') ||
+        lowerMessage.includes('when are you open') ||
+        lowerMessage.includes('what time') ||
+        lowerMessage.includes('operating hours')) {
+      
+      // Check if there's a business knowledge entry for hours
+      if (businessKnowledge && businessKnowledge.length > 0) {
+        const hoursEntry = businessKnowledge.find(item => 
+          item.category === 'hours' || 
+          (item.title && item.title.toLowerCase().includes('hours')) ||
+          (item.title && item.title.toLowerCase().includes('open')) ||
+          (item.title && item.title.toLowerCase().includes('time')) ||
+          (item.content && item.content.toLowerCase().includes('hours')) ||
+          (item.content && item.content.toLowerCase().includes('open')) ||
+          (item.content && item.content.toLowerCase().includes('time')) ||
+          (item.question && item.question.toLowerCase().includes('hours')) ||
+          (item.question && item.question.toLowerCase().includes('open')) ||
+          (item.question && item.question.toLowerCase().includes('time')) ||
+          (item.answer && item.answer.toLowerCase().includes('hours')) ||
+          (item.answer && item.answer.toLowerCase().includes('open')) ||
+          (item.answer && item.answer.toLowerCase().includes('time'))
+        );
+        
+        if (hoursEntry) {
+          return {
+            text: hoursEntry.content || hoursEntry.answer,
+            confidence: 0.9,
+            sources: [hoursEntry]
+          };
+        }
+      }
+      
+      // Fallback to default response if no business knowledge found
+      return {
+        text: "Our business hours are typically Monday through Friday, 9 AM to 6 PM, and Saturday 10 AM to 4 PM. We're closed on Sundays. For specific holiday hours, please contact us directly.",
+        confidence: 0.8,
+        sources: []
+      };
+    }
+
+    // Pricing questions
+    if (lowerMessage.includes('price') || 
+        lowerMessage.includes('cost') || 
+        lowerMessage.includes('how much') ||
+        lowerMessage.includes('pricing')) {
+      return {
+        text: "I'd be happy to help you with pricing information. Could you please specify which service you're interested in? You can also check our services page for detailed pricing.",
+        confidence: 0.7,
+        sources: []
+      };
+    }
+
+    // Appointment/Booking questions
+    if (lowerMessage.includes('appointment') || 
+        lowerMessage.includes('book') || 
+        lowerMessage.includes('schedule') ||
+        lowerMessage.includes('reservation')) {
+      return {
+        text: "To book an appointment, you can call us directly, use our online booking system, or send us a message with your preferred date and time. We'll get back to you to confirm the details.",
+        confidence: 0.8,
+        sources: []
+      };
+    }
+
+    // Location questions
+    if (lowerMessage.includes('location') || 
+        lowerMessage.includes('address') || 
+        lowerMessage.includes('where') ||
+        lowerMessage.includes('directions')) {
+      return {
+        text: "We're located in the heart of the city. For our exact address and directions, please check our contact information on our website or give us a call.",
+        confidence: 0.7,
+        sources: []
+      };
+    }
+
+    // Now check for relevant business knowledge with better matching
+    if (businessKnowledge && businessKnowledge.length > 0) {
+      let bestMatch = null;
+      let bestScore = 0;
+
+      for (const item of businessKnowledge) {
+        const question = item.question.toLowerCase();
+        const answer = item.answer.toLowerCase();
+        
+        // Calculate relevance score
+        let score = 0;
+        
+        // Check for exact word matches in the question
+        const questionWords = question.split(/\s+/);
+        const messageWords = lowerMessage.split(/\s+/);
+        
+        for (const word of messageWords) {
+          if (word.length > 2 && questionWords.includes(word)) {
+            score += 2; // Higher score for question matches
+          }
+        }
+        
+        // Check for phrase matches
+        if (question.includes(lowerMessage) || lowerMessage.includes(question)) {
+          score += 5; // High score for phrase matches
+        }
+        
+        // Check answer content for relevant keywords
+        if (answer.includes(lowerMessage)) {
+          score += 1; // Lower score for answer matches
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = item;
+        }
+      }
+
+      // Only use business knowledge if we have a good match (score > 1)
+      if (bestMatch && bestScore > 1) {
+        return {
+          text: `Based on our business information: ${bestMatch.answer}`,
+          confidence: Math.min(0.9, 0.6 + (bestScore * 0.1)),
+          sources: [bestMatch.question]
+        };
+      }
+    }
+
+    // Default response for questions we can't answer
+    return {
+      text: "Thank you for your question! I'd be happy to help you. Could you please provide more specific details about what you're looking for? You can also check our FAQ section or contact us directly for personalized assistance.",
+      confidence: 0.5,
+      sources: []
+    };
+  }
 
   const httpServer = createServer(app);
 

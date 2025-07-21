@@ -24,7 +24,8 @@ import {
   CalendarDays,
   Gift,
   Phone,
-  FileText
+  FileText,
+  Bot
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -171,6 +172,7 @@ const Sidebar = () => {
     { icon: <Zap />, label: "Automations", href: "/automations" },
     { icon: <FileText />, label: "Forms", href: "/forms" },
     { icon: <Phone />, label: "Phone", href: "/phone" },
+    { icon: <Bot />, label: "AI Messaging", href: "/ai-messaging" },
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 

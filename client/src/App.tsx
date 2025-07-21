@@ -37,6 +37,7 @@ import GiftCertificatesPage from "@/pages/gift-certificates";
 import PhonePage from "@/pages/phone";
 import FormsPage from "@/pages/forms";
 import FormDisplay from "@/pages/form-display";
+import AIMessagingPage from "@/pages/ai-messaging";
 
 function Router() {
   const { isAuthenticated, loading } = useAuth();
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/automations" component={Automations} />
       <Route path="/phone" component={PhonePage} />
       <Route path="/forms" component={FormsPage} />
+      <Route path="/ai-messaging" component={AIMessagingPage} />
       <Route path="/email-test" component={EmailTest} />
       <Route path="/settings" component={Settings} />
       <Route path="/schedule" component={Schedule} />

@@ -874,12 +874,66 @@ export const automationRules = pgTable("automation_rules", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// FAQ Categories schema
+export const businessKnowledgeCategories = pgTable("business_knowledge_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  color: text("color").default("#3B82F6"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// FAQ and Business Knowledge schema
+export const businessKnowledge = pgTable("business_knowledge", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id").references(() => businessKnowledgeCategories.id),
+  category: text("category").notNull(), // "pricing", "services", "policies", "hours", "location", "faq"
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  keywords: text("keywords"), // Comma-separated keywords for better matching
+  priority: integer("priority").default(1), // Higher priority items are used more frequently
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// LLM Conversation History schema
+export const llmConversations = pgTable("llm_conversations", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").references(() => users.id),
+  clientMessage: text("client_message").notNull(),
+  aiResponse: text("ai_response").notNull(),
+  channel: text("channel").notNull(), // "email" or "sms"
+  confidence: doublePrecision("confidence"),
+  suggestedActions: text("suggested_actions"), // JSON string of suggested actions
+  metadata: text("metadata"), // JSON string of additional data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
   id: true,
   sentCount: true,
   lastRun: true,
   createdAt: true,
   updatedAt: true,
+});
+
+export const insertBusinessKnowledgeCategorySchema = createInsertSchema(businessKnowledgeCategories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertBusinessKnowledgeSchema = createInsertSchema(businessKnowledge).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLLMConversationSchema = createInsertSchema(llmConversations).omit({
+  id: true,
+  createdAt: true,
 });
 
 export type AutomationRule = typeof automationRules.$inferSelect;
@@ -929,3 +983,12 @@ export type Form = typeof forms.$inferSelect & {
   fields?: any[] | string; // Can be either parsed array or JSON string
 };
 export type InsertForm = z.infer<typeof insertFormSchema>;
+
+export type BusinessKnowledgeCategory = typeof businessKnowledgeCategories.$inferSelect;
+export type InsertBusinessKnowledgeCategory = z.infer<typeof insertBusinessKnowledgeCategorySchema>;
+
+export type BusinessKnowledge = typeof businessKnowledge.$inferSelect;
+export type InsertBusinessKnowledge = z.infer<typeof insertBusinessKnowledgeSchema>;
+
+export type LLMConversation = typeof llmConversations.$inferSelect;
+export type InsertLLMConversation = z.infer<typeof insertLLMConversationSchema>;

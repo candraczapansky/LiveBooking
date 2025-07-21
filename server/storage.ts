@@ -30,10 +30,13 @@ import {
   businessSettings, BusinessSettings, InsertBusinessSettings,
   automationRules, AutomationRule, InsertAutomationRule,
   forms, Form, InsertForm,
-  formSubmissions, FormSubmission, InsertFormSubmission
+  formSubmissions, FormSubmission, InsertFormSubmission,
+  businessKnowledge, BusinessKnowledge, InsertBusinessKnowledge,
+  businessKnowledgeCategories, BusinessKnowledgeCategory, InsertBusinessKnowledgeCategory,
+  llmConversations, LLMConversation, InsertLLMConversation
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, gte, lte, desc, asc, isNull, count, sql } from "drizzle-orm";
+import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -310,6 +313,22 @@ export interface IStorage {
     ipAddress?: string;
     userAgent?: string;
   }>>;
+
+  // Business Knowledge
+  getBusinessKnowledge(categories?: string[]): Promise<any[]>;
+  createBusinessKnowledge(knowledge: any): Promise<any>;
+  updateBusinessKnowledge(id: number, updates: any): Promise<any>;
+  deleteBusinessKnowledge(id: number): Promise<void>;
+
+  // Business Knowledge Categories
+  getBusinessKnowledgeCategories(): Promise<any[]>;
+  createBusinessKnowledgeCategory(category: any): Promise<any>;
+  updateBusinessKnowledgeCategory(id: number, updates: any): Promise<any>;
+  deleteBusinessKnowledgeCategory(id: number): Promise<void>;
+
+  // LLM Conversations
+  createLLMConversation(conversation: any): Promise<any>;
+  getLLMConversations(clientId?: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2468,6 +2487,143 @@ export class DatabaseStorage implements IStorage {
       ipAddress: submission.ipAddress || undefined,
       userAgent: submission.userAgent || undefined,
     }));
+  }
+
+  // Business Knowledge methods
+  async getBusinessKnowledge(categories?: string[]): Promise<any[]> {
+    try {
+      let query = db.select().from(businessKnowledge).where(eq(businessKnowledge.active, true));
+      
+      if (categories && categories.length > 0) {
+        query = query.where(inArray(businessKnowledge.category, categories));
+      }
+      
+      const knowledge = await query.orderBy(desc(businessKnowledge.priority), desc(businessKnowledge.updatedAt));
+      return knowledge;
+    } catch (error) {
+      console.error('Error fetching business knowledge:', error);
+      return [];
+    }
+  }
+
+  async createBusinessKnowledge(knowledge: any): Promise<any> {
+    try {
+      const [newKnowledge] = await db.insert(businessKnowledge).values(knowledge).returning();
+      return newKnowledge;
+    } catch (error) {
+      console.error('Error creating business knowledge:', error);
+      throw error;
+    }
+  }
+
+  async updateBusinessKnowledge(id: number, updates: any): Promise<any> {
+    try {
+      const [updatedKnowledge] = await db
+        .update(businessKnowledge)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(businessKnowledge.id, id))
+        .returning();
+      return updatedKnowledge;
+    } catch (error) {
+      console.error('Error updating business knowledge:', error);
+      throw error;
+    }
+  }
+
+  async deleteBusinessKnowledge(id: number): Promise<void> {
+    try {
+      await db.delete(businessKnowledge).where(eq(businessKnowledge.id, id));
+    } catch (error) {
+      console.error('Error deleting business knowledge:', error);
+      throw error;
+    }
+  }
+
+  // Business Knowledge Categories methods
+  async getBusinessKnowledgeCategories(): Promise<any[]> {
+    try {
+      const categories = await db.select().from(businessKnowledgeCategories).orderBy(asc(businessKnowledgeCategories.name));
+      
+      // Get entry count for each category
+      const categoriesWithCounts = await Promise.all(
+        categories.map(async (category) => {
+          const entryCount = await db
+            .select({ count: count() })
+            .from(businessKnowledge)
+            .where(eq(businessKnowledge.category, category.name));
+          
+          return {
+            ...category,
+            entryCount: entryCount[0]?.count || 0
+          };
+        })
+      );
+      
+      return categoriesWithCounts;
+    } catch (error) {
+      console.error('Error fetching business knowledge categories:', error);
+      return [];
+    }
+  }
+
+  async createBusinessKnowledgeCategory(category: any): Promise<any> {
+    try {
+      const [newCategory] = await db.insert(businessKnowledgeCategories).values(category).returning();
+      return newCategory;
+    } catch (error) {
+      console.error('Error creating business knowledge category:', error);
+      throw error;
+    }
+  }
+
+  async updateBusinessKnowledgeCategory(id: number, updates: any): Promise<any> {
+    try {
+      const [updatedCategory] = await db
+        .update(businessKnowledgeCategories)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(businessKnowledgeCategories.id, id))
+        .returning();
+      return updatedCategory;
+    } catch (error) {
+      console.error('Error updating business knowledge category:', error);
+      throw error;
+    }
+  }
+
+  async deleteBusinessKnowledgeCategory(id: number): Promise<void> {
+    try {
+      await db.delete(businessKnowledgeCategories).where(eq(businessKnowledgeCategories.id, id));
+    } catch (error) {
+      console.error('Error deleting business knowledge category:', error);
+      throw error;
+    }
+  }
+
+  // LLM Conversation methods
+  async createLLMConversation(conversation: any): Promise<any> {
+    try {
+      const [newConversation] = await db.insert(llmConversations).values(conversation).returning();
+      return newConversation;
+    } catch (error) {
+      console.error('Error creating LLM conversation:', error);
+      throw error;
+    }
+  }
+
+  async getLLMConversations(clientId?: number): Promise<any[]> {
+    try {
+      let query = db.select().from(llmConversations);
+      
+      if (clientId) {
+        query = query.where(eq(llmConversations.clientId, clientId));
+      }
+      
+      const conversations = await query.orderBy(desc(llmConversations.createdAt));
+      return conversations;
+    } catch (error) {
+      console.error('Error fetching LLM conversations:', error);
+      return [];
+    }
   }
 }
 
