@@ -49,19 +49,24 @@ export default function LLMTest() {
   // Test LLM response mutation
   const testLLMMutation = useMutation({
     mutationFn: async (message: string) => {
+      const requestBody = {
+        message,
+        businessKnowledge: businessKnowledge.map((item: any) => ({
+          question: item.title,
+          answer: item.content,
+          category: item.category
+        }))
+      };
+      
+      console.log('Sending request to LLM test:', requestBody);
+      console.log('Business Knowledge details:', businessKnowledge);
+      
       const response = await fetch("/api/llm/test", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          message,
-          businessKnowledge: businessKnowledge.map((item: any) => ({
-            question: item.title,
-            answer: item.content,
-            category: item.category
-          }))
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -71,6 +76,7 @@ export default function LLMTest() {
       return response.json();
     },
     onSuccess: (data) => {
+      console.log('LLM Test Response:', data);
       const newMessage: TestMessage = {
         id: Date.now().toString(),
         role: 'assistant',

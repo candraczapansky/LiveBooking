@@ -6715,6 +6715,10 @@ If you didn't attempt to log in, please ignore this email and contact support im
     try {
       const { message, businessKnowledge } = req.body;
       
+      console.log('=== LLM TEST DEBUG ===');
+      console.log('Message:', message);
+      console.log('Business Knowledge received:', businessKnowledge);
+      
       if (!message) {
         return res.status(400).json({ error: 'Message is required' });
       }
@@ -6769,29 +6773,45 @@ If you didn't attempt to log in, please ignore this email and contact support im
       
       // Check if there's a business knowledge entry for hours
       if (businessKnowledge && businessKnowledge.length > 0) {
-        const hoursEntry = businessKnowledge.find(item => 
-          item.category === 'hours' || 
-          (item.title && item.title.toLowerCase().includes('hours')) ||
-          (item.title && item.title.toLowerCase().includes('open')) ||
-          (item.title && item.title.toLowerCase().includes('time')) ||
-          (item.content && item.content.toLowerCase().includes('hours')) ||
-          (item.content && item.content.toLowerCase().includes('open')) ||
-          (item.content && item.content.toLowerCase().includes('time')) ||
-          (item.question && item.question.toLowerCase().includes('hours')) ||
-          (item.question && item.question.toLowerCase().includes('open')) ||
-          (item.question && item.question.toLowerCase().includes('time')) ||
-          (item.answer && item.answer.toLowerCase().includes('hours')) ||
-          (item.answer && item.answer.toLowerCase().includes('open')) ||
-          (item.answer && item.answer.toLowerCase().includes('time'))
-        );
+        console.log('Checking business knowledge for hours...');
+        console.log('Business knowledge items:');
+        businessKnowledge.forEach((item: any, index: number) => {
+          console.log(`  ${index + 1}. Category: "${item.category}", Question: "${item.question}", Answer: "${item.answer}"`);
+        });
+        
+                 const hoursEntry = businessKnowledge.find(item => {
+           // More flexible matching - check if any field contains hours-related keywords
+           const hasHoursKeyword = (text: string) => {
+             if (!text) return false;
+             const lowerText = text.toLowerCase();
+             return lowerText.includes('hours') || lowerText.includes('open') || lowerText.includes('time') || lowerText.includes('when');
+           };
+           
+           const categoryMatch = item.category && item.category.toLowerCase().includes('hours');
+           const titleMatch = item.title && hasHoursKeyword(item.title);
+           const contentMatch = item.content && hasHoursKeyword(item.content);
+           const questionMatch = item.question && hasHoursKeyword(item.question);
+           const answerMatch = item.answer && hasHoursKeyword(item.answer);
+           
+           const matches = categoryMatch || titleMatch || contentMatch || questionMatch || answerMatch;
+           
+           console.log(`Item "${item.question}": categoryMatch=${categoryMatch}, questionMatch=${questionMatch}, answerMatch=${answerMatch}, matches=${matches}`);
+           
+           return matches;
+         });
         
         if (hoursEntry) {
+          console.log('Found hours entry:', hoursEntry);
           return {
             text: hoursEntry.content || hoursEntry.answer,
             confidence: 0.9,
             sources: [hoursEntry]
           };
+        } else {
+          console.log('No hours entry found');
         }
+      } else {
+        console.log('No business knowledge available');
       }
       
       // Fallback to default response if no business knowledge found
