@@ -11,13 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
-  User, 
   Lock, 
   Sun, 
   Moon, 
@@ -30,7 +29,8 @@ import {
   EyeOff,
   CheckCircle,
   AlertTriangle,
-  Info
+  Info,
+  Settings as SettingsIcon
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,6 +39,7 @@ import { apiRequest } from "@/lib/queryClient";
 import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
 import TwoFactorDisableModal from "@/components/TwoFactorDisableModal";
 import timeZones from "@/lib/timezones"; // We'll add a list of IANA timezones
+import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
@@ -81,68 +82,110 @@ export default function Settings() {
     return localStorage.getItem('textColor') || '#1f2937';
   });
 
-  // Profile states
-  const [firstName, setFirstName] = useState(user?.firstName || '');
-  const [lastName, setLastName] = useState(user?.lastName || ''); 
-  const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState(user?.phone || '');
-  const [profilePicture, setProfilePicture] = useState<string | null>(user?.profilePicture || null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const businessLogoInputRef = useRef<HTMLInputElement>(null);
 
   // 2FA states
   const [show2faSetup, setShow2faSetup] = useState(false);
   const [show2faDisable, setShow2faDisable] = useState(false);
   const twoFactorEnabled = user?.twoFactorEnabled;
 
-  // Load profile picture from user data or localStorage on component mount
+
+
+  // Notification states - updated to use actual user preferences
+  const [emailAccountManagement, setEmailAccountManagement] = useState(user?.emailAccountManagement ?? true);
+  const [emailAppointmentReminders, setEmailAppointmentReminders] = useState(user?.emailAppointmentReminders ?? true);
+  const [emailPromotions, setEmailPromotions] = useState(user?.emailPromotions ?? false);
+  const [smsAccountManagement, setSmsAccountManagement] = useState(user?.smsAccountManagement ?? false);
+  const [smsAppointmentReminders, setSmsAppointmentReminders] = useState(user?.smsAppointmentReminders ?? true);
+  const [smsPromotions, setSmsPromotions] = useState(user?.smsPromotions ?? false);
+  const [pushNotifications, setPushNotifications] = useState(true);
+  const [isSavingNotificationPreferences, setIsSavingNotificationPreferences] = useState(false);
+
+  // Load user notification preferences when user data changes
   useEffect(() => {
-    console.log('Settings page - Loading profile picture...');
-    console.log('User from context:', user);
-    console.log('User profile picture from context:', user?.profilePicture);
-    
-    // Prioritize database profile picture from user context
-    if (user && user.profilePicture) {
-      console.log('Using profile picture from user context');
-      setProfilePicture(user.profilePicture);
-      // Also sync to localStorage as backup
-      localStorage.setItem('profilePicture', user.profilePicture);
-    } else {
-      // Fallback to localStorage if no database profile picture
-      const savedPicture = localStorage.getItem('profilePicture');
-      console.log('Profile picture from localStorage:', savedPicture ? 'Found' : 'Not found');
-      if (savedPicture) {
-        console.log('Using profile picture from localStorage');
-        setProfilePicture(savedPicture);
-      }
+    if (user) {
+      setEmailAccountManagement(user.emailAccountManagement ?? true);
+      setEmailAppointmentReminders(user.emailAppointmentReminders ?? true);
+      setEmailPromotions(user.emailPromotions ?? false);
+      setSmsAccountManagement(user.smsAccountManagement ?? false);
+      setSmsAppointmentReminders(user.smsAppointmentReminders ?? true);
+      setSmsPromotions(user.smsPromotions ?? false);
     }
   }, [user]);
 
-  // Listen for user data updates (includes profile picture updates)
-  useEffect(() => {
-    const handleUserDataUpdate = (event: CustomEvent) => {
-      console.log('Settings page received user data update:', event.detail);
-      if (event.detail && event.detail.profilePicture) {
-        setProfilePicture(event.detail.profilePicture);
-        localStorage.setItem('profilePicture', event.detail.profilePicture);
+  // Function to save notification preferences
+  const handleSaveNotificationPreferences = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not found. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingNotificationPreferences(true);
+    
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          emailAccountManagement,
+          emailAppointmentReminders,
+          emailPromotions,
+          smsAccountManagement,
+          smsAppointmentReminders,
+          smsPromotions,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to save notification preferences');
       }
-    };
 
-    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
-    return () => {
-      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
-    };
-  }, []);
-
-  // Notification states
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [smsNotifications, setSmsNotifications] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [marketingEmails, setMarketingEmails] = useState(false);
+      const result = await response.json();
+      
+      // Update the user context if updateUser function is available
+      if (updateUser) {
+        updateUser({ ...user, ...result });
+      }
+      
+      toast({
+        title: "Success",
+        description: "Notification preferences saved successfully!",
+      });
+      setNotificationPreferencesSaved(true);
+      setTimeout(() => setNotificationPreferencesSaved(false), 3000);
+    } catch (error: any) {
+      console.error("Error saving notification preferences:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save notification preferences. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingNotificationPreferences(false);
+    }
+  };
 
   // Password form
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Account information states
+  const [isEditingAccount, setIsEditingAccount] = useState(false);
+  const [isUpdatingAccount, setIsUpdatingAccount] = useState(false);
+  const [accountForm, setAccountForm] = useState({
+    username: user?.username || '',
+    email: user?.email || '',
+  });
 
   const passwordForm = useForm<PasswordChangeForm>({
     resolver: zodResolver(passwordChangeSchema),
@@ -153,54 +196,85 @@ export default function Settings() {
     },
   });
 
-  // Timezone state
-  const [timezone, setTimezone] = useState<string>("America/New_York");
-  type BusinessSettingsType = { timezone: string };
-  const { data: businessSettings, refetch: refetchBusinessSettings } = useQuery<BusinessSettingsType>({
-    queryKey: ["/api/business-settings"],
-    queryFn: async () => {
-      const res = await fetch("/api/business-settings");
-      if (!res.ok) throw new Error("Failed to fetch business settings");
-      return res.json();
-    },
-  });
-
-  // Update timezone state when businessSettings changes
+  // Business settings
+  const { businessSettings, updateBusinessSettings, isLoading: businessSettingsLoading } = useBusinessSettings();
+  
+  // Business settings form state
+  const [businessName, setBusinessName] = useState(businessSettings?.businessName || '');
+  const [businessLogo, setBusinessLogo] = useState<string | null>(businessSettings?.businessLogo || null);
+  const [businessAddress, setBusinessAddress] = useState(businessSettings?.address || '');
+  const [businessPhone, setBusinessPhone] = useState(businessSettings?.phone || '');
+  const [businessEmail, setBusinessEmail] = useState(businessSettings?.email || '');
+  const [businessWebsite, setBusinessWebsite] = useState(businessSettings?.website || '');
+  const [timezone, setTimezone] = useState<string>(businessSettings?.timezone || "America/New_York");
+  const [currency, setCurrency] = useState(businessSettings?.currency || "USD");
+  const [taxRate, setTaxRate] = useState(businessSettings?.taxRate || 0.08);
+  const [receiptFooter, setReceiptFooter] = useState(businessSettings?.receiptFooter || '');
+  const [businessSettingsSaved, setBusinessSettingsSaved] = useState(false);
+  const [notificationPreferencesSaved, setNotificationPreferencesSaved] = useState(false);
+  const [appearanceSettingsSaved, setAppearanceSettingsSaved] = useState(false);
+  
+  // Update form state when business settings change
   useEffect(() => {
-    if (businessSettings && businessSettings.timezone) {
-      setTimezone(businessSettings.timezone);
+    if (businessSettings) {
+      setBusinessName(businessSettings.businessName || '');
+      setBusinessLogo(businessSettings.businessLogo || null);
+      setBusinessAddress(businessSettings.address || '');
+      setBusinessPhone(businessSettings.phone || '');
+      setBusinessEmail(businessSettings.email || '');
+      setBusinessWebsite(businessSettings.website || '');
+      setTimezone(businessSettings.timezone || "America/New_York");
+      setCurrency(businessSettings.currency || "USD");
+      setTaxRate(businessSettings.taxRate || 0.08);
+      setReceiptFooter(businessSettings.receiptFooter || '');
     }
   }, [businessSettings]);
 
-  // Remove auto-save from handleTimezoneChange
-  const handleTimezoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setTimezone(e.target.value);
+  // Business settings handlers
+  const handleBusinessLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      setBusinessLogo(result);
+    };
+    reader.readAsDataURL(file);
   };
 
-  // Add a save handler
-  const handleSaveTimezone = async () => {
-
+  const handleSaveBusinessSettings = async () => {
     try {
-      const response = await fetch("/api/business-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone }),
+      await updateBusinessSettings({
+        businessName,
+        businessLogo: businessLogo || undefined,
+        address: businessAddress,
+        phone: businessPhone,
+        email: businessEmail,
+        website: businessWebsite,
+        timezone,
+        currency,
+        taxRate,
+        receiptFooter,
       });
+      console.log("Success: Business settings saved successfully");
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error("[DEBUG] API error:", response.status, errorData);
-        console.log("Error: Failed to save timezone. Please try again.");
-        return;
-      }
-      
-      const data = await response.json();
-      
-      console.log("Success: Timezone saved successfully");
-      refetchBusinessSettings();
+      // Show success toast
+      toast({
+        title: "Success",
+        description: "Business settings saved successfully!",
+      });
+      setBusinessSettingsSaved(true);
+      setTimeout(() => setBusinessSettingsSaved(false), 3000); // Hide "Saved" after 3 seconds
     } catch (error) {
-      console.error("[DEBUG] Network error:", error);
-      console.log("Error: Failed to save timezone. Please try again.");
+      console.error("Error saving business settings:", error);
+      
+      // Show error toast
+      toast({
+        title: "Error",
+        description: "Failed to save business settings. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -370,136 +444,113 @@ export default function Settings() {
 
 
 
-  const handleSaveProfile = () => {
-    console.log("Saving profile...");
-    console.log("User ID:", user?.id);
-    console.log("Profile data:", {
-      firstName,
-      lastName,
-      email,
-      phone,
-      profilePicture,
-      primaryColor: customColor,
-      textColor
-    });
 
+
+  const handleChangePassword = async (data: PasswordChangeForm) => {
     if (!user?.id) {
-      console.log("Error: No user ID available");
+      toast({
+        title: "Error",
+        description: "User not found. Please log in again.",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Save profile data (without colors) to user table
-    fetch(`/api/users/${user.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        firstName,
-        lastName,
-        email,
-        phone,
-        profilePicture
-      }),
-    })
-    .then(response => {
+    setIsChangingPassword(true);
+    
+    try {
+      const response = await fetch('/api/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          currentPassword: data.currentPassword,
+          newPassword: data.newPassword,
+        }),
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to update profile');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to change password');
       }
-      return response.json();
-    })
-    .then(data => {
-      console.log("Profile updated successfully:", data);
+
+      const result = await response.json();
       
-      // Update the user context
-      if (updateUser) {
-        updateUser(data);
-      }
+      toast({
+        title: "Success",
+        description: "Password changed successfully!",
+      });
       
-      // Dispatch custom event for other components
-      const event = new CustomEvent('userDataUpdated', { detail: data });
-      window.dispatchEvent(event);
-      
-      // Update localStorage
-      localStorage.setItem('user', JSON.stringify(data));
-      localStorage.setItem('profilePicture', data.profilePicture || '');
-      
-      // Now save color preferences to the dedicated endpoint
-      return fetch(`/api/users/${user.id}/color-preferences`, {
+      passwordForm.reset();
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const handleUpdateAccount = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not found. Please log in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUpdatingAccount(true);
+    
+    try {
+      const response = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          primaryColor: customColor,
-          primaryTextColor: textColor,
-          secondaryTextColor: textColorSecondary,
-          isDarkMode: false
+          username: accountForm.username,
+          email: accountForm.email,
         }),
       });
-    })
-    .then(response => {
+
       if (!response.ok) {
-        throw new Error('Failed to save color preferences');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update account information');
       }
-      return response.json();
-    })
-    .then(colorData => {
-      console.log("Color preferences saved successfully:", colorData);
-      console.log("Success: Profile and color preferences updated successfully");
+
+      const result = await response.json();
       
-      // Dispatch color preferences updated event
-      window.dispatchEvent(new CustomEvent('colorPreferencesUpdated'));
-    })
-    .catch(error => {
-      console.error("Error updating profile or color preferences:", error);
-      console.log("Error: Failed to update profile. Please try again.");
-    });
-  };
-
-  const handleChangePassword = (data: PasswordChangeForm) => {
-    console.log("Changing password...");
-    console.log("Password data:", data);
-
-    fetch('/api/auth/change-password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        currentPassword: data.currentPassword,
-        newPassword: data.newPassword,
-      }),
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error('Failed to change password');
+      toast({
+        title: "Success",
+        description: "Account information updated successfully!",
+      });
+      
+      setIsEditingAccount(false);
+      
+      // Update the user context if updateUser function is available
+      if (updateUser) {
+        updateUser({ ...user, ...result });
       }
-      return response.json();
-    })
-    .then(data => {
-      console.log("Password changed successfully:", data);
-      console.log("Success: Password changed successfully");
-      passwordForm.reset();
-    })
-    .catch(error => {
-      console.error("Error changing password:", error);
-      console.log("Error: Failed to change password. Please try again.");
-    });
+    } catch (error: any) {
+      console.error("Error updating account:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update account information. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingAccount(false);
+    }
   };
 
-  const handleProfilePictureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setProfilePicture(result);
-      console.log("Profile picture updated locally");
-    };
-    reader.readAsDataURL(file);
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -520,112 +571,45 @@ export default function Settings() {
               </div>
             </div>
 
-            <Tabs defaultValue="profile" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="profile">Profile</TabsTrigger>
-                <TabsTrigger value="security">Security</TabsTrigger>
-                <TabsTrigger value="notifications">Notifications</TabsTrigger>
-                <TabsTrigger value="appearance">Appearance</TabsTrigger>
+            <Tabs defaultValue="business" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4 bg-white dark:bg-gray-800">
+                <TabsTrigger 
+                  value="security"
+                  className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+                  style={{ 
+                    color: customColor
+                  } as React.CSSProperties}
+                >
+                  Security
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="notifications"
+                  className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+                  style={{ 
+                    color: customColor
+                  } as React.CSSProperties}
+                >
+                  Notifications
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="appearance"
+                  className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+                  style={{ 
+                    color: customColor
+                  } as React.CSSProperties}
+                >
+                  Appearance
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="business"
+                  className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+                  style={{ 
+                    color: customColor
+                  } as React.CSSProperties}
+                >
+                  Business
+                </TabsTrigger>
               </TabsList>
-
-              {/* Profile Tab */}
-              <TabsContent value="profile" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <User className="h-5 w-5 mr-2" />
-                      Profile Information
-                    </CardTitle>
-                    <CardDescription>
-                      Update your personal information and profile picture.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Profile Picture */}
-                    <div className="flex items-center space-x-4">
-                      <Avatar className="h-20 w-20">
-                        <AvatarImage 
-                          src={profilePicture || "/placeholder-avatar.svg"} 
-                          alt="Profile picture"
-                        />
-                        <AvatarFallback>
-                          {user?.firstName?.[0]}{user?.lastName?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <Button
-                          variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          <Camera className="h-4 w-4 mr-2" />
-                          Change Picture
-                        </Button>
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleProfilePictureChange}
-                          className="hidden"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Name Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="firstName">First Name</Label>
-                        <Input
-                          id="firstName"
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="lastName">Last Name</Label>
-                        <Input
-                          id="lastName"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Contact Fields */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="phone">Phone</Label>
-                        <Input
-                          id="phone"
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <Button 
-                      onClick={handleSaveProfile}
-                      className="w-full h-12"
-                      style={{ 
-                        backgroundColor: customColor,
-                        borderColor: customColor
-                      }}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Profile
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
 
               {/* Security Tab */}
               <TabsContent value="security" className="space-y-6">
@@ -640,6 +624,108 @@ export default function Settings() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Account Information */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-base font-medium">Account Information</Label>
+                        {!isEditingAccount ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setAccountForm({
+                                username: user?.username || '',
+                                email: user?.email || '',
+                              });
+                              setIsEditingAccount(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        ) : (
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setIsEditingAccount(false)}
+                              disabled={isUpdatingAccount}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleUpdateAccount}
+                              disabled={isUpdatingAccount}
+                              variant="outline"
+                              style={{ 
+                                borderColor: customColor,
+                                color: customColor,
+                                '--tw-ring-color': customColor
+                              } as React.CSSProperties}
+                              className="hover:bg-transparent hover:border-opacity-80 focus:ring-2 focus:ring-offset-2"
+                            >
+                              {isUpdatingAccount ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {!isEditingAccount ? (
+                        <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Username</p>
+                              <p className="font-medium text-gray-900 dark:text-gray-100">{user?.username || 'Not available'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                              <p className="font-medium text-gray-900 dark:text-gray-100">{user?.email || 'Not available'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Role</p>
+                              <p className="font-medium text-gray-900 dark:text-gray-100 capitalize">{user?.role || 'Not available'}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="editUsername">Username</Label>
+                              <Input
+                                id="editUsername"
+                                value={accountForm.username}
+                                onChange={(e) => setAccountForm(prev => ({ ...prev, username: e.target.value }))}
+                                placeholder="Enter username"
+                                disabled={isUpdatingAccount}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="editEmail">Email</Label>
+                              <Input
+                                id="editEmail"
+                                type="email"
+                                value={accountForm.email}
+                                onChange={(e) => setAccountForm(prev => ({ ...prev, email: e.target.value }))}
+                                placeholder="Enter email"
+                                disabled={isUpdatingAccount}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Role: <span className="font-medium capitalize">{user?.role || 'Not available'}</span>
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Role cannot be changed from this interface
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator />
+
                     {/* Change Password Form */}
                     <form onSubmit={passwordForm.handleSubmit(handleChangePassword)} className="space-y-4">
                       <div>
@@ -731,14 +817,17 @@ export default function Settings() {
 
                       <Button 
                         type="submit"
-                        className="w-full h-12"
+                        className="w-full h-12 hover:bg-transparent hover:border-opacity-80 focus:ring-2 focus:ring-offset-2"
+                        disabled={isChangingPassword}
+                        variant="outline"
                         style={{ 
-                          backgroundColor: customColor,
-                          borderColor: customColor
-                        }}
+                          borderColor: customColor,
+                          color: customColor,
+                          '--tw-ring-color': customColor
+                        } as React.CSSProperties}
                       >
                         <Lock className="h-4 w-4 mr-2" />
-                        Change Password
+                        {isChangingPassword ? "Changing Password..." : "Change Password"}
                       </Button>
                     </form>
 
@@ -789,73 +878,129 @@ export default function Settings() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base flex items-center">
-                          <Smartphone className="h-4 w-4 mr-2" />
-                          Email Notifications
-                        </Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive notifications via email
-                        </p>
+                    {/* Email Notifications Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Email Notifications</h3>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Account Management</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive account-related notifications via email
+                          </p>
+                        </div>
+                        <Switch
+                          checked={emailAccountManagement}
+                          onCheckedChange={setEmailAccountManagement}
+                        />
                       </div>
-                      <Switch
-                        checked={emailNotifications}
-                        onCheckedChange={setEmailNotifications}
-                      />
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Appointment Reminders</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive appointment reminders via email
+                          </p>
+                        </div>
+                        <Switch
+                          checked={emailAppointmentReminders}
+                          onCheckedChange={setEmailAppointmentReminders}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Marketing & Promotions</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive promotional emails and updates
+                          </p>
+                        </div>
+                        <Switch
+                          checked={emailPromotions}
+                          onCheckedChange={setEmailPromotions}
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base flex items-center">
-                          <Smartphone className="h-4 w-4 mr-2" />
-                          SMS Notifications
-                        </Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive notifications via SMS
-                        </p>
+                    <Separator />
+
+                    {/* SMS Notifications Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">SMS Notifications</h3>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Account Management</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive account-related notifications via SMS
+                          </p>
+                        </div>
+                        <Switch
+                          checked={smsAccountManagement}
+                          onCheckedChange={setSmsAccountManagement}
+                        />
                       </div>
-                      <Switch
-                        checked={smsNotifications}
-                        onCheckedChange={setSmsNotifications}
-                      />
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Appointment Reminders</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive appointment reminders via SMS
+                          </p>
+                        </div>
+                        <Switch
+                          checked={smsAppointmentReminders}
+                          onCheckedChange={setSmsAppointmentReminders}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Marketing & Promotions</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive promotional messages via SMS
+                          </p>
+                        </div>
+                        <Switch
+                          checked={smsPromotions}
+                          onCheckedChange={setSmsPromotions}
+                        />
+                      </div>
                     </div>
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Push Notifications</Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive push notifications in your browser
-                        </p>
-                      </div>
-                      <Switch
-                        checked={pushNotifications}
-                        onCheckedChange={setPushNotifications}
-                      />
-                    </div>
+                    <Separator />
 
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Marketing Emails</Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Receive promotional emails and updates
-                        </p>
+                    {/* Browser Notifications Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Browser Notifications</h3>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label className="text-base">Push Notifications</Label>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Receive push notifications in your browser
+                          </p>
+                        </div>
+                        <Switch
+                          checked={pushNotifications}
+                          onCheckedChange={setPushNotifications}
+                        />
                       </div>
-                      <Switch
-                        checked={marketingEmails}
-                        onCheckedChange={setMarketingEmails}
-                      />
                     </div>
 
                     <Button 
-                      className="w-full h-12"
+                      onClick={handleSaveNotificationPreferences}
+                      className="w-full h-12 hover:bg-transparent hover:border-opacity-80 focus:ring-2 focus:ring-offset-2"
+                      variant="outline"
                       style={{ 
-                        backgroundColor: customColor,
-                        borderColor: customColor
-                      }}
+                        borderColor: customColor,
+                        color: customColor,
+                        '--tw-ring-color': customColor
+                      } as React.CSSProperties}
+                      disabled={isSavingNotificationPreferences}
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Save Notification Preferences
+                      {isSavingNotificationPreferences ? 'Saving...' : notificationPreferencesSaved ? 'Saved!' : 'Save Notification Preferences'}
                     </Button>
                   </CardContent>
                 </Card>
@@ -935,40 +1080,220 @@ export default function Settings() {
                     </div>
 
                     <Button 
-                      onClick={handleSaveProfile}
-                      className="w-full h-12"
-                      style={{ 
-                        backgroundColor: customColor,
-                        borderColor: customColor
+                      onClick={() => {
+                        saveColorPreferences(customColor, textColor);
+                        toast({
+                          title: "Success",
+                          description: "Appearance settings saved successfully!",
+                        });
+                        setAppearanceSettingsSaved(true);
+                        setTimeout(() => setAppearanceSettingsSaved(false), 3000);
                       }}
+                      className="w-full h-12 hover:bg-transparent hover:border-opacity-80 focus:ring-2 focus:ring-offset-2"
+                      variant="outline"
+                      style={{ 
+                        borderColor: customColor,
+                        color: customColor,
+                        '--tw-ring-color': customColor
+                      } as React.CSSProperties}
                     >
                       <Save className="h-4 w-4 mr-2" />
-                      Save Appearance Settings
+                      {appearanceSettingsSaved ? 'Saved!' : 'Save Appearance Settings'}
                     </Button>
                   </CardContent>
                 </Card>
 
-                {/* Business Timezone */}
-                <Card className="mb-6">
+
+              </TabsContent>
+
+              {/* Business Tab */}
+              <TabsContent value="business" className="space-y-6">
+                <Card>
                   <CardHeader>
-                    <CardTitle>Business Timezone</CardTitle>
+                    <CardTitle className="flex items-center">
+                      <SettingsIcon className="h-5 w-5 mr-2" />
+                      Business Information
+                    </CardTitle>
                     <CardDescription>
-                      Select the timezone for your business. All appointment times will be shown in this timezone.
+                      Configure your business details and branding.
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <Label htmlFor="timezone">Timezone</Label>
-                    <select
-                      id="timezone"
-                      value={timezone}
-                      onChange={handleTimezoneChange}
-                      className="block w-full mt-2 p-2 border rounded"
+                  <CardContent className="space-y-6">
+                    {/* Business Logo */}
+                    <div className="flex items-center space-x-4">
+                      <div className="flex-shrink-0">
+                        {businessLogo ? (
+                          <img 
+                            src={businessLogo} 
+                            alt="Business logo" 
+                            className="h-20 w-20 object-contain border rounded-lg"
+                          />
+                        ) : (
+                          <div className="h-20 w-20 bg-gray-100 dark:bg-gray-800 border rounded-lg flex items-center justify-center">
+                            <Camera className="h-8 w-8 text-gray-400" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <Button
+                          variant="outline"
+                          onClick={() => businessLogoInputRef.current?.click()}
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          {businessLogo ? 'Change Logo' : 'Upload Logo'}
+                        </Button>
+                        <input
+                          ref={businessLogoInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleBusinessLogoChange}
+                          className="hidden"
+                        />
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Upload your business logo (PNG, JPG, SVG)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Business Name */}
+                    <div>
+                      <Label htmlFor="businessName">Business Name</Label>
+                      <Input
+                        id="businessName"
+                        value={businessName}
+                        onChange={(e) => setBusinessName(e.target.value)}
+                        placeholder="Enter your business name"
+                      />
+                    </div>
+
+                    {/* Contact Information */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="businessPhone">Phone</Label>
+                        <Input
+                          id="businessPhone"
+                          type="tel"
+                          value={businessPhone}
+                          onChange={(e) => setBusinessPhone(e.target.value)}
+                          placeholder="Business phone number"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="businessEmail">Email</Label>
+                        <Input
+                          id="businessEmail"
+                          type="email"
+                          value={businessEmail}
+                          onChange={(e) => setBusinessEmail(e.target.value)}
+                          placeholder="Business email address"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Address and Website */}
+                    <div>
+                      <Label htmlFor="businessAddress">Address</Label>
+                      <Input
+                        id="businessAddress"
+                        value={businessAddress}
+                        onChange={(e) => setBusinessAddress(e.target.value)}
+                        placeholder="Business address"
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="businessWebsite">Website</Label>
+                      <Input
+                        id="businessWebsite"
+                        type="url"
+                        value={businessWebsite}
+                        onChange={(e) => setBusinessWebsite(e.target.value)}
+                        placeholder="https://your-website.com"
+                      />
+                    </div>
+
+                    {/* Business Settings */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="timezone">Timezone</Label>
+                        <select
+                          id="timezone"
+                          value={timezone}
+                          onChange={(e) => setTimezone(e.target.value)}
+                          className="block w-full mt-2 p-2 border rounded"
+                        >
+                          {timeZones.map((tz) => (
+                            <option key={tz} value={tz}>{tz}</option>
+                          ))}
+                        </select>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          All appointment times will be shown in this timezone
+                        </p>
+                      </div>
+                      <div>
+                        <Label htmlFor="currency">Currency</Label>
+                        <select
+                          id="currency"
+                          value={currency}
+                          onChange={(e) => setCurrency(e.target.value)}
+                          className="block w-full mt-2 p-2 border rounded"
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                          <option value="CAD">CAD (C$)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label htmlFor="taxRate">Tax Rate (%)</Label>
+                        <Input
+                          id="taxRate"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="1"
+                          value={taxRate}
+                          onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                          placeholder="0.08"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Receipt Footer */}
+                    <div>
+                      <Label htmlFor="receiptFooter">Receipt Footer</Label>
+                      <textarea
+                        id="receiptFooter"
+                        value={receiptFooter}
+                        onChange={(e) => setReceiptFooter(e.target.value)}
+                        placeholder="Thank you for your business!"
+                        style={{
+                          display: 'block',
+                          width: '100%',
+                          marginTop: '0.5rem',
+                          padding: '0.5rem',
+                          border: '1px solid #d1d5db',
+                          borderRadius: '0.375rem',
+                          minHeight: '80px',
+                          resize: 'vertical'
+                        }}
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handleSaveBusinessSettings}
+                      className="w-full h-12 hover:bg-transparent hover:border-opacity-80 focus:ring-2 focus:ring-offset-2"
+                      variant="outline"
+                      style={{ 
+                        borderColor: customColor,
+                        color: customColor,
+                        '--tw-ring-color': customColor
+                      } as React.CSSProperties}
+                      disabled={businessSettingsLoading}
                     >
-                      {timeZones.map((tz) => (
-                        <option key={tz} value={tz}>{tz}</option>
-                      ))}
-                    </select>
-                    <Button className="mt-4" onClick={handleSaveTimezone}>Save</Button>
+                      <Save className="h-4 w-4 mr-2" />
+                      {businessSettingsLoading ? 'Saving...' : businessSettingsSaved ? 'Saved!' : 'Save Business Settings'}
+                    </Button>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -980,30 +1305,36 @@ export default function Settings() {
       <TwoFactorSetupModal
         isOpen={show2faSetup}
         onClose={() => setShow2faSetup(false)}
-        userId={user?.id}
+        userId={user?.id || 0}
         onSuccess={async () => {
           setShow2faSetup(false);
           // Refetch user or update context
           const res = await fetch(`/api/users`);
           const users = await res.json();
-          const updated = users.find((u: any) => u.id === user.id);
-          if (updated) updateUser(updated);
-          toast({ title: "2FA enabled!", description: "Two-factor authentication is now active." });
+          const updated = users.find((u: any) => u.id === user?.id);
+          if (updated && updateUser) updateUser(updated);
+          toast({
+            title: "Success",
+            description: "Two-factor authentication has been enabled successfully.",
+          });
         }}
       />
       <TwoFactorDisableModal
         isOpen={show2faDisable}
         onClose={() => setShow2faDisable(false)}
-        userId={user?.id}
+        userId={user?.id || 0}
         twoFactorMethod={user?.twoFactorMethod}
         onSuccess={async () => {
           setShow2faDisable(false);
           // Refetch user or update context
           const res = await fetch(`/api/users`);
           const users = await res.json();
-          const updated = users.find((u: any) => u.id === user.id);
-          if (updated) updateUser(updated);
-          toast({ title: "2FA disabled", description: "Two-factor authentication has been turned off." });
+          const updated = users.find((u: any) => u.id === user?.id);
+          if (updated && updateUser) updateUser(updated);
+          toast({
+            title: "Success",
+            description: "Two-factor authentication has been disabled successfully.",
+          });
         }}
       />
     </div>

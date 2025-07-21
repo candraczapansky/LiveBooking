@@ -23,6 +23,13 @@ export interface User {
   secondaryColor?: string;
   textColor?: string;
   textColorSecondary?: string;
+  // Notification preference fields
+  emailAccountManagement?: boolean;
+  emailAppointmentReminders?: boolean;
+  emailPromotions?: boolean;
+  smsAccountManagement?: boolean;
+  smsAppointmentReminders?: boolean;
+  smsPromotions?: boolean;
 }
 
 interface AuthContextType {

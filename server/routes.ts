@@ -33,6 +33,7 @@ import {
   createMarketingCampaignEmail, 
   createAccountUpdateEmail 
 } from "./email";
+import { hashPassword, comparePassword } from "./utils/password";
 import { 
   triggerBookingConfirmation, 
   triggerCancellation, 
@@ -121,7 +122,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     
     const user = await storage.getUserByUsername(username);
     
-    if (!user || user.password !== password) { // In real app, compare hashed passwords
+    const isPasswordValid = user ? await comparePassword(password, user.password) : false;
+    if (!user || !isPasswordValid) {
       return res.status(401).json({ error: "Invalid credentials" });
     }
     
@@ -154,9 +156,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       }
     }
     
-    // Create new user with client role by default
+    // Hash password and create new user with client role by default
+    const hashedPassword = await hashPassword(req.body.password);
     const newUser = await storage.createUser({
       ...req.body,
+      password: hashedPassword,
       role: "client"
     });
     
@@ -217,9 +221,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       
       console.log("Creating new staff user with validated data");
       
-      // Create new user with staff role
+      // Hash password and create new user with staff role
+      const hashedPassword = await hashPassword(req.body.password);
       const newUser = await storage.createUser({
         ...req.body,
+        password: hashedPassword,
         role: "staff"
       });
       
@@ -371,8 +377,9 @@ If you didn't request this password reset, please ignore this email and your pas
         return res.status(400).json({ error: "Invalid or expired reset token" });
       }
 
-      // Update user's password and clear reset token
-      await storage.updateUser(user.id, { password: newPassword });
+      // Hash and update user's password and clear reset token
+      const hashedNewPassword = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { password: hashedNewPassword });
       await storage.clearPasswordResetToken(user.id);
 
       res.status(200).json({ 
@@ -436,8 +443,9 @@ If you didn't request this password reset, please ignore this email and your pas
           message: "If an account with this phone number exists, you will receive password reset instructions." 
         });
       } else {
+        console.error('SMS sending failed:', smsResult.error);
         res.status(500).json({ 
-          error: "Failed to send reset SMS. Please try again." 
+          error: smsResult.error || "Failed to send reset SMS. Please try again." 
         });
       }
 
@@ -464,11 +472,12 @@ If you didn't request this password reset, please ignore this email and your pas
     const username = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
     const password = Math.random().toString(36).substring(2, 12); // Generate temporary password
     
-    // Create new client
+    // Hash password and create new client
+    const hashedPassword = await hashPassword(password);
     const newClient = await storage.createUser({
       ...req.body,
       username,
-      password,
+      password: hashedPassword,
       role: "client"
     });
     
@@ -538,7 +547,12 @@ If you didn't request this password reset, please ignore this email and your pas
             smsPromotions: clientData.smsPromotions ?? false,
           };
 
-          await storage.createUser(newClient);
+          // Hash password before creating user
+          const hashedPassword = await hashPassword(newClient.password);
+          await storage.createUser({
+            ...newClient,
+            password: hashedPassword
+          });
           existingEmails.add(clientData.email.toLowerCase());
           results.imported++;
         } catch (error) {
@@ -573,13 +587,15 @@ If you didn't request this password reset, please ignore this email and your pas
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Verify current password (in real app, compare hashed passwords)
-      if (user.password !== currentPassword) {
+      // Verify current password
+      const isCurrentPasswordValid = await comparePassword(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
         return res.status(401).json({ error: "Current password is incorrect" });
       }
       
-      // Update password (in real app, hash the new password)
-      await storage.updateUser(userId, { password: newPassword });
+      // Hash and update password
+      const hashedNewPassword = await hashPassword(newPassword);
+      await storage.updateUser(userId, { password: hashedNewPassword });
       
       return res.status(200).json({ message: "Password changed successfully" });
     } catch (error) {
@@ -3506,6 +3522,69 @@ If you didn't request this password reset, please ignore this email and your pas
       console.error('Error sending daily reminders:', error);
       res.status(500).json({ 
         error: "Error sending daily reminders: " + error.message 
+      });
+    }
+  });
+
+  // Test email endpoint
+  app.post("/api/test-email", async (req, res) => {
+    try {
+      const { to, subject, content } = req.body;
+      
+      if (!to || !subject || !content) {
+        return res.status(400).json({ 
+          success: false,
+          error: "Email, subject, and content are required" 
+        });
+      }
+
+      if (!process.env.SENDGRID_API_KEY) {
+        return res.status(400).json({
+          success: false,
+          error: "Email service not configured. Please configure SendGrid API key."
+        });
+      }
+
+      const emailSent = await sendEmail({
+        to,
+        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #9532b8;">Glo Head Spa</h1>
+              <h2 style="color: #333;">Test Email</h2>
+            </div>
+            
+            <p style="color: #666; line-height: 1.6;">
+              ${content}
+            </p>
+            
+            <hr style="border: 1px solid #eee; margin: 30px 0;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              This is a test email from your Glo Head Spa salon management system.
+            </p>
+          </div>
+        `,
+        text: content
+      });
+
+      if (emailSent) {
+        res.json({ 
+          success: true, 
+          message: "Test email sent successfully" 
+        });
+      } else {
+        res.status(500).json({ 
+          success: false,
+          error: "Failed to send test email" 
+        });
+      }
+    } catch (error: any) {
+      console.error('Test email error:', error);
+      res.status(500).json({ 
+        success: false,
+        error: "Error sending test email: " + error.message 
       });
     }
   });

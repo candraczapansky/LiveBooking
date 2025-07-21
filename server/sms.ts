@@ -2,7 +2,7 @@ import twilio from 'twilio';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER?.replace(/^\+\+/, '+') || process.env.TWILIO_PHONE_NUMBER;
 
 // Initialize Twilio client if credentials are available
 let twilioClient: twilio.Twilio | null = null;
@@ -40,10 +40,9 @@ function isValidPhoneNumber(phone: string): boolean {
   
   // Check if it's a valid US phone number (10 digits) or international (7-15 digits)
   if (digits.length === 10) {
-    // US phone number validation - shouldn't start with 0 or 1, avoid test numbers
-    const isValidStart = !digits.startsWith('0') && !digits.startsWith('1');
+    // US phone number validation - allow numbers starting with 1 (area codes)
     const isNotTestNumber = !digits.startsWith('555');
-    return isValidStart && isNotTestNumber;
+    return isNotTestNumber;
   }
   
   // International number validation (7-15 digits)

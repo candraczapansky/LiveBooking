@@ -1,5 +1,6 @@
 import React, { useContext } from "react";
 import { AuthContext } from "@/contexts/AuthProvider";
+import { BusinessBrand } from "@/components/BusinessBrand";
 
 const MobileDashboard = () => {
   const { user } = useContext(AuthContext);
@@ -26,7 +27,7 @@ const MobileDashboard = () => {
         }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '22px', fontWeight: '600' }}>
-              Glo Head Spa
+              <BusinessBrand size="md" showName={true} />
             </h1>
             <p style={{ margin: '4px 0 0 0', fontSize: '14px', opacity: 0.9 }}>
               Welcome, {user?.firstName || 'Admin'}!

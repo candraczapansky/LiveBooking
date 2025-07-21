@@ -9,8 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Scissors } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { BusinessBrand } from "@/components/BusinessBrand";
 
 
 // Login schema
@@ -133,21 +133,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-sm mx-auto">
-        <Card className="w-full shadow-lg border-0">
-        <CardHeader className="text-center pb-4 px-8">
+        <div className="w-full">
+        <div className="text-center pb-4 px-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-primary/10 p-3 rounded-full">
-              <Scissors className="h-10 w-10 text-primary" />
+            <div className="transform scale-[3]">
+              <BusinessBrand size="xl" showLogo={true} showName={false} />
             </div>
           </div>
-          <CardTitle className="text-3xl font-bold mb-2">Glo Head Spa</CardTitle>
-          <CardDescription className="text-base text-gray-600 dark:text-gray-400">
-            Salon & Spa Management Platform
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-6 pb-8">
+        </div>
+        <div className="px-6 pb-8">
             <div className="flex w-full mb-8 h-7 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
               <button
                 type="button"
@@ -362,8 +358,8 @@ const Login = () => {
                 </Form>
               </>
             )}
-        </CardContent>
-        </Card>
+        </div>
+        </div>
 
 
       </div>

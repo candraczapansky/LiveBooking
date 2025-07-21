@@ -97,12 +97,19 @@ export default function PhonePage() {
   const makeCallMutation = useMutation({
     mutationFn: (data: any) => apiRequest('POST', '/api/phone/outbound', data),
     onSuccess: () => {
-      toast();
+      toast({
+        title: "Call Initiated",
+        description: "Outbound call has been initiated successfully.",
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/phone/recent'] });
       setOutboundForm({ toNumber: '', staffId: '', userId: '', purpose: 'outbound' });
     },
     onError: (error: any) => {
-      toast();
+      toast({
+        title: "Call Failed",
+        description: "Failed to initiate outbound call.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -111,7 +118,10 @@ export default function PhonePage() {
     mutationFn: ({ callId, notes, staffId }: { callId: number; notes: string; staffId: number }) =>
       apiRequest('PUT', `/api/phone/notes/${callId}`, { notes, staffId }),
     onSuccess: () => {
-      toast();
+      toast({
+        title: "Notes Saved",
+        description: "Call notes have been saved successfully.",
+      });
       queryClient.invalidateQueries({ queryKey: ['/api/phone/recent'] });
       setCallNotes('');
       setSelectedCall(null);

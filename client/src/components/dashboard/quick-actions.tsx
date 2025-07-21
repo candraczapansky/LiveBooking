@@ -34,7 +34,11 @@ const QuickActions = () => {
       navigate('/appointments?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast();
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to create appointments.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -46,7 +50,11 @@ const QuickActions = () => {
       navigate('/clients?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast();
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to add clients.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -58,7 +66,11 @@ const QuickActions = () => {
       navigate('/marketing?new=true');
     } else {
       console.log('Permission denied for user role:', currentUser?.role);
-      toast();
+      toast({
+        title: "Permission Denied",
+        description: "You don't have permission to send promotions.",
+        variant: "destructive",
+      });
     }
   };
 

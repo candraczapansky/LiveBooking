@@ -2,6 +2,7 @@ import { useContext, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { BusinessBrand } from "@/components/BusinessBrand";
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -82,7 +83,6 @@ const Sidebar = () => {
 
     // Listen for user data updates (includes profile picture updates)
     const handleUserDataUpdate = (event: CustomEvent) => {
-      console.log('Sidebar received user data update:', event.detail);
       setLocalUser(event.detail);
     };
 
@@ -123,7 +123,6 @@ const Sidebar = () => {
     
     // Listen for color preference updates
     const handleColorUpdate = () => {
-      console.log('Color preferences updated, reloading colors');
       loadUserColor();
     };
     
@@ -175,7 +174,7 @@ const Sidebar = () => {
     { icon: <Settings />, label: "Settings", href: "/settings" },
   ];
 
-  console.log('Sidebar DOM element about to render:', { isOpen, isMobile });
+
 
   return (
     <div 
@@ -183,23 +182,23 @@ const Sidebar = () => {
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex flex-col h-full">
-        <div className="p-4 border-b border-sidebar-border">
+        <div className="p-1 border-b border-sidebar-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={`h-8 w-8 ${isOpen ? 'mr-3' : 'mx-auto'}`}
+                className={`h-10 w-10 ${isOpen ? 'mr-3' : 'mx-auto'}`}
                 onClick={toggleSidebar}
               >
                 <Menu 
                   ref={hamburgerRef}
                   data-hamburger="true"
-                  className="h-5 w-5" 
+                  className="h-10 w-10" 
                   style={{ color: primaryColor }}
                 />
               </Button>
-              {isOpen && <h1 className="text-xl font-bold text-primary">Glo Head Spa</h1>}
+              {isOpen && <BusinessBrand size="2xl" className="text-primary justify-center ml-4" showName={true} />}
             </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">

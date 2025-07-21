@@ -4,6 +4,7 @@ import BookingWidget from "@/components/bookings/booking-widget";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { BusinessBrand } from "@/components/BusinessBrand";
 
 const ClientBookingPage = () => {
   useDocumentTitle("Book an Appointment | Glo Head Spa");
@@ -22,7 +23,7 @@ const ClientBookingPage = () => {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">Glo Head Spa</h1>
+          <BusinessBrand size="md" className="text-gray-900 dark:text-gray-100" />
           <Button 
             variant="outline" 
             size="sm" 
@@ -52,7 +53,7 @@ const ClientBookingPage = () => {
       <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-            &copy; {new Date().getFullYear()} Glo Head Spa. All rights reserved.
+            &copy; {new Date().getFullYear()} <BusinessBrand size="sm" showLogo={false} showName={true} />. All rights reserved.
           </p>
         </div>
       </footer>

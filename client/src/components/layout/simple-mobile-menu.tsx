@@ -4,6 +4,7 @@ import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Sc
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BusinessBrand } from "@/components/BusinessBrand";
 
 
 const SimpleMobileMenu = () => {
@@ -116,14 +117,14 @@ const SimpleMobileMenu = () => {
       <button 
         onClick={toggleMenu}
         disabled={isAnimating}
-        className="flex items-center justify-center w-11 h-11 bg-transparent border-none rounded-lg cursor-pointer p-0 touch-manipulation tap-highlight-transparent disabled:opacity-50"
+        className="flex items-center justify-center w-12 h-12 bg-transparent border-none rounded-lg cursor-pointer p-0 touch-manipulation tap-highlight-transparent disabled:opacity-50"
         style={{
           WebkitTapHighlightColor: "transparent",
           touchAction: "manipulation"
         }}
         aria-label="Toggle mobile menu"
       >
-        <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+        <Menu className="w-12 h-12 text-gray-700 dark:text-gray-300" />
       </button>
 
       {/* Mobile Menu Overlay */}
@@ -162,10 +163,8 @@ const SimpleMobileMenu = () => {
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100" style={{ color: 'hsl(0 0% 0%)' }}>
-                Glo Head Spa
-              </h2>
+            <div className="flex items-center justify-between p-1 border-b border-gray-200 dark:border-gray-700">
+              <BusinessBrand size="xl" className="text-gray-900 dark:text-gray-100 justify-center ml-2" showName={false} />
               <button
                 onClick={closeMenu}
                 disabled={isAnimating}

@@ -2,6 +2,7 @@ import { useContext, useState, useEffect } from "react";
 import { Settings, User, LogOut, ChevronDown, Menu } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
+import { BusinessBrand } from "@/components/BusinessBrand";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,8 +100,8 @@ const Header = () => {
               <SimpleMobileMenu />
             </div>
             <div className="lg:hidden ml-2 sm:ml-3 truncate">
-              <Link href="/dashboard" className="text-lg sm:text-xl font-bold text-primary truncate hover:opacity-80 transition-opacity cursor-pointer">
-                Glo Head Spa
+              <Link href="/dashboard" className="truncate hover:opacity-80 transition-opacity cursor-pointer">
+                <BusinessBrand size="md" className="text-primary" showName={false} />
               </Link>
             </div>
           </div>

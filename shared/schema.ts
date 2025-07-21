@@ -835,6 +835,7 @@ export type InsertAppointmentHistory = z.infer<typeof insertAppointmentHistorySc
 export const businessSettings = pgTable("business_settings", {
   id: serial("id").primaryKey(),
   businessName: text("business_name").notNull(),
+  businessLogo: text("business_logo"), // Base64 encoded logo or URL
   address: text("address"),
   phone: text("phone"),
   email: text("email"),

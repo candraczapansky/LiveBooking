@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ type ForgotPasswordSMSValues = z.infer<typeof forgotPasswordSMSSchema>;
 const ForgotPasswordSMS = () => {
   useDocumentTitle("Forgot Password - SMS | Glo Head Spa");
   const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(false);
   const [smsSent, setSmsSent] = useState(false);
@@ -47,9 +49,18 @@ const ForgotPasswordSMS = () => {
       }
 
       setSmsSent(true);
+      toast({
+        title: "Reset SMS Sent",
+        description: "Check your phone for password reset instructions.",
+      });
 
     } catch (error: any) {
       console.error("Forgot password SMS error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

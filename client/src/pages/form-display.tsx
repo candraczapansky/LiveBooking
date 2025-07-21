@@ -67,11 +67,7 @@ const FormDisplay = () => {
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const clientId = urlParams.get('clientId');
   
-  console.log('FormDisplay component loaded');
-  console.log('Form ID extracted from URL:', formId);
-  console.log('Client ID from URL params:', clientId);
-  console.log('Current location:', location);
-  console.log('Full URL:', window.location.href);
+
 
   useDocumentTitle(`Form | Glo Head Spa`);
 
@@ -81,17 +77,13 @@ const FormDisplay = () => {
   const { data: form, isLoading, error } = useQuery({
     queryKey: [`/api/forms/${formId}`],
     queryFn: async () => {
-      console.log('Fetching form data for ID:', formId);
       const response = await fetch(`/api/forms/${formId}`);
-      console.log('API response status:', response.status);
       
       if (!response.ok) {
-        console.error('API error:', response.status, response.statusText);
         throw new Error('Form not found');
       }
       
       const formData = await response.json();
-      console.log('Form data received:', formData);
       
       // Parse fields from JSON string to array
       let parsedFields = [];
@@ -107,11 +99,8 @@ const FormDisplay = () => {
           }
         }
       } catch (error) {
-        console.error('Error parsing form fields:', error);
         parsedFields = [];
       }
-      
-      console.log('Parsed fields:', parsedFields);
       
       return {
         ...formData,
@@ -145,7 +134,11 @@ const FormDisplay = () => {
       const fieldLabel = field.label || field.config?.label || field.id;
       
       if (isRequired && (!formData[field.id] || formData[field.id] === '')) {
-        toast();
+        toast({
+          title: "Validation Error",
+          description: `Please fill in the required field: ${fieldLabel}`,
+          variant: "destructive",
+        });
         return false;
       }
     }
@@ -177,9 +170,16 @@ const FormDisplay = () => {
       }
 
       setIsSubmitted(true);
-      toast();
+      toast({
+        title: "Success",
+        description: "Form submitted successfully!",
+      });
     } catch (error) {
-      toast();
+      toast({
+        title: "Error",
+        description: "Failed to submit form. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

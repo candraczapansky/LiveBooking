@@ -10,7 +10,7 @@ import { Mail, AlertCircle, CheckCircle } from 'lucide-react';
 
 export default function EmailTestPage() {
   const [email, setEmail] = useState('');
-  const [subject, setSubject] = useState('Test Email from Glo Head Spa');
+  const [subject, setSubject] = useState('Test Email');
   const [content, setContent] = useState('This is a test email to verify delivery. If you receive this, your email system is working correctly!');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -20,8 +20,8 @@ export default function EmailTestPage() {
     if (!email || !subject || !content) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields",
-        variant: "destructive"
+        description: "Please fill in all required fields.",
+        variant: "destructive",
       });
       return;
     }
@@ -36,15 +36,15 @@ export default function EmailTestPage() {
       
       setResult(response);
       toast({
-        title: "Test Email Sent",
-        description: `Email sent to ${email}. Check inbox and spam folder.`,
+        title: "Success",
+        description: "Test email sent successfully!",
       });
     } catch (error: any) {
       console.error('Test email error:', error);
       toast({
-        title: "Email Failed",
-        description: error.message || "Failed to send test email",
-        variant: "destructive"
+        title: "Error",
+        description: "Failed to send test email. Please check your configuration.",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
