@@ -67,10 +67,35 @@ export async function updateForm(id: number, formData: Partial<CreateFormData>):
 
   const form = await response.json();
   
-  // Parse fields from JSON string to array
+  // Parse fields from JSON string to array with error handling
+  let parsedFields = [];
+  if (form.fields) {
+    try {
+      // If fields is already an array, use it directly
+      if (Array.isArray(form.fields)) {
+        parsedFields = form.fields;
+      } else if (typeof form.fields === 'string') {
+        // Try to parse the string
+        const parsed = JSON.parse(form.fields);
+        if (Array.isArray(parsed)) {
+          parsedFields = parsed;
+        } else {
+          console.error('Parsed fields is not an array:', parsed);
+          parsedFields = [];
+        }
+      } else {
+        console.error('Fields is not a string or array:', typeof form.fields);
+        parsedFields = [];
+      }
+    } catch (error) {
+      console.error('Error parsing form fields:', error);
+      parsedFields = [];
+    }
+  }
+  
   return {
     ...form,
-    fields: form.fields ? JSON.parse(form.fields) : [],
+    fields: parsedFields,
   };
 }
 
@@ -79,16 +104,45 @@ export async function getForms(): Promise<Form[]> {
   const response = await fetch('/api/forms');
   
   if (!response.ok) {
-    throw new Error('Failed to fetch forms');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.details || 'Failed to fetch forms');
   }
 
   const forms = await response.json();
   
-  // Parse fields from JSON string to array
-  return forms.map((form: any) => ({
-    ...form,
-    fields: form.fields ? JSON.parse(form.fields) : [],
-  }));
+  // Parse fields from JSON string to array with error handling
+  return forms.map((form: any) => {
+    let parsedFields = [];
+    if (form.fields) {
+      try {
+        // If fields is already an array, use it directly
+        if (Array.isArray(form.fields)) {
+          parsedFields = form.fields;
+        } else if (typeof form.fields === 'string') {
+          // Try to parse the string
+          const parsed = JSON.parse(form.fields);
+          if (Array.isArray(parsed)) {
+            parsedFields = parsed;
+          } else {
+            console.error('Parsed fields is not an array:', parsed);
+            parsedFields = [];
+          }
+        } else {
+          console.error('Fields is not a string or array:', typeof form.fields);
+          parsedFields = [];
+        }
+      } catch (error) {
+        console.error(`Error parsing form ${form.id} fields:`, error);
+        console.error('Raw fields data:', form.fields);
+        parsedFields = [];
+      }
+    }
+    
+    return {
+      ...form,
+      fields: parsedFields,
+    };
+  });
 }
 
 // Get a single form by ID
@@ -96,14 +150,41 @@ export async function getForm(id: number): Promise<Form> {
   const response = await fetch(`/api/forms/${id}`);
   
   if (!response.ok) {
-    throw new Error('Failed to fetch form');
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || errorData.details || 'Failed to fetch form');
   }
 
   const form = await response.json();
   
-  // Parse fields from JSON string to array
+  // Parse fields from JSON string to array with error handling
+  let parsedFields = [];
+  if (form.fields) {
+    try {
+      // If fields is already an array, use it directly
+      if (Array.isArray(form.fields)) {
+        parsedFields = form.fields;
+      } else if (typeof form.fields === 'string') {
+        // Try to parse the string
+        const parsed = JSON.parse(form.fields);
+        if (Array.isArray(parsed)) {
+          parsedFields = parsed;
+        } else {
+          console.error('Parsed fields is not an array:', parsed);
+          parsedFields = [];
+        }
+      } else {
+        console.error('Fields is not a string or array:', typeof form.fields);
+        parsedFields = [];
+      }
+    } catch (error) {
+      console.error(`Error parsing form ${form.id} fields:`, error);
+      console.error('Raw fields data:', form.fields);
+      parsedFields = [];
+    }
+  }
+  
   return {
     ...form,
-    fields: form.fields ? JSON.parse(form.fields) : [],
+    fields: parsedFields,
   };
 } 

@@ -160,13 +160,56 @@ const FormDisplay = () => {
     setIsSubmitting(true);
     
     try {
+      // Convert file uploads to base64 before submission
+      const processedFormData = { ...formData };
+      
+      // Process each field to convert File objects to base64
+      for (const [fieldId, value] of Object.entries(processedFormData)) {
+        if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
+          // Convert File array to base64 array
+          const base64Files = await Promise.all(
+            value.map(async (file: File) => {
+              return new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+            })
+          );
+          
+          // Store as array of base64 strings with metadata
+          processedFormData[fieldId] = base64Files.map((base64, index) => ({
+            name: value[index].name,
+            type: value[index].type,
+            size: value[index].size,
+            data: base64
+          }));
+        } else if (value instanceof File) {
+          // Convert single File to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(value);
+          });
+          
+          processedFormData[fieldId] = {
+            name: value.name,
+            type: value.type,
+            size: value.size,
+            data: base64
+          };
+        }
+      }
+
       const response = await fetch(`/api/forms/${formId}/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          formData,
+          formData: processedFormData,
           submittedAt: new Date().toISOString(),
           clientId: clientId ? parseInt(clientId) : undefined,
         }),

@@ -2429,24 +2429,65 @@ export class DatabaseStorage implements IStorage {
         form.fields = JSON.parse(form.fields);
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
-        form.fields = "[]";
+        console.error('Raw fields data that caused error:', form.fields);
+        form.fields = []; // Return empty array instead of string
       }
+    } else {
+      form.fields = []; // Ensure fields is always an array
     }
     
     return form;
   }
 
   async getAllForms(): Promise<Form[]> {
-    return await db.select().from(forms).orderBy(desc(forms.createdAt));
+    const results = await db.select().from(forms).orderBy(desc(forms.createdAt));
+    
+    // Parse fields from JSON string to array for each form
+    return results.map(form => {
+      const parsedForm = { ...form };
+      if (parsedForm.fields) {
+        try {
+          parsedForm.fields = JSON.parse(parsedForm.fields);
+        } catch (error) {
+          console.error('Error parsing form fields JSON:', error);
+          console.error('Raw fields data that caused error:', parsedForm.fields);
+          parsedForm.fields = []; // Return empty array instead of string
+        }
+      } else {
+        parsedForm.fields = []; // Ensure fields is always an array
+      }
+      return parsedForm;
+    });
   }
 
   async updateForm(id: number, formData: Partial<InsertForm>): Promise<Form> {
+    // Convert fields array to JSON string if it exists, similar to createForm method
+    const updateData = {
+      ...formData,
+      fields: formData.fields ? JSON.stringify(formData.fields) : undefined
+    };
+    
     const result = await db
       .update(forms)
-      .set(formData)
+      .set(updateData)
       .where(eq(forms.id, id))
       .returning();
-    return result[0];
+    
+    // Parse fields from JSON string to array, similar to getForm method
+    const form = { ...result[0] };
+    if (form.fields) {
+      try {
+        form.fields = JSON.parse(form.fields);
+      } catch (error) {
+        console.error('Error parsing form fields JSON:', error);
+        console.error('Raw fields data that caused error:', form.fields);
+        form.fields = []; // Return empty array instead of string
+      }
+    } else {
+      form.fields = []; // Ensure fields is always an array
+    }
+    
+    return form;
   }
 
   async updateFormSubmissions(id: number, submissions: number, lastSubmission?: Date): Promise<Form> {

@@ -961,6 +961,13 @@ export const insertFormSchema = createInsertSchema(forms).omit({
   id: true,
   createdAt: true,
   lastSubmission: true,
+}).extend({
+  fields: z.union([z.array(z.any()), z.string()]).optional().transform((val) => {
+    if (Array.isArray(val)) {
+      return JSON.stringify(val);
+    }
+    return val;
+  }),
 });
 
 // Form submissions schema

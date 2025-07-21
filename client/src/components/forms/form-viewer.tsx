@@ -91,27 +91,50 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       }
       
       const formData = await response.json();
+      console.log('Raw form data:', formData);
       
-      // Parse fields from JSON string to array
+      // Parse fields from JSON string to array with robust error handling
       let parsedFields = [];
       try {
         if (formData.fields) {
-          const parsed = JSON.parse(formData.fields);
-          if (Array.isArray(parsed)) {
-            parsedFields = parsed;
+          console.log('Fields data type:', typeof formData.fields);
+          console.log('Fields data:', formData.fields);
+          
+          // If fields is already an array, use it directly
+          if (Array.isArray(formData.fields)) {
+            parsedFields = formData.fields;
+            console.log('Fields is already an array:', parsedFields);
+          } else if (typeof formData.fields === 'string') {
+            // Try to parse the string
+            const parsed = JSON.parse(formData.fields);
+            if (Array.isArray(parsed)) {
+              parsedFields = parsed;
+              console.log('Successfully parsed fields from JSON:', parsedFields);
+            } else {
+              console.error('Parsed fields is not an array:', parsed);
+              parsedFields = [];
+            }
           } else {
-            console.error('Fields is not an array:', parsed);
+            console.error('Fields is not a string or array:', typeof formData.fields);
             parsedFields = [];
           }
+        } else {
+          console.log('No fields data found');
+          parsedFields = [];
         }
       } catch (error) {
+        console.error('Error parsing form fields:', error);
+        console.error('Raw fields data that caused error:', formData.fields);
         parsedFields = [];
       }
       
-      return {
+      const result = {
         ...formData,
         fields: parsedFields,
       } as Form;
+      
+      console.log('Final form data:', result);
+      return result;
     },
     enabled: open && !!formId,
     retry: 1,
@@ -479,7 +502,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                {form?.fields && form.fields.length > 0 ? (
+                {form?.fields && Array.isArray(form.fields) && form.fields.length > 0 ? (
                   form.fields.map((field) => (
                     <div key={field.id} className="p-4 border rounded-lg">
                       {renderFieldPreview(field)}
@@ -489,6 +512,11 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <p>No fields defined in this form</p>
+                    {form?.fields && !Array.isArray(form.fields) && (
+                      <p className="text-xs text-red-500 mt-2">
+                        Error: Fields data is not in the expected format
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

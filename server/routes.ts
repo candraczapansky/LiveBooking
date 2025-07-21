@@ -5763,8 +5763,14 @@ If you didn't attempt to log in, please ignore this email and contact support im
     try {
       const forms = await storage.getAllForms();
       res.json(forms);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch forms" });
+    } catch (error: any) {
+      console.error("Error fetching forms:", error);
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ 
+        error: "Failed to fetch forms", 
+        details: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
     }
   });
 
@@ -5816,7 +5822,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
   });
 
   // Update existing form
-  app.put("/api/forms/:id", async (req, res) => {
+  app.put("/api/forms/:id", validateBody(insertFormSchema), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const existingForm = await storage.getForm(id);
