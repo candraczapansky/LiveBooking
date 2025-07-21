@@ -66,8 +66,15 @@ const FormDisplay = () => {
   const formId = location.split('/forms/')[1]?.split('?')[0];
   const urlParams = new URLSearchParams(location.split('?')[1] || '');
   const clientId = urlParams.get('clientId');
-  
 
+  // Clear any stored user data to prevent authentication attempts on public forms
+  useEffect(() => {
+    // Clear user data from localStorage to prevent AuthProvider from trying to authenticate
+    localStorage.removeItem('user');
+    localStorage.removeItem('profilePicture');
+    // Also clear any other auth-related data
+    sessionStorage.removeItem('user');
+  }, []);
 
   useDocumentTitle(`Form | Glo Head Spa`);
 

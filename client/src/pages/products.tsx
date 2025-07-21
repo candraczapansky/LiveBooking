@@ -104,7 +104,7 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   // Fetch products
-  const { data: products, isLoading } = useQuery({
+  const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
   });
 

@@ -66,6 +66,7 @@ interface AppointmentFormProps {
   onAppointmentCreated?: (appointment: any) => void;
   appointments: any[];
   selectedDate?: Date;
+  selectedTime?: string;
 }
 
 const generateTimeSlots = () => {

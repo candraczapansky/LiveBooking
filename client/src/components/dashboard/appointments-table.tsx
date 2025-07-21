@@ -33,17 +33,17 @@ const AppointmentsTable = () => {
   const [page, setPage] = useState(1);
   const pageSize = 5;
 
-  const { data: allAppointments, isLoading } = useQuery({
+  const { data: allAppointments = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/appointments'],
     refetchOnMount: true, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
-  const { data: services } = useQuery({
+  const { data: services = [] } = useQuery<any[]>({
     queryKey: ['/api/services'],
   });
 
-  const { data: users } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ['/api/users'],
   });
 
@@ -52,7 +52,7 @@ const AppointmentsTable = () => {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-  const todayAppointments = allAppointments?.filter((apt: any) => {
+  const todayAppointments = (allAppointments as any[])?.filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
     return aptDate >= todayStart && aptDate < todayEnd;
   }) || [];
@@ -94,9 +94,9 @@ const AppointmentsTable = () => {
         ) : (
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {paginatedAppointments?.map((appointment: any) => {
-              const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const client = users?.find((u: any) => u.id === appointment.clientId);
-              const staff = users?.find((u: any) => u.id === appointment.staffId);
+              const service = (services as any[])?.find((s: any) => s.id === appointment.serviceId);
+              const client = (users as any[])?.find((u: any) => u.id === appointment.clientId);
+              const staff = (users as any[])?.find((u: any) => u.id === appointment.staffId);
               
               return (
                 <div key={appointment.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50">
@@ -155,9 +155,9 @@ const AppointmentsTable = () => {
           </TableHeader>
           <TableBody>
             {paginatedAppointments?.map((appointment: any) => {
-              const service = services?.find((s: any) => s.id === appointment.serviceId);
-              const client = users?.find((u: any) => u.id === appointment.clientId);
-              const staff = users?.find((u: any) => u.id === appointment.staffId);
+              const service = (services as any[])?.find((s: any) => s.id === appointment.serviceId);
+              const client = (users as any[])?.find((u: any) => u.id === appointment.clientId);
+              const staff = (users as any[])?.find((u: any) => u.id === appointment.staffId);
               
               return (
                 <TableRow key={appointment.id}>

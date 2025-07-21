@@ -111,6 +111,7 @@ export class AutoRenewalService {
           clientId: client.id,
           clientMembershipId: clientMembership.id,
           amount: membership.price,
+          totalAmount: membership.price,
           method: "card",
           status: "completed",
           type: "membership_renewal",

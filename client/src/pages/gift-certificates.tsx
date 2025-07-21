@@ -273,7 +273,7 @@ export default function GiftCertificatesPage() {
     },
   });
 
-  const balanceQuery = useQuery({
+  const balanceQuery = useQuery<any>({
     queryKey: [`/api/gift-card-balance/${balanceCheckCode}`],
     enabled: !!balanceCheckCode && balanceCheckCode.length >= 8,
     retry: false,
@@ -478,36 +478,36 @@ export default function GiftCertificatesPage() {
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400">Current Balance:</span>
                             <span className="font-medium text-green-900 dark:text-green-100">
-                              ${balanceQuery.data.currentBalance?.toFixed(2)}
+                              ${(balanceQuery.data as any).currentBalance?.toFixed(2)}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400">Original Amount:</span>
                             <span className="text-gray-900 dark:text-gray-100">
-                              ${balanceQuery.data.initialAmount?.toFixed(2)}
+                              ${(balanceQuery.data as any).initialAmount?.toFixed(2)}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400">Status:</span>
                             <div className="flex items-center gap-1">
-                              {getStatusIcon(balanceQuery.data.status)}
+                              {getStatusIcon((balanceQuery.data as any).status)}
                               <span className="text-gray-900 dark:text-gray-100">
-                                {getStatusText(balanceQuery.data.status)}
+                                {getStatusText((balanceQuery.data as any).status)}
                               </span>
                             </div>
                           </div>
-                          {balanceQuery.data.expiryDate && (
+                          {(balanceQuery.data as any).expiryDate && (
                             <div className="flex justify-between">
                               <span className="text-gray-600 dark:text-gray-400">Expires:</span>
                               <span className="text-gray-900 dark:text-gray-100">
-                                {new Date(balanceQuery.data.expiryDate).toLocaleDateString()}
+                                {new Date((balanceQuery.data as any).expiryDate).toLocaleDateString()}
                               </span>
                             </div>
                           )}
                           <div className="flex justify-between">
                             <span className="text-gray-600 dark:text-gray-400">Recipient:</span>
                             <span className="text-gray-900 dark:text-gray-100">
-                              {balanceQuery.data.issuedToName}
+                              {(balanceQuery.data as any).issuedToName}
                             </span>
                           </div>
                         </div>

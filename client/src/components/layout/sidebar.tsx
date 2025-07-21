@@ -25,7 +25,8 @@ import {
   Gift,
   Phone,
   FileText,
-  Bot
+  Bot,
+  Receipt
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -167,6 +168,7 @@ const Sidebar = () => {
     { icon: <MapPin />, label: "Rooms", href: "/rooms" },
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
+    { icon: <Receipt />, label: "Payroll", href: "/payroll" },
     { icon: <BarChart3 />, label: "Reports", href: "/reports" },
     { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
     { icon: <Zap />, label: "Automations", href: "/automations" },

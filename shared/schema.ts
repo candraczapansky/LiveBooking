@@ -59,6 +59,7 @@ export const serviceCategories = pgTable("service_categories", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  color: text("color").default("#3B82F6"), // hex color code for UI display
 });
 
 export const insertServiceCategorySchema = createInsertSchema(serviceCategories).omit({
@@ -475,6 +476,9 @@ export type InsertClientMembership = z.infer<typeof insertClientMembershipSchema
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
+export type StaffEarnings = typeof staffEarnings.$inferSelect;
+export type InsertStaffEarnings = z.infer<typeof insertStaffEarningsSchema>;
+
 export type SavedPaymentMethod = typeof savedPaymentMethods.$inferSelect;
 export type InsertSavedPaymentMethod = z.infer<typeof insertSavedPaymentMethodSchema>;
 
@@ -674,8 +678,8 @@ export type InsertTimeClockEntry = z.infer<typeof insertTimeClockEntrySchema>;
 export const payrollHistory = pgTable("payroll_history", {
   id: serial("id").primaryKey(),
   staffId: integer("staff_id").notNull(),
-  periodStart: date("period_start").notNull(), // Start date of payroll period
-  periodEnd: date("period_end").notNull(), // End date of payroll period
+  periodStart: timestamp("period_start").notNull(), // Start date of payroll period
+  periodEnd: timestamp("period_end").notNull(), // End date of payroll period
   periodType: text("period_type").notNull().default("monthly"), // monthly, weekly, biweekly
   totalHours: doublePrecision("total_hours").default(0),
   totalServices: integer("total_services").default(0),
@@ -738,6 +742,7 @@ export const notifications = pgTable("notifications", {
   type: text("type").notNull(), // appointment_booked, appointment_cancelled, payment_received, new_membership, etc.
   title: text("title").notNull(),
   description: text("description").notNull(),
+  message: text("message"), // Additional message content
   userId: integer("user_id"), // Who the notification is for (optional - can be system-wide)
   relatedId: integer("related_id"), // ID of related entity (appointment, payment, etc.)
   relatedType: text("related_type"), // appointment, payment, membership, etc.
@@ -955,7 +960,6 @@ export const forms = pgTable("forms", {
 export const insertFormSchema = createInsertSchema(forms).omit({
   id: true,
   createdAt: true,
-  submissions: true,
   lastSubmission: true,
 });
 
@@ -980,7 +984,8 @@ export type FormSubmission = typeof formSubmissions.$inferSelect;
 export type InsertFormSubmission = typeof formSubmissions.$inferInsert;
 
 export type Form = typeof forms.$inferSelect & {
-  fields?: any[] | string; // Can be either parsed array or JSON string
+  fields?: any[] | string | null; // Can be either parsed array or JSON string
+  submissions?: number | null; // Add submissions field to the type
 };
 export type InsertForm = z.infer<typeof insertFormSchema>;
 
@@ -992,3 +997,65 @@ export type InsertBusinessKnowledge = z.infer<typeof insertBusinessKnowledgeSche
 
 export type LLMConversation = typeof llmConversations.$inferSelect;
 export type InsertLLMConversation = z.infer<typeof insertLLMConversationSchema>;
+
+// Check Software Integration types
+export type CheckSoftwareProvider = typeof checkSoftwareProviders.$inferSelect;
+export type InsertCheckSoftwareProvider = typeof checkSoftwareProviders.$inferInsert;
+
+export type PayrollCheck = typeof payrollChecks.$inferSelect;
+export type InsertPayrollCheck = typeof payrollChecks.$inferInsert;
+
+export type CheckSoftwareLog = typeof checkSoftwareLogs.$inferSelect;
+export type InsertCheckSoftwareLog = typeof checkSoftwareLogs.$inferInsert;
+
+// Check Software Integration schema
+export const checkSoftwareProviders = pgTable("check_software_providers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(), // "quickbooks", "adp", "gusto", "paychex", "square", "custom"
+  displayName: text("display_name").notNull(),
+  apiKey: text("api_key"),
+  apiSecret: text("api_secret"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  webhookUrl: text("webhook_url"),
+  companyId: text("company_id"),
+  locationId: text("location_id"),
+  isActive: boolean("is_active").default(true),
+  config: text("config"), // JSON string with provider-specific configuration
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Payroll Check Processing schema
+export const payrollChecks = pgTable("payroll_checks", {
+  id: serial("id").primaryKey(),
+  payrollHistoryId: integer("payroll_history_id").references(() => payrollHistory.id),
+  staffId: integer("staff_id").notNull(),
+  checkNumber: text("check_number"),
+  checkAmount: doublePrecision("check_amount").notNull(),
+  checkDate: timestamp("check_date").notNull(),
+  providerId: integer("provider_id").references(() => checkSoftwareProviders.id),
+  providerCheckId: text("provider_check_id"), // External check ID from provider
+  status: text("status").notNull().default("pending"), // pending, issued, cleared, voided
+  issueDate: timestamp("issue_date"),
+  clearDate: timestamp("clear_date"),
+  voidDate: timestamp("void_date"),
+  voidReason: text("void_reason"),
+  checkImageUrl: text("check_image_url"), // URL to check image if available
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Check Software API Logs schema
+export const checkSoftwareLogs = pgTable("check_software_logs", {
+  id: serial("id").primaryKey(),
+  providerId: integer("provider_id").references(() => checkSoftwareProviders.id),
+  action: text("action").notNull(), // "create_check", "void_check", "sync_payroll", etc.
+  status: text("status").notNull(), // "success", "error", "pending"
+  requestData: text("request_data"), // JSON string of request sent to provider
+  responseData: text("response_data"), // JSON string of response from provider
+  errorMessage: text("error_message"),
+  payrollCheckId: integer("payroll_check_id").references(() => payrollChecks.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});

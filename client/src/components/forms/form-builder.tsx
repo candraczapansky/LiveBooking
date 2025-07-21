@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   DragDropContext, 
   Droppable, 
@@ -300,6 +300,42 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
 
+  // Fetch existing form data if editing
+  const { data: existingForm, isLoading: isLoadingForm } = useQuery({
+    queryKey: [`/api/forms/${formId}`],
+    queryFn: async () => {
+      const response = await fetch(`/api/forms/${formId}`);
+      if (!response.ok) {
+        throw new Error('Form not found');
+      }
+      const formData = await response.json();
+      
+      // Parse fields from JSON string to array
+      let parsedFields = [];
+      try {
+        if (formData.fields) {
+          const parsed = JSON.parse(formData.fields);
+          if (Array.isArray(parsed)) {
+            parsedFields = parsed;
+          } else {
+            console.error('Fields is not an array:', parsed);
+            parsedFields = [];
+          }
+        }
+      } catch (error) {
+        parsedFields = [];
+      }
+      
+      return {
+        ...formData,
+        fields: parsedFields,
+      };
+    },
+    enabled: open && !!formId,
+    retry: 1,
+    retryDelay: 1000,
+  });
+
   const form = useForm<FormBuilderValues>({
     resolver: zodResolver(formBuilderSchema),
     defaultValues: {
@@ -310,21 +346,33 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     },
   });
 
-  // Reset form and fields when dialog opens
+  // Reset form and fields when dialog opens, or load existing form data when editing
   useEffect(() => {
     if (open) {
-      form.reset({
-        title: "",
-        description: "",
-        type: "intake",
-        status: "draft",
-      });
-      setFields([]);
+      if (formId && existingForm) {
+        // Load existing form data for editing
+        form.reset({
+          title: existingForm.title || "",
+          description: existingForm.description || "",
+          type: existingForm.type || "intake",
+          status: existingForm.status || "draft",
+        });
+        setFields(existingForm.fields || []);
+      } else {
+        // Reset for new form
+        form.reset({
+          title: "",
+          description: "",
+          type: "intake",
+          status: "draft",
+        });
+        setFields([]);
+      }
       setSelectedField(null);
       setShowFieldConfig(false);
       setActiveTab("builder");
     }
-  }, [open, form]);
+  }, [open, form, formId, existingForm]);
 
   // Add field to form
   const addField = (fieldType: string) => {
@@ -905,24 +953,45 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     );
   };
 
-  const createFormMutation = useMutation({
+  const saveFormMutation = useMutation({
     mutationFn: async (data: FormBuilderValues) => {
-      // Call the real API to save the form to the database
-      const savedForm = await createForm({
+      const formData = {
         title: data.title,
         description: data.description,
         type: data.type,
         status: data.status,
         fields: fields,
-      });
-      return savedForm;
+      };
+
+      if (formId) {
+        // Update existing form
+        const response = await fetch(`/api/forms/${formId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to update form');
+        }
+        
+        return response.json();
+      } else {
+        // Create new form
+        return await createForm(formData);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/forms"] });
+      if (formId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/forms/${formId}`] });
+      }
       onOpenChange(false);
     },
     onError: (error: any) => {
-      console.error("Failed to create form:", error.message || "Unknown error");
+      console.error(`Failed to ${formId ? 'update' : 'create'} form:`, error.message || "Unknown error");
     },
   });
 
@@ -931,8 +1000,24 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     console.log("Fields:", fields);
     console.log("Form is valid:", form.formState.isValid);
     console.log("Form errors:", form.formState.errors);
-    createFormMutation.mutate(data);
+    saveFormMutation.mutate(data);
   };
+
+  // Show loading state when editing and form is being fetched
+  if (formId && isLoadingForm) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Loading Form...</DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1238,9 +1323,9 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                     </Button>
                     <Button
                       type="submit"
-                      disabled={createFormMutation.isPending || form.formState.isSubmitting}
+                      disabled={saveFormMutation.isPending || form.formState.isSubmitting}
                     >
-                      {createFormMutation.isPending ? "Creating..." : "Create Form"}
+                      {saveFormMutation.isPending ? (formId ? "Updating..." : "Creating...") : (formId ? "Update Form" : "Create Form")}
                     </Button>
                   </div>
                 </form>

@@ -233,7 +233,7 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
             category: category ? {
               id: category.id,
               name: category.name,
-              color: category.color
+              description: category.description
             } : null,
             assignedStaff: assignedStaff.filter(a => a.staff)
           };
@@ -392,10 +392,10 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
       if (!serviceId && serviceInfo) {
         try {
           // First ensure we have a category
-          let categoryId = serviceInfo.categoryId;
-          if (!categoryId && serviceInfo.categoryName) {
+          let categoryId: number | undefined;
+          if (serviceInfo.categoryName) {
             const categories = await storage.getAllServiceCategories();
-            let category = categories.find(c => c.name.toLowerCase() === serviceInfo.categoryName.toLowerCase());
+            let category = categories.find(c => c.name.toLowerCase() === serviceInfo.categoryName!.toLowerCase());
             if (!category) {
               category = await storage.createServiceCategory({
                 name: serviceInfo.categoryName,
@@ -553,6 +553,7 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
         await storage.createNotification({
           type: 'new_appointment',
           title: 'New Appointment from External App',
+          description: `New appointment scheduled${client ? ` for ${client.firstName} ${client.lastName}` : ''}${service ? ` - ${service.name}` : ''}`,
           message: `New appointment scheduled${client ? ` for ${client.firstName} ${client.lastName}` : ''}${service ? ` - ${service.name}` : ''}`,
           relatedId: newAppointment.id,
           userId: null

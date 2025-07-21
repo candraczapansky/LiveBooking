@@ -23,14 +23,14 @@ export default function StaffScheduleDetailPage() {
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
 
   // Fetch staff member details
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [] } = useQuery<any[]>({
     queryKey: ['/api/staff'],
   });
 
   const staffMember = staff.find((s: any) => s.id === staffId);
 
   // Fetch schedules for this staff member
-  const { data: allSchedules = [], isLoading } = useQuery({
+  const { data: allSchedules = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/schedules'],
     staleTime: 0, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus

@@ -199,6 +199,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                       placeholder="Brief description of the device..."
                       className="resize-none"
                       {...field}
+                      value={field.value || ""}
                     />
                   </FormControl>
                   <FormMessage />
@@ -214,7 +215,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Brand</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Dyson, Babyliss" {...field} />
+                      <Input placeholder="e.g., Dyson, Babyliss" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -228,7 +229,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Model</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., SuperSonic HD07" {...field} />
+                      <Input placeholder="e.g., SuperSonic HD07" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -244,7 +245,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Serial Number</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., ABC123456789" {...field} />
+                      <Input placeholder="e.g., ABC123456789" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -285,7 +286,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Purchase Date</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -299,7 +300,7 @@ export function DeviceForm({ device, onClose }: DeviceFormProps) {
                   <FormItem>
                     <FormLabel>Warranty Expiry</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" {...field} value={field.value || ""} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

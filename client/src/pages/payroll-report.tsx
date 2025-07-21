@@ -93,7 +93,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     queryKey: ['/api/appointments'],
   });
 
-  const { data: staffServices } = useQuery({
+  const { data: staffServices = [] } = useQuery<any[]>({
     queryKey: ['/api/staff-services'],
   });
 
@@ -411,10 +411,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         notes: `Generated for ${format(selectedMonth, 'MMMM yyyy')}`
       };
 
-      const response = await apiRequest('/api/payroll-history', {
-        method: 'POST',
-        body: JSON.stringify(payrollHistoryData),
-      });
+      const response = await apiRequest("POST", '/api/payroll-history', payrollHistoryData);
 
       if (response.ok) {
         toast({

@@ -113,7 +113,7 @@ export function createMarketingCampaignEmail(
   salonEmail: string,
   trackingToken?: string
 ): EmailParams {
-  const baseUrl = process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || (process.env.REPLIT_DOMAINS ? 
+  const baseUrl = process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || (process.env.REPLIT_DOMAINS ? 
     `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
     'http://localhost:5000');
   

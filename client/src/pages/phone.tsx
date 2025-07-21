@@ -70,6 +70,9 @@ export default function PhonePage() {
     purpose: 'outbound'
   });
   const [callNotes, setCallNotes] = useState('');
+  const [isConnectClientDialogOpen, setIsConnectClientDialogOpen] = useState(false);
+  const [selectedCallForConnection, setSelectedCallForConnection] = useState<PhoneCallData | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -84,13 +87,19 @@ export default function PhonePage() {
   });
 
   // Fetch staff for outbound calls
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [] } = useQuery<any[]>({
     queryKey: ['/api/staff'],
   });
 
   // Fetch clients for outbound calls
-  const { data: clients = [] } = useQuery({
+  const { data: clients = [] } = useQuery<any[]>({
     queryKey: ['/api/users'],
+  });
+
+  // Search clients for connection
+  const { data: searchResults = [] } = useQuery<any[]>({
+    queryKey: ['/api/users', searchQuery],
+    enabled: searchQuery.length > 2,
   });
 
   // Make outbound call mutation
@@ -135,6 +144,28 @@ export default function PhonePage() {
     },
   });
 
+  // Connect call to client mutation
+  const connectCallMutation = useMutation({
+    mutationFn: ({ callId, userId }: { callId: number; userId: number | null }) =>
+      apiRequest('PUT', `/api/phone/call/${callId}/user`, { userId }),
+    onSuccess: () => {
+      toast({
+        title: "Call Connected",
+        description: "Call has been connected to client successfully.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/phone/recent'] });
+      setIsConnectClientDialogOpen(false);
+      setSelectedCallForConnection(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to connect call",
+        description: error.message || "Could not connect call to client.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleMakeCall = () => {
     if (!outboundForm.toNumber || !outboundForm.staffId) {
       toast({
@@ -167,6 +198,20 @@ export default function PhonePage() {
       callId: selectedCall.id,
       notes: callNotes,
       staffId: 1, // Default to first staff member - would get from auth context
+    });
+  };
+
+  const handleConnectCall = (call: PhoneCallData) => {
+    setSelectedCallForConnection(call);
+    setIsConnectClientDialogOpen(true);
+  };
+
+  const handleConnectToClient = (userId: number | null) => {
+    if (!selectedCallForConnection) return;
+    
+    connectCallMutation.mutate({
+      callId: selectedCallForConnection.id,
+      userId,
     });
   };
 
@@ -369,9 +414,13 @@ export default function PhonePage() {
                       <div className="font-medium">
                         {call.direction === 'inbound' ? call.fromNumber : call.toNumber}
                       </div>
-                      {call.user && (
-                        <div className="text-sm text-muted-foreground">
-                          {call.user.firstName} {call.user.lastName}
+                      {call.user ? (
+                        <div className="text-sm text-green-600 font-medium">
+                          ✓ {call.user.firstName} {call.user.lastName}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-orange-600">
+                          Unknown caller
                         </div>
                       )}
                       <div className="text-sm text-muted-foreground">
@@ -391,13 +440,24 @@ export default function PhonePage() {
                       </Badge>
                     )}
 
-                    {call.recordings && (
+                    {call.recordings?.id && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => window.open(`/api/phone/recording/${call.recordings.id}`, '_blank')}
+                        onClick={() => window.open(`/api/phone/recording/${call.recordings!.id}`, '_blank')}
                       >
                         <Play className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {!call.user && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleConnectCall(call)}
+                        title="Connect to client"
+                      >
+                        <User className="h-4 w-4" />
                       </Button>
                     )}
 
@@ -474,6 +534,91 @@ export default function PhonePage() {
           </div>
         </main>
       </div>
+
+      {/* Connect Call to Client Dialog */}
+      <Dialog open={isConnectClientDialogOpen} onOpenChange={setIsConnectClientDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Connect Call to Client</DialogTitle>
+            <DialogDescription>
+              Connect this call to a client profile for better caller ID recognition
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedCallForConnection && (
+              <div className="p-3 bg-muted rounded-md">
+                <div className="text-sm">
+                  <strong>Call from:</strong> {selectedCallForConnection.fromNumber}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {format(new Date(selectedCallForConnection.createdAt), 'PPp')}
+                </div>
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="search">Search Clients</Label>
+              <Input
+                id="search"
+                placeholder="Search by name, email, or phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {searchQuery.length > 2 ? (
+                searchResults.length > 0 ? (
+                  searchResults.map((client) => (
+                    <div
+                      key={client.id}
+                      className="flex items-center justify-between p-2 border rounded-md hover:bg-muted cursor-pointer"
+                      onClick={() => handleConnectToClient(client.id)}
+                    >
+                      <div>
+                        <div className="font-medium">
+                          {client.firstName} {client.lastName}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {client.email} • {client.phone}
+                        </div>
+                      </div>
+                      <Button size="sm" variant="outline">
+                        Connect
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    No clients found
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  Start typing to search for clients
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => handleConnectToClient(null)}
+                className="flex-1"
+              >
+                Mark as Unknown
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsConnectClientDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

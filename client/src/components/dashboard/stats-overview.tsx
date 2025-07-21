@@ -29,11 +29,11 @@ const StatsOverview = () => {
     refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
-  const { data: services } = useQuery({
+  const { data: services = [] } = useQuery<any[]>({
     queryKey: ['/api/services'],
   });
 
-  const { data: users } = useQuery({
+  const { data: users = [] } = useQuery<any[]>({
     queryKey: ['/api/users'],
   });
 
@@ -42,18 +42,18 @@ const StatsOverview = () => {
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
 
-  const todayAppointments = appointments?.filter((apt: any) => {
+  const todayAppointments = (appointments as any[])?.filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
     return aptDate >= todayStart && aptDate < todayEnd;
   }).length || 0;
 
   // Calculate today's revenue from paid appointments
-  const paidAppointments = appointments?.filter((apt: any) => apt.paymentStatus === 'paid') || [];
+  const paidAppointments = (appointments as any[])?.filter((apt: any) => apt.paymentStatus === 'paid') || [];
   const todayRevenue = paidAppointments.filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
     return aptDate >= todayStart && aptDate < todayEnd;
   }).reduce((sum: number, apt: any) => {
-    const service = services?.find((s: any) => s.id === apt.serviceId);
+    const service = (services as any[])?.find((s: any) => s.id === apt.serviceId);
     return sum + (service?.price || 0);
   }, 0);
 

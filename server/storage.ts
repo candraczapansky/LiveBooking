@@ -33,7 +33,11 @@ import {
   formSubmissions, FormSubmission, InsertFormSubmission,
   businessKnowledge, BusinessKnowledge, InsertBusinessKnowledge,
   businessKnowledgeCategories, BusinessKnowledgeCategory, InsertBusinessKnowledgeCategory,
-  llmConversations, LLMConversation, InsertLLMConversation
+  llmConversations, LLMConversation, InsertLLMConversation,
+  checkSoftwareProviders, CheckSoftwareProvider, InsertCheckSoftwareProvider,
+  payrollChecks, PayrollCheck, InsertPayrollCheck,
+  checkSoftwareLogs, CheckSoftwareLog, InsertCheckSoftwareLog,
+  staffEarnings, StaffEarnings, InsertStaffEarnings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
@@ -45,6 +49,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  searchUsers(query: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User>;
   deleteUser(id: number): Promise<boolean>;
@@ -293,6 +298,7 @@ export interface IStorage {
   getForm(id: number): Promise<Form | undefined>;
   getAllForms(): Promise<Form[]>;
   updateForm(id: number, formData: Partial<InsertForm>): Promise<Form>;
+  updateFormSubmissions(id: number, submissions: number, lastSubmission?: Date): Promise<Form>;
   deleteForm(id: number): Promise<boolean>;
   saveFormSubmission(submission: any): Promise<void>;
   getFormSubmissions(formId: number): Promise<Array<{
@@ -329,6 +335,24 @@ export interface IStorage {
   // LLM Conversations
   createLLMConversation(conversation: any): Promise<any>;
   getLLMConversations(clientId?: number): Promise<any[]>;
+
+  // Check Software Providers
+  getCheckSoftwareProviders(): Promise<any[]>;
+  getCheckSoftwareProvider(id: number): Promise<any | undefined>;
+  createCheckSoftwareProvider(provider: any): Promise<any>;
+  updateCheckSoftwareProvider(id: number, updates: any): Promise<any>;
+  deleteCheckSoftwareProvider(id: number): Promise<boolean>;
+
+  // Payroll Checks
+  getPayrollChecks(staffId?: number, status?: string): Promise<any[]>;
+  getPayrollCheck(id: number): Promise<any | undefined>;
+  createPayrollCheck(check: any): Promise<any>;
+  updatePayrollCheck(id: number, updates: any): Promise<any>;
+  deletePayrollCheck(id: number): Promise<boolean>;
+
+  // Check Software Logs
+  getCheckSoftwareLogs(providerId?: number, action?: string): Promise<any[]>;
+  createCheckSoftwareLog(log: any): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -602,6 +626,22 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users);
   }
 
+  async searchUsers(query: string): Promise<User[]> {
+    const searchTerm = `%${query}%`;
+    return await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          sql`LOWER(${users.firstName}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${users.lastName}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${users.email}) LIKE LOWER(${searchTerm})`,
+          sql`LOWER(${users.phone}) LIKE LOWER(${searchTerm})`
+        )
+      )
+      .limit(20);
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
@@ -724,7 +764,7 @@ export class DatabaseStorage implements IStorage {
       
       // Use sql template literal for Drizzle with proper parameterized query
       try {
-        const result = await db.execute(sql.raw(updateQuery, values));
+        const result = await db.execute(sql.raw(updateQuery));
         
         if (!result.rows || result.rows.length === 0) {
           throw new Error('User not found');
@@ -2194,8 +2234,8 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(payrollHistory.staffId, staffId),
-          eq(payrollHistory.periodStart, periodStart.toISOString().split('T')[0]),
-          eq(payrollHistory.periodEnd, periodEnd.toISOString().split('T')[0])
+          eq(payrollHistory.periodStart, periodStart),
+          eq(payrollHistory.periodEnd, periodEnd)
         )
       );
     return payroll;
@@ -2383,13 +2423,13 @@ export class DatabaseStorage implements IStorage {
     if (!result[0]) return undefined;
     
     // Parse fields JSON if it exists
-    const form = result[0];
+    const form = { ...result[0] };
     if (form.fields) {
       try {
         form.fields = JSON.parse(form.fields);
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
-        form.fields = [];
+        form.fields = "[]";
       }
     }
     
@@ -2404,6 +2444,20 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .update(forms)
       .set(formData)
+      .where(eq(forms.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateFormSubmissions(id: number, submissions: number, lastSubmission?: Date): Promise<Form> {
+    const updateData: any = { submissions };
+    if (lastSubmission) {
+      updateData.lastSubmission = lastSubmission;
+    }
+    
+    const result = await db
+      .update(forms)
+      .set(updateData)
       .where(eq(forms.id, id))
       .returning();
     return result[0];
@@ -2492,13 +2546,18 @@ export class DatabaseStorage implements IStorage {
   // Business Knowledge methods
   async getBusinessKnowledge(categories?: string[]): Promise<any[]> {
     try {
-      let query = db.select().from(businessKnowledge).where(eq(businessKnowledge.active, true));
+      let conditions = [eq(businessKnowledge.active, true)];
       
       if (categories && categories.length > 0) {
-        query = query.where(inArray(businessKnowledge.category, categories));
+        conditions.push(inArray(businessKnowledge.category, categories));
       }
       
-      const knowledge = await query.orderBy(desc(businessKnowledge.priority), desc(businessKnowledge.updatedAt));
+      const knowledge = await db
+        .select()
+        .from(businessKnowledge)
+        .where(and(...conditions))
+        .orderBy(desc(businessKnowledge.priority), desc(businessKnowledge.updatedAt));
+      
       return knowledge;
     } catch (error) {
       console.error('Error fetching business knowledge:', error);
@@ -2612,17 +2671,183 @@ export class DatabaseStorage implements IStorage {
 
   async getLLMConversations(clientId?: number): Promise<any[]> {
     try {
-      let query = db.select().from(llmConversations);
+      let conditions: any[] = [];
       
       if (clientId) {
-        query = query.where(eq(llmConversations.clientId, clientId));
+        conditions.push(eq(llmConversations.clientId, clientId));
       }
       
-      const conversations = await query.orderBy(desc(llmConversations.createdAt));
+      const conversations = await db
+        .select()
+        .from(llmConversations)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(llmConversations.createdAt));
+      
       return conversations;
     } catch (error) {
       console.error('Error fetching LLM conversations:', error);
       return [];
+    }
+  }
+
+  // Check Software Providers methods
+  async getCheckSoftwareProviders(): Promise<any[]> {
+    try {
+      const providers = await db.select().from(checkSoftwareProviders).orderBy(asc(checkSoftwareProviders.name));
+      return providers;
+    } catch (error) {
+      console.error('Error fetching check software providers:', error);
+      return [];
+    }
+  }
+
+  async getCheckSoftwareProvider(id: number): Promise<any | undefined> {
+    try {
+      const [provider] = await db.select().from(checkSoftwareProviders).where(eq(checkSoftwareProviders.id, id));
+      return provider;
+    } catch (error) {
+      console.error('Error fetching check software provider:', error);
+      return undefined;
+    }
+  }
+
+  async createCheckSoftwareProvider(provider: any): Promise<any> {
+    try {
+      const [newProvider] = await db.insert(checkSoftwareProviders).values(provider).returning();
+      return newProvider;
+    } catch (error) {
+      console.error('Error creating check software provider:', error);
+      throw error;
+    }
+  }
+
+  async updateCheckSoftwareProvider(id: number, updates: any): Promise<any> {
+    try {
+      const [updatedProvider] = await db
+        .update(checkSoftwareProviders)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(checkSoftwareProviders.id, id))
+        .returning();
+      return updatedProvider;
+    } catch (error) {
+      console.error('Error updating check software provider:', error);
+      throw error;
+    }
+  }
+
+  async deleteCheckSoftwareProvider(id: number): Promise<boolean> {
+    try {
+      await db.delete(checkSoftwareProviders).where(eq(checkSoftwareProviders.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting check software provider:', error);
+      return false;
+    }
+  }
+
+  // Payroll Checks methods
+  async getPayrollChecks(staffId?: number, status?: string): Promise<any[]> {
+    try {
+      let conditions: any[] = [];
+      
+      if (staffId) {
+        conditions.push(eq(payrollChecks.staffId, staffId));
+      }
+      
+      if (status) {
+        conditions.push(eq(payrollChecks.status, status));
+      }
+      
+      const checks = await db
+        .select()
+        .from(payrollChecks)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(payrollChecks.createdAt));
+      
+      return checks;
+    } catch (error) {
+      console.error('Error fetching payroll checks:', error);
+      return [];
+    }
+  }
+
+  async getPayrollCheck(id: number): Promise<any | undefined> {
+    try {
+      const [check] = await db.select().from(payrollChecks).where(eq(payrollChecks.id, id));
+      return check;
+    } catch (error) {
+      console.error('Error fetching payroll check:', error);
+      return undefined;
+    }
+  }
+
+  async createPayrollCheck(check: any): Promise<any> {
+    try {
+      const [newCheck] = await db.insert(payrollChecks).values(check).returning();
+      return newCheck;
+    } catch (error) {
+      console.error('Error creating payroll check:', error);
+      throw error;
+    }
+  }
+
+  async updatePayrollCheck(id: number, updates: any): Promise<any> {
+    try {
+      const [updatedCheck] = await db
+        .update(payrollChecks)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(payrollChecks.id, id))
+        .returning();
+      return updatedCheck;
+    } catch (error) {
+      console.error('Error updating payroll check:', error);
+      throw error;
+    }
+  }
+
+  async deletePayrollCheck(id: number): Promise<boolean> {
+    try {
+      await db.delete(payrollChecks).where(eq(payrollChecks.id, id));
+      return true;
+    } catch (error) {
+      console.error('Error deleting payroll check:', error);
+      return false;
+    }
+  }
+
+  // Check Software Logs methods
+  async getCheckSoftwareLogs(providerId?: number, action?: string): Promise<any[]> {
+    try {
+      let conditions: any[] = [];
+      
+      if (providerId) {
+        conditions.push(eq(checkSoftwareLogs.providerId, providerId));
+      }
+      
+      if (action) {
+        conditions.push(eq(checkSoftwareLogs.action, action));
+      }
+      
+      const logs = await db
+        .select()
+        .from(checkSoftwareLogs)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(checkSoftwareLogs.createdAt));
+      
+      return logs;
+    } catch (error) {
+      console.error('Error fetching check software logs:', error);
+      return [];
+    }
+  }
+
+  async createCheckSoftwareLog(log: any): Promise<any> {
+    try {
+      const [newLog] = await db.insert(checkSoftwareLogs).values(log).returning();
+      return newLog;
+    } catch (error) {
+      console.error('Error creating check software log:', error);
+      throw error;
     }
   }
 }

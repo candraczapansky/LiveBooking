@@ -204,17 +204,17 @@ const MarketingPage = () => {
   });
 
   // Fetch campaigns from API
-  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery({
+  const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<any[]>({
     queryKey: ['/api/marketing-campaigns'],
   });
 
   // Fetch promo codes from API
-  const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery({
+  const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery<any[]>({
     queryKey: ['/api/promo-codes'],
   });
 
   // Fetch SMS configuration status
-  const { data: smsConfig } = useQuery({
+  const { data: smsConfig } = useQuery<any>({
     queryKey: ['/api/sms-config-status'],
   });
 
@@ -378,7 +378,7 @@ const MarketingPage = () => {
       return; // Prevent duplicate submissions
     }
     
-    if (data.type === 'sms' && !smsConfig?.configured) {
+    if (data.type === 'sms' && !(smsConfig as any)?.configured) {
       toast({
         title: "SMS not configured",
         description: "Please configure Twilio credentials to send SMS campaigns.",
@@ -391,7 +391,7 @@ const MarketingPage = () => {
   };
 
   const handleSendCampaign = (campaignId: number, campaignType: string) => {
-    if (campaignType === 'sms' && !smsConfig?.configured) {
+    if (campaignType === 'sms' && !(smsConfig as any)?.configured) {
       toast({
         title: "SMS not configured",
         description: "Please configure Twilio credentials to send SMS campaigns.",
@@ -443,13 +443,13 @@ const MarketingPage = () => {
     },
   ];
 
-  const filteredCampaigns = campaigns.filter(campaign =>
+  const filteredCampaigns = (campaigns as any[]).filter((campaign: any) =>
     campaign.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     campaign.subject?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     campaign.content.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const filteredPromos = promoCodes.filter((promo: any) =>
+  const filteredPromos = (promoCodes as any[]).filter((promo: any) =>
     promo.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
     promo.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );

@@ -1,0 +1,452 @@
+import type { Express, Request, Response } from "express";
+import type { IStorage } from "../storage";
+import { z } from "zod";
+import { insertPaymentSchema, insertSavedPaymentMethodSchema } from "@shared/schema";
+import { 
+  ValidationError, 
+  NotFoundError, 
+  ConflictError, 
+  ExternalServiceError,
+  asyncHandler 
+} from "../utils/errors";
+import LoggerService, { getLogContext } from "../utils/logger";
+import { validateRequest, requireAuth } from "../middleware/error-handler";
+import { SquareClient, SquareEnvironment } from "square";
+import cache, { invalidateCache } from "../utils/cache";
+
+export function registerPaymentRoutes(app: Express, storage: IStorage) {
+  // Initialize Square client
+  const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'production' 
+    ? SquareEnvironment.Production 
+    : SquareEnvironment.Sandbox;
+  
+  const squareClient = new SquareClient({
+    accessToken: process.env.SQUARE_ACCESS_TOKEN || '',
+    environment: squareEnvironment,
+  });
+
+  // Create payment
+  app.post("/api/payments", validateRequest(insertPaymentSchema), asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const paymentData = req.body;
+
+    LoggerService.logPayment("create", paymentData.amount, context);
+
+    const newPayment = await storage.createPayment(paymentData);
+
+    // Invalidate relevant caches
+    invalidateCache('payments');
+    invalidateCache(`user:${paymentData.clientId}`);
+
+    res.status(201).json(newPayment);
+  }));
+
+  // Get all payments
+  app.get("/api/payments", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { clientId, staffId, startDate, endDate, status } = req.query;
+
+    LoggerService.debug("Fetching payments", { ...context, filters: { clientId, staffId, startDate, endDate, status } });
+
+    let payments;
+    if (clientId) {
+      payments = await storage.getPaymentsByClient(parseInt(clientId as string));
+    } else if (staffId) {
+      payments = await storage.getPaymentsByStaff(parseInt(staffId as string));
+    } else if (startDate && endDate) {
+      payments = await storage.getPaymentsByDateRange(new Date(startDate as string), new Date(endDate as string));
+    } else if (status) {
+      payments = await storage.getPaymentsByStatus(status as string);
+    } else {
+      payments = await storage.getAllPayments();
+    }
+
+    LoggerService.info("Payments fetched", { ...context, count: payments.length });
+    res.json(payments);
+  }));
+
+  // Update payment
+  app.put("/api/payments/:id", validateRequest(insertPaymentSchema.partial()), asyncHandler(async (req: Request, res: Response) => {
+    const paymentId = parseInt(req.params.id);
+    const context = getLogContext(req);
+    const updateData = req.body;
+
+    LoggerService.logPayment("update", updateData.amount, context);
+
+    const existingPayment = await storage.getPayment(paymentId);
+    if (!existingPayment) {
+      throw new NotFoundError("Payment");
+    }
+
+    const updatedPayment = await storage.updatePayment(paymentId, updateData);
+
+    // Invalidate relevant caches
+    invalidateCache('payments');
+    invalidateCache(`payment:${paymentId}`);
+
+    res.json(updatedPayment);
+  }));
+
+  // Confirm cash payment
+  app.post("/api/confirm-cash-payment", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { appointmentId, amount, notes } = req.body;
+
+    LoggerService.logPayment("cash_payment", amount, context);
+
+    // Get appointment details
+    const appointment = await storage.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+
+    // Create payment record
+    const payment = await storage.createPayment({
+      appointmentId,
+      clientId: appointment.clientId,
+      amount,
+      method: 'cash',
+      status: 'completed',
+      notes: notes || 'Cash payment',
+      processedAt: new Date(),
+    });
+
+    // Update appointment payment status
+    await storage.updateAppointment(appointmentId, {
+      paymentStatus: 'paid',
+      totalAmount: amount,
+    });
+
+    LoggerService.logPayment("cash_payment_confirmed", amount, { ...context, paymentId: payment.id });
+
+    res.json({ success: true, payment });
+  }));
+
+  // Confirm gift card payment
+  app.post("/api/confirm-gift-card-payment", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { appointmentId, giftCardCode, amount, notes } = req.body;
+
+    LoggerService.logPayment("gift_card_payment", amount, context);
+
+    // Validate gift card
+    const giftCard = await storage.getGiftCardByCode(giftCardCode);
+    if (!giftCard) {
+      throw new ValidationError("Invalid gift card code");
+    }
+
+    if (giftCard.balance < amount) {
+      throw new ValidationError("Insufficient gift card balance");
+    }
+
+    // Get appointment details
+    const appointment = await storage.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+
+    // Create payment record
+    const payment = await storage.createPayment({
+      appointmentId,
+      clientId: appointment.clientId,
+      amount,
+      method: 'gift_card',
+      status: 'completed',
+      notes: notes || `Gift card payment - Code: ${giftCardCode}`,
+      processedAt: new Date(),
+    });
+
+    // Update gift card balance
+    await storage.updateGiftCard(giftCard.id, {
+      balance: giftCard.balance - amount,
+    });
+
+    // Update appointment payment status
+    await storage.updateAppointment(appointmentId, {
+      paymentStatus: 'paid',
+      totalAmount: amount,
+    });
+
+    LoggerService.logPayment("gift_card_payment_confirmed", amount, { ...context, paymentId: payment.id });
+
+    res.json({ success: true, payment, remainingBalance: giftCard.balance - amount });
+  }));
+
+  // Add gift card
+  app.post("/api/add-gift-card", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { code, balance, clientId, notes } = req.body;
+
+    LoggerService.info("Adding gift card", { ...context, code, balance, clientId });
+
+    // Check if gift card already exists
+    const existingGiftCard = await storage.getGiftCardByCode(code);
+    if (existingGiftCard) {
+      throw new ConflictError("Gift card with this code already exists");
+    }
+
+    const giftCard = await storage.createGiftCard({
+      code,
+      balance,
+      clientId,
+      notes,
+      isActive: true,
+    });
+
+    LoggerService.info("Gift card added", { ...context, giftCardId: giftCard.id });
+
+    res.status(201).json(giftCard);
+  }));
+
+  // Get saved gift cards
+  app.get("/api/saved-gift-cards", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { clientId } = req.query;
+
+    LoggerService.debug("Fetching saved gift cards", { ...context, clientId });
+
+    const giftCards = clientId 
+      ? await storage.getGiftCardsByClient(parseInt(clientId as string))
+      : await storage.getAllGiftCards();
+
+    res.json(giftCards);
+  }));
+
+  // Delete saved gift card
+  app.delete("/api/saved-gift-cards/:id", asyncHandler(async (req: Request, res: Response) => {
+    const giftCardId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.info("Deleting gift card", { ...context, giftCardId });
+
+    const giftCard = await storage.getGiftCard(giftCardId);
+    if (!giftCard) {
+      throw new NotFoundError("Gift card");
+    }
+
+    await storage.deleteGiftCard(giftCardId);
+
+    res.json({ success: true, message: "Gift card deleted successfully" });
+  }));
+
+  // Purchase gift certificate
+  app.post("/api/gift-certificates/purchase", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { recipientName, recipientEmail, amount, message, purchaserName, purchaserEmail } = req.body;
+
+    LoggerService.logPayment("gift_certificate_purchase", amount, context);
+
+    // Generate unique gift certificate code
+    const code = `GC${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    // Create gift certificate
+    const giftCertificate = await storage.createGiftCertificate({
+      code,
+      recipientName,
+      recipientEmail,
+      amount,
+      message,
+      purchaserName,
+      purchaserEmail,
+      status: 'active',
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+    });
+
+    // Create payment record
+    const payment = await storage.createPayment({
+      amount,
+      method: 'gift_certificate',
+      status: 'completed',
+      notes: `Gift certificate purchase - Code: ${code}`,
+      processedAt: new Date(),
+    });
+
+    LoggerService.logPayment("gift_certificate_created", amount, { ...context, giftCertificateId: giftCertificate.id });
+
+    res.status(201).json({ success: true, giftCertificate, payment });
+  }));
+
+  // Get gift card balance
+  app.get("/api/gift-card-balance/:code", asyncHandler(async (req: Request, res: Response) => {
+    const code = req.params.code;
+    const context = getLogContext(req);
+
+    LoggerService.debug("Checking gift card balance", { ...context, code });
+
+    const giftCard = await storage.getGiftCardByCode(code);
+    if (!giftCard) {
+      throw new NotFoundError("Gift card");
+    }
+
+    res.json({ balance: giftCard.balance, isActive: giftCard.isActive });
+  }));
+
+  // Create Square payment
+  app.post("/api/create-payment", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { sourceId, amount, currency = 'USD', appointmentId, clientId } = req.body;
+
+    LoggerService.logPayment("square_payment_create", amount, context);
+
+    try {
+      // Create payment with Square
+      const response = await squareClient.paymentsApi.createPayment({
+        sourceId,
+        amountMoney: {
+          amount: Math.round(amount * 100), // Convert to cents
+          currency,
+        },
+        idempotencyKey: `payment_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`,
+      });
+
+      if (response.result.payment) {
+        const payment = response.result.payment;
+
+        // Create payment record in database
+        const dbPayment = await storage.createPayment({
+          appointmentId,
+          clientId,
+          amount,
+          method: 'card',
+          status: payment.status === 'COMPLETED' ? 'completed' : 'pending',
+          transactionId: payment.id,
+          notes: `Square payment - ${payment.status}`,
+          processedAt: new Date(),
+        });
+
+        LoggerService.logPayment("square_payment_success", amount, { ...context, paymentId: dbPayment.id });
+
+        res.json({ success: true, payment: dbPayment, squarePayment: payment });
+      } else {
+        throw new ExternalServiceError('Square', 'Payment creation failed');
+      }
+    } catch (error: any) {
+      LoggerService.error("Square payment failed", context, error);
+      throw new ExternalServiceError('Square', error.message || 'Payment processing failed');
+    }
+  }));
+
+  // Test Square connection
+  app.get("/api/test-square-connection", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+
+    LoggerService.info("Testing Square connection", context);
+
+    try {
+      // Test connection by getting locations
+      const response = await squareClient.locationsApi.listLocations();
+      
+      if (response.result.locations) {
+        LoggerService.info("Square connection successful", { ...context, locationCount: response.result.locations.length });
+        res.json({ 
+          success: true, 
+          message: "Square connection successful",
+          locations: response.result.locations 
+        });
+      } else {
+        throw new ExternalServiceError('Square', 'No locations found');
+      }
+    } catch (error: any) {
+      LoggerService.error("Square connection failed", context, error);
+      throw new ExternalServiceError('Square', error.message || 'Connection test failed');
+    }
+  }));
+
+  // Confirm payment
+  app.post("/api/confirm-payment", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { paymentId, appointmentId } = req.body;
+
+    LoggerService.logPayment("payment_confirmation", undefined, context);
+
+    // Get payment details
+    const payment = await storage.getPayment(paymentId);
+    if (!payment) {
+      throw new NotFoundError("Payment");
+    }
+
+    // Update payment status
+    const updatedPayment = await storage.updatePayment(paymentId, {
+      status: 'completed',
+      processedAt: new Date(),
+    });
+
+    // Update appointment payment status if appointmentId provided
+    if (appointmentId) {
+      await storage.updateAppointment(appointmentId, {
+        paymentStatus: 'paid',
+        totalAmount: payment.amount,
+      });
+    }
+
+    LoggerService.logPayment("payment_confirmed", payment.amount, { ...context, paymentId });
+
+    res.json({ success: true, payment: updatedPayment });
+  }));
+
+  // Get saved payment methods
+  app.get("/api/saved-payment-methods", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { clientId } = req.query;
+
+    LoggerService.debug("Fetching saved payment methods", { ...context, clientId });
+
+    const paymentMethods = clientId 
+      ? await storage.getSavedPaymentMethodsByClient(parseInt(clientId as string))
+      : await storage.getAllSavedPaymentMethods();
+
+    res.json(paymentMethods);
+  }));
+
+  // Save payment method
+  app.post("/api/saved-payment-methods", validateRequest(insertSavedPaymentMethodSchema), asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const paymentMethodData = req.body;
+
+    LoggerService.info("Saving payment method", { ...context, clientId: paymentMethodData.clientId });
+
+    const paymentMethod = await storage.createSavedPaymentMethod(paymentMethodData);
+
+    res.status(201).json(paymentMethod);
+  }));
+
+  // Delete saved payment method
+  app.delete("/api/saved-payment-methods/:id", asyncHandler(async (req: Request, res: Response) => {
+    const paymentMethodId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.info("Deleting saved payment method", { ...context, paymentMethodId });
+
+    const paymentMethod = await storage.getSavedPaymentMethod(paymentMethodId);
+    if (!paymentMethod) {
+      throw new NotFoundError("Payment method");
+    }
+
+    await storage.deleteSavedPaymentMethod(paymentMethodId);
+
+    res.json({ success: true, message: "Payment method deleted successfully" });
+  }));
+
+  // Set default payment method
+  app.put("/api/saved-payment-methods/:id/default", asyncHandler(async (req: Request, res: Response) => {
+    const paymentMethodId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.info("Setting default payment method", { ...context, paymentMethodId });
+
+    const paymentMethod = await storage.getSavedPaymentMethod(paymentMethodId);
+    if (!paymentMethod) {
+      throw new NotFoundError("Payment method");
+    }
+
+    // Remove default from other payment methods for this client
+    await storage.clearDefaultPaymentMethods(paymentMethod.clientId);
+
+    // Set this payment method as default
+    const updatedPaymentMethod = await storage.updateSavedPaymentMethod(paymentMethodId, {
+      isDefault: true,
+    });
+
+    res.json(updatedPaymentMethod);
+  }));
+} 

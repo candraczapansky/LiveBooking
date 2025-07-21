@@ -99,7 +99,7 @@ const RecentNotifications = () => {
       <CardContent className="p-3 sm:p-4">
         <div className="flow-root">
           <ul className="-my-3 sm:-my-4 divide-y divide-gray-200 dark:divide-gray-700">
-            {notifications.map(notification => (
+            {(notifications as any[]).map((notification: any) => (
               <NotificationItem key={notification.id} notification={notification} />
             ))}
           </ul>

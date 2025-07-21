@@ -3,8 +3,9 @@ import { createServer, type Server } from "http";
 import type { IStorage } from "./storage";
 import { z } from "zod";
 import { SquareClient, SquareEnvironment } from "square";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 import {
-  insertUserSchema,
   insertClientSchema,
   insertServiceCategorySchema,
   insertRoomSchema,
@@ -22,8 +23,8 @@ import {
   insertMarketingCampaignSchema,
   insertPromoCodeSchema,
   insertStaffScheduleSchema,
-  insertUserColorPreferencesSchema,
-  insertFormSchema
+  insertFormSchema,
+  insertUserColorPreferencesSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 
@@ -33,14 +34,12 @@ import {
   createMarketingCampaignEmail, 
   createAccountUpdateEmail 
 } from "./email";
-import { hashPassword, comparePassword } from "./utils/password";
 import { 
   triggerBookingConfirmation, 
   triggerCancellation, 
   triggerNoShow, 
   triggerAfterPayment,
   triggerCustomAutomation,
-
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
 import { PayrollAutoSync } from "./payroll-auto-sync";
@@ -49,8 +48,53 @@ import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema
 import { registerExternalRoutes } from "./external-api";
 import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
-import speakeasy from "speakeasy";
-import QRCode from "qrcode";
+import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerPaymentRoutes, registerServiceRoutes } from "./routes/index";
+import { hashPassword, comparePassword } from "./utils/password";
+import { insertUserSchema } from "@shared/schema";
+
+// Helper to validate request body using schema
+function validateBody<T>(schema: z.ZodType<T>) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      console.log("Validating body with schema:", JSON.stringify(req.body, null, 2));
+      req.body = schema.parse(req.body);
+      console.log("Validation successful");
+      next();
+    } catch (error) {
+      console.log("Validation failed:", error);
+      
+      // Provide more detailed error messages for Zod validation errors
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map(err => {
+          const field = err.path.join('.');
+          return `${field}: ${err.message}`;
+        });
+        return res.status(400).json({ 
+          error: "Validation failed", 
+          details: errorMessages.join(', ')
+        });
+      }
+      
+      res.status(400).json({ error: "Invalid request body" });
+    }
+  };
+}
+
+// Extend Express Request interface to include user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        username: string;
+        email: string;
+        role: string;
+        firstName?: string;
+        lastName?: string;
+      };
+    }
+  }
+}
 
 // Custom schema for service with staff assignments
 const serviceWithStaffSchema = insertServiceSchema.extend({
@@ -81,33 +125,7 @@ console.log('Square client initialized for environment:', squareEnvironment === 
 
 // Square API clients will be accessed directly from squareClient
 
-// Helper to validate request body using schema
-function validateBody<T>(schema: z.ZodType<T>) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    try {
-      console.log("Validating body with schema:", JSON.stringify(req.body, null, 2));
-      req.body = schema.parse(req.body);
-      console.log("Validation successful");
-      next();
-    } catch (error) {
-      console.log("Validation failed:", error);
-      
-      // Provide more detailed error messages for Zod validation errors
-      if (error instanceof z.ZodError) {
-        const errorMessages = error.errors.map(err => {
-          const field = err.path.join('.');
-          return `${field}: ${err.message}`;
-        });
-        return res.status(400).json({ 
-          error: "Validation failed", 
-          details: errorMessages.join(', ')
-        });
-      }
-      
-      res.status(400).json({ error: "Invalid request body" });
-    }
-  };
-}
+
 
 export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
   // Initialize LLM Service
@@ -115,350 +133,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Initialize PayrollAutoSync
   const payrollAutoSync = new PayrollAutoSync(storage);
 
-  // Auth routes
-  app.post("/api/login", async (req, res) => {
-    const { username, password } = req.body;
-    
-    if (!username || !password) {
-      return res.status(400).json({ error: "Username and password are required" });
-    }
-    
-    const user = await storage.getUserByUsername(username);
-    
-    const isPasswordValid = user ? await comparePassword(password, user.password) : false;
-    if (!user || !isPasswordValid) {
-      return res.status(401).json({ error: "Invalid credentials" });
-    }
-    
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-    
-    return res.status(200).json(userWithoutPassword);
-  });
-  
-  app.post("/api/register", validateBody(insertUserSchema), async (req, res) => {
-    const { username, email, phone } = req.body;
-    
-    // Check if username already exists
-    const existingUser = await storage.getUserByUsername(username);
-    if (existingUser) {
-      return res.status(400).json({ error: "Username already taken" });
-    }
-    
-    // Check if email already exists
-    const existingUserByEmail = await storage.getUserByEmail(email);
-    if (existingUserByEmail) {
-      return res.status(400).json({ error: "Email already registered" });
-    }
-    
-    // Check if phone number already exists (if provided)
-    if (phone) {
-      const existingUserByPhone = await storage.getUserByPhone(phone);
-      if (existingUserByPhone) {
-        return res.status(400).json({ error: "Phone number already registered" });
-      }
-    }
-    
-    // Hash password and create new user with client role by default
-    const hashedPassword = await hashPassword(req.body.password);
-    const newUser = await storage.createUser({
-      ...req.body,
-      password: hashedPassword,
-      role: "client"
-    });
-    
-    // Remove password from response
-    const { password, ...userWithoutPassword } = newUser;
-    
-    return res.status(201).json(userWithoutPassword);
-  });
+  // Register modular routes
+  registerAuthRoutes(app, storage);
+  registerUserRoutes(app, storage);
+  registerAppointmentRoutes(app, storage);
+  registerPaymentRoutes(app, storage);
+  registerServiceRoutes(app, storage);
 
-  // Staff user creation endpoint
-  app.post("/api/register/staff", validateBody(insertUserSchema), async (req, res) => {
-    try {
-      console.log("POST /api/register/staff received data:", req.body);
-      const { username, email, phone, firstName, lastName } = req.body;
-      
-      // Enhanced validation
-      if (!username?.trim()) {
-        return res.status(400).json({ error: "Username is required" });
-      }
-      
-      if (!email?.trim()) {
-        return res.status(400).json({ error: "Email is required" });
-      }
-      
-      if (!firstName?.trim()) {
-        return res.status(400).json({ error: "First name is required" });
-      }
-      
-      if (!lastName?.trim()) {
-        return res.status(400).json({ error: "Last name is required" });
-      }
-      
-      // Email format validation
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return res.status(400).json({ error: "Please enter a valid email address" });
-      }
-      
-      // Check if username already exists
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ error: "Username already taken" });
-      }
-      
-      // Check if email already exists
-      const existingUserByEmail = await storage.getUserByEmail(email);
-      if (existingUserByEmail) {
-        return res.status(400).json({ error: "Email already registered" });
-      }
-      
-      // Check if phone number already exists (if provided)
-      if (phone?.trim()) {
-        const existingUserByPhone = await storage.getUserByPhone(phone);
-        if (existingUserByPhone) {
-          return res.status(400).json({ error: "Phone number already registered" });
-        }
-      }
-      
-      console.log("Creating new staff user with validated data");
-      
-      // Hash password and create new user with staff role
-      const hashedPassword = await hashPassword(req.body.password);
-      const newUser = await storage.createUser({
-        ...req.body,
-        password: hashedPassword,
-        role: "staff"
-      });
-      
-      console.log("Successfully created staff user:", { id: newUser.id, username: newUser.username, email: newUser.email });
-      
-      // Remove password from response
-      const { password, ...userWithoutPassword } = newUser;
-      
-      return res.status(201).json(userWithoutPassword);
-    } catch (error) {
-      console.error("Error in /api/register/staff:", error);
-      return res.status(500).json({ 
-        error: "Failed to create staff user account",
-        details: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.message : 'Unknown error') : undefined
-      });
-    }
-  });
 
-  // Password reset request
-  app.post("/api/forgot-password", async (req, res) => {
-    const { email } = req.body;
-    
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
-    }
-
-    try {
-      const user = await storage.getUserByEmail(email);
-      
-      if (!user) {
-        // Return success even if user doesn't exist to prevent email enumeration
-        return res.status(200).json({ 
-          success: true, 
-          message: "If an account with this email exists, you will receive password reset instructions." 
-        });
-      }
-
-      // Generate reset token (in production, use a proper secure token)
-      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-      await storage.setPasswordResetToken(user.id, resetToken, resetTokenExpiry);
-
-      // Create reset URL
-      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
-
-      // Send password reset email
-      const emailParams = {
-        to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject: "Reset Your Glo Head Spa Password",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">Glo Head Spa</h1>
-              <h2 style="color: #333;">Password Reset Request</h2>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Hello ${user.firstName || 'there'},
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              You requested to reset your password for your Glo Head Spa account. 
-              Click the button below to create a new password:
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" 
-                 style="background-color: #9532b8; color: white; padding: 12px 30px; 
-                        text-decoration: none; border-radius: 5px; display: inline-block;">
-                Reset My Password
-              </a>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Or copy and paste this link into your browser:
-              <br>
-              <a href="${resetUrl}" style="color: #9532b8;">${resetUrl}</a>
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              This reset link will expire in 1 hour for security reasons.
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              If you didn't request this password reset, please ignore this email and your password will remain unchanged.
-            </p>
-            
-            <hr style="border: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              This email was sent from your Glo Head Spa salon management system.
-            </p>
-          </div>
-        `,
-        text: `
-Hello ${user.firstName || 'there'},
-
-You requested to reset your password for your Glo Head Spa account.
-
-Please visit the following link to reset your password:
-${resetUrl}
-
-This reset link will expire in 1 hour for security reasons.
-
-If you didn't request this password reset, please ignore this email and your password will remain unchanged.
-
-- Glo Head Spa Team
-        `
-      };
-
-      const emailSent = await sendEmail(emailParams);
-      
-      if (emailSent) {
-        res.status(200).json({ 
-          success: true, 
-          message: "If an account with this email exists, you will receive password reset instructions." 
-        });
-      } else {
-        res.status(500).json({ 
-          error: "Failed to send reset email. Please try again." 
-        });
-      }
-
-    } catch (error: any) {
-      console.error('Password reset request error:', error);
-      res.status(500).json({ 
-        error: "Something went wrong. Please try again." 
-      });
-    }
-  });
-
-  // Password reset confirmation
-  app.post("/api/reset-password", async (req, res) => {
-    const { token, newPassword } = req.body;
-    
-    if (!token || !newPassword) {
-      return res.status(400).json({ error: "Token and new password are required" });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters long" });
-    }
-
-    try {
-      const user = await storage.getUserByResetToken(token);
-      
-      if (!user) {
-        return res.status(400).json({ error: "Invalid or expired reset token" });
-      }
-
-      // Hash and update user's password and clear reset token
-      const hashedNewPassword = await hashPassword(newPassword);
-      await storage.updateUser(user.id, { password: hashedNewPassword });
-      await storage.clearPasswordResetToken(user.id);
-
-      res.status(200).json({ 
-        success: true, 
-        message: "Password has been reset successfully. You can now log in with your new password." 
-      });
-
-    } catch (error: any) {
-      console.error('Password reset error:', error);
-      res.status(500).json({ 
-        error: "Something went wrong. Please try again." 
-      });
-    }
-  });
-
-  // SMS Password reset request
-  app.post("/api/forgot-password-sms", async (req, res) => {
-    const { phone } = req.body;
-    
-    if (!phone) {
-      return res.status(400).json({ error: "Phone number is required" });
-    }
-
-    // Check if SMS service is configured
-    if (!isTwilioConfigured()) {
-      return res.status(400).json({ 
-        error: "SMS service not configured. Please contact support." 
-      });
-    }
-
-    try {
-      // Find user by phone number
-      const users = await storage.getAllUsers();
-      const user = users.find(u => u.phone === phone);
-      
-      if (!user) {
-        // Return success even if user doesn't exist to prevent phone enumeration
-        return res.status(200).json({ 
-          success: true, 
-          message: "If an account with this phone number exists, you will receive password reset instructions." 
-        });
-      }
-
-      // Generate reset token (in production, use a proper secure token)
-      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-      await storage.setPasswordResetToken(user.id, resetToken, resetTokenExpiry);
-
-      // Create reset URL
-      const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
-
-      // Send password reset SMS
-      const smsMessage = `Glo Head Spa: Reset your password by visiting ${resetUrl}. This link expires in 1 hour. If you didn't request this, please ignore.`;
-
-      const smsResult = await sendSMS(phone, smsMessage);
-      
-      if (smsResult.success) {
-        res.status(200).json({ 
-          success: true, 
-          message: "If an account with this phone number exists, you will receive password reset instructions." 
-        });
-      } else {
-        console.error('SMS sending failed:', smsResult.error);
-        res.status(500).json({ 
-          error: smsResult.error || "Failed to send reset SMS. Please try again." 
-        });
-      }
-
-    } catch (error: any) {
-      console.error('SMS Password reset request error:', error);
-      res.status(500).json({ 
-        error: "Something went wrong. Please try again." 
-      });
-    }
-  });
 
   // Client registration route (without username/password)
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
@@ -615,7 +297,16 @@ If you didn't request this password reset, please ignore this email and your pas
   app.get("/api/users", async (req, res) => {
     console.log("GET /api/users called");
     try {
-      const users = await storage.getAllUsers();
+      const { search } = req.query;
+      let users;
+      
+      if (search && typeof search === 'string') {
+        // Search users by name, email, or phone
+        users = await storage.searchUsers(search);
+      } else {
+        users = await storage.getAllUsers();
+      }
+      
       console.log("Users found:", users.length);
       
       // Remove passwords from all users before sending
@@ -1495,31 +1186,7 @@ If you didn't request this password reset, please ignore this email and your pas
     }
   });
 
-  // Endpoint for active appointments (excluding cancelled) - lightweight for availability checking
-  app.get("/api/appointments/active", async (req, res) => {
-    try {
-      const { staffId, date } = req.query;
-      
-      let appointments;
-      if (staffId) {
-        appointments = await storage.getActiveAppointmentsByStaff(parseInt(staffId as string));
-      } else if (date) {
-        appointments = await storage.getActiveAppointmentsByDate(new Date(date as string));
-      } else {
-        // For general active appointments, filter from all appointments
-        const allAppointments = await storage.getAllAppointments();
-        appointments = allAppointments.filter(apt => 
-          apt.status === "pending" || apt.status === "confirmed" || apt.status === "completed"
-        );
-      }
-      
-      // Return basic appointment data without detailed info to improve performance for availability checking
-      return res.status(200).json(appointments);
-    } catch (error) {
-      console.error('Error in active appointments route:', error);
-      return res.status(500).json({ error: 'Failed to fetch active appointments' });
-    }
-  });
+
   
   app.post("/api/appointments", validateBody(insertAppointmentSchema), async (req, res) => {
     const { staffId, startTime, endTime } = req.body;
@@ -3957,10 +3624,10 @@ If you didn't request this password reset, please ignore this email and your pas
 
         // Create sales history record with product details
         const productData = {
-          productIds: JSON.stringify(items.map(item => item.id)),
-          productNames: JSON.stringify(items.map(item => item.name)),
-          productQuantities: JSON.stringify(items.map(item => item.quantity)),
-          productUnitPrices: JSON.stringify(items.map(item => item.price))
+          productIds: JSON.stringify(items.map((item: any) => item.id)),
+          productNames: JSON.stringify(items.map((item: any) => item.name)),
+          productQuantities: JSON.stringify(items.map((item: any) => item.quantity)),
+          productUnitPrices: JSON.stringify(items.map((item: any) => item.price))
         };
         await createSalesHistoryRecord(paymentRecord, 'pos_sale', productData);
 
@@ -4239,14 +3906,14 @@ Thank you for choosing Glo Head Spa!
         return res.status(400).json({ error: "Promo code has expired" });
       }
 
-      if (promoCode.usedCount >= promoCode.usageLimit) {
+      if ((promoCode.usedCount || 0) >= promoCode.usageLimit) {
         return res.status(400).json({ error: "Promo code usage limit reached" });
       }
       
       res.json({ 
         valid: true, 
         promoCode: promoCode,
-        remainingUses: promoCode.usageLimit - promoCode.usedCount
+        remainingUses: promoCode.usageLimit - (promoCode.usedCount || 0)
       });
     } catch (error: any) {
       res.status(500).json({ error: "Error validating promo code: " + error.message });
@@ -4691,8 +4358,8 @@ Thank you for choosing Glo Head Spa!
             lastError = `${externalResponse.status} ${externalResponse.statusText}`;
           }
         } catch (error) {
-          console.log(`Error connecting to ${url}:`, error.message);
-          lastError = error.message;
+          console.log(`Error connecting to ${url}:`, (error as Error).message);
+          lastError = (error as Error).message;
         }
       }
 
@@ -5228,10 +4895,10 @@ Thank you for choosing Glo Head Spa!
         if (appointmentInfo) {
           serviceInfo = await storage.getService(appointmentInfo.serviceId);
           if (appointmentInfo.staffId) {
-            staffInfo = await storage.getStaff(appointmentInfo.staffId);
-            if (staffInfo) {
-              const staffUser = await storage.getUser(staffInfo.userId);
-              staffInfo.user = staffUser;
+            const staffData = await storage.getStaff(appointmentInfo.staffId);
+            if (staffData) {
+              const staffUser = await storage.getUser(staffData.userId);
+              staffInfo = { ...staffData, user: staffUser };
             }
           }
         }
@@ -5503,6 +5170,41 @@ Thank you for choosing Glo Head Spa!
     }
   });
 
+  // Update call user association
+  app.put("/api/phone/call/:callId/user", async (req, res) => {
+    try {
+      const callId = parseInt(req.params.callId);
+      const { userId } = req.body;
+      
+      if (!callId) {
+        return res.status(400).json({ error: "Call ID is required" });
+      }
+
+      await PhoneService.updateCallUserAssociation(callId, userId || null);
+      res.json({ message: "Call user association updated successfully" });
+    } catch (error) {
+      console.error("Error updating call user association:", error);
+      res.status(500).json({ error: "Failed to update call user association" });
+    }
+  });
+
+  // Find user by phone number
+  app.get("/api/phone/find-user/:phoneNumber", async (req, res) => {
+    try {
+      const { phoneNumber } = req.params;
+      
+      if (!phoneNumber) {
+        return res.status(400).json({ error: "Phone number is required" });
+      }
+
+      const user = await PhoneService.findUserByPhone(phoneNumber);
+      res.json({ user });
+    } catch (error) {
+      console.error("Error finding user by phone:", error);
+      res.status(500).json({ error: "Failed to find user by phone" });
+    }
+  });
+
   // Get call analytics
   app.get("/api/phone/analytics", async (req, res) => {
     try {
@@ -5592,7 +5294,7 @@ Thank you for choosing Glo Head Spa!
         "Field mapping support"
       ],
       setup: {
-        webhookUrl: `${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
+        webhookUrl: `${process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
         requiredFields: ["Client information", "Service information", "Appointment date/time"],
         fieldMapping: "Configure field mappings in the JotformIntegration constructor"
       }
@@ -6200,9 +5902,10 @@ If you didn't attempt to log in, please ignore this email and contact support im
       }
 
       // Create the SMS messages
-      // Use custom domain if available, otherwise fall back to Replit domain
+      // Use custom domain if available, otherwise use Replit domain, fall back to localhost for development
       const customDomain = process.env.CUSTOM_DOMAIN || process.env.VITE_API_BASE_URL;
-      const baseUrl = customDomain || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5002';
+      const replitDomain = process.env.REPLIT_DOMAINS;
+      const baseUrl = customDomain || (replitDomain ? `https://${replitDomain}` : 'http://localhost:5002');
       // Include clientId in form URL if sending to a specific client
       const formUrl = clientId ? `${baseUrl}/forms/${formId}?clientId=${clientId}` : `${baseUrl}/forms/${formId}`;
       
@@ -6234,10 +5937,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
         console.log(`[TEST MODE] Would send second SMS to ${targetPhone}: ${secondMessage}`);
         
         // Update form submission count
-        await storage.updateForm(formId, {
-          submissions: (form.submissions || 0) + 1,
-          lastSubmission: new Date().toISOString().split('T')[0]
-        });
+        await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
 
         return res.json({
           success: true,
@@ -6266,10 +5966,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
       
       if (secondSmsResult.success) {
         // Update form submission count
-        await storage.updateForm(formId, {
-          submissions: (form.submissions || 0) + 1,
-          lastSubmission: new Date().toISOString().split('T')[0] // Convert to date string
-        });
+        await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
 
         res.json({
           success: true,
@@ -6357,10 +6054,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
       await storage.saveFormSubmission(submission);
 
       // Update form submission count
-      await storage.updateForm(formId, {
-        submissions: (form.submissions || 0) + 1,
-        lastSubmission: new Date().toISOString().split('T')[0]
-      });
+      await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
 
       res.json({
         success: true,
@@ -6406,7 +6100,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
           return {
             name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Unknown',
             title: s.title,
-            bio: s.bio
+            bio: s.bio || undefined
           };
         })
       );
@@ -6419,20 +6113,20 @@ If you didn't attempt to log in, please ignore this email and contact support im
       const context = {
         clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username : undefined,
         clientEmail: client?.email,
-        clientPhone: client?.phone,
+        clientPhone: client?.phone || undefined,
         businessName: businessSettings?.businessName || 'Glo Head Spa',
         businessType: 'salon and spa',
         clientPreferences: client ? {
-          emailAccountManagement: client.emailAccountManagement,
-          emailAppointmentReminders: client.emailAppointmentReminders,
-          emailPromotions: client.emailPromotions,
-          smsAccountManagement: client.smsAccountManagement,
-          smsAppointmentReminders: client.smsAppointmentReminders,
-          smsPromotions: client.smsPromotions,
+          emailAccountManagement: client.emailAccountManagement || undefined,
+          emailAppointmentReminders: client.emailAppointmentReminders || undefined,
+          emailPromotions: client.emailPromotions || undefined,
+          smsAccountManagement: client.smsAccountManagement || undefined,
+          smsAppointmentReminders: client.smsAppointmentReminders || undefined,
+          smsPromotions: client.smsPromotions || undefined,
         } : undefined,
         availableServices: services.map(s => ({
           name: s.name,
-          description: s.description,
+          description: s.description || undefined,
           price: s.price,
           duration: s.duration
         })),
@@ -6707,6 +6401,207 @@ If you didn't attempt to log in, please ignore this email and contact support im
     } catch (error) {
       console.error('Error deleting business knowledge category:', error);
       res.status(500).json({ error: 'Failed to delete business knowledge category' });
+    }
+  });
+
+  // Check Software routes
+  app.get("/api/check-software/providers", async (req, res) => {
+    try {
+      const providers = await storage.getCheckSoftwareProviders();
+      res.json(providers);
+    } catch (error) {
+      console.error('Error fetching check software providers:', error);
+      res.status(500).json({ error: 'Failed to fetch check software providers' });
+    }
+  });
+
+  app.post("/api/check-software/providers", async (req, res) => {
+    try {
+      const provider = await storage.createCheckSoftwareProvider(req.body);
+      res.json(provider);
+    } catch (error) {
+      console.error('Error creating check software provider:', error);
+      res.status(500).json({ error: 'Failed to create check software provider' });
+    }
+  });
+
+  app.put("/api/check-software/providers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const provider = await storage.updateCheckSoftwareProvider(parseInt(id), req.body);
+      res.json(provider);
+    } catch (error) {
+      console.error('Error updating check software provider:', error);
+      res.status(500).json({ error: 'Failed to update check software provider' });
+    }
+  });
+
+  app.delete("/api/check-software/providers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteCheckSoftwareProvider(parseInt(id));
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(404).json({ error: 'Check software provider not found' });
+      }
+    } catch (error) {
+      console.error('Error deleting check software provider:', error);
+      res.status(500).json({ error: 'Failed to delete check software provider' });
+    }
+  });
+
+  app.get("/api/check-software/checks", async (req, res) => {
+    try {
+      const { staffId, status } = req.query;
+      const checks = await storage.getPayrollChecks(
+        staffId ? parseInt(staffId as string) : undefined,
+        status as string
+      );
+      res.json(checks);
+    } catch (error) {
+      console.error('Error fetching payroll checks:', error);
+      res.status(500).json({ error: 'Failed to fetch payroll checks' });
+    }
+  });
+
+  app.post("/api/check-software/issue-check", async (req, res) => {
+    try {
+      const { payrollHistoryId, checkData } = req.body;
+      
+      // Initialize check software service
+      const { CheckSoftwareService } = await import('./check-software-service');
+      const checkSoftwareService = new CheckSoftwareService(storage);
+      
+      const result = await checkSoftwareService.issuePayrollCheck(payrollHistoryId, checkData);
+      
+      if (result.success) {
+        res.json(result);
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error issuing payroll check:', error);
+      res.status(500).json({ error: 'Failed to issue payroll check' });
+    }
+  });
+
+  app.post("/api/check-software/void-check/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      
+      // Initialize check software service
+      const { CheckSoftwareService } = await import('./check-software-service');
+      const checkSoftwareService = new CheckSoftwareService(storage);
+      
+      const success = await checkSoftwareService.voidPayrollCheck(parseInt(id), reason);
+      
+      if (success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({ error: 'Failed to void payroll check' });
+      }
+    } catch (error) {
+      console.error('Error voiding payroll check:', error);
+      res.status(500).json({ error: 'Failed to void payroll check' });
+    }
+  });
+
+  app.get("/api/check-software/logs", async (req, res) => {
+    try {
+      const { providerId, action } = req.query;
+      const logs = await storage.getCheckSoftwareLogs(
+        providerId ? parseInt(providerId as string) : undefined,
+        action as string
+      );
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching check software logs:', error);
+      res.status(500).json({ error: 'Failed to fetch check software logs' });
+    }
+  });
+
+  // Payroll processing route
+  app.post("/api/payroll/process", async (req, res) => {
+    try {
+      const { staffId, periodStart, periodEnd, periodType = 'monthly' } = req.body;
+      
+      if (!staffId || !periodStart || !periodEnd) {
+        return res.status(400).json({ error: 'Staff ID, period start, and period end are required' });
+      }
+
+      // Check if payroll already exists for this period
+      const existingPayroll = await storage.getPayrollHistoryByPeriod(
+        staffId, 
+        new Date(periodStart), 
+        new Date(periodEnd)
+      );
+
+      if (existingPayroll) {
+        return res.status(400).json({ error: 'Payroll already exists for this period' });
+      }
+
+      // Calculate payroll for the staff member
+      const payrollData = await calculatePayrollForStaff(
+        { id: staffId },
+        null,
+        new Date(periodStart),
+        new Date(periodEnd)
+      );
+
+      if (!payrollData) {
+        return res.status(400).json({ error: 'No payroll data found for this period' });
+      }
+
+      // Create payroll history record
+      const payrollHistory = await storage.createPayrollHistory({
+        staffId,
+        periodStart: new Date(periodStart),
+        periodEnd: new Date(periodEnd),
+        periodType,
+        totalHours: payrollData.totalHours || 0,
+        totalEarnings: payrollData.totalEarnings || 0,
+        commissionType: payrollData.commissionType || 'commission',
+        hourlyRate: payrollData.hourlyRate,
+        fixedRate: payrollData.fixedRate,
+        payrollStatus: 'generated',
+        notes: `Payroll processed for ${periodType} period`
+      });
+
+      res.json(payrollHistory);
+    } catch (error) {
+      console.error('Error processing payroll:', error);
+      res.status(500).json({ error: 'Failed to process payroll' });
+    }
+  });
+
+  // Staff earnings route
+  app.get("/api/staff-earnings", async (req, res) => {
+    try {
+      const { startDate, endDate, staffId } = req.query;
+      
+      let earnings = await storage.getAllStaffEarnings();
+      
+      // Filter by date range
+      if (startDate && endDate) {
+        const start = new Date(startDate as string);
+        const end = new Date(endDate as string);
+        earnings = earnings.filter(earning => {
+          const earningDate = new Date(earning.earningsDate);
+          return earningDate >= start && earningDate <= end;
+        });
+      }
+      
+      // Filter by staff ID
+      if (staffId) {
+        earnings = earnings.filter(earning => earning.staffId === parseInt(staffId as string));
+      }
+      
+      res.json(earnings);
+    } catch (error) {
+      console.error('Error fetching staff earnings:', error);
+      res.status(500).json({ error: 'Failed to fetch staff earnings' });
     }
   });
 

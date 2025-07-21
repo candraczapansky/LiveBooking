@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
-import SimpleMobileMenu from "./simple-mobile-menu";
+
 import { useSidebar } from "@/contexts/SidebarContext";
 
 
@@ -96,9 +96,6 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 sm:h-16">
           <div className="flex items-center min-w-0">
-            <div className="lg:hidden">
-              <SimpleMobileMenu />
-            </div>
             <div className="lg:hidden ml-2 sm:ml-3 truncate">
               <Link href="/dashboard" className="truncate hover:opacity-80 transition-opacity cursor-pointer">
                 <BusinessBrand size="md" className="text-primary" showName={false} />

@@ -16,6 +16,7 @@ import {
 import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FormBuilder } from "@/components/forms/form-builder";
+import { FormViewer } from "@/components/forms/form-viewer";
 import { SendFormSMSDialog } from "@/components/forms/send-form-sms-dialog";
 import { FormSubmissionsDialog } from "@/components/forms/form-submissions-dialog";
 import { getForms } from "@/api/forms";
@@ -25,9 +26,11 @@ const FormsPage = () => {
   useDocumentTitle("Forms | Glo Head Spa");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isViewFormOpen, setIsViewFormOpen] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
   const [submissionsDialogOpen, setSubmissionsDialogOpen] = useState(false);
   const [selectedForm, setSelectedForm] = useState<{ id: number; title: string } | null>(null);
+  const [formToEdit, setFormToEdit] = useState<{ id: number; title: string } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [formToDelete, setFormToDelete] = useState<{ id: number; title: string } | null>(null);
   const { toast } = useToast();
@@ -337,11 +340,27 @@ const FormsPage = () => {
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 pt-3 border-t">
-                        <Button variant="outline" size="sm" className="w-full">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => {
+                            setSelectedForm({ id: form.id, title: form.title });
+                            setIsViewFormOpen(true);
+                          }}
+                        >
                           <Eye className="h-4 w-4 mr-1" />
                           View
                         </Button>
-                        <Button variant="outline" size="sm" className="w-full">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full"
+                          onClick={() => {
+                            setFormToEdit({ id: form.id, title: form.title });
+                            setIsFormOpen(true);
+                          }}
+                        >
                           <Edit className="h-4 w-4 mr-1" />
                           Edit
                         </Button>
@@ -413,8 +432,30 @@ const FormsPage = () => {
       {/* Form Builder Modal */}
       <FormBuilder 
         open={isFormOpen} 
-        onOpenChange={setIsFormOpen}
+        onOpenChange={(open) => {
+          setIsFormOpen(open);
+          if (!open) {
+            setFormToEdit(null);
+          }
+        }}
+        formId={formToEdit?.id}
       />
+
+      {/* Form Viewer Modal */}
+      {selectedForm && (
+        <FormViewer
+          open={isViewFormOpen}
+          onOpenChange={(open) => {
+            setIsViewFormOpen(open);
+            if (!open) {
+              setSelectedForm(null);
+            }
+          }}
+          formId={selectedForm.id}
+        />
+      )}
+
+
 
       {/* Send SMS Dialog */}
       {selectedForm && (

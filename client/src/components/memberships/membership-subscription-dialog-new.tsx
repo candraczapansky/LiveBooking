@@ -323,7 +323,7 @@ export default function MembershipSubscriptionDialog({
   const handlePaymentSuccess = async () => {
     try {
       // Create the membership subscription
-      const membershipData = await apiRequest("POST", "/api/client-memberships", {
+      const membershipResponse = await apiRequest("POST", "/api/client-memberships", {
         clientId: selectedClient?.id,
         membershipId: membership?.id,
         startDate: new Date().toISOString(),
@@ -332,9 +332,10 @@ export default function MembershipSubscriptionDialog({
         autoRenew: autoRenew,
         renewalDate: autoRenew ? parseInt(renewalDate) : null
       });
+      const membershipData = await membershipResponse.json();
 
       // Create payment record
-      const paymentRecord = await apiRequest("POST", "/api/payments", {
+      const paymentResponse = await apiRequest("POST", "/api/payments", {
         clientId: selectedClient?.id,
         clientMembershipId: membershipData.id,
         amount: membership?.price,
@@ -344,6 +345,7 @@ export default function MembershipSubscriptionDialog({
         description: `Membership payment for ${membership?.name}`,
         paymentDate: new Date().toISOString()
       });
+      const paymentRecord = await paymentResponse.json();
 
       // Set up transaction data for receipt
       setLastTransaction({

@@ -35,9 +35,10 @@ interface CheckoutFormProps {
   appointment: AppointmentDetails;
   onSuccess: () => void;
   onCancel: () => void;
+  onPaymentSuccess: () => void;
 }
 
-const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) => {
+const CheckoutForm = ({ appointment, onSuccess, onCancel, onPaymentSuccess }: CheckoutFormProps) => {
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -155,7 +156,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
         const nonce = result.token;
         
         // Process payment with Square
-        const paymentData = await apiRequest("POST", "/api/create-payment", {
+        const paymentResponse = await apiRequest("POST", "/api/create-payment", {
           amount: appointment.amount,
           tipAmount: tipAmount,
           totalAmount: totalAmount,
@@ -164,6 +165,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
           appointmentId: appointment.id,
           description: `Payment for ${appointment.serviceName} appointment`
         });
+        const paymentData = await paymentResponse.json();
 
         console.log('Payment response:', paymentData);
         
@@ -189,7 +191,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
           });
           
           // Close the payment dialog and refresh
-          handlePaymentSuccess();
+          onPaymentSuccess();
         } else {
           console.error('Unexpected payment response:', paymentData);
           throw new Error('Payment processing failed');
@@ -218,7 +220,7 @@ const CheckoutForm = ({ appointment, onSuccess, onCancel }: CheckoutFormProps) =
       });
       
       // Force close the dialog and refresh
-      handlePaymentSuccess();
+      onPaymentSuccess();
     } finally {
       setIsProcessing(false);
     }
@@ -375,13 +377,14 @@ export default function AppointmentCheckout({
     setIsCashProcessing(true);
     try {
       // Create the payment and update appointment in one call
-      const paymentData = await apiRequest("POST", "/api/create-payment", {
+      const paymentResponse = await apiRequest("POST", "/api/create-payment", {
         amount: appointment.amount,
         sourceId: "cash",
         type: "appointment_payment",
         appointmentId: appointment.id,
         description: `Cash payment for ${appointment.serviceName} appointment`
       });
+      const paymentData = await paymentResponse.json();
 
       // Confirm the cash payment and update appointment status
       const paymentId = paymentData.paymentId || paymentData.payment?.id;
@@ -522,6 +525,7 @@ export default function AppointmentCheckout({
                   onClose();
                 }}
                 onCancel={() => setPaymentMethod(null)}
+                onPaymentSuccess={handlePaymentSuccess}
               />
             </div>
           )}

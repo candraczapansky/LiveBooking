@@ -172,7 +172,7 @@ const FAQManagement: React.FC = () => {
     setFormData({ question: '', answer: '', category: '', priority: 1 });
   };
 
-  const existingCategories = [...new Set(faqEntries.map((faq: FAQEntry) => faq.category).filter(Boolean))] as string[];
+  const existingCategories = Array.from(new Set(faqEntries.map((faq: FAQEntry) => faq.category).filter(Boolean))) as string[];
 
   if (isLoading) {
     return (

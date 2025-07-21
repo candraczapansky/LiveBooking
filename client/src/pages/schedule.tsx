@@ -26,12 +26,12 @@ const SchedulePage = () => {
   const [, setLocation] = useLocation();
 
   // Fetch staff for display
-  const { data: staff = [], isLoading } = useQuery({
+  const { data: staff = [], isLoading } = useQuery<StaffMember[]>({
     queryKey: ['/api/staff'],
   });
 
   // Fetch schedules to show count per staff member
-  const { data: schedules = [] } = useQuery({
+  const { data: schedules = [] } = useQuery<any[]>({
     queryKey: ['/api/schedules'],
   });
 

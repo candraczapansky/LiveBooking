@@ -61,17 +61,17 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   const { toast } = useToast();
 
   // Fetch staff for dropdown
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [] } = useQuery<any[]>({
     queryKey: ['/api/staff'],
   });
 
   // Fetch service categories
-  const { data: serviceCategories = [] } = useQuery({
+  const { data: serviceCategories = [] } = useQuery<any[]>({
     queryKey: ['/api/service-categories'],
   });
 
   // Fetch rooms for location options
-  const { data: rooms = [] } = useQuery({
+  const { data: rooms = [] } = useQuery<any[]>({
     queryKey: ['/api/rooms'],
   });
 
@@ -256,7 +256,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {staff.map((staffMember: any) => (
+                      {(staff as any[]).map((staffMember: any) => (
                         <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
                           {getStaffName(staffMember)} - {staffMember.title}
                         </SelectItem>
@@ -369,7 +369,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="All Locations">All Locations</SelectItem>
-                      {rooms.map((room: any) => (
+                      {(rooms as any[]).map((room: any) => (
                         <SelectItem key={room.id} value={room.name}>
                           {room.name}
                         </SelectItem>

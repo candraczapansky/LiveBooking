@@ -503,7 +503,7 @@ const ClientsPage = () => {
     ];
 
     // Convert clients data to CSV format
-    const csvData = clients.map(client => [
+    const csvData = (clients as any[]).map((client: any) => [
       client.id,
       client.firstName || '',
       client.lastName || '',
@@ -526,7 +526,7 @@ const ClientsPage = () => {
     // Create CSV content
     const csvContent = [
       headers.join(','),
-      ...csvData.map(row => row.map(field => `"${field}"`).join(','))
+      ...csvData.map((row: any) => row.map((field: any) => `"${field}"`).join(','))
     ].join('\n');
 
     // Create and download the file
@@ -642,7 +642,7 @@ const ClientsPage = () => {
                     </Button>
                     <div>
                       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {getFullName(clientDetail?.firstName, clientDetail?.lastName) || clientDetail?.username}
+                        {getFullName(clientDetail?.firstName, clientDetail?.lastName) || 'Client Profile'}
                       </h1>
                       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Client Profile & Payment Methods
@@ -847,7 +847,7 @@ const ClientsPage = () => {
                       </Avatar>
                       <div>
                         <h3 className="text-xl font-semibold">
-                          {getFullName(clientDetail?.firstName, clientDetail?.lastName) || clientDetail?.username}
+                          {getFullName(clientDetail?.firstName, clientDetail?.lastName) || 'Client'}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           Client since {new Date(clientDetail?.createdAt || Date.now()).toLocaleDateString()}
@@ -868,10 +868,6 @@ const ClientsPage = () => {
                           <div>
                             <span className="text-gray-500 dark:text-gray-400">Phone:</span>
                             <span className="ml-2">{clientDetail?.phone || "Not provided"}</span>
-                          </div>
-                          <div>
-                            <span className="text-gray-500 dark:text-gray-400">Username:</span>
-                            <span className="ml-2">{clientDetail?.username}</span>
                           </div>
                         </div>
                       </div>
@@ -960,7 +956,7 @@ const ClientsPage = () => {
                 {clientDetail && (
                   <ClientPaymentMethods 
                     clientId={clientDetail.id} 
-                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
                   />
                 )}
 

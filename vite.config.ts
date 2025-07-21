@@ -18,6 +18,20 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs', '@radix-ui/react-toast', '@radix-ui/react-tooltip'],
+          'form-vendor': ['react-hook-form', '@hookform/resolvers', 'zod'],
+          'date-vendor': ['date-fns', 'react-day-picker'],
+          'query-vendor': ['@tanstack/react-query'],
+          'utils-vendor': ['clsx', 'tailwind-merge', 'lucide-react'],
+        },
+      },
+    },
   },
   server: {
     port: 5173,

@@ -240,7 +240,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize user from localStorage
   useEffect(() => {
+    // Check if we're on a public route (forms/:id) first
+    const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
+    
+    // If we're on a public route, don't try to authenticate at all
+    if (isPublicFormRoute) {
+      setLoading(false);
+      return;
+    }
+    
     const storedUser = localStorage.getItem("user");
+    
     if (storedUser) {
       try {
         const userData: User = JSON.parse(storedUser);
@@ -299,13 +309,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     } else {
+      // For public routes or no stored user, just set loading to false
       setLoading(false);
     }
   }, []);
 
   // Apply color preferences whenever user data changes
   useEffect(() => {
-    if (user && !colorPreferencesApplied) {
+    // Check if we're on a public route (forms/:id)
+    const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
+    
+    // If we're on a public route, apply default colors immediately
+    if (isPublicFormRoute && !colorPreferencesApplied) {
+      applyThemeColors('#8b5cf6', false);
+      applyTextColors('#111827', '#6b7280');
+      setColorPreferencesApplied(true);
+      return;
+    }
+    
+    // Only apply user-specific colors if we have a user and we're not on a public route
+    if (user && !colorPreferencesApplied && !isPublicFormRoute) {
       // Add a small delay to ensure DOM is ready
       setTimeout(() => {
         loadAndApplyColorPreferences(user.id);

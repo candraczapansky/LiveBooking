@@ -81,7 +81,7 @@ export default function Automations() {
   const [selectedSMSTrigger, setSelectedSMSTrigger] = useState("");
 
   // Fetch automation rules from API
-  const { data: automationRules = [], isLoading } = useQuery({
+  const { data: automationRules = [], isLoading, refetch } = useQuery<any[]>({
     queryKey: ["/api/automation-rules"],
   });
 
@@ -277,7 +277,7 @@ export default function Automations() {
   // Other utility functions
   const toggleRuleStatus = async (id: number) => {
     try {
-      const rule = automationRules?.find((r: any) => r.id === id);
+      const rule = (automationRules as any[])?.find((r: any) => r.id === id);
       if (!rule) return;
 
       const response = await fetch(`/api/automation-rules/${id}`, {

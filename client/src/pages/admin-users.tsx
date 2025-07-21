@@ -1,6 +1,6 @@
 import { useEffect, useState, useContext } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { AuthContext } from "@/App";
+import { AuthContext } from "@/contexts/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Admin User Management</CardTitle>
-            <Button onClick={() => setCreateOpen(true)} variant="primary">Create New User</Button>
+            <Button onClick={() => setCreateOpen(true)} variant="default">Create New User</Button>
           </div>
         </CardHeader>
         <CardContent>

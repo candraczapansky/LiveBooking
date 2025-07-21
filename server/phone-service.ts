@@ -1,7 +1,7 @@
 import twilio from 'twilio';
 import { db } from './db';
 import { phoneCalls, callRecordings, users } from '@shared/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, gte, lte } from 'drizzle-orm';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -25,10 +25,10 @@ export class PhoneService {
     try {
       // Create TwiML for call with recording
       const call = await client.calls.create({
-        twiml: `<Response><Say voice="alice">Hello, this is BeautyBook Salon. Please hold while we connect you.</Say><Dial record="record-from-ringing" recordingStatusCallback="${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status"><Number>${toNumber}</Number></Dial></Response>`,
-        from: twilioPhoneNumber,
+        twiml: `<Response><Say voice="alice">Hello, this is BeautyBook Salon. Please hold while we connect you.</Say><Dial record="record-from-ringing" recordingStatusCallback="${(process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000')}/api/phone/recording-status"><Number>${toNumber}</Number></Dial></Response>`,
+        from: twilioPhoneNumber!,
         to: toNumber,
-        statusCallback: `${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/call-status`,
+        statusCallback: `${(process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000')}/api/phone/call-status`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
         record: true,
       });
@@ -36,7 +36,7 @@ export class PhoneService {
       // Save call record to database
       const [phoneCall] = await db.insert(phoneCalls).values({
         twilioCallSid: call.sid,
-        fromNumber: twilioPhoneNumber,
+        fromNumber: twilioPhoneNumber!,
         toNumber: toNumber,
         direction: 'outbound',
         status: call.status,
@@ -80,7 +80,7 @@ export class PhoneService {
       const twiml = `
         <Response>
           <Say voice="alice">Thank you for calling ${process.env.BUSINESS_NAME || 'BeautyBook Salon'}. Your call is being recorded for quality assurance. Please hold while we connect you to our staff.</Say>
-          <Dial record="record-from-ringing" recordingStatusCallback="${process.env.CUSTOM_DOMAIN || 'https://gloheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status">
+          <Dial record="record-from-ringing" recordingStatusCallback="${process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000'}/api/phone/recording-status">
             <Queue>salon-queue</Queue>
           </Dial>
         </Response>
@@ -236,6 +236,37 @@ export class PhoneService {
     }
   }
 
+  // Update user association for a call
+  static async updateCallUserAssociation(callId: number, userId: number | null) {
+    try {
+      await db
+        .update(phoneCalls)
+        .set({ userId })
+        .where(eq(phoneCalls.id, callId));
+
+      return true;
+    } catch (error) {
+      console.error('Error updating call user association:', error);
+      throw error;
+    }
+  }
+
+  // Find user by phone number
+  static async findUserByPhone(phoneNumber: string) {
+    try {
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.phone, phoneNumber))
+        .limit(1);
+
+      return user || null;
+    } catch (error) {
+      console.error('Error finding user by phone:', error);
+      throw error;
+    }
+  }
+
   // Get recording download URL
   static async getRecordingDownloadUrl(recordingSid: string) {
     try {
@@ -250,18 +281,21 @@ export class PhoneService {
   // Generate call analytics
   static async getCallAnalytics(startDate?: Date, endDate?: Date) {
     try {
-      let query = db.select().from(phoneCalls);
+      let conditions: any[] = [];
       
       if (startDate && endDate) {
-        query = query.where(
+        conditions.push(
           and(
-            eq(phoneCalls.createdAt, startDate),
-            eq(phoneCalls.createdAt, endDate)
+            gte(phoneCalls.createdAt, startDate),
+            lte(phoneCalls.createdAt, endDate)
           )
         );
       }
 
-      const calls = await query;
+      const calls = await db
+        .select()
+        .from(phoneCalls)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
 
       const analytics = {
         totalCalls: calls.length,
