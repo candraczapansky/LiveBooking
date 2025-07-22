@@ -13,7 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare } from "lucide-react";
+import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare, ClipboardList } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FormBuilder } from "@/components/forms/form-builder";
 import { FormViewer } from "@/components/forms/form-viewer";
@@ -100,13 +100,13 @@ const FormsPage = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'intake':
-        return <Users className="h-4 w-4" />;
+        return <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
       case 'feedback':
-        return <FileText className="h-4 w-4" />;
+        return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />;
       case 'booking':
-        return <Calendar className="h-4 w-4" />;
+        return <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />;
       default:
-        return <FileText className="h-4 w-4" />;
+        return <FileText className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -171,7 +171,7 @@ const FormsPage = () => {
             <div className="max-w-7xl mx-auto px-2 sm:px-0">
               <div className="text-center py-12">
                 <div className="mx-auto h-12 w-12 text-red-400">
-                  <FileText className="h-12 w-12" />
+                  <FileText className="h-12 w-12 text-red-400" />
                 </div>
                 <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">Error loading forms</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -260,7 +260,7 @@ const FormsPage = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center">
                     <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-lg">
-                      <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                      <ClipboardList className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Submissions</p>
@@ -408,7 +408,7 @@ const FormsPage = () => {
             {forms.length === 0 && (
               <div className="text-center py-12">
                 <div className="mx-auto h-12 w-12 text-gray-400">
-                  <FileText className="h-12 w-12" />
+                  <FileText className="h-12 w-12 text-gray-400" />
                 </div>
                 <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-gray-100">No forms yet</h3>
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">

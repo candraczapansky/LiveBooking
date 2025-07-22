@@ -6,6 +6,7 @@ import { useSidebar } from "@/contexts/SidebarContext";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Select, 
   SelectContent, 
@@ -300,7 +301,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   );
 };
 
-const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: { 
+const ClientsReport = ({ }: { 
   timePeriod: string; 
   customStartDate?: string; 
   customEndDate?: string; 
@@ -720,353 +721,187 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   );
 };
 
+// === StaffReport (RECREATED) ===
 const StaffReport = ({ timePeriod, customStartDate, customEndDate }: { 
   timePeriod: string; 
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  const { data: staff = [] } = useQuery({ queryKey: ["/api/staff"] });
-  const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
-  const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
-  const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
+  // Data fetching
+  const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery({ 
+    queryKey: ["/api/staff"],
+    queryFn: async () => {
+      const response = await fetch('/api/staff');
+      if (!response.ok) throw new Error('Failed to fetch staff');
+      return response.json();
+    }
+  });
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({ 
+    queryKey: ["/api/appointments"],
+    queryFn: async () => {
+      const response = await fetch('/api/appointments');
+      if (!response.ok) throw new Error('Failed to fetch appointments');
+      return response.json();
+    }
+  });
   const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+  const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
 
+  // Loading/Error states
+  if (staffLoading || appointmentsLoading) {
+    return <div className="p-8 text-center text-gray-500">Loading staff report data...</div>;
+  }
+  if (staffError) {
+    return <div className="p-8 text-center text-red-500">Failed to load staff data. Please refresh.</div>;
+  }
+  if (!staff || staff.length === 0) {
+    return <div className="p-8 text-center text-gray-500">No staff data available.</div>;
+  }
+
+  // Date range
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
 
-  // Filter data by date range
-  const filteredAppointments = (appointments as any[]).filter((apt: any) => {
-    const aptDate = new Date(apt.date);
-    return aptDate >= startDate && aptDate <= endDate;
+  // --- Metrics Calculation ---
+  const staffMetrics = staff.map((staffMember: any) => {
+    // Robust staff ID
+    const staffId = staffMember.userId || staffMember.user?.id || staffMember.id;
+    // Appointments for this staff
+    const staffAppointments = (appointments as any[]).filter(
+      (apt: any) => apt.staffId === staffId && apt.date && new Date(apt.date) >= startDate && new Date(apt.date) <= endDate
+    );
+    // Completed appointments
+    const completedAppointments = staffAppointments.filter(
+      (apt: any) => apt.status === 'completed' || apt.paymentStatus === 'paid'
+    );
+    // Sales for this staff
+    const staffSales = (salesHistory as any[]).filter(
+      (sale: any) => sale.staffId === staffId && sale.transactionDate && new Date(sale.transactionDate) >= startDate && new Date(sale.transactionDate) <= endDate
+    );
+    // Revenue from sales
+    const totalRevenue = staffSales.reduce((sum: number, sale: any) => {
+      const amount = Number(sale.totalAmount);
+      return sum + (isNaN(amount) ? 0 : amount);
+    }, 0);
+    // Revenue from completed appointments (fallback)
+    const appointmentRevenue = completedAppointments.reduce((sum: number, apt: any) => {
+      const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
+      const price = Number(service?.price);
+      return sum + (isNaN(price) ? 0 : price);
+    }, 0);
+    // Use the higher of the two
+    const finalRevenue = Math.max(totalRevenue, appointmentRevenue);
+    // Average ticket
+    const avgTicket = completedAppointments.length > 0 ? finalRevenue / completedAppointments.length : 0;
+    // Service hours
+    const serviceHours = completedAppointments.reduce((sum: number, apt: any) => {
+      const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
+      const duration = Number(service?.duration);
+      const hours = isNaN(duration) ? 1 : duration / 60;
+      return sum + (isNaN(hours) ? 1 : hours);
+    }, 0);
+    // Utilization (assume 160h/month, 40h/week, etc)
+    const totalWorkingHours = timePeriod === "week" ? 40 : timePeriod === "month" ? 160 : timePeriod === "quarter" ? 480 : 640;
+    const utilization = totalWorkingHours > 0 ? Math.min((serviceHours / totalWorkingHours) * 100, 100) : 0;
+    // Commission
+    const commissionRate = Number(staffMember.commissionRate) || 0;
+    const commissionEarnings = finalRevenue * commissionRate;
+    // Name/role
+    const name = `${staffMember.user?.firstName || ''} ${staffMember.user?.lastName || ''}`.trim() || staffMember.user?.username || 'Unknown';
+    const role = staffMember.title || 'Staff';
+    // Robust output
+    return {
+      id: staffId,
+      name,
+      role,
+      totalRevenue: isNaN(finalRevenue) ? 0 : finalRevenue,
+      completedAppointments: completedAppointments.length,
+      avgTicket: isNaN(avgTicket) ? 0 : avgTicket,
+      commissionEarnings: isNaN(commissionEarnings) ? 0 : commissionEarnings,
+      utilization: isNaN(utilization) ? 0 : utilization,
+      serviceHours: isNaN(serviceHours) ? 0 : serviceHours
+    };
   });
 
-  const filteredPayments = (payments as any[]).filter((payment: any) => {
-    const paymentDate = new Date(payment.createdAt || payment.paymentDate);
-    return paymentDate >= startDate && paymentDate <= endDate && payment.status === 'completed';
-  });
-
-  const filteredSalesHistory = (salesHistory as any[]).filter((sale: any) => {
-    const saleDate = new Date(sale.transactionDate);
-    return saleDate >= startDate && saleDate <= endDate;
-  });
-
-  // Calculate staff performance metrics
-  const calculateStaffMetrics = () => {
-    const staffMetrics = (staff as any[]).map((staffMember: any) => {
-      const staffAppointments = filteredAppointments.filter(
-        (apt: any) => apt.staffId === staffMember.id
-      );
-      
-      const staffSales = filteredSalesHistory.filter(
-        (sale: any) => sale.staffId === staffMember.id && sale.transactionType === 'appointment'
-      );
-
-      const completedAppointments = staffAppointments.filter(
-        (apt: any) => apt.status === 'completed' || apt.paymentStatus === 'paid'
-      );
-
-      const totalRevenue = staffSales.reduce((sum: number, sale: any) => {
-        const amount = Number(sale.totalAmount) || 0;
-        return sum + (isNaN(amount) ? 0 : amount);
-      }, 0);
-
-      const totalServices = completedAppointments.length;
-      const averageTicket = totalServices > 0 && totalRevenue > 0 ? totalRevenue / totalServices : 0;
-
-      // Calculate utilization (assuming 8-hour workday, 5 days a week)
-      const totalWorkingHours = timePeriod === "week" ? 40 : 
-                               timePeriod === "month" ? 160 : 
-                               timePeriod === "quarter" ? 480 : 640;
-      
-      const serviceHours = completedAppointments.reduce((sum: number, apt: any) => {
-        const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
-        const duration = Number(service?.duration) || 60;
-        const hours = isNaN(duration) ? 1 : duration / 60; // Convert minutes to hours
-        return sum + hours;
-      }, 0);
-
-      const utilization = totalWorkingHours > 0 && serviceHours >= 0 ? 
-        Math.min((serviceHours / totalWorkingHours) * 100, 100) : 0;
-
-      // Ensure all calculated values are valid numbers
-      const safeUtilization = isNaN(utilization) || utilization < 0 ? 0 : Math.min(utilization, 100);
-      const safeAverageTicket = isNaN(averageTicket) || averageTicket < 0 ? 0 : averageTicket;
-      const safeTotalRevenue = isNaN(totalRevenue) || totalRevenue < 0 ? 0 : totalRevenue;
-      const safeServiceHours = isNaN(serviceHours) || serviceHours < 0 ? 0 : serviceHours;
-      const safeCommissionRate = Number(staffMember.commissionRate) || 0;
-      const safeCommissionEarnings = isNaN(safeTotalRevenue * safeCommissionRate) ? 0 : safeTotalRevenue * safeCommissionRate;
-
-      return {
-        id: staffMember.id,
-        name: `${staffMember.user?.firstName || ''} ${staffMember.user?.lastName || ''}`.trim() || 'Unknown',
-        title: staffMember.title,
-        totalAppointments: staffAppointments.length,
-        completedAppointments: completedAppointments.length,
-        totalRevenue: safeTotalRevenue,
-        averageTicket: safeAverageTicket,
-        utilization: safeUtilization,
-        serviceHours: safeServiceHours,
-        commissionRate: safeCommissionRate,
-        commissionEarnings: safeCommissionEarnings
-      };
-    });
-
-    return staffMetrics.sort((a, b) => b.totalRevenue - a.totalRevenue);
-  };
-
-  const staffMetrics = calculateStaffMetrics();
-
-  // Calculate overall stats
-  const totalStaff = (staff as any[]).length;
-  const totalRevenue = staffMetrics.reduce((sum, staff) => sum + staff.totalRevenue, 0);
-  const totalAppointments = staffMetrics.reduce((sum, staff) => sum + staff.completedAppointments, 0);
-  const averageUtilization = staffMetrics.length > 0 ? 
-    staffMetrics.reduce((sum, staff) => sum + staff.utilization, 0) / staffMetrics.length : 0;
-
-  // Prepare chart data with safe number conversion
-  const performanceChartData = staffMetrics.slice(0, 10).map(staff => ({
-    name: staff.name,
-    revenue: Number(staff.totalRevenue) || 0,
-    appointments: Number(staff.completedAppointments) || 0,
-    utilization: Math.round(Number(staff.utilization) || 0)
+  // --- Chart Data ---
+  const chartData = staffMetrics.map(s => ({
+    name: s.name,
+    revenue: s.totalRevenue,
+    utilization: Math.round(s.utilization)
   }));
+  const hasChartData = chartData.some(s => s.revenue > 0 || s.utilization > 0);
 
-  const utilizationData = staffMetrics.map(staff => ({
-    name: staff.name,
-    utilization: Math.round(Number(staff.utilization) || 0),
-    hours: Math.round((Number(staff.serviceHours) || 0) * 10) / 10
-  }));
-
+  // --- Render ---
   return (
-    <div className="space-y-6">
-      {/* Overview Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <Users className="h-5 w-5 text-primary" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Total Staff
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    {totalStaff}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <DollarSign className="h-5 w-5 text-primary" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Total Revenue
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    {formatPrice(totalRevenue)}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <Scissors className="h-5 w-5 text-primary" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Total Services
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    {totalAppointments}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-primary/10 rounded-md p-3">
-                <BarChart2 className="h-5 w-5 text-primary" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Avg Utilization
-                  </dt>
-                  <dd className="text-lg font-medium text-gray-900 dark:text-gray-100">
-                    {Math.round(averageUtilization)}%
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Performance Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Staff Performance Overview</CardTitle>
-            <CardDescription>Revenue and appointments by staff member</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={performanceChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="name" 
-                  angle={-45}
-                  textAnchor="end"
-                  height={80}
-                  interval={0}
-                />
-                <YAxis yAxisId="revenue" orientation="left" />
-                <YAxis yAxisId="appointments" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Bar 
-                  yAxisId="revenue" 
-                  dataKey="revenue" 
-                  fill="hsl(var(--primary))" 
-                  name="Revenue ($)"
-                />
-                <Bar 
-                  yAxisId="appointments" 
-                  dataKey="appointments" 
-                  fill="hsl(var(--primary)/0.6)" 
-                  name="Appointments"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Staff Utilization</CardTitle>
-            <CardDescription>Utilization percentage by staff member</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={utilizationData} layout="horizontal">
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" domain={[0, 100]} />
-                <YAxis type="category" dataKey="name" width={100} />
-                <Tooltip 
-                  formatter={(value, name) => [
-                    name === 'utilization' ? `${value}%` : `${value}h`,
-                    name === 'utilization' ? 'Utilization' : 'Service Hours'
-                  ]}
-                />
-                <Bar 
-                  dataKey="utilization" 
-                  fill="hsl(var(--primary))" 
-                  name="Utilization %"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Detailed Staff Metrics Table */}
+    <div className="space-y-8">
+      <h2 className="text-2xl font-bold mb-2">Staff Performance Report</h2>
+      {hasChartData ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Total Sales by Staff</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" angle={-30} textAnchor="end" height={60} interval={0} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="revenue" fill="#3aaad9" name="Total Sales" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Utilization by Staff (%)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" domain={[0, 100]} />
+                  <YAxis type="category" dataKey="name" width={100} />
+                  <Tooltip formatter={v => `${v}%`} />
+                  <Bar dataKey="utilization" fill="#566acd" name="Utilization %" />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="p-8 text-center text-gray-500">No chart data available for this period.</div>
+      )}
       <Card>
         <CardHeader>
-          <CardTitle>Individual Staff Metrics</CardTitle>
-          <CardDescription>Detailed performance and productivity metrics for each staff member</CardDescription>
+          <CardTitle>Staff Metrics</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-800">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Staff Member
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Appointments
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Revenue
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Avg Ticket
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Utilization
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Commission
-                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold">Name</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold">Role</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Total Sales</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Completed</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Avg Ticket</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Commission</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Utilization</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Service Hours</th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {staffMetrics.map((staff, index) => (
-                  <tr key={staff.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {staff.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {staff.title}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-gray-100">
-                        {staff.completedAppointments}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {Math.round(staff.serviceHours * 10) / 10}h
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {formatPrice(staff.totalRevenue)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {formatPrice(staff.averageTicket)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
-                            style={{ width: `${Math.min(staff.utilization, 100)}%` }}
-                          ></div>
-                        </div>
-                        <span className="ml-2 text-sm text-gray-900 dark:text-gray-100">
-                          {Math.round(staff.utilization)}%
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900 dark:text-gray-100">
-                        {formatPrice(staff.commissionEarnings)}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {(staff.commissionRate * 100).toFixed(1)}% rate
-                      </div>
-                    </td>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {staffMetrics.map((s) => (
+                  <tr key={s.id}>
+                    <td className="px-4 py-2 text-sm">{s.name}</td>
+                    <td className="px-4 py-2 text-sm">{s.role}</td>
+                    <td className="px-4 py-2 text-sm text-right">${s.totalRevenue.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-sm text-right">{s.completedAppointments}</td>
+                    <td className="px-4 py-2 text-sm text-right">${s.avgTicket.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-sm text-right">${s.commissionEarnings.toFixed(2)}</td>
+                    <td className="px-4 py-2 text-sm text-right">{Math.round(s.utilization)}%</td>
+                    <td className="px-4 py-2 text-sm text-right">{s.serviceHours.toFixed(1)}h</td>
                   </tr>
                 ))}
               </tbody>
@@ -1078,7 +913,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   );
 };
 
-const TimeClockReport = ({ timePeriod, customStartDate, customEndDate }: { 
+const TimeClockReport = ({ }: { 
   timePeriod: string; 
   customStartDate?: string; 
   customEndDate?: string; 

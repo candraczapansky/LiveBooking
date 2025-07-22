@@ -146,9 +146,10 @@ export default function DevicesPage() {
           <div className="space-y-6 px-2 sm:px-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">Devices</h1>
-            <Button 
+                        <Button
               onClick={() => setShowForm(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto h-12 text-base"
+              variant="default"
+              className="w-full sm:w-auto h-12 text-base"
             >
               <Plus className="h-5 w-5 mr-2" />
               Add Device
@@ -192,7 +193,7 @@ export default function DevicesPage() {
                           className="h-10 w-10 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                           title="Edit device"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-4 w-4 text-blue-600" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -201,7 +202,7 @@ export default function DevicesPage() {
                           className="h-10 w-10 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                           title="Delete device"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>
                       </div>
                     </div>

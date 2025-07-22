@@ -1772,6 +1772,29 @@ div[style*="absolute" i][style*="bottom" i][style*="white" i] {
   border: none !important;
 }
 
+/* Hide scrollbar for better UX */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Custom tab styling to respect user color preferences */
+[data-radix-tabs-trigger] {
+  color: hsl(var(--text-primary)) !important;
+}
+
+[data-radix-tabs-trigger]:hover {
+  color: hsl(var(--text-primary)) !important;
+}
+
+[data-radix-tabs-trigger][data-state="active"] {
+  color: hsl(var(--primary-foreground)) !important;
+}
+
 /* Force custom colors to override defaults with maximum specificity */
 html[style*="--primary"] {
   --primary: var(--primary) !important;

@@ -1015,6 +1015,9 @@ export type InsertPayrollCheck = typeof payrollChecks.$inferInsert;
 export type CheckSoftwareLog = typeof checkSoftwareLogs.$inferSelect;
 export type InsertCheckSoftwareLog = typeof checkSoftwareLogs.$inferInsert;
 
+export type SystemConfig = typeof systemConfig.$inferSelect;
+export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
+
 // Check Software Integration schema
 export const checkSoftwareProviders = pgTable("check_software_providers", {
   id: serial("id").primaryKey(),
@@ -1065,4 +1068,23 @@ export const checkSoftwareLogs = pgTable("check_software_logs", {
   errorMessage: text("error_message"),
   payrollCheckId: integer("payroll_check_id").references(() => payrollChecks.id),
   createdAt: timestamp("created_at").defaultNow(),
+});
+
+// System Configuration schema
+export const systemConfig = pgTable("system_config", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(), // "openai_api_key", "sendgrid_api_key", etc.
+  value: text("value"), // The actual configuration value
+  description: text("description"), // Human-readable description
+  isEncrypted: boolean("is_encrypted").default(false), // Whether the value is encrypted
+  category: text("category").default("general"), // "ai", "email", "sms", "payment", etc.
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
 });

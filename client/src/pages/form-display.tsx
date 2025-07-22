@@ -540,7 +540,7 @@ const FormDisplay = () => {
         
         <div className="text-center mb-8">
           <div className="mx-auto h-12 w-12 text-primary mb-4">
-            <FileText className="h-12 w-12" />
+            <FileText className="h-12 w-12 text-primary" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
             {form.title}
@@ -557,7 +557,7 @@ const FormDisplay = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
+              <FileText className="h-5 w-5 text-primary" />
               Form Details
             </CardTitle>
           </CardHeader>

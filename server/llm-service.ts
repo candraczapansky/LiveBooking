@@ -1,4 +1,5 @@
 import { IStorage } from "./storage";
+import { config, DatabaseConfig } from "./config";
 
 interface LLMConfig {
   apiKey?: string;
@@ -61,15 +62,17 @@ interface LLMResponse {
 export class LLMService {
   private config: LLMConfig;
   private storage: IStorage;
+  private dbConfig: DatabaseConfig;
 
-  constructor(storage: IStorage, config: LLMConfig = {}) {
+  constructor(storage: IStorage, llmConfig: LLMConfig = {}) {
     this.storage = storage;
+    this.dbConfig = new DatabaseConfig(storage);
     this.config = {
-      apiKey: config.apiKey || process.env.OPENAI_API_KEY,
-      model: config.model || 'gpt-3.5-turbo',
-      maxTokens: config.maxTokens || 500,
-      temperature: config.temperature || 0.7,
-      ...config
+      apiKey: llmConfig.apiKey || config.openai.apiKey,
+      model: llmConfig.model || config.openai.model,
+      maxTokens: llmConfig.maxTokens || config.openai.maxTokens,
+      temperature: llmConfig.temperature || config.openai.temperature,
+      ...llmConfig
     };
   }
 
@@ -79,7 +82,14 @@ export class LLMService {
     channel: 'email' | 'sms' = 'email'
   ): Promise<LLMResponse> {
     try {
-      if (!this.config.apiKey) {
+      // Try to get API key from database first, then fallback to config
+      let apiKey = this.config.apiKey;
+      if (!apiKey) {
+        const dbApiKey = await this.dbConfig.getOpenAIKey();
+        apiKey = dbApiKey || undefined;
+      }
+      
+      if (!apiKey) {
         return {
           success: false,
           error: 'OpenAI API key not configured'
@@ -224,11 +234,25 @@ Example actions:
 
   private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<LLMResponse> {
     try {
+      // Get the current API key (could be from database)
+      let apiKey = this.config.apiKey;
+      if (!apiKey) {
+        const dbApiKey = await this.dbConfig.getOpenAIKey();
+        apiKey = dbApiKey || undefined;
+      }
+      
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'OpenAI API key not configured'
+        };
+      }
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
           model: this.config.model,

@@ -744,9 +744,9 @@ export default function Settings() {
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                           >
                             {showCurrentPassword ? (
-                              <EyeOff className="h-4 w-4" />
+                              <EyeOff className="h-4 w-4 text-gray-500" />
                             ) : (
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4 text-gray-500" />
                             )}
                           </Button>
                         </div>
@@ -773,9 +773,9 @@ export default function Settings() {
                             onClick={() => setShowNewPassword(!showNewPassword)}
                           >
                             {showNewPassword ? (
-                              <EyeOff className="h-4 w-4" />
+                              <EyeOff className="h-4 w-4 text-gray-500" />
                             ) : (
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4 text-gray-500" />
                             )}
                           </Button>
                         </div>
@@ -802,9 +802,9 @@ export default function Settings() {
                             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           >
                             {showConfirmPassword ? (
-                              <EyeOff className="h-4 w-4" />
+                              <EyeOff className="h-4 w-4 text-gray-500" />
                             ) : (
-                              <Eye className="h-4 w-4" />
+                              <Eye className="h-4 w-4 text-gray-500" />
                             )}
                           </Button>
                         </div>

@@ -37,7 +37,8 @@ import {
   checkSoftwareProviders, CheckSoftwareProvider, InsertCheckSoftwareProvider,
   payrollChecks, PayrollCheck, InsertPayrollCheck,
   checkSoftwareLogs, CheckSoftwareLog, InsertCheckSoftwareLog,
-  staffEarnings, StaffEarnings, InsertStaffEarnings
+  staffEarnings, StaffEarnings, InsertStaffEarnings,
+  systemConfig, SystemConfig, InsertSystemConfig
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
@@ -49,6 +50,7 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
   searchUsers(query: string): Promise<User[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: number, userData: Partial<InsertUser>): Promise<User>;
@@ -353,6 +355,14 @@ export interface IStorage {
   // Check Software Logs
   getCheckSoftwareLogs(providerId?: number, action?: string): Promise<any[]>;
   createCheckSoftwareLog(log: any): Promise<any>;
+
+  // System Configuration
+  getSystemConfig(key: string): Promise<SystemConfig | undefined>;
+  getAllSystemConfig(category?: string): Promise<SystemConfig[]>;
+  setSystemConfig(config: InsertSystemConfig): Promise<SystemConfig>;
+  updateSystemConfig(key: string, value: string, description?: string): Promise<SystemConfig>;
+  deleteSystemConfig(key: string): Promise<boolean>;
+  getSystemConfigByCategory(category: string): Promise<SystemConfig[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -626,6 +636,13 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(users);
   }
 
+  async getUsersByRole(role: string): Promise<User[]> {
+    const users = await db.select().from(users).where(eq(users.role, role));
+    console.log('getUsersByRole - First user sample:', users[0]);
+    console.log('getUsersByRole - First user keys:', Object.keys(users[0] || {}));
+    return users;
+  }
+
   async searchUsers(query: string): Promise<User[]> {
     const searchTerm = `%${query}%`;
     return await db
@@ -643,8 +660,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    try {
+      console.log('Storage: Creating user with data:', insertUser);
+      const [user] = await db.insert(users).values(insertUser).returning();
+      console.log('Storage: User created successfully:', user);
+      return user;
+    } catch (error) {
+      console.error('Storage: Error creating user:', error);
+      throw error;
+    }
   }
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
@@ -2426,7 +2450,17 @@ export class DatabaseStorage implements IStorage {
     const form = { ...result[0] };
     if (form.fields) {
       try {
-        form.fields = JSON.parse(form.fields);
+        // Handle double-encoded JSON strings
+        let fieldsData = form.fields;
+        if (typeof fieldsData === 'string') {
+          // Try to parse once
+          fieldsData = JSON.parse(fieldsData);
+          // If the result is still a string, try parsing again (double-encoded)
+          if (typeof fieldsData === 'string') {
+            fieldsData = JSON.parse(fieldsData);
+          }
+        }
+        form.fields = fieldsData;
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
@@ -2447,7 +2481,17 @@ export class DatabaseStorage implements IStorage {
       const parsedForm = { ...form };
       if (parsedForm.fields) {
         try {
-          parsedForm.fields = JSON.parse(parsedForm.fields);
+          // Handle double-encoded JSON strings
+          let fieldsData = parsedForm.fields;
+          if (typeof fieldsData === 'string') {
+            // Try to parse once
+            fieldsData = JSON.parse(fieldsData);
+            // If the result is still a string, try parsing again (double-encoded)
+            if (typeof fieldsData === 'string') {
+              fieldsData = JSON.parse(fieldsData);
+            }
+          }
+          parsedForm.fields = fieldsData;
         } catch (error) {
           console.error('Error parsing form fields JSON:', error);
           console.error('Raw fields data that caused error:', parsedForm.fields);
@@ -2477,7 +2521,17 @@ export class DatabaseStorage implements IStorage {
     const form = { ...result[0] };
     if (form.fields) {
       try {
-        form.fields = JSON.parse(form.fields);
+        // Handle double-encoded JSON strings
+        let fieldsData = form.fields;
+        if (typeof fieldsData === 'string') {
+          // Try to parse once
+          fieldsData = JSON.parse(fieldsData);
+          // If the result is still a string, try parsing again (double-encoded)
+          if (typeof fieldsData === 'string') {
+            fieldsData = JSON.parse(fieldsData);
+          }
+        }
+        form.fields = fieldsData;
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
@@ -2888,6 +2942,82 @@ export class DatabaseStorage implements IStorage {
       return newLog;
     } catch (error) {
       console.error('Error creating check software log:', error);
+      throw error;
+    }
+  }
+
+  // System Configuration methods
+  async getSystemConfig(key: string): Promise<SystemConfig | undefined> {
+    try {
+      const [result] = await db.select().from(systemConfig).where(eq(systemConfig.key, key));
+      return result;
+    } catch (error) {
+      console.error('Error getting system config:', error);
+      throw error;
+    }
+  }
+
+  async getAllSystemConfig(category?: string): Promise<SystemConfig[]> {
+    try {
+      let query = db.select().from(systemConfig);
+      if (category) {
+        query = query.where(eq(systemConfig.category, category));
+      }
+      return await query;
+    } catch (error) {
+      console.error('Error getting all system config:', error);
+      throw error;
+    }
+  }
+
+  async setSystemConfig(config: InsertSystemConfig): Promise<SystemConfig> {
+    try {
+      const [result] = await db.insert(systemConfig).values(config).returning();
+      return result;
+    } catch (error) {
+      console.error('Error setting system config:', error);
+      throw error;
+    }
+  }
+
+  async updateSystemConfig(key: string, value: string, description?: string): Promise<SystemConfig> {
+    try {
+      const updateData: any = { 
+        value, 
+        updatedAt: new Date() 
+      };
+      if (description) {
+        updateData.description = description;
+      }
+      
+      const [result] = await db
+        .update(systemConfig)
+        .set(updateData)
+        .where(eq(systemConfig.key, key))
+        .returning();
+      
+      return result;
+    } catch (error) {
+      console.error('Error updating system config:', error);
+      throw error;
+    }
+  }
+
+  async deleteSystemConfig(key: string): Promise<boolean> {
+    try {
+      const result = await db.delete(systemConfig).where(eq(systemConfig.key, key));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting system config:', error);
+      throw error;
+    }
+  }
+
+  async getSystemConfigByCategory(category: string): Promise<SystemConfig[]> {
+    try {
+      return await db.select().from(systemConfig).where(eq(systemConfig.category, category));
+    } catch (error) {
+      console.error('Error getting system config by category:', error);
       throw error;
     }
   }

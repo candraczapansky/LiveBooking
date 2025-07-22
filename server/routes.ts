@@ -48,7 +48,10 @@ import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema
 import { registerExternalRoutes } from "./external-api";
 import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
+import { AutoRespondService } from "./auto-respond-service";
+import { SMSAutoRespondService } from "./sms-auto-respond-service";
 import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerPaymentRoutes, registerServiceRoutes } from "./routes/index";
+import { getConfigStatus, validateConfig, DatabaseConfig } from "./config";
 import { hashPassword, comparePassword } from "./utils/password";
 import { insertUserSchema } from "@shared/schema";
 
@@ -177,6 +180,12 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     try {
       const { clients } = req.body;
       
+      console.log('Import request received:', { 
+        clientsCount: clients?.length, 
+        isArray: Array.isArray(clients),
+        sampleClient: clients?.[0]
+      });
+      
       if (!Array.isArray(clients) || clients.length === 0) {
         return res.status(400).json({ error: "Invalid clients data" });
       }
@@ -188,38 +197,67 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       };
 
       const existingUsers = await storage.getAllUsers();
-      const existingEmails = new Set(existingUsers.map(user => user.email.toLowerCase()));
 
       for (const clientData of clients) {
         try {
-          // Validate required fields
-          if (!clientData.email) {
-            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email is required`);
-            results.skipped++;
-            continue;
+          console.log('Processing client:', { 
+            originalEmail: clientData.email,
+            firstName: clientData.firstName,
+            lastName: clientData.lastName,
+            phone: clientData.phone
+          });
+          
+          // Generate a unique email if none provided
+          let email = clientData.email?.trim() || '';
+          if (!email) {
+            // Generate a placeholder email using first/last name or row number
+            const firstName = clientData.firstName?.trim() || 'client';
+            const lastName = clientData.lastName?.trim() || '';
+            const namePart = lastName ? `${firstName}.${lastName}` : firstName;
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 8);
+            const rowNumber = results.imported + results.skipped + 1;
+            const processId = process.pid || Math.floor(Math.random() * 10000);
+            email = `${namePart}.${rowNumber}.${timestamp}.${processId}.${randomSuffix}@placeholder.com`;
+            console.log('Generated email:', email);
           }
 
-          // Check if email already exists
-          if (existingEmails.has(clientData.email.toLowerCase())) {
-            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email ${clientData.email} already exists`);
+          // Basic email format validation only if email was provided
+          if (clientData.email && clientData.email.trim()) {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(clientData.email.trim())) {
+              results.errors.push(`Row ${results.imported + results.skipped + 1}: Invalid email format: ${clientData.email}`);
+              results.skipped++;
+              continue;
+            }
+          }
+
+          // Check if email already exists in database (only check database, not current import batch)
+          console.log(`Checking if email exists in database: ${email}`);
+          const existingUser = await storage.getUserByEmail(email);
+          if (existingUser) {
+            console.log(`Email ${email} already exists in database, skipping`);
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email ${email} already exists in database`);
             results.skipped++;
             continue;
           }
+          console.log(`Email ${email} is unique, proceeding with import`);
 
           // Generate username and password
           const username = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
           const password = Math.random().toString(36).substring(2, 12);
+          console.log('Generated credentials:', { username, password: '***' });
 
-          // Create client with default values
+          // Create client with default values - handle empty strings and null values
           const newClient = {
-            email: clientData.email,
-            firstName: clientData.firstName || "",
-            lastName: clientData.lastName || "",
-            phone: clientData.phone || "",
-            address: clientData.address || "",
-            city: clientData.city || "",
-            state: clientData.state || "",
-            zipCode: clientData.zipCode || "",
+            email: email, // Use the generated or provided email
+            firstName: clientData.firstName?.trim() || "",
+            lastName: clientData.lastName?.trim() || "",
+            phone: clientData.phone?.trim() || "",
+            address: clientData.address?.trim() || "",
+            city: clientData.city?.trim() || "",
+            state: clientData.state?.trim() || "",
+            zipCode: clientData.zipCode?.trim() || "",
             username,
             password,
             role: "client" as const,
@@ -233,19 +271,36 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           };
 
           // Hash password before creating user
+          console.log('Creating user with data:', { 
+            email: newClient.email, 
+            firstName: newClient.firstName, 
+            lastName: newClient.lastName,
+            phone: newClient.phone,
+            username: newClient.username 
+          });
           const hashedPassword = await hashPassword(newClient.password);
-          await storage.createUser({
+          const createdUser = await storage.createUser({
             ...newClient,
             password: hashedPassword
           });
-          existingEmails.add(clientData.email.toLowerCase());
+          console.log('User created successfully:', { id: createdUser?.id, email: createdUser?.email });
           results.imported++;
+          console.log('Successfully imported client:', { email, firstName: clientData.firstName, lastName: clientData.lastName });
         } catch (error) {
-          results.errors.push(`Row ${results.imported + results.skipped + 1}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const fullError = `Row ${results.imported + results.skipped + 1}: ${errorMessage}`;
+          console.error('Import error for row:', { 
+            rowNumber: results.imported + results.skipped + 1,
+            clientData,
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined
+          });
+          results.errors.push(fullError);
           results.skipped++;
         }
       }
 
+      console.log('Import completed:', results);
       return res.status(200).json(results);
     } catch (error) {
       console.error("Bulk import error:", error);
@@ -297,18 +352,24 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.get("/api/users", async (req, res) => {
     console.log("GET /api/users called");
     try {
-      const { search } = req.query;
+      const { search, role } = req.query;
       let users;
       
       if (search && typeof search === 'string') {
         // Search users by name, email, or phone
         users = await storage.searchUsers(search);
+      } else if (role && typeof role === 'string') {
+        // Filter users by role
+        users = await storage.getUsersByRole(role);
       } else {
         users = await storage.getAllUsers();
       }
       
       console.log("Users found:", users.length);
-      
+      if (users.length > 0) {
+        console.log("First user object:", users[0]);
+        console.log("First user keys:", Object.keys(users[0]));
+      }
       // Remove passwords from all users before sending
       const usersWithoutPasswords = users.map(user => {
         const { password, ...userWithoutPassword } = user;
@@ -6074,6 +6135,10 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Initialize Auto-Respond Services
+  const autoRespondService = new AutoRespondService(storage);
+  const smsAutoRespondService = new SMSAutoRespondService(storage);
+
   // LLM Messaging API Routes
   // Generate AI response for client message
   app.post("/api/llm/generate-response", async (req, res) => {
@@ -6299,6 +6364,338 @@ If you didn't attempt to log in, please ignore this email and contact support im
     } catch (error: any) {
       console.error("Error fetching conversations:", error);
       res.status(500).json({ error: "Failed to fetch conversations: " + error.message });
+    }
+  });
+
+  // Auto-Respond API Routes
+  // Process incoming email for auto-response
+  app.post("/api/auto-respond/process-email", async (req, res) => {
+    try {
+      const { from, to, subject, body, timestamp, messageId } = req.body;
+
+      if (!from || !subject || !body) {
+        return res.status(400).json({ error: "From, subject, and body are required" });
+      }
+
+      const result = await autoRespondService.processIncomingEmail({
+        from,
+        to: to || process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        subject,
+        body,
+        timestamp: timestamp || new Date().toISOString(),
+        messageId: messageId || `msg_${Date.now()}`
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error processing email for auto-response:", error);
+      res.status(500).json({ error: "Failed to process email: " + error.message });
+    }
+  });
+
+  // Get auto-respond configuration
+  app.get("/api/auto-respond/config", async (req, res) => {
+    try {
+      const config = autoRespondService.getConfig();
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error getting auto-respond config:", error);
+      res.status(500).json({ error: "Failed to get configuration: " + error.message });
+    }
+  });
+
+  // Update auto-respond configuration
+  app.put("/api/auto-respond/config", async (req, res) => {
+    try {
+      const newConfig = req.body;
+      await autoRespondService.updateConfig(newConfig);
+      res.json({ success: true, message: "Configuration updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating auto-respond config:", error);
+      res.status(500).json({ error: "Failed to update configuration: " + error.message });
+    }
+  });
+
+  // Get auto-respond statistics
+  app.get("/api/auto-respond/stats", async (req, res) => {
+    try {
+      const stats = await autoRespondService.getStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error getting auto-respond stats:", error);
+      res.status(500).json({ error: "Failed to get statistics: " + error.message });
+    }
+  });
+
+  // Email webhook for incoming emails (SendGrid Inbound Parse)
+  app.post("/api/webhook/incoming-email", async (req, res) => {
+    try {
+      console.log('Incoming email webhook received:', {
+        headers: req.headers,
+        body: req.body
+      });
+
+      // Handle SendGrid Inbound Parse format
+      const emailData = {
+        from: req.body.from || req.body.sender,
+        to: req.body.to || req.body.recipient,
+        subject: req.body.subject || 'No Subject',
+        body: req.body.text || req.body.html || req.body.body || '',
+        timestamp: req.body.timestamp || new Date().toISOString(),
+        messageId: req.body.message_id || `webhook_${Date.now()}`
+      };
+
+      // Process for auto-response
+      const result = await autoRespondService.processIncomingEmail(emailData);
+
+      console.log('Auto-respond result:', result);
+
+      // Always return 200 to acknowledge receipt
+      res.status(200).json({
+        success: true,
+        message: "Email processed",
+        autoResponded: result.responseSent,
+        reason: result.reason
+      });
+
+    } catch (error: any) {
+      console.error("Error processing incoming email webhook:", error);
+      // Still return 200 to prevent webhook retries
+      res.status(200).json({
+        success: false,
+        error: "Failed to process email"
+      });
+    }
+  });
+
+  // Test auto-respond with sample email
+  app.post("/api/auto-respond/test", async (req, res) => {
+    try {
+      const { from, subject, body } = req.body;
+
+      if (!from || !subject || !body) {
+        return res.status(400).json({ error: "From, subject, and body are required" });
+      }
+
+      const result = await autoRespondService.processIncomingEmail({
+        from,
+        to: 'info@gloheadspa.com', // Use a configured auto-respond email
+        subject,
+        body,
+        timestamp: new Date().toISOString(),
+        messageId: `test_${Date.now()}`
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error testing auto-respond:", error);
+      res.status(500).json({ error: "Failed to test auto-respond: " + error.message });
+    }
+  });
+
+  // SMS Auto-Respond API Routes
+  // Process incoming SMS for auto-response
+  app.post("/api/sms-auto-respond/process-sms", async (req, res) => {
+    try {
+      const { from, to, body, timestamp, messageId } = req.body;
+
+      if (!from || !body) {
+        return res.status(400).json({ error: "From and body are required" });
+      }
+
+      const result = await smsAutoRespondService.processIncomingSMS({
+        from,
+        to: to || process.env.TWILIO_PHONE_NUMBER || '+1234567890',
+        body,
+        timestamp: timestamp || new Date().toISOString(),
+        messageId: messageId || `sms_${Date.now()}`
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error processing SMS for auto-response:", error);
+      res.status(500).json({ error: "Failed to process SMS: " + error.message });
+    }
+  });
+
+  // Get SMS auto-respond configuration
+  app.get("/api/sms-auto-respond/config", async (req, res) => {
+    try {
+      const config = smsAutoRespondService.getConfig();
+      res.json(config);
+    } catch (error: any) {
+      console.error("Error getting SMS auto-respond config:", error);
+      res.status(500).json({ error: "Failed to get configuration: " + error.message });
+    }
+  });
+
+  // Update SMS auto-respond configuration
+  app.put("/api/sms-auto-respond/config", async (req, res) => {
+    try {
+      const newConfig = req.body;
+      await smsAutoRespondService.updateConfig(newConfig);
+      res.json({ success: true, message: "Configuration updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating SMS auto-respond config:", error);
+      res.status(500).json({ error: "Failed to update configuration: " + error.message });
+    }
+  });
+
+  // Get SMS auto-respond statistics
+  app.get("/api/sms-auto-respond/stats", async (req, res) => {
+    try {
+      const stats = await smsAutoRespondService.getStats();
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error getting SMS auto-respond stats:", error);
+      res.status(500).json({ error: "Failed to get statistics: " + error.message });
+    }
+  });
+
+  // SMS webhook for incoming messages (Twilio)
+  app.post("/api/webhook/incoming-sms", async (req, res) => {
+    try {
+      console.log('Incoming SMS webhook received:', {
+        headers: req.headers,
+        body: req.body
+      });
+
+      // Handle Twilio webhook format
+      const smsData = {
+        from: req.body.From,
+        to: req.body.To,
+        body: req.body.Body || '',
+        timestamp: req.body.Timestamp || new Date().toISOString(),
+        messageId: req.body.MessageSid || `webhook_${Date.now()}`
+      };
+
+      // Process for auto-response
+      const result = await smsAutoRespondService.processIncomingSMS(smsData);
+
+      console.log('SMS auto-respond result:', result);
+
+      // Return TwiML response for Twilio
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <!-- Auto-response handled by system -->
+</Response>`;
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+
+    } catch (error: any) {
+      console.error("Error processing incoming SMS webhook:", error);
+      // Return empty TwiML response
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+</Response>`;
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+    }
+  });
+
+  // Test SMS auto-respond with sample message
+  app.post("/api/sms-auto-respond/test", async (req, res) => {
+    try {
+      const { from, to, body } = req.body;
+
+      if (!from || !to || !body) {
+        return res.status(400).json({ error: "From, to, and body are required" });
+      }
+
+      const result = await smsAutoRespondService.processIncomingSMS({
+        from,
+        to,
+        body,
+        timestamp: new Date().toISOString(),
+        messageId: `test_${Date.now()}`
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error testing SMS auto-respond:", error);
+      res.status(500).json({ error: "Failed to test SMS auto-respond: " + error.message });
+    }
+  });
+
+  // Configuration status endpoint
+  app.get("/api/config/status", async (req, res) => {
+    try {
+      const dbConfig = new DatabaseConfig(storage);
+      const status = await getConfigStatus(dbConfig);
+      const validation = await validateConfig(dbConfig);
+      
+      res.json({
+        status,
+        validation,
+        message: validation.isValid 
+          ? "All required configuration is set" 
+          : "Some configuration is missing"
+      });
+    } catch (error) {
+      console.error('Error getting config status:', error);
+      res.status(500).json({ error: "Failed to get configuration status" });
+    }
+  });
+
+  // Set OpenAI API key
+  app.post("/api/config/openai", async (req, res) => {
+    try {
+      const { apiKey } = req.body;
+      
+      if (!apiKey) {
+        return res.status(400).json({ error: "API key is required" });
+      }
+
+      const dbConfig = new DatabaseConfig(storage);
+      await dbConfig.setOpenAIKey(apiKey);
+      
+      res.json({ 
+        success: true, 
+        message: "OpenAI API key configured successfully",
+        configured: true
+      });
+    } catch (error) {
+      console.error('Error setting OpenAI API key:', error);
+      res.status(500).json({ error: "Failed to set OpenAI API key" });
+    }
+  });
+
+  // Get all system configuration
+  app.get("/api/config/system", async (req, res) => {
+    try {
+      const dbConfig = new DatabaseConfig(storage);
+      const allConfig = await storage.getAllSystemConfig();
+      
+      res.json({
+        success: true,
+        config: allConfig
+      });
+    } catch (error) {
+      console.error('Error getting system config:', error);
+      res.status(500).json({ error: "Failed to get system configuration" });
+    }
+  });
+
+  // Set system configuration
+  app.post("/api/config/system", async (req, res) => {
+    try {
+      const { key, value, description, category, isEncrypted } = req.body;
+      
+      if (!key || !value) {
+        return res.status(400).json({ error: "Key and value are required" });
+      }
+
+      const dbConfig = new DatabaseConfig(storage);
+      await dbConfig.setConfig(key, value, description, category, isEncrypted);
+      
+      res.json({ 
+        success: true, 
+        message: "Configuration updated successfully"
+      });
+    } catch (error) {
+      console.error('Error setting system config:', error);
+      res.status(500).json({ error: "Failed to set system configuration" });
     }
   });
 
@@ -6819,3 +7216,4 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
   return httpServer;
 }
+console.log("SERVER LOG TEST");

@@ -19,7 +19,9 @@ import {
   Calendar,
   User,
   Phone,
-  Mail as MailIcon
+  Mail as MailIcon,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -27,6 +29,8 @@ import { AIMessagingDialog } from "@/components/llm/ai-messaging-dialog";
 import FAQManagement from "@/components/llm/faq-management";
 import CategoryManagement from "@/components/llm/category-management";
 import LLMTest from "@/components/llm/llm-test";
+import AutoRespondSettings from "@/components/llm/auto-respond-settings";
+import SMSAutoRespondSettings from "@/components/llm/sms-auto-respond-settings";
 import { Input } from "@/components/ui/input";
 
 export default function AIMessagingPage() {
@@ -101,7 +105,7 @@ export default function AIMessagingPage() {
   };
 
   const getChannelIcon = (channel: string) => {
-    return channel === "email" ? <MailIcon className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />;
+    return channel === "email" ? <MailIcon className="h-4 w-4 text-blue-600" /> : <MessageSquare className="h-4 w-4 text-green-600" />;
   };
 
   const formatTimeAgo = (timestamp: string) => {
@@ -125,7 +129,7 @@ export default function AIMessagingPage() {
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto w-full">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -201,13 +205,63 @@ export default function AIMessagingPage() {
 
             {/* Main Content */}
             <Tabs defaultValue="conversations" className="space-y-6">
-              <TabsList>
-                <TabsTrigger value="conversations">Recent Conversations</TabsTrigger>
-                <TabsTrigger value="clients">Client Directory</TabsTrigger>
-                <TabsTrigger value="faq">Business Knowledge</TabsTrigger>
-                <TabsTrigger value="categories">Categories</TabsTrigger>
-                <TabsTrigger value="test">AI Test</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsList className="w-full grid grid-cols-4 md:grid-cols-8 gap-1 border-b bg-transparent p-0">
+                <TabsTrigger 
+                  value="conversations" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Conversations
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="clients" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Clients
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="faq" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Knowledge
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="categories" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Categories
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="test" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  AI Test
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="auto-respond" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Email Auto
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="sms-auto-respond" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  SMS Auto
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="analytics" 
+                  className="text-xs md:text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+                  style={{ color: 'hsl(var(--text-primary))' }}
+                >
+                  Analytics
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="conversations" className="space-y-6">
@@ -333,6 +387,14 @@ export default function AIMessagingPage() {
 
               <TabsContent value="test" className="space-y-6">
                 <LLMTest />
+              </TabsContent>
+
+              <TabsContent value="auto-respond" className="space-y-6">
+                <AutoRespondSettings />
+              </TabsContent>
+
+              <TabsContent value="sms-auto-respond" className="space-y-6">
+                <SMSAutoRespondSettings />
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-6">

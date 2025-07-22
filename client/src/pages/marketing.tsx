@@ -710,7 +710,7 @@ const MarketingPage = () => {
                                 className="min-h-[44px] min-w-[44px] p-3"
                                 onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code editing will be available soon!" })}
                               >
-                                <Edit className="h-4 w-4" />
+                                <Edit className="h-4 w-4 text-gray-600" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -718,7 +718,7 @@ const MarketingPage = () => {
                                 className="min-h-[44px] min-w-[44px] p-3 text-destructive"
                                 onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code deletion will be available soon!" })}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
                             </div>
                           </div>

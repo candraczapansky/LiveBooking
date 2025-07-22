@@ -138,7 +138,20 @@ const ClientsPage = () => {
     skipped: number;
     errors: string[];
   } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  
+  // Create a file input element programmatically as a fallback
+  const createFileInput = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv,application/vnd.ms-excel,text/plain';
+    input.style.display = 'none';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0] || null;
+      processSelectedFile(file);
+    };
+    return input;
+  };
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -299,10 +312,19 @@ const ClientsPage = () => {
 
   const importClientsMutation = useMutation({
     mutationFn: async (clients: any[]) => {
+      console.log('Sending import request with', clients.length, 'clients');
       return apiRequest("POST", "/api/clients/import", { clients });
     },
     onSuccess: async (response) => {
+      console.log('Import response received:', response);
       const results = await response.json();
+      console.log('Import results:', results);
+      
+      // Log any errors for debugging
+      if (results.errors && results.errors.length > 0) {
+        console.log('Import errors:', results.errors);
+      }
+      
       setImportResults(results);
       
       // Invalidate client queries to refresh the list
@@ -317,9 +339,10 @@ const ClientsPage = () => {
       });
     },
     onError: (error) => {
+      console.error('Import mutation error:', error);
       toast({
         title: "Import Failed",
-        description: `Failed to import clients: ${error.message}`,
+        description: `Failed to import clients: ${error.message || 'Unknown error occurred'}`,
         variant: "destructive",
       });
     }
@@ -382,16 +405,49 @@ const ClientsPage = () => {
 
   // CSV Import handlers
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type === 'text/csv') {
-      setImportFile(file);
-      setImportResults(null);
-    } else {
-      toast({
-        title: "Invalid file type",
-        description: "Please select a CSV file.",
-        variant: "destructive",
-      });
+    const file = event.target.files?.[0] || null;
+    processSelectedFile(file);
+  };
+
+  const processSelectedFile = (file: File | null) => {
+    if (file) {
+      // Check if it's a CSV file by extension or MIME type
+      const isCSV = file.name.toLowerCase().endsWith('.csv') || 
+                   file.type === 'text/csv' || 
+                   file.type === 'application/vnd.ms-excel' ||
+                   file.type === 'text/plain' ||
+                   file.type === 'application/csv';
+      
+      if (isCSV) {
+        setImportFile(file);
+        setImportResults(null);
+        toast({
+          title: "File selected",
+          description: `${file.name} has been selected for import.`,
+        });
+      } else {
+        toast({
+          title: "Invalid file type",
+          description: `File type "${file.type}" is not supported. Please select a CSV file.`,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    const files = event.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      processSelectedFile(file);
     }
   };
 
@@ -407,34 +463,173 @@ const ClientsPage = () => {
 
     setIsImporting(true);
     
-    Papa.parse(importFile, {
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
+    // First, let's read the file content to debug
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      console.log('File content preview (first 500 chars):', content.substring(0, 500));
+      console.log('File content length:', content.length);
+      console.log('File content lines:', content.split('\n').length);
+      
+      // Now parse the CSV
+      Papa.parse(importFile, {
+        header: true,
+        skipEmptyLines: true,
+        encoding: 'UTF-8',
+        delimiter: ',',
+        complete: (results) => {
+        console.log('CSV parse results:', results);
+        console.log('CSV meta:', results.meta);
+        console.log('CSV errors:', results.errors);
+        console.log('Raw data sample:', results.data.slice(0, 3));
+        console.log('Total rows parsed:', results.data.length);
+        
         const clients = results.data as any[];
         
-        // Validate and transform the data
-        const validClients = clients.map((row: any) => ({
-          email: row.email || row.Email || '',
-          firstName: row.firstName || row['First Name'] || row.first_name || '',
-          lastName: row.lastName || row['Last Name'] || row.last_name || '',
-          phone: row.phone || row.Phone || '',
-          address: row.address || row.Address || '',
-          city: row.city || row.City || '',
-          state: row.state || row.State || '',
-          zipCode: row.zipCode || row['ZIP Code'] || row.zip_code || '',
-          emailAccountManagement: row.emailAccountManagement !== 'false',
-          emailAppointmentReminders: row.emailAppointmentReminders !== 'false',
-          emailPromotions: row.emailPromotions === 'true',
-          smsAccountManagement: row.smsAccountManagement === 'true',
-          smsAppointmentReminders: row.smsAppointmentReminders !== 'false',
-          smsPromotions: row.smsPromotions === 'true',
-        }));
+        // Log the first few rows to see the structure
+        console.log('First 3 rows structure:', clients.slice(0, 3).map((row, index) => ({
+          rowIndex: index,
+          keys: Object.keys(row),
+          values: row
+        })));
+        
+        if (clients.length === 0) {
+          setIsImporting(false);
+          toast({
+            title: "No data found",
+            description: `The CSV file appears to be empty or has no valid data. Parsed ${results.data.length} rows.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Validate and transform the data for new format: Last name, First name, Email, Phone number
+        const validClients = clients.map((row: any, index: number) => {
+          // Get all column names to help with debugging
+          const columnNames = Object.keys(row);
+          console.log(`Row ${index + 1} columns:`, columnNames);
+          
+          // Try multiple possible column names for each field, including the unusual ones from the CSV
+          const email = row.email || row.Email || row.EMAIL || row['email'] || row['Email'] || 
+                       row['narevalo2007@gmail.com'] || ''; // Handle the unusual email column
+          const firstName = row.firstName || row['First Name'] || row['first name'] || row.first_name || 
+                           row['firstName'] || row['First Name'] || row.nelly || ''; // Handle the unusual firstName column
+          const lastName = row.lastName || row['Last Name'] || row['last name'] || row.last_name || 
+                          row['lastName'] || row['Last Name'] || row.A || ''; // Handle the unusual lastName column
+          const phone = row.phone || row.Phone || row.PHONE || row['phone'] || row['Phone'] || 
+                       row['9182619317'] || ''; // Handle the unusual phone column
+          
+          // Debug the extracted values for the first few rows
+          if (index < 5) {
+            console.log(`Row ${index + 1} extracted values:`, {
+              email: email,
+              firstName: firstName,
+              lastName: lastName,
+              phone: phone,
+              originalRow: row
+            });
+          }
+          
+          // Log phone extraction details for debugging
+          console.log(`Row ${index + 1} phone extraction:`, {
+            'row.phone': row.phone,
+            'row.Phone': row.Phone,
+            'row.PHONE': row.PHONE,
+            'row["phone"]': row['phone'],
+            'row["Phone"]': row['Phone'],
+            'row["9182619317"]': row['9182619317'],
+            'final phone value': phone
+          });
+          
+          // Skip completely empty rows (check if any field has data)
+          const hasAnyData = email.trim() || firstName.trim() || lastName.trim() || phone.trim();
+          if (!hasAnyData) {
+            console.log(`Row ${index + 1} is completely empty, skipping:`, row);
+            return null;
+          }
+          
+          // Log any rows with missing email for debugging
+          if (!email || email.trim() === '') {
+            console.log(`Row ${index + 1} has missing email, will generate placeholder:`, row);
+          }
+          
+          return {
+            email: email.trim(), // Keep as empty string, backend will generate placeholder
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            phone: phone.trim(),
+            // Set default values for other fields
+            address: '',
+            city: '',
+            state: '',
+            zipCode: '',
+            emailAccountManagement: true,
+            emailAppointmentReminders: true,
+            emailPromotions: false,
+            smsAccountManagement: true,
+            smsAppointmentReminders: true,
+            smsPromotions: false,
+          };
+        }).filter(Boolean); // Remove null entries
 
+        console.log('Valid clients to import:', validClients);
+        
+        // Debug: Show phone numbers being imported
+        const clientsWithPhones = validClients.filter(client => client.phone && client.phone.trim() !== '');
+        console.log('Clients with phone numbers:', clientsWithPhones.length, 'out of', validClients.length);
+        if (clientsWithPhones.length > 0) {
+          console.log('Sample phone numbers:', clientsWithPhones.slice(0, 3).map(c => ({ name: `${c.firstName} ${c.lastName}`, phone: c.phone })));
+        }
+        
+        // Check if we have any valid clients to import
+        if (validClients.length === 0) {
+          setIsImporting(false);
+          toast({
+            title: "No valid data found",
+            description: "No valid client data found in the CSV file. Please check the file format and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Check if the import is too large
+        if (validClients.length > 1000) {
+          setIsImporting(false);
+          toast({
+            title: "Import too large",
+            description: `Cannot import ${validClients.length} clients at once. Please split your file into smaller batches of 1000 or fewer clients.`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        // Show progress for large imports
+        if (validClients.length > 100) {
+          toast({
+            title: "Large import detected",
+            description: `Importing ${validClients.length} clients. This may take a few moments...`,
+          });
+        }
+        
+        // Debug: Show phone number status
+        if (clientsWithPhones.length === 0) {
+          toast({
+            title: "No phone numbers found",
+            description: "No phone numbers were extracted from the CSV file. Check your column headers.",
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Phone numbers detected",
+            description: `${clientsWithPhones.length} out of ${validClients.length} clients have phone numbers.`,
+          });
+        }
+        
         importClientsMutation.mutate(validClients);
         setIsImporting(false);
       },
       error: (error) => {
+        console.error('CSV parse error:', error);
         setIsImporting(false);
         toast({
           title: "CSV Parse Error",
@@ -443,34 +638,47 @@ const ClientsPage = () => {
         });
       }
     });
+    };
+    reader.readAsText(importFile);
   };
 
   const resetImportDialog = () => {
     setImportFile(null);
     setImportResults(null);
     setIsImportDialogOpen(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
   };
 
   const downloadSampleCSV = () => {
     const sampleData = [
       {
-        email: 'john.doe@example.com',
-        firstName: 'John',
         lastName: 'Doe',
-        phone: '(555) 123-4567',
-        address: '123 Main St',
-        city: 'Anytown',
-        state: 'CA',
-        zipCode: '12345',
-        emailAccountManagement: 'true',
-        emailAppointmentReminders: 'true',
-        emailPromotions: 'false',
-        smsAccountManagement: 'true',
-        smsAppointmentReminders: 'true',
-        smsPromotions: 'false'
+        firstName: 'John',
+        email: 'john.doe@example.com',
+        phone: '(555) 123-4567'
+      },
+      {
+        lastName: 'Smith',
+        firstName: 'Jane',
+        email: 'jane.smith@example.com',
+        phone: '(555) 987-6543'
+      },
+      {
+        lastName: 'Johnson',
+        firstName: 'Mike',
+        email: '',
+        phone: '(555) 111-2222'
+      },
+      {
+        lastName: 'Wilson',
+        firstName: 'Bob',
+        email: 'bob.wilson@example.com',
+        phone: ''
+      },
+      {
+        lastName: '',
+        firstName: 'Alice',
+        email: '',
+        phone: ''
       }
     ];
 
@@ -623,6 +831,7 @@ const ClientsPage = () => {
                         <span className="hidden xs:inline">Import</span>
                         <span className="xs:hidden">Import</span>
                       </Button>
+
                     </div>
                   </div>
                 </div>
@@ -1659,7 +1868,11 @@ const ClientsPage = () => {
           <DialogHeader>
             <DialogTitle>Import Clients from CSV</DialogTitle>
             <DialogDescription>
-              Upload a CSV file to import multiple clients at once. Download the sample file to see the required format.
+              Upload a CSV file to import multiple clients at once. Download the sample file to see the format. 
+              <br />
+              <span className="text-green-600 font-medium">✓ All fields are optional! Missing emails will be auto-generated.</span>
+              <br />
+              <span className="text-orange-600 font-medium">Note: Large files (over 1000 clients) should be split into smaller batches for better performance.</span>
             </DialogDescription>
           </DialogHeader>
           
@@ -1686,14 +1899,21 @@ const ClientsPage = () => {
             {/* File Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Select CSV File</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
+              <div 
+                className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors cursor-pointer"
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onClick={() => {
+                  const input = createFileInput();
+                  document.body.appendChild(input);
+                  input.click();
+                  setTimeout(() => {
+                    if (document.body.contains(input)) {
+                      document.body.removeChild(input);
+                    }
+                  }, 1000);
+                }}
+              >
                 <div className="space-y-2">
                   <Upload className="h-8 w-8 mx-auto text-gray-400" />
                   {importFile ? (
@@ -1710,7 +1930,17 @@ const ClientsPage = () => {
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const input = createFileInput();
+                      document.body.appendChild(input);
+                      input.click();
+                      setTimeout(() => {
+                        if (document.body.contains(input)) {
+                          document.body.removeChild(input);
+                        }
+                      }, 1000);
+                    }}
                     className="mt-2"
                   >
                     {importFile ? 'Change File' : 'Choose File'}

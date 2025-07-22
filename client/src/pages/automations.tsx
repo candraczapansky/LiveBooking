@@ -406,7 +406,7 @@ export default function Automations() {
             <Card className="mb-8">
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
+                  <Calendar className="h-5 w-5 mr-2 text-primary" />
                   This Month's Activity
                 </CardTitle>
               </CardHeader>

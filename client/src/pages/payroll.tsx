@@ -19,7 +19,8 @@ import {
   CheckCircle,
   AlertCircle,
   TrendingUp,
-  CalendarDays
+  CalendarDays,
+  Scissors
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,27 +146,37 @@ const PayrollPage: React.FC = () => {
   }, [selectedPeriod, customStartDate, customEndDate]);
 
   // Fetch staff members
-  const { data: staff = [] } = useQuery({
+  const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      return response.json();
+      try {
+        const response = await fetch('/api/staff');
+        if (!response.ok) throw new Error('Failed to fetch staff');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching staff:', error);
+        return [];
+      }
     }
   });
 
   // Fetch payroll history
-  const { data: payrollHistory = [], isLoading: payrollLoading } = useQuery({
+  const { data: payrollHistory = [], isLoading: payrollLoading, error: payrollError } = useQuery({
     queryKey: ['payroll-history', dateRange.start, dateRange.end, selectedStaff],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        startDate: dateRange.start.toISOString(),
-        endDate: dateRange.end.toISOString(),
-        ...(selectedStaff !== 'all' && { staffId: selectedStaff.toString() })
-      });
-      const response = await fetch(`/api/payroll-history?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch payroll history');
-      return response.json();
+      try {
+        const params = new URLSearchParams({
+          startDate: dateRange.start.toISOString(),
+          endDate: dateRange.end.toISOString(),
+          ...(selectedStaff !== 'all' && { staffId: selectedStaff.toString() })
+        });
+        const response = await fetch(`/api/payroll-history?${params}`);
+        if (!response.ok) throw new Error('Failed to fetch payroll history');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching payroll history:', error);
+        return [];
+      }
     }
   });
 
@@ -359,6 +370,34 @@ const PayrollPage: React.FC = () => {
             </div>
             
             <div className="space-y-6">
+              {/* Error Display */}
+              {(staffError || payrollError) && (
+                <Alert>
+                  <AlertDescription>
+                    {staffError ? 'Failed to load staff data. Please refresh the page.' : 
+                     payrollError ? 'Failed to load payroll data. Please refresh the page.' : 
+                     'An error occurred while loading data.'}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* No Data Message */}
+              {!staffLoading && !payrollLoading && staff.length === 0 && (
+                <Alert>
+                  <AlertDescription>
+                    No staff members found. Please add staff members to use the payroll system.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Loading State */}
+              {staffLoading && (
+                <div className="flex items-center justify-center p-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <span className="ml-2">Loading payroll data...</span>
+                </div>
+              )}
+
               {/* Header Actions */}
               <div className="flex items-center justify-between">
                 <div></div>
@@ -370,11 +409,14 @@ const PayrollPage: React.FC = () => {
                 </div>
               </div>
 
-      {/* Period Selection */}
-      <Card>
+      {/* Main Content - Only show when not loading */}
+      {!staffLoading && (
+        <>
+          {/* Period Selection */}
+          <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+            <Calendar className="h-5 w-5 text-primary" />
             Payroll Period
           </CardTitle>
         </CardHeader>
@@ -439,83 +481,9 @@ const PayrollPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm text-gray-600">Total Earnings</p>
-                <p className="text-2xl font-bold">${summaryStats.totalEarnings.toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-blue-600" />
-              <div>
-                <p className="text-sm text-gray-600">Total Hours</p>
-                <p className="text-2xl font-bold">{summaryStats.totalHours.toFixed(1)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-purple-600" />
-              <div>
-                <p className="text-sm text-gray-600">Total Services</p>
-                <p className="text-2xl font-bold">{summaryStats.totalServices}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-              <div>
-                <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-bold">${summaryStats.totalRevenue.toFixed(2)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Payroll Status */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-yellow-600" />
-              <div>
-                <p className="text-sm text-gray-600">Pending Payrolls</p>
-                <p className="text-2xl font-bold">{summaryStats.pendingPayrolls}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600" />
-              <div>
-                <p className="text-sm text-gray-600">Paid Payrolls</p>
-                <p className="text-2xl font-bold">{summaryStats.paidPayrolls}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
+
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="payroll" className="space-y-4">
@@ -787,6 +755,8 @@ const PayrollPage: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
             </div>
           </div>
         </main>

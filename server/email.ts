@@ -2,12 +2,13 @@ import { MailService } from '@sendgrid/mail';
 
 let mailService: MailService | null = null;
 
-// Only initialize SendGrid if API key is provided
+// Initialize SendGrid with environment variable (fallback)
 if (process.env.SENDGRID_API_KEY) {
   mailService = new MailService();
   mailService.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('SendGrid initialized with environment API key');
 } else {
-  console.log('SendGrid API key not found. Email functionality will be disabled.');
+  console.log('SendGrid API key not found in environment. Email functionality will be disabled.');
 }
 
 interface EmailParams {
@@ -21,15 +22,42 @@ interface EmailParams {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
-  if (!mailService) {
-    console.log('Email service not available. Skipping email send.');
-    return false;
-  }
-
   try {
+    // Try to get SendGrid configuration from database first
+    let apiKey = process.env.SENDGRID_API_KEY;
+    let fromEmail = process.env.SENDGRID_FROM_EMAIL;
+    
+    // If we have a database connection, try to get config from there
+    try {
+      const { DatabaseConfig } = await import('./config');
+      const { DatabaseStorage } = await import('./storage');
+      const storage = new DatabaseStorage();
+      const dbConfig = new DatabaseConfig(storage);
+      
+      const dbApiKey = await dbConfig.getSendGridKey();
+      const dbFromEmail = await dbConfig.getSendGridFromEmail();
+      
+      if (dbApiKey) apiKey = dbApiKey;
+      if (dbFromEmail) fromEmail = dbFromEmail;
+    } catch (error) {
+      console.log('Using environment variables for SendGrid config');
+    }
+    
+    if (!apiKey) {
+      console.log('SendGrid API key not available. Skipping email send.');
+      return false;
+    }
+    
+    // Create mail service with current API key
+    const currentMailService = new MailService();
+    currentMailService.setApiKey(apiKey);
+    
+    // Use database from email if available, otherwise use the one provided
+    const finalFromEmail = fromEmail || params.from;
+    
     const msg: any = {
       to: params.to,
-      from: params.from,
+      from: finalFromEmail,
       subject: params.subject,
     };
 
@@ -45,7 +73,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       }
     }
 
-    const response = await mailService.send(msg);
+    const response = await currentMailService.send(msg);
     console.log('Email sent successfully to:', params.to);
     console.log('SendGrid response:', JSON.stringify(response, null, 2));
     return true;
