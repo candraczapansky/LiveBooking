@@ -132,6 +132,8 @@ export class DatabaseConfig {
 
   // Convenience methods for common configs
   async getOpenAIKey(): Promise<string | null> {
+    // Force clear cache for OpenAI key to ensure fresh data
+    this.clearCache('openai_api_key');
     return this.getConfig('openai_api_key');
   }
 

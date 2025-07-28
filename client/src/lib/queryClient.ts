@@ -22,20 +22,13 @@ async function throwIfResNotOk(res: Response) {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 function withBaseUrl(url: string) {
-  // If we're on a Replit domain or localhost, use relative URLs
-  const currentHost = window.location.hostname;
-  const isReplitDomain = currentHost.includes('replit.dev') || currentHost.includes('replit.com');
-  const isLocalhost = currentHost === 'localhost' || currentHost === '127.0.0.1';
-  
-  if (isReplitDomain || isLocalhost) {
-    // Use relative URLs for Replit domains and localhost
+  // Always use relative URLs for API calls to ensure proxy is used
+  // This ensures that API calls go through the Vite proxy to the local server
+  if (url.startsWith('/')) {
     return url;
   }
   
-  // Use the configured API_BASE_URL for other domains
-  if (url.startsWith('/')) {
-    return API_BASE_URL.replace(/\/$/, '') + url;
-  }
+  // If the URL doesn't start with '/', it's already a full URL
   return url;
 }
 

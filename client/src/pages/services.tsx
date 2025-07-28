@@ -38,8 +38,8 @@ const ServicesPage = () => {
     }
   });
 
-  // Select the first category if none is selected yet
-  if (!selectedCategoryId && categories && categories.length > 0) {
+  // Select the first category if none is selected yet or if selected category doesn't exist
+  if ((!selectedCategoryId || selectedCategoryId === 0) && categories && categories.length > 0) {
     setSelectedCategoryId(categories[0].id);
   }
 
@@ -94,7 +94,7 @@ const ServicesPage = () => {
                 
                 {/* Services List */}
                 <div className="lg:col-span-3">
-                  {selectedCategoryId ? (
+                  {selectedCategoryId && selectedCategoryId > 0 ? (
                     <ServiceList categoryId={selectedCategoryId} />
                   ) : (
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">

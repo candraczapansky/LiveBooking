@@ -7,11 +7,14 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-if (!accountSid || !authToken || !twilioPhoneNumber) {
-  throw new Error('Missing required Twilio environment variables');
+// Make Twilio optional - only initialize if all variables are present
+let client: twilio.Twilio | null = null;
+if (accountSid && authToken && twilioPhoneNumber) {
+  client = twilio(accountSid, authToken);
+  console.log('Twilio client initialized successfully');
+} else {
+  console.log('Twilio environment variables not found. Phone service will be disabled.');
 }
-
-const client = twilio(accountSid, authToken);
 
 export class PhoneService {
   // Make an outbound call
@@ -23,6 +26,11 @@ export class PhoneService {
     purpose: string = 'outbound'
   ) {
     try {
+      if (!client) {
+        console.log('Twilio client not initialized. Skipping outbound call.');
+        return null;
+      }
+
       // Create TwiML for call with recording
       const call = await client.calls.create({
         twiml: `<Response><Say voice="alice">Hello, this is BeautyBook Salon. Please hold while we connect you.</Say><Dial record="record-from-ringing" recordingStatusCallback="${(process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:3000')}/api/phone/recording-status"><Number>${toNumber}</Number></Dial></Response>`,
@@ -270,6 +278,11 @@ export class PhoneService {
   // Get recording download URL
   static async getRecordingDownloadUrl(recordingSid: string) {
     try {
+      if (!client) {
+        console.log('Twilio client not initialized. Cannot get recording download URL.');
+        return null;
+      }
+      
       const recording = await client.recordings(recordingSid).fetch();
       return `https://api.twilio.com${recording.uri.replace('.json', '.mp3')}`;
     } catch (error) {

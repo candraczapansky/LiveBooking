@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -79,6 +79,7 @@ const PersistentMobileMenu = () => {
     { icon: FileText, label: "Forms", href: "/forms" },
     { icon: Phone, label: "Phone", href: "/phone" },
     { icon: Bot, label: "AI Messaging", href: "/ai-messaging" },
+    { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 

@@ -42,6 +42,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { NoteInput } from "@/components/ui/note-input";
 import { Loader2, Calendar as CalendarIcon, Clock, CreditCard, DollarSign } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 
@@ -1003,10 +1004,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   <FormItem>
                     <FormLabel>Notes (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea
+                      <NoteInput
+                        value={field.value || ""}
+                        onChange={field.onChange}
                         placeholder="Any special instructions or notes for this appointment"
                         disabled={isLoading}
-                        {...field}
+                        category="appointment"
+                        showTemplateSelector={true}
                       />
                     </FormControl>
                     <FormMessage />

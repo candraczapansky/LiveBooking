@@ -96,23 +96,37 @@ const FormDisplay = () => {
       let parsedFields = [];
       try {
         if (formData.fields) {
-          const parsed = JSON.parse(formData.fields);
-          // Ensure fields is always an array
-          if (Array.isArray(parsed)) {
-            parsedFields = parsed;
+          // Check if fields is already an array (from storage layer parsing)
+          if (Array.isArray(formData.fields)) {
+            parsedFields = formData.fields;
+          } else if (typeof formData.fields === 'string') {
+            const parsed = JSON.parse(formData.fields);
+            // Ensure fields is always an array
+            if (Array.isArray(parsed)) {
+              parsedFields = parsed;
+            } else {
+              console.error('Fields is not an array:', parsed);
+              parsedFields = [];
+            }
           } else {
-            console.error('Fields is not an array:', parsed);
+            console.error('Fields is neither string nor array:', typeof formData.fields);
             parsedFields = [];
           }
+        } else {
+          parsedFields = [];
         }
       } catch (error) {
+        console.error('Error parsing form fields:', error);
+        console.error('Raw fields data that caused error:', formData.fields);
         parsedFields = [];
       }
       
-      return {
+      const result = {
         ...formData,
         fields: parsedFields,
       } as Form;
+      
+      return result;
     },
     enabled: !!formId,
     retry: 1,

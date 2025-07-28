@@ -80,6 +80,15 @@ export class AutoRespondService {
         timestamp: email.timestamp
       });
 
+      // Validate required email fields
+      if (!email.from || !email.to || !email.subject || !email.body) {
+        return {
+          success: false,
+          responseSent: false,
+          error: "Missing required email fields (from, to, subject, or body)"
+        };
+      }
+
       // Check if auto-respond is enabled
       if (!this.config.enabled) {
         return {
@@ -363,6 +372,7 @@ export class AutoRespondService {
    * Check if email is from excluded domain
    */
   private isExcludedDomain(email: string): boolean {
+    if (!email || typeof email !== 'string') return false;
     const domain = email.split('@')[1]?.toLowerCase();
     if (!domain) return false;
     
@@ -375,6 +385,7 @@ export class AutoRespondService {
    * Check if email is sent to an auto-respond address
    */
   private isAutoRespondEmail(email: string): boolean {
+    if (!email || typeof email !== 'string') return false;
     const emailLower = email.toLowerCase();
     return this.config.autoRespondEmails.some(autoRespondEmail => 
       autoRespondEmail.toLowerCase() === emailLower

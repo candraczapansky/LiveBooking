@@ -18,7 +18,8 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  BookOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -51,6 +52,7 @@ export default function SMSAutoRespondSettings() {
     to: "",
     body: ""
   });
+  const [lastTestResult, setLastTestResult] = useState<any>(null);
   const [newKeyword, setNewKeyword] = useState("");
   const [newPhoneNumber, setNewPhoneNumber] = useState("");
   const [newAutoRespondNumber, setNewAutoRespondNumber] = useState("");
@@ -118,10 +120,12 @@ export default function SMSAutoRespondSettings() {
       return response.json();
     },
     onSuccess: (data) => {
+      console.log('SMS Test Result:', data);
+      setLastTestResult(data);
       toast({
         title: "Test Completed",
         description: data.responseSent 
-          ? "SMS auto-response was sent successfully!" 
+          ? `SMS auto-response was sent successfully! Response: "${data.response}"` 
           : `Test completed. Reason: ${data.reason}`,
         variant: data.responseSent ? "default" : "destructive",
       });
@@ -130,6 +134,34 @@ export default function SMSAutoRespondSettings() {
       toast({
         title: "Test Failed",
         description: error.message || "Failed to test SMS auto-respond",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Test FAQ integration mutation
+  const testFAQMutation = useMutation({
+    mutationFn: async (testData: { from: string; to: string; body: string }) => {
+      const response = await fetch("/api/sms-auto-respond/test-faq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(testData),
+      });
+      if (!response.ok) throw new Error("Failed to test FAQ integration");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      console.log('FAQ Test Result:', data);
+      toast({
+        title: "FAQ Test Completed",
+        description: `Found ${data.faqData.count} FAQ entries. LLM ${data.llmResponse.success ? 'successful' : 'failed'}`,
+        variant: data.llmResponse.success ? "default" : "destructive",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "FAQ Test Failed",
+        description: error.message || "Failed to test FAQ integration",
         variant: "destructive",
       });
     },
@@ -296,14 +328,14 @@ export default function SMSAutoRespondSettings() {
           <div className="space-y-2">
             <Label className="text-base font-medium">Maximum Response Length</Label>
             <p className="text-sm text-gray-600">
-              Maximum characters allowed in SMS auto-responses (SMS limit: 160 characters)
+              Maximum characters allowed in SMS auto-responses (increased to 500 characters)
             </p>
             <Input
               type="number"
               value={config.maxResponseLength}
               onChange={(e) => handleConfigChange("maxResponseLength", parseInt(e.target.value))}
               min="50"
-              max="160"
+              max="500"
               className="w-32"
             />
           </div>
@@ -513,30 +545,86 @@ export default function SMSAutoRespondSettings() {
               value={testSMS.body}
               onChange={(e) => setTestSMS({ ...testSMS, body: e.target.value })}
               rows={3}
-              maxLength={160}
+              maxLength={500}
             />
             <p className="text-xs text-gray-500 mt-1">
-              {testSMS.body.length}/160 characters
+              {testSMS.body.length}/500 characters
             </p>
           </div>
           
-          <Button 
-            onClick={handleTest} 
-            disabled={testMutation.isPending || !testSMS.from || !testSMS.to || !testSMS.body}
-            className="w-full"
-          >
-            {testMutation.isPending ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Testing...
-              </>
-            ) : (
-              <>
-                <TestTube className="h-4 w-4 mr-2" />
-                Test SMS Auto-Respond
-              </>
-            )}
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button 
+              onClick={handleTest} 
+              disabled={testMutation.isPending || !testSMS.from || !testSMS.to || !testSMS.body}
+              className="w-full"
+            >
+              {testMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Testing...
+                </>
+              ) : (
+                <>
+                  <TestTube className="h-4 w-4 mr-2" />
+                  Test SMS Auto-Respond
+                </>
+              )}
+            </Button>
+            
+            <Button 
+              onClick={() => testFAQMutation.mutate(testSMS)}
+              disabled={testFAQMutation.isPending || !testSMS.from || !testSMS.body}
+              variant="outline"
+              className="w-full"
+            >
+              {testFAQMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Testing FAQ...
+                </>
+              ) : (
+                <>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Test FAQ Integration
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {/* Test Result Display */}
+          {lastTestResult && (
+            <div className={`p-4 rounded-lg border ${
+              lastTestResult.responseSent 
+                ? 'bg-green-50 border-green-200' 
+                : 'bg-red-50 border-red-200'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                {lastTestResult.responseSent ? (
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-600" />
+                )}
+                <h4 className="font-medium">
+                  {lastTestResult.responseSent ? 'Test Successful!' : 'Test Failed'}
+                </h4>
+              </div>
+              {lastTestResult.responseSent && (
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-700">
+                    <strong>Response:</strong> {lastTestResult.response}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <strong>Confidence:</strong> {(lastTestResult.confidence * 100).toFixed(0)}%
+                  </p>
+                </div>
+              )}
+              {!lastTestResult.responseSent && (
+                <p className="text-sm text-gray-700">
+                  <strong>Reason:</strong> {lastTestResult.reason}
+                </p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

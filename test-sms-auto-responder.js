@@ -7,8 +7,8 @@
  * Run this after setting up Twilio and configuring the webhook.
  */
 
-const https = require('https');
-const http = require('http');
+import https from 'https';
+import http from 'http';
 
 // Configuration
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
@@ -243,15 +243,13 @@ async function testSMSAutoResponder() {
 }
 
 // Handle script execution
-if (require.main === module) {
-  testSMSAutoResponder()
-    .then(() => {
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('❌ Test script failed:', error.message);
-      process.exit(1);
-    });
-}
+testSMSAutoResponder()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('❌ Test script failed:', error.message);
+    process.exit(1);
+  });
 
-module.exports = { testSMSAutoResponder }; 
+export { testSMSAutoResponder }; 

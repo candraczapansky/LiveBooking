@@ -11,7 +11,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("client"), // admin, staff, client
   firstName: text("first_name"),
   lastName: text("last_name"),
-  phone: text("phone").unique(),
+  phone: text("phone"),
   address: text("address"),
   city: text("city"),
   state: text("state"),
@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   twoFactorMethod: text("two_factor_method").default("authenticator"), // "authenticator" or "email"
   twoFactorEmailCode: text("two_factor_email_code"), // Temporary email verification code
   twoFactorEmailCodeExpiry: timestamp("two_factor_email_code_expiry"), // When email code expires
+  notes: text("notes"), // Client notes for staff reference
 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -43,6 +44,14 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
 });
+
+// Schema for user updates (partial updates without required fields)
+export const updateUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  username: true,
+  password: true,
+}).partial();
 
 // Client-specific schema without username/password for client registration
 export const insertClientSchema = createInsertSchema(users).omit({
@@ -993,7 +1002,13 @@ export type InsertFormSubmission = typeof formSubmissions.$inferInsert;
 export type Form = typeof forms.$inferSelect & {
   fields?: any[] | string | null; // Can be either parsed array or JSON string
   submissions?: number | null; // Add submissions field to the type
+  lastSubmission?: Date | string | null; // Add lastSubmission field to the type (can be string from DB)
 };
+
+// Type guard to check if fields is an array
+export function isFormFieldsArray(fields: any): fields is any[] {
+  return Array.isArray(fields);
+}
 export type InsertForm = z.infer<typeof insertFormSchema>;
 
 export type BusinessKnowledgeCategory = typeof businessKnowledgeCategories.$inferSelect;
@@ -1076,9 +1091,50 @@ export const systemConfig = pgTable("system_config", {
   key: text("key").notNull().unique(), // "openai_api_key", "sendgrid_api_key", etc.
   value: text("value"), // The actual configuration value
   description: text("description"), // Human-readable description
+  category: text("category").default("general"), // Configuration category
   isEncrypted: boolean("is_encrypted").default(false), // Whether the value is encrypted
-  category: text("category").default("general"), // "ai", "email", "sms", "payment", etc.
-  isActive: boolean("is_active").default(true),
+  isActive: boolean("is_active").default(true), // Whether the configuration is active
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Messaging Configuration schema - stores all AI auto-responder settings
+export const aiMessagingConfig = pgTable("ai_messaging_config", {
+  id: serial("id").primaryKey(),
+  
+  // General settings
+  enabled: boolean("enabled").default(false),
+  confidenceThreshold: doublePrecision("confidence_threshold").default(0.7),
+  maxResponseLength: integer("max_response_length").default(500), // Increased from 160 to 500 characters
+  
+  // Business hours settings
+  businessHoursOnly: boolean("business_hours_only").default(false),
+  businessHoursStart: text("business_hours_start").default("09:00"),
+  businessHoursEnd: text("business_hours_end").default("17:00"),
+  businessHoursTimezone: text("business_hours_timezone").default("America/Chicago"),
+  
+  // Email auto-responder specific settings
+  emailEnabled: boolean("email_enabled").default(false),
+  emailExcludedKeywords: text("email_excluded_keywords"), // JSON array of keywords
+  emailExcludedDomains: text("email_excluded_domains"), // JSON array of domains
+  emailAutoRespondEmails: text("email_auto_respond_emails"), // JSON array of email addresses
+  
+  // SMS auto-responder specific settings
+  smsEnabled: boolean("sms_enabled").default(false),
+  smsExcludedKeywords: text("sms_excluded_keywords"), // JSON array of keywords
+  smsExcludedPhoneNumbers: text("sms_excluded_phone_numbers"), // JSON array of phone numbers
+  smsAutoRespondPhoneNumbers: text("sms_auto_respond_phone_numbers"), // JSON array of phone numbers
+  
+  // Common excluded keywords (used by both email and SMS)
+  excludedKeywords: text("excluded_keywords"), // JSON array of keywords
+  
+  // Statistics tracking
+  totalProcessed: integer("total_processed").default(0),
+  responsesSent: integer("responses_sent").default(0),
+  responsesBlocked: integer("responses_blocked").default(0),
+  averageConfidence: doublePrecision("average_confidence").default(0),
+  
+  // Metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1088,3 +1144,107 @@ export const insertSystemConfigSchema = createInsertSchema(systemConfig).omit({
   createdAt: true,
   updatedAt: true,
 });
+
+// AI Messaging Configuration schema and types
+export const insertAiMessagingConfigSchema = createInsertSchema(aiMessagingConfig).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Conversation Flows schema
+export const conversationFlows = pgTable("conversation_flows", {
+  id: text("id").primaryKey(), // UUID for the flow
+  name: text("name").notNull(),
+  description: text("description"),
+  steps: text("steps").notNull(), // JSON array of conversation steps
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertConversationFlowSchema = createInsertSchema(conversationFlows).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ConversationFlow = typeof conversationFlows.$inferSelect;
+export type InsertConversationFlow = z.infer<typeof insertConversationFlowSchema>;
+
+export type AiMessagingConfig = typeof aiMessagingConfig.$inferSelect;
+export type InsertAiMessagingConfig = z.infer<typeof insertAiMessagingConfigSchema>;
+
+export type AppointmentPhoto = typeof appointmentPhotos.$inferSelect;
+export type InsertAppointmentPhoto = z.infer<typeof insertAppointmentPhotoSchema>;
+
+export type NoteTemplate = typeof noteTemplates.$inferSelect;
+export type InsertNoteTemplate = z.infer<typeof insertNoteTemplateSchema>;
+export type UpdateNoteTemplate = z.infer<typeof updateNoteTemplateSchema>;
+
+// Appointment Photos schema - for tracking progress with photos
+export const appointmentPhotos = pgTable("appointment_photos", {
+  id: serial("id").primaryKey(),
+  appointmentId: integer("appointment_id").notNull(),
+  photoData: text("photo_data").notNull(), // Base64 encoded image data
+  photoType: text("photo_type").notNull(), // "before", "during", "after", "progress"
+  description: text("description"), // Optional description of the photo
+  uploadedBy: integer("uploaded_by"), // User ID who uploaded the photo
+  uploadedByRole: text("uploaded_by_role"), // "admin", "staff", "client"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAppointmentPhotoSchema = createInsertSchema(appointmentPhotos).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Note Templates schema - for reusable note templates
+export const noteTemplates = pgTable("note_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  category: text("category").notNull().default("general"), // "general", "appointment", "client", "follow_up", etc.
+  isActive: boolean("is_active").default(true),
+  createdBy: integer("created_by"), // User ID who created the template
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertNoteTemplateSchema = createInsertSchema(noteTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateNoteTemplateSchema = createInsertSchema(noteTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+// Note History schema - tracks all notes with timestamps for clients
+export const noteHistory = pgTable("note_history", {
+  id: serial("id").primaryKey(),
+  clientId: integer("client_id").notNull(),
+  appointmentId: integer("appointment_id"), // Optional - for appointment-specific notes
+  noteContent: text("note_content").notNull(),
+  noteType: text("note_type").notNull().default("general"), // "general", "appointment", "follow_up", "treatment", etc.
+  createdBy: integer("created_by").notNull(), // User ID who created the note
+  createdByRole: text("created_by_role").notNull(), // "admin", "staff", "client"
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertNoteHistorySchema = createInsertSchema(noteHistory).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updateNoteHistorySchema = createInsertSchema(noteHistory).omit({
+  id: true,
+  createdAt: true,
+}).partial();
+
+export type NoteHistory = typeof noteHistory.$inferSelect;
+export type InsertNoteHistory = z.infer<typeof insertNoteHistorySchema>;
+export type UpdateNoteHistory = z.infer<typeof updateNoteHistorySchema>;

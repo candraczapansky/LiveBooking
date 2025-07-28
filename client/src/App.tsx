@@ -19,6 +19,7 @@ const ForgotPasswordSMS = lazy(() => import("@/pages/forgot-password-sms"));
 const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const Services = lazy(() => import("@/pages/services"));
 const Clients = lazy(() => import("@/pages/clients"));
+const ClientsImport = lazy(() => import("@/pages/clients-import"));
 const Staff = lazy(() => import("@/pages/staff-simple"));
 const Rooms = lazy(() => import("@/pages/rooms"));
 const Devices = lazy(() => import("@/pages/devices"));
@@ -27,6 +28,7 @@ const Memberships = lazy(() => import("@/pages/memberships"));
 const Reports = lazy(() => import("@/pages/reports"));
 const Marketing = lazy(() => import("@/pages/marketing"));
 const Automations = lazy(() => import("@/pages/automations"));
+const NoteTemplates = lazy(() => import("@/pages/note-templates"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Schedule = lazy(() => import("@/pages/schedule"));
 const StaffSchedule = lazy(() => import("@/pages/staff-schedule"));
@@ -93,6 +95,7 @@ function Router() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/services" component={Services} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients-import" component={ClientsImport} />
         <Route path="/staff" component={Staff} />
         <Route path="/pos" component={PointOfSale} />
         <Route path="/products" component={Products} />
@@ -104,6 +107,7 @@ function Router() {
         <Route path="/reports" component={Reports} />
         <Route path="/marketing" component={Marketing} />
         <Route path="/automations" component={Automations} />
+        <Route path="/note-templates" component={NoteTemplates} />
         <Route path="/phone" component={PhonePage} />
         <Route path="/forms" component={FormsPage} />
         <Route path="/ai-messaging" component={AIMessagingPage} />

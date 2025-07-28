@@ -147,6 +147,22 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     res.json(categories);
   }));
 
+  // Get service category by ID
+  app.get("/api/service-categories/:id", asyncHandler(async (req: Request, res: Response) => {
+    const categoryId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.debug("Fetching service category by ID", { ...context, categoryId });
+
+    const category = await storage.getServiceCategory(categoryId);
+    if (!category) {
+      throw new NotFoundError("Service category");
+    }
+
+    LoggerService.info("Service category fetched", { ...context, categoryId });
+    res.json(category);
+  }));
+
   // Create service category
   app.post("/api/service-categories", validateRequest(insertServiceCategorySchema), asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
@@ -215,7 +231,7 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     }
 
     // Check if category is being used by services
-    const servicesInCategory = await storage.getServicesByCategory(category.name);
+    const servicesInCategory = await storage.getServicesByCategory(categoryId);
     if (servicesInCategory.length > 0) {
       throw new ConflictError("Cannot delete category that has associated services");
     }

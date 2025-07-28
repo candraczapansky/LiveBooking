@@ -33,7 +33,7 @@ The SMS auto-responder automatically responds to incoming SMS messages using AI,
 ### Configuration Options
 - **Enable/Disable**: Toggle the entire system on/off
 - **Confidence Threshold**: Set minimum AI confidence (0-100%)
-- **Response Length**: Set maximum response length (50-160 characters)
+- **Response Length**: Set maximum response length (50-500 characters)
 - **Business Hours**: Configure start/end times and timezone
 - **Excluded Keywords**: Words that prevent auto-response (e.g., "urgent", "emergency")
 - **Excluded Phone Numbers**: Numbers that won't trigger auto-responses
@@ -87,7 +87,7 @@ The system comes with these default settings:
 {
   "enabled": true,
   "confidenceThreshold": 0.7,
-  "maxResponseLength": 160,
+  "maxResponseLength": 500,
   "businessHoursOnly": false,
   "businessHours": {
     "start": "09:00",
@@ -121,8 +121,8 @@ The system comes with these default settings:
 - Leave auto-respond numbers empty to respond to all
 
 ### 4. Response Length
-- Keep responses under 160 characters for single SMS
-- Consider breaking longer responses into multiple messages
+- Keep responses under 500 characters for optimal SMS delivery
+- Consider breaking longer responses into multiple messages if needed
 - Test responses on actual phones
 
 ### 5. Monitoring

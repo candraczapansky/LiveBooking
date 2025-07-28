@@ -11,4 +11,7 @@ if (!process.env.DATABASE_URL) {
 // Use direct neon connection with proper configuration
 const sql = neon(process.env.DATABASE_URL);
 
-export const db = drizzle(sql, { schema });
+// Configure Drizzle with explicit schema mapping
+export const db = drizzle(sql, { 
+  schema
+});

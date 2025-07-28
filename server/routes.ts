@@ -24,7 +24,8 @@ import {
   insertPromoCodeSchema,
   insertStaffScheduleSchema,
   insertFormSchema,
-  insertUserColorPreferencesSchema
+  insertUserColorPreferencesSchema,
+  insertNoteTemplateSchema
 } from "@shared/schema";
 import { sendSMS, isTwilioConfigured } from "./sms";
 import { 
@@ -50,10 +51,10 @@ import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
 import { AutoRespondService } from "./auto-respond-service";
 import { SMSAutoRespondService } from "./sms-auto-respond-service";
-import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerPaymentRoutes, registerServiceRoutes } from "./routes/index";
+import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerPaymentRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes } from "./routes/index";
 import { getConfigStatus, validateConfig, DatabaseConfig } from "./config";
 import { hashPassword, comparePassword } from "./utils/password";
-import { insertUserSchema } from "@shared/schema";
+import { insertUserSchema, updateUserSchema } from "@shared/schema";
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
@@ -140,8 +141,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerAuthRoutes(app, storage);
   registerUserRoutes(app, storage);
   registerAppointmentRoutes(app, storage);
+  registerAppointmentPhotoRoutes(app, storage);
   registerPaymentRoutes(app, storage);
   registerServiceRoutes(app, storage);
+  registerNoteTemplateRoutes(app, storage);
+  registerNoteHistoryRoutes(app, storage);
 
 
 
@@ -175,16 +179,10 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     return res.status(201).json(clientWithoutPassword);
   });
 
-  // Bulk client import route
+  // Simple CSV client import route
   app.post("/api/clients/import", async (req, res) => {
     try {
       const { clients } = req.body;
-      
-      console.log('Import request received:', { 
-        clientsCount: clients?.length, 
-        isArray: Array.isArray(clients),
-        sampleClient: clients?.[0]
-      });
       
       if (!Array.isArray(clients) || clients.length === 0) {
         return res.status(400).json({ error: "Invalid clients data" });
@@ -196,114 +194,122 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         errors: [] as string[]
       };
 
-      const existingUsers = await storage.getAllUsers();
-
       for (const clientData of clients) {
         try {
-          console.log('Processing client:', { 
-            originalEmail: clientData.email,
-            firstName: clientData.firstName,
-            lastName: clientData.lastName,
-            phone: clientData.phone
-          });
-          
-          // Generate a unique email if none provided
-          let email = clientData.email?.trim() || '';
-          if (!email) {
-            // Generate a placeholder email using first/last name or row number
-            const firstName = clientData.firstName?.trim() || 'client';
-            const lastName = clientData.lastName?.trim() || '';
-            const namePart = lastName ? `${firstName}.${lastName}` : firstName;
-            const timestamp = Date.now();
-            const randomSuffix = Math.random().toString(36).substring(2, 8);
-            const rowNumber = results.imported + results.skipped + 1;
-            const processId = process.pid || Math.floor(Math.random() * 10000);
-            email = `${namePart}.${rowNumber}.${timestamp}.${processId}.${randomSuffix}@placeholder.com`;
-            console.log('Generated email:', email);
-          }
-
-          // Basic email format validation only if email was provided
-          if (clientData.email && clientData.email.trim()) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(clientData.email.trim())) {
-              results.errors.push(`Row ${results.imported + results.skipped + 1}: Invalid email format: ${clientData.email}`);
-              results.skipped++;
-              continue;
-            }
-          }
-
-          // Check if email already exists in database (only check database, not current import batch)
-          console.log(`Checking if email exists in database: ${email}`);
-          const existingUser = await storage.getUserByEmail(email);
-          if (existingUser) {
-            console.log(`Email ${email} already exists in database, skipping`);
-            results.errors.push(`Row ${results.imported + results.skipped + 1}: Email ${email} already exists in database`);
+          // Basic validation
+          if (!clientData.firstName || !clientData.lastName) {
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Missing first name or last name`);
             results.skipped++;
             continue;
           }
-          console.log(`Email ${email} is unique, proceeding with import`);
 
-          // Generate username and password
+          // Handle email - generate unique if missing or duplicate
+          let email = clientData.email?.trim() || '';
+          if (!email) {
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 6);
+            email = `client.${timestamp}.${randomSuffix}@placeholder.com`;
+          } else {
+            // Check if email already exists
+            const existingUser = await storage.getUserByEmail(email);
+            if (existingUser) {
+              const timestamp = Date.now();
+              const randomSuffix = Math.random().toString(36).substring(2, 6);
+              const emailParts = email.split('@');
+              email = `${emailParts[0]}+${timestamp}-${randomSuffix}@${emailParts[1]}`;
+            }
+          }
+
+          // Handle phone number - format plain 10-digit numbers or generate placeholder
+          let phone = clientData.phone?.trim() || '';
+          console.log(`Processing phone number: "${clientData.phone}" -> "${phone}"`);
+          console.log(`Phone data type: ${typeof clientData.phone}, length: ${clientData.phone?.length}`);
+          
+          if (!phone) {
+            const timestamp = Date.now();
+            const randomSuffix = Math.random().toString(36).substring(2, 6);
+            phone = `555-000-${timestamp}-${randomSuffix}`;
+            console.log(`Generated placeholder phone: ${phone}`);
+          } else {
+            // Format plain 10-digit numbers to (XXX) XXX-XXXX format
+            const cleanPhone = phone.replace(/\D/g, ''); // Remove all non-digits
+            console.log(`Cleaned phone: "${phone}" -> "${cleanPhone}"`);
+            
+            if (cleanPhone.length === 10) {
+              phone = `(${cleanPhone.slice(0, 3)}) ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
+              console.log(`Formatted 10-digit phone: ${phone}`);
+            } else if (cleanPhone.length === 11 && cleanPhone.startsWith('1')) {
+              // Handle 11-digit numbers starting with 1
+              phone = `(${cleanPhone.slice(1, 4)}) ${cleanPhone.slice(4, 7)}-${cleanPhone.slice(7)}`;
+              console.log(`Formatted 11-digit phone: ${phone}`);
+            } else {
+              console.log(`Keeping phone as-is: ${phone}`);
+              // Try to format any 10-digit number that wasn't caught above
+              if (cleanPhone.length === 10) {
+                phone = `(${cleanPhone.slice(0, 3)}) ${cleanPhone.slice(3, 6)}-${cleanPhone.slice(6)}`;
+                console.log(`Formatted 10-digit phone after cleanup: ${phone}`);
+              }
+            }
+            // If it doesn't match expected patterns, keep as is
+            
+            // Check if phone number already exists and generate unique if needed
+            const existingUserWithPhone = await storage.getUserByPhone(phone);
+            if (existingUserWithPhone) {
+              console.log(`Phone number already exists: ${phone}, generating unique version`);
+              const timestamp = Date.now();
+              const randomSuffix = Math.random().toString(36).substring(2, 6);
+              const phoneParts = phone.replace(/[^\d]/g, ''); // Get just digits
+              if (phoneParts.length >= 7) {
+                phone = `(${phoneParts.slice(0, 3)}) ${phoneParts.slice(3, 6)}-${phoneParts.slice(6, 10)}-${timestamp}-${randomSuffix}`;
+              } else {
+                phone = `${phone}-${timestamp}-${randomSuffix}`;
+              }
+              console.log(`Generated unique phone: ${phone}`);
+            }
+          }
+
+          // Generate unique username and password
           const username = `client_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
           const password = Math.random().toString(36).substring(2, 12);
-          console.log('Generated credentials:', { username, password: '***' });
 
-          // Create client with default values - handle empty strings and null values
+          // Create user with all required fields
           const newClient = {
-            email: email, // Use the generated or provided email
-            firstName: clientData.firstName?.trim() || "",
-            lastName: clientData.lastName?.trim() || "",
-            phone: clientData.phone?.trim() || "",
-            address: clientData.address?.trim() || "",
-            city: clientData.city?.trim() || "",
-            state: clientData.state?.trim() || "",
-            zipCode: clientData.zipCode?.trim() || "",
+            email,
+            firstName: clientData.firstName.trim(),
+            lastName: clientData.lastName.trim(),
+            phone,
             username,
             password,
             role: "client" as const,
-            // Communication preferences defaults
-            emailAccountManagement: clientData.emailAccountManagement ?? true,
-            emailAppointmentReminders: clientData.emailAppointmentReminders ?? true,
-            emailPromotions: clientData.emailPromotions ?? false,
-            smsAccountManagement: clientData.smsAccountManagement ?? false,
-            smsAppointmentReminders: clientData.smsAppointmentReminders ?? true,
-            smsPromotions: clientData.smsPromotions ?? false,
+            // Default communication preferences
+            emailAccountManagement: true,
+            emailAppointmentReminders: true,
+            emailPromotions: false,
+            smsAccountManagement: false,
+            smsAppointmentReminders: true,
+            smsPromotions: false,
           };
 
-          // Hash password before creating user
-          console.log('Creating user with data:', { 
-            email: newClient.email, 
-            firstName: newClient.firstName, 
-            lastName: newClient.lastName,
-            phone: newClient.phone,
-            username: newClient.username 
-          });
+          // Hash password and create user
           const hashedPassword = await hashPassword(newClient.password);
           const createdUser = await storage.createUser({
             ...newClient,
             password: hashedPassword
           });
-          console.log('User created successfully:', { id: createdUser?.id, email: createdUser?.email });
+
           results.imported++;
-          console.log('Successfully imported client:', { email, firstName: clientData.firstName, lastName: clientData.lastName });
+          console.log(`Imported client: ${createdUser.firstName} ${createdUser.lastName} - Phone: ${createdUser.phone}`);
+
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          const fullError = `Row ${results.imported + results.skipped + 1}: ${errorMessage}`;
-          console.error('Import error for row:', { 
-            rowNumber: results.imported + results.skipped + 1,
-            clientData,
-            error: errorMessage,
-            stack: error instanceof Error ? error.stack : undefined
-          });
-          results.errors.push(fullError);
+          results.errors.push(`Row ${results.imported + results.skipped + 1}: ${errorMessage}`);
           results.skipped++;
         }
       }
 
-      console.log('Import completed:', results);
       return res.status(200).json(results);
     } catch (error) {
-      console.error("Bulk import error:", error);
+      console.error("CSV import error:", error);
       return res.status(500).json({ error: "Failed to import clients" });
     }
   });
@@ -350,7 +356,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
   // Users routes
   app.get("/api/users", async (req, res) => {
-    console.log("GET /api/users called");
+    console.log("GET /api/users called - DEBUG VERSION");
     try {
       const { search, role } = req.query;
       let users;
@@ -376,6 +382,25 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         return userWithoutPassword;
       });
       
+      // Debug log: print the first user object and its keys
+      if (usersWithoutPasswords.length > 0) {
+        console.log('API response - first user object:', usersWithoutPasswords[0]);
+        console.log('API response - first user keys:', Object.keys(usersWithoutPasswords[0]));
+        
+        // Check if phone field exists in the response
+        const firstUser = usersWithoutPasswords[0];
+        console.log('Phone field check:', {
+          hasPhone: 'phone' in firstUser,
+          phoneValue: firstUser.phone,
+          phoneType: typeof firstUser.phone,
+          phoneLength: firstUser.phone?.length
+        });
+        
+        // Check how many users have phone numbers
+        const usersWithPhones = usersWithoutPasswords.filter((u: any) => u.phone && u.phone.trim() !== '');
+        console.log('Users with phones in API response:', usersWithPhones.length, 'out of', usersWithoutPasswords.length);
+      }
+      
       return res.status(200).json(usersWithoutPasswords);
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -386,7 +411,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
 
   // Update user profile route
-  app.put("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
+  app.put("/api/users/:id", validateBody(updateUserSchema), async (req, res) => {
     const userId = parseInt(req.params.id);
     
     if (!userId) {
@@ -394,6 +419,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
     
     console.log("Updating user with data:", JSON.stringify(req.body, null, 2));
+    console.log("User ID:", userId);
+    console.log("Request body keys:", Object.keys(req.body));
     
     try {
       const user = await storage.getUser(userId);
@@ -401,6 +428,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
+      
+      console.log("Existing user found:", user.id, user.email);
       
       // Update user profile with all provided fields including communication preferences
       const updatedUser = await storage.updateUser(userId, req.body);
@@ -411,14 +440,22 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const { password, ...userWithoutPassword } = updatedUser;
       
       return res.status(200).json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating user profile:", error);
-      return res.status(500).json({ error: "Failed to update user profile" });
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      return res.status(500).json({ 
+        error: "Failed to update user profile",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
   // PATCH route for user updates (used by staff form)
-  app.patch("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
+  app.patch("/api/users/:id", validateBody(updateUserSchema), async (req, res) => {
     const userId = parseInt(req.params.id);
     
     if (!userId) {
@@ -443,9 +480,17 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const { password, ...userWithoutPassword } = updatedUser;
       
       return res.status(200).json(userWithoutPassword);
-    } catch (error) {
+    } catch (error: any) {
       console.error("PATCH - Error updating user profile:", error);
-      return res.status(500).json({ error: "Failed to update user profile" });
+      console.error("PATCH - Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      return res.status(500).json({ 
+        error: "Failed to update user profile",
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
   });
 
@@ -565,48 +610,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
   
-  // Service Categories routes
-  app.get("/api/service-categories", async (req, res) => {
-    const categories = await storage.getAllServiceCategories();
-    return res.status(200).json(categories);
-  });
-  
-  app.post("/api/service-categories", validateBody(insertServiceCategorySchema), async (req, res) => {
-    const newCategory = await storage.createServiceCategory(req.body);
-    return res.status(201).json(newCategory);
-  });
-  
-  app.get("/api/service-categories/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const category = await storage.getServiceCategory(id);
-    
-    if (!category) {
-      return res.status(404).json({ error: "Service category not found" });
-    }
-    
-    return res.status(200).json(category);
-  });
-  
-  app.put("/api/service-categories/:id", validateBody(insertServiceCategorySchema.partial()), async (req, res) => {
-    const id = parseInt(req.params.id);
-    try {
-      const updatedCategory = await storage.updateServiceCategory(id, req.body);
-      return res.status(200).json(updatedCategory);
-    } catch (error) {
-      return res.status(404).json({ error: "Service category not found" });
-    }
-  });
-  
-  app.delete("/api/service-categories/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const deleted = await storage.deleteServiceCategory(id);
-    
-    if (!deleted) {
-      return res.status(404).json({ error: "Service category not found" });
-    }
-    
-    return res.status(204).end();
-  });
+
 
   // Rooms routes
   app.get("/api/rooms", async (req, res) => {
@@ -3398,9 +3402,10 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
   // Check Twilio configuration status
   app.get("/api/sms-config-status", async (req, res) => {
+    const isConfigured = await isTwilioConfigured();
     res.json({
-      configured: isTwilioConfigured(),
-      message: isTwilioConfigured() 
+      configured: isConfigured,
+      message: isConfigured 
         ? "SMS service is configured and ready" 
         : "SMS service requires Twilio configuration (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)"
     });
@@ -6073,6 +6078,172 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Get client analytics
+  app.get("/api/clients/:id/analytics", async (req, res) => {
+    try {
+      const clientId = parseInt(req.params.id);
+
+      // Verify the client exists
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Get client appointments
+      const appointments = await storage.getAppointmentsByClient(clientId);
+      
+      // Calculate analytics
+      const totalAppointments = appointments.length;
+      const completedAppointments = appointments.filter((a: any) => a.status === 'completed').length;
+      const cancelledAppointments = appointments.filter((a: any) => a.status === 'cancelled').length;
+      
+      // Calculate total spent (assuming appointments have a totalAmount field)
+      const totalSpent = appointments
+        .filter((a: any) => a.status === 'completed' && a.totalAmount)
+        .reduce((sum: number, a: any) => sum + (a.totalAmount || 0), 0);
+      
+      const averageAppointmentValue = completedAppointments > 0 
+        ? totalSpent / completedAppointments 
+        : 0;
+      
+      // Get last and next appointments
+      const sortedAppointments = appointments.sort((a: any, b: any) => 
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+      
+      const lastAppointment = sortedAppointments
+        .filter((a: any) => a.status === 'completed')
+        .pop()?.startTime || null;
+      
+      const nextAppointment = sortedAppointments
+        .filter((a: any) => a.status === 'confirmed' && new Date(a.startTime) > new Date())
+        .shift()?.startTime || null;
+      
+      // Get favorite service (most booked service)
+      const serviceCounts: { [key: string]: number } = {};
+      appointments.forEach((appointment: any) => {
+        if (appointment.serviceName) {
+          serviceCounts[appointment.serviceName] = (serviceCounts[appointment.serviceName] || 0) + 1;
+        }
+      });
+      
+      const favoriteService = Object.keys(serviceCounts).length > 0
+        ? Object.entries(serviceCounts).sort(([,a], [,b]) => b - a)[0][0]
+        : null;
+      
+      // Get client communication preferences
+      const communicationPreferences = {
+        emailAccountManagement: client?.emailAccountManagement || false,
+        emailAppointmentReminders: client?.emailAppointmentReminders || false,
+        emailPromotions: client?.emailPromotions || false,
+        smsAccountManagement: client?.smsAccountManagement || false,
+        smsAppointmentReminders: client?.smsAppointmentReminders || false,
+        smsPromotions: client?.smsPromotions || false,
+      };
+      
+      res.json({
+        totalAppointments,
+        completedAppointments,
+        cancelledAppointments,
+        totalSpent,
+        averageAppointmentValue,
+        lastAppointment,
+        nextAppointment,
+        favoriteService,
+        communicationPreferences,
+      });
+    } catch (error: any) {
+      console.error("Error fetching client analytics:", error);
+      res.status(500).json({ error: "Failed to fetch client analytics: " + error.message });
+    }
+  });
+
+  // Send communication to client
+  app.post("/api/communications/send", async (req, res) => {
+    try {
+      const { clientId, subject, message, type } = req.body;
+
+      // Verify the client exists
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Send communication based on type
+      if (type === 'email') {
+        // Send email using existing email service
+        await emailService.sendEmail({
+          to: client.email,
+          subject: subject,
+          html: message.replace(/\n/g, '<br>'),
+        });
+      } else if (type === 'sms' && client.phone) {
+        // Send SMS using existing SMS service
+        await smsService.sendSMS({
+          to: client.phone!,
+          body: message,
+        });
+      } else {
+        return res.status(400).json({ error: "Invalid communication type or missing phone number" });
+      }
+
+      res.json({ success: true, message: "Communication sent successfully" });
+    } catch (error: any) {
+      console.error("Error sending communication:", error);
+      res.status(500).json({ error: "Failed to send communication: " + error.message });
+    }
+  });
+
+  // Send appointment reminder
+  app.post("/api/communications/reminder", async (req, res) => {
+    try {
+      const { clientId } = req.body;
+
+      // Verify the client exists
+      const client = await storage.getUser(clientId);
+      if (!client || client.role !== 'client') {
+        return res.status(404).json({ error: "Client not found" });
+      }
+
+      // Get upcoming appointments for this client
+      const appointments = await storage.getAppointmentsByClient(clientId);
+      const upcomingAppointments = appointments.filter((a: any) => 
+        a.status === 'confirmed' && new Date(a.startTime) > new Date()
+      );
+
+      if (upcomingAppointments.length === 0) {
+        return res.status(404).json({ error: "No upcoming appointments found" });
+      }
+
+      // Send reminder for the next appointment
+      const nextAppointment = upcomingAppointments.sort((a: any, b: any) => 
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      )[0];
+
+      const reminderMessage = `Hi ${client.firstName || client.username}, this is a reminder for your appointment on ${new Date(nextAppointment.startTime).toLocaleDateString()} at ${new Date(nextAppointment.startTime).toLocaleTimeString()}. Please call us if you need to reschedule.`;
+
+      if (client.phone) {
+        await smsService.sendSMS({
+          to: client.phone!,
+          body: reminderMessage,
+        });
+      } else if (client.email) {
+        await emailService.sendEmail({
+          to: client.email,
+          subject: "Appointment Reminder",
+          html: reminderMessage.replace(/\n/g, '<br>'),
+        });
+      } else {
+        return res.status(400).json({ error: "No contact information available for reminder" });
+      }
+
+      res.json({ success: true, message: "Reminder sent successfully" });
+    } catch (error: any) {
+      console.error("Error sending reminder:", error);
+      res.status(500).json({ error: "Failed to send reminder: " + error.message });
+    }
+  });
+
   // Submit form data
   app.post("/api/forms/:id/submit", async (req, res) => {
     try {
@@ -6137,7 +6308,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
   // Initialize Auto-Respond Services
   const autoRespondService = new AutoRespondService(storage);
-  const smsAutoRespondService = new SMSAutoRespondService(storage);
+  const smsAutoRespondService = SMSAutoRespondService.getInstance(storage);
 
   // LLM Messaging API Routes
   // Generate AI response for client message
@@ -6336,7 +6507,46 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
-  // Get conversation history for a client
+  // Get all conversations for the conversations tab
+  app.get("/api/llm/conversations", async (req, res) => {
+    try {
+      // Fetch all conversations from database
+      const conversations = await storage.getLLMConversations();
+      
+      // Enrich conversations with client information
+      const enrichedConversations = await Promise.all(
+        conversations.map(async (conv: any) => {
+          if (conv.clientId) {
+            const client = await storage.getUser(conv.clientId);
+            return {
+              ...conv,
+              clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username : 'Unknown Client',
+              clientEmail: client?.email || '',
+              clientPhone: client?.phone || '',
+              lastMessage: conv.clientMessage,
+              status: 'responded' // All conversations in database have been responded to
+            };
+          }
+          return {
+            ...conv,
+            clientName: 'Unknown Client',
+            clientEmail: '',
+            clientPhone: '',
+            lastMessage: conv.clientMessage,
+            status: 'responded'
+          };
+        })
+      );
+
+      res.json(enrichedConversations);
+
+    } catch (error: any) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ error: "Failed to fetch conversations: " + error.message });
+    }
+  });
+
+  // Get conversation history for a specific client
   app.get("/api/llm/conversations/:clientId", async (req, res) => {
     try {
       const clientId = parseInt(req.params.clientId);
@@ -6346,18 +6556,8 @@ If you didn't attempt to log in, please ignore this email and contact support im
         return res.status(404).json({ error: "Client not found" });
       }
 
-      // For now, return mock conversation history
-      // In a real implementation, this would fetch from a conversations table
-      const conversations = [
-        {
-          id: 1,
-          timestamp: new Date().toISOString(),
-          channel: 'email',
-          clientMessage: "Hi, I'd like to book an appointment",
-          aiResponse: "Hello! I'd be happy to help you book an appointment. What service are you interested in?",
-          confidence: 0.9
-        }
-      ];
+      // Fetch real conversation history from database
+      const conversations = await storage.getLLMConversations(clientId);
 
       res.json(conversations);
 
@@ -6493,6 +6693,93 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // AI Messaging Configuration API Routes
+  // Get AI messaging configuration
+  app.get("/api/ai-messaging/config", async (req, res) => {
+    try {
+      const config = await storage.getAiMessagingConfig();
+      if (!config) {
+        // Return default configuration if none exists
+        const defaultConfig = {
+          enabled: false,
+          confidenceThreshold: 0.7,
+          maxResponseLength: 160,
+          businessHoursOnly: false,
+          businessHoursStart: "09:00",
+          businessHoursEnd: "17:00",
+          businessHoursTimezone: "America/Chicago",
+          emailEnabled: false,
+          emailExcludedKeywords: JSON.stringify([]),
+          emailExcludedDomains: JSON.stringify([]),
+          emailAutoRespondEmails: JSON.stringify([]),
+          smsEnabled: false,
+          smsExcludedKeywords: JSON.stringify([]),
+          smsExcludedPhoneNumbers: JSON.stringify([]),
+          smsAutoRespondPhoneNumbers: JSON.stringify([]),
+          excludedKeywords: JSON.stringify([]),
+          totalProcessed: 0,
+          responsesSent: 0,
+          responsesBlocked: 0,
+          averageConfidence: 0
+        };
+        res.json(defaultConfig);
+      } else {
+        res.json(config);
+      }
+    } catch (error: any) {
+      console.error("Error getting AI messaging config:", error);
+      res.status(500).json({ error: "Failed to get configuration: " + error.message });
+    }
+  });
+
+  // Update AI messaging configuration
+  app.put("/api/ai-messaging/config", async (req, res) => {
+    try {
+      const newConfig = req.body;
+      let config = await storage.getAiMessagingConfig();
+      
+      if (!config) {
+        // Create new configuration if none exists
+        config = await storage.createAiMessagingConfig(newConfig);
+      } else {
+        // Update existing configuration
+        config = await storage.updateAiMessagingConfig(config.id, newConfig);
+      }
+      
+      res.json({ success: true, message: "Configuration updated successfully", config });
+    } catch (error: any) {
+      console.error("Error updating AI messaging config:", error);
+      res.status(500).json({ error: "Failed to update configuration: " + error.message });
+    }
+  });
+
+  // Get AI messaging statistics
+  app.get("/api/ai-messaging/stats", async (req, res) => {
+    try {
+      const config = await storage.getAiMessagingConfig();
+      if (!config) {
+        return res.json({
+          totalProcessed: 0,
+          responsesSent: 0,
+          responsesBlocked: 0,
+          averageConfidence: 0,
+          topReasons: []
+        });
+      }
+      
+      res.json({
+        totalProcessed: config.totalProcessed || 0,
+        responsesSent: config.responsesSent || 0,
+        responsesBlocked: config.responsesBlocked || 0,
+        averageConfidence: config.averageConfidence || 0,
+        topReasons: []
+      });
+    } catch (error: any) {
+      console.error("Error getting AI messaging stats:", error);
+      res.status(500).json({ error: "Failed to get statistics: " + error.message });
+    }
+  });
+
   // SMS Auto-Respond API Routes
   // Process incoming SMS for auto-response
   app.post("/api/sms-auto-respond/process-sms", async (req, res) => {
@@ -6521,7 +6808,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
   // Get SMS auto-respond configuration
   app.get("/api/sms-auto-respond/config", async (req, res) => {
     try {
-      const config = smsAutoRespondService.getConfig();
+      const config = await smsAutoRespondService.getConfig();
       res.json(config);
     } catch (error: any) {
       console.error("Error getting SMS auto-respond config:", error);
@@ -6541,6 +6828,23 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Update SMS auto-respond phone numbers specifically
+  app.put("/api/sms-auto-respond/phone-numbers", async (req, res) => {
+    try {
+      const { phoneNumbers } = req.body;
+      
+      if (!phoneNumbers || !Array.isArray(phoneNumbers)) {
+        return res.status(400).json({ error: "phoneNumbers array is required" });
+      }
+      
+      await smsAutoRespondService.updateAutoRespondPhoneNumbers(phoneNumbers);
+      res.json({ success: true, message: "Phone numbers updated successfully" });
+    } catch (error: any) {
+      console.error("Error updating SMS auto-respond phone numbers:", error);
+      res.status(500).json({ error: "Failed to update phone numbers: " + error.message });
+    }
+  });
+
   // Get SMS auto-respond statistics
   app.get("/api/sms-auto-respond/stats", async (req, res) => {
     try {
@@ -6549,6 +6853,31 @@ If you didn't attempt to log in, please ignore this email and contact support im
     } catch (error: any) {
       console.error("Error getting SMS auto-respond stats:", error);
       res.status(500).json({ error: "Failed to get statistics: " + error.message });
+    }
+  });
+
+  // SMS auto-responder health check
+  app.get("/api/sms-auto-respond/health", async (req, res) => {
+    try {
+      const health = await smsAutoRespondService.healthCheck();
+      res.json(health);
+    } catch (error: any) {
+      console.error("Error checking SMS auto-respond health:", error);
+      res.status(500).json({ 
+        status: 'unhealthy',
+        error: "Failed to check health: " + error.message 
+      });
+    }
+  });
+
+  // Clear SMS auto-respond service instance (for development/testing)
+  app.post("/api/sms-auto-respond/clear-instance", async (req, res) => {
+    try {
+      SMSAutoRespondService.clearInstance();
+      res.json({ success: true, message: "SMS auto-responder service instance cleared" });
+    } catch (error: any) {
+      console.error("Error clearing SMS auto-respond service instance:", error);
+      res.status(500).json({ error: "Failed to clear service instance: " + error.message });
     }
   });
 
@@ -6615,6 +6944,149 @@ If you didn't attempt to log in, please ignore this email and contact support im
     } catch (error: any) {
       console.error("Error testing SMS auto-respond:", error);
       res.status(500).json({ error: "Failed to test SMS auto-respond: " + error.message });
+    }
+  });
+
+  // Test SMS auto-respond FAQ integration (bypasses SMS sending)
+  app.post("/api/sms-auto-respond/test-faq", async (req, res) => {
+    try {
+      const { from, to, body } = req.body;
+
+      if (!from || !body) {
+        return res.status(400).json({ error: "From and body are required" });
+      }
+
+      // Get FAQ data directly
+      const businessKnowledge = await storage.getBusinessKnowledge();
+      
+      // Create a test client
+      const testClient = {
+        id: 0,
+        phone: from,
+        firstName: 'Test',
+        lastName: 'Client',
+        email: '',
+        username: 'test_client',
+        password: 'temp',
+        role: 'client',
+        address: null,
+        city: null,
+        state: null,
+        zipCode: null,
+        createdAt: null
+      };
+
+      // Build context with FAQ data
+      const context = await smsAutoRespondService['buildContext'](testClient, {
+        from,
+        to: to || '+1234567890',
+        body,
+        timestamp: new Date().toISOString(),
+        messageId: `test_faq_${Date.now()}`
+      });
+
+      // Generate LLM response
+      const llmContext = {
+        clientName: context.client.name,
+        clientPhone: context.client.phone,
+        businessName: context.business.name,
+        businessType: 'salon and spa',
+        availableServices: context.business.services,
+        businessKnowledge: context.knowledge_base || [],
+        conversationHistory: [],
+        clientPreferences: {
+          smsAccountManagement: true,
+          smsAppointmentReminders: true,
+          smsPromotions: false
+        }
+      };
+
+      const llmResponse = await llmService.generateResponse(body, llmContext, 'sms');
+
+      res.json({
+        success: true,
+        faqData: {
+          count: businessKnowledge?.length || 0,
+          entries: businessKnowledge?.map((kb: any) => ({ title: kb.title, category: kb.category })) || []
+        },
+        llmResponse: {
+          success: llmResponse.success,
+          message: llmResponse.message,
+          confidence: llmResponse.confidence,
+          error: llmResponse.error
+        },
+        context: {
+          businessName: context.business.name,
+          services: context.business.services.length,
+          knowledgeBaseCount: context.knowledge_base?.length || 0
+        }
+      });
+    } catch (error: any) {
+      console.error("Error testing SMS auto-respond FAQ:", error);
+      res.status(500).json({ error: "Failed to test SMS auto-respond FAQ: " + error.message });
+    }
+  });
+
+  // Conversation Flow Management
+  // Get all conversation flows
+  app.get("/api/sms-auto-respond/conversation-flows", async (req, res) => {
+    try {
+      const flows = await storage.getConversationFlows();
+      res.json(flows || []);
+    } catch (error: any) {
+      console.error("Error getting conversation flows:", error);
+      res.status(500).json({ error: "Failed to get conversation flows: " + error.message });
+    }
+  });
+
+  // Create or update conversation flow
+  app.post("/api/sms-auto-respond/conversation-flows", async (req, res) => {
+    try {
+      const flow = req.body;
+      
+      if (!flow.name || !flow.steps || !Array.isArray(flow.steps)) {
+        return res.status(400).json({ error: "Flow name and steps array are required" });
+      }
+
+      const savedFlow = await storage.saveConversationFlow(flow);
+      res.json(savedFlow);
+    } catch (error: any) {
+      console.error("Error saving conversation flow:", error);
+      res.status(500).json({ error: "Failed to save conversation flow: " + error.message });
+    }
+  });
+
+  // Update conversation flow
+  app.put("/api/sms-auto-respond/conversation-flows", async (req, res) => {
+    try {
+      const flow = req.body;
+      
+      if (!flow.id || !flow.name || !flow.steps || !Array.isArray(flow.steps)) {
+        return res.status(400).json({ error: "Flow ID, name and steps array are required" });
+      }
+
+      const updatedFlow = await storage.updateConversationFlow(flow);
+      res.json(updatedFlow);
+    } catch (error: any) {
+      console.error("Error updating conversation flow:", error);
+      res.status(500).json({ error: "Failed to update conversation flow: " + error.message });
+    }
+  });
+
+  // Delete conversation flow
+  app.delete("/api/sms-auto-respond/conversation-flows/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return res.status(400).json({ error: "Flow ID is required" });
+      }
+
+      await storage.deleteConversationFlow(id);
+      res.json({ success: true, message: "Conversation flow deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting conversation flow:", error);
+      res.status(500).json({ error: "Failed to delete conversation flow: " + error.message });
     }
   });
 
@@ -7216,4 +7688,3 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
   return httpServer;
 }
-console.log("SERVER LOG TEST");

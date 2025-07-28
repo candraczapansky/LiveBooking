@@ -390,6 +390,15 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
 
       // If service doesn't exist but serviceInfo is provided, create the service
       if (!serviceId && serviceInfo) {
+        // Check if automatic service creation is disabled
+        if (process.env.DISABLE_AUTOMATIC_SERVICE_CREATION === 'true') {
+          console.log('Automatic service creation is disabled. Skipping service creation from webhook.');
+          return res.status(400).json({ 
+            error: "Automatic service creation is disabled",
+            message: "Please create services manually through the web interface"
+          });
+        }
+
         try {
           // First ensure we have a category
           let categoryId: number | undefined;

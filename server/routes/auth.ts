@@ -266,7 +266,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
     // Send SMS with reset code
     const message = `Your Glo Head Spa password reset code is: ${resetCode}. This code expires in 15 minutes.`;
     
-    if (isTwilioConfigured()) {
+    if (await isTwilioConfigured()) {
       const smsSent = await sendSMS(phone, message);
       if (smsSent) {
         LoggerService.logCommunication("sms", "password_reset_sent", { ...context, userId: user.id });

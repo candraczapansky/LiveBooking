@@ -4,13 +4,13 @@ import { AuthContext } from "@/contexts/AuthProvider";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { BusinessBrand } from "@/components/BusinessBrand";
+import { generateUsername, suggestUsernames } from "@/utils/username-generator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 // Login schema
@@ -42,6 +42,8 @@ const Login = () => {
   const [activeTab, setActiveTab] = useState<string>("login");
   const [loginError, setLoginError] = useState<string | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
 
   // Login form
@@ -118,8 +120,28 @@ const Login = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setRegisterError(errorData.error || "Registration failed"); // <-- Set error for user
-        throw new Error(errorData.error || "Registration failed");
+        console.log("Registration error response:", errorData);
+        
+        // Provide more specific error messages based on the error type
+        let errorMessage = "Registration failed";
+        if (errorData.message) {
+          if (errorData.message.includes("Username already exists")) {
+            errorMessage = "This username is already taken. Please choose a different username.";
+            // Generate suggestions when username conflict occurs
+            const suggestions = await suggestUsernames(values.firstName, values.lastName);
+            setUsernameSuggestions(suggestions);
+            setShowSuggestions(true);
+          } else if (errorData.message.includes("Email already exists")) {
+            errorMessage = "This email address is already registered. Please use a different email or try logging in.";
+          } else {
+            errorMessage = errorData.message;
+          }
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+        
+        setRegisterError(errorMessage);
+        throw new Error(errorMessage);
       }
 
       const userData = await response.json();
@@ -133,6 +155,18 @@ const Login = () => {
       if (!registerError) setRegisterError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Auto-generate username when first and last name change
+  const handleNameChange = async (firstName: string, lastName: string) => {
+    if (firstName && lastName) {
+      const generatedUsername = generateUsername(firstName, lastName);
+      registerForm.setValue("username", generatedUsername);
+      
+      // Generate suggestions
+      const suggestions = await suggestUsernames(firstName, lastName);
+      setUsernameSuggestions(suggestions);
     }
   };
 
@@ -266,7 +300,19 @@ const Login = () => {
                           <FormItem>
                             <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">First Name</FormLabel>
                             <FormControl>
-                              <Input placeholder="John" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                              <Input 
+                                placeholder="John" 
+                                className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                                {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const firstName = e.target.value;
+                                  const lastName = registerForm.getValues("lastName");
+                                  if (firstName && lastName) {
+                                    handleNameChange(firstName, lastName);
+                                  }
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -280,7 +326,19 @@ const Login = () => {
                           <FormItem>
                             <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Last Name</FormLabel>
                             <FormControl>
-                              <Input placeholder="Doe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                              <Input 
+                                placeholder="Doe" 
+                                className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                                {...field}
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const lastName = e.target.value;
+                                  const firstName = registerForm.getValues("firstName");
+                                  if (firstName && lastName) {
+                                    handleNameChange(firstName, lastName);
+                                  }
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -295,7 +353,31 @@ const Login = () => {
                         <FormItem>
                           <FormLabel className="text-xs font-medium text-gray-700 dark:text-gray-300">Username</FormLabel>
                           <FormControl>
-                            <Input placeholder="johndoe" className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" {...field} />
+                            <div className="relative">
+                              <Input 
+                                placeholder="johndoe" 
+                                className="h-9 text-sm px-2 rounded border border-gray-300 focus:border-primary focus:shadow-[0_0_0_2px_rgba(236,72,153,0.1)] focus:outline-none transition-all" 
+                                {...field} 
+                              />
+                              {usernameSuggestions.length > 0 && showSuggestions && (
+                                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                  <div className="p-2 text-xs text-gray-500 border-b">Suggested usernames:</div>
+                                  {usernameSuggestions.map((suggestion, index) => (
+                                    <button
+                                      key={index}
+                                      type="button"
+                                      className="w-full text-left px-2 py-1 text-sm hover:bg-gray-100 block"
+                                      onClick={() => {
+                                        registerForm.setValue("username", suggestion);
+                                        setShowSuggestions(false);
+                                      }}
+                                    >
+                                      {suggestion}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>

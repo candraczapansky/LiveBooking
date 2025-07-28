@@ -1,5 +1,7 @@
 import { IStorage } from './storage';
 import { LLMService } from './llm-service';
+import { SMSAppointmentBookingService } from './sms-appointment-booking';
+import { SMSAppointmentManagementService } from './sms-appointment-management';
 import { sendSMS } from './sms';
 
 interface SMSAutoRespondConfig {
@@ -34,18 +36,33 @@ interface SMSAutoRespondResult {
   reason?: string; // Why auto-response was not sent
 }
 
+interface BookingConversationState {
+  phoneNumber: string;
+  selectedService?: string;
+  selectedDate?: string;
+  selectedTime?: string;
+  lastUpdated: Date;
+  conversationStep: 'initial' | 'service_selected' | 'date_selected' | 'time_selected' | 'completed';
+}
+
 export class SMSAutoRespondService {
   private storage: IStorage;
   private llmService: LLMService;
+  private appointmentBookingService: SMSAppointmentBookingService;
+  private appointmentManagementService: SMSAppointmentManagementService;
   private config: SMSAutoRespondConfig;
+  private configLoaded: boolean = false;
+  private conversationStates: Map<string, BookingConversationState> = new Map();
 
   constructor(storage: IStorage) {
     this.storage = storage;
     this.llmService = new LLMService(storage);
+    this.appointmentBookingService = new SMSAppointmentBookingService(storage);
+    this.appointmentManagementService = new SMSAppointmentManagementService(storage);
     this.config = {
       enabled: true,
       confidenceThreshold: 0.7,
-      maxResponseLength: 160, // SMS character limit
+      maxResponseLength: 500, // Increased from 160 to 500 characters
       businessHoursOnly: false,
       businessHours: {
         start: "09:00",
@@ -56,14 +73,415 @@ export class SMSAutoRespondService {
         "urgent", "emergency", "complaint", "refund", "cancel", "cancellation",
         "reschedule", "change", "modify", "asap", "immediately", "help", "911"
       ],
-      excludedPhoneNumbers: [
-        // Add any phone numbers that should not trigger auto-responses
-      ],
-      autoRespondPhoneNumbers: [
-        // Add phone numbers that should receive auto-responses
-        // Format: "+1234567890"
-      ]
+      excludedPhoneNumbers: [],
+      autoRespondPhoneNumbers: []
     };
+    this.configLoaded = true; // Mark config as loaded
+  }
+
+  static getInstance(storage: IStorage): SMSAutoRespondService {
+    if (!(global as any).smsAutoRespondService) {
+      (global as any).smsAutoRespondService = new SMSAutoRespondService(storage);
+    }
+    return (global as any).smsAutoRespondService;
+  }
+
+  static clearInstance(): void {
+    if ((global as any).smsAutoRespondService) {
+      delete (global as any).smsAutoRespondService;
+      console.log('SMS Auto Responder Service singleton instance cleared');
+    }
+  }
+
+  /**
+   * Validate time format
+   */
+  private validateTimeFormat(time: string | undefined): { isValid: boolean; reason?: string } {
+    if (!time) return { isValid: false, reason: 'No time provided' };
+    
+    // Check for malformed patterns
+    if (time.includes('00 am') || time.includes('00 pm')) {
+      return { isValid: false, reason: 'Malformed time format (00 am/pm)' };
+    }
+    
+    // Check length
+    if (time.length < 2) {
+      return { isValid: false, reason: 'Time too short' };
+    }
+    
+    // Check for numeric time patterns
+    const timePattern = /^(\d{1,2}):?(\d{2})?\s*(am|pm)$/i;
+    const match = time.match(timePattern);
+    
+    if (match) {
+      const hour = parseInt(match[1]);
+      const minute = match[2] ? parseInt(match[2]) : 0;
+      
+      if (hour < 1 || hour > 12) {
+        return { isValid: false, reason: 'Invalid hour' };
+      }
+      
+      if (minute < 0 || minute > 59) {
+        return { isValid: false, reason: 'Invalid minute' };
+      }
+      
+      return { isValid: true };
+    }
+    
+    return { isValid: false, reason: 'Invalid time format' };
+  }
+
+  /**
+   * Determine message intent with improved logic
+   */
+  private getMessageIntent(smsText: string, phoneNumber: string): 'booking' | 'reschedule' | 'cancel' | 'business_question' | 'general' {
+    const text = smsText.toLowerCase().trim();
+    
+    // Get current conversation state
+    const conversationState = this.getConversationState(phoneNumber);
+    const inBookingConversation = conversationState && conversationState.conversationStep !== 'initial';
+    
+    console.log(`🔍 Intent analysis for: "${smsText}"`);
+    console.log(`🔍 Conversation state:`, conversationState);
+    console.log(`🔍 In booking conversation:`, inBookingConversation);
+    
+    // PRIORITY 1: Check for explicit reschedule intent
+    if (this.isRescheduleRequest(smsText)) {
+      console.log(`✅ Intent: reschedule (explicit)`);
+      return 'reschedule';
+    }
+    
+    // PRIORITY 2: Check for explicit cancel intent
+    if (this.isCancelRequest(smsText)) {
+      console.log(`✅ Intent: cancel (explicit)`);
+      return 'cancel';
+    }
+    
+    // PRIORITY 3: Check for business questions (highest priority for non-booking)
+    if (this.isBusinessQuestion(smsText)) {
+      console.log(`✅ Intent: business_question (explicit)`);
+      return 'business_question';
+    }
+    
+    // PRIORITY 4: Check for explicit booking intent
+    if (this.isAppointmentBookingRequest(smsText, phoneNumber)) {
+      console.log(`✅ Intent: booking (explicit or context-based)`);
+      return 'booking';
+    }
+    
+    // PRIORITY 5: Check for simple greetings (should not be booking unless in booking context)
+    const isSimpleGreeting = this.isSimpleGreeting(smsText);
+    console.log(`🔍 isSimpleGreeting result:`, isSimpleGreeting);
+    
+    if (isSimpleGreeting) {
+      console.log(`✅ Intent: general (simple greeting)`);
+      return 'general';
+    }
+    
+    // PRIORITY 6: Default to general for anything else
+    console.log(`✅ Intent: general (default)`);
+    return 'general';
+  }
+
+  /**
+   * Improved appointment booking request detection
+   */
+  private isAppointmentBookingRequest(smsText: string, phoneNumber: string): boolean {
+    const text = smsText.toLowerCase().trim();
+    
+    console.log(`🔍 isAppointmentBookingRequest called with: "${smsText}"`);
+    
+    // Check for explicit booking keywords
+    const bookingKeywords = [
+      'book', 'booking', 'appointment', 'schedule', 'reserve', 'make an appointment',
+      'want to book', 'need an appointment', 'looking to book', 'can i book',
+      'i want to book', 'i need to book', 'book me', 'book a', 'book the'
+    ];
+    
+    // Check for service + booking combination
+    const serviceKeywords = [
+      'signature head spa', 'deluxe head spa', 'platinum head spa', 'head spa',
+      'massage', 'facial', 'haircut', 'styling', 'treatment'
+    ];
+    
+    // Check for time/date keywords
+    const timeKeywords = [
+      'today', 'tomorrow', 'next week', 'this week', 'monday', 'tuesday', 'wednesday',
+      'thursday', 'friday', 'saturday', 'sunday', 'morning', 'afternoon', 'evening',
+      'am', 'pm', 'o\'clock', 'at', 'for'
+    ];
+    
+    // Check for availability questions (should be treated as booking requests)
+    const availabilityKeywords = [
+      'available', 'availability', 'when can i', 'what times', 'open slots',
+      'do you have', 'can i get', 'is there', 'any openings', 'any slots'
+    ];
+    
+    // Get conversation state
+    const conversationState = this.getConversationState(phoneNumber);
+    const inBookingConversation = conversationState && conversationState.conversationStep !== 'initial';
+    
+    console.log(`🔍 Booking request analysis for: "${smsText}"`);
+    console.log(`🔍 Conversation state:`, conversationState);
+    console.log(`🔍 In booking conversation:`, inBookingConversation);
+    
+    // PRIORITY 1: If it's clearly a pricing question, it's NOT a booking request
+    if (text.includes('how much') || text.includes('cost') || text.includes('price') || text.includes('pricing')) {
+      console.log(`❌ Not a booking request: Contains pricing keywords`);
+      return false;
+    }
+    
+    // PRIORITY 2: If it's a business information question, it's NOT a booking request
+    if (text.includes('what services') || text.includes('services do you offer') || 
+        text.includes('when are you open') || text.includes('what are your hours') ||
+        text.includes('where are you') || text.includes('what\'s your address')) {
+      console.log(`❌ Not a booking request: Contains business info keywords`);
+      return false;
+    }
+    
+    // PRIORITY 3: Check for explicit booking intent
+    const hasBookingIntent = bookingKeywords.some(keyword => text.includes(keyword));
+    console.log(`🔍 Has booking intent:`, hasBookingIntent);
+    console.log(`🔍 Matching keywords:`, bookingKeywords.filter(keyword => text.includes(keyword)));
+    
+    if (hasBookingIntent) {
+      console.log(`✅ Is a booking request: Contains explicit booking keywords`);
+      return true;
+    }
+    
+    // PRIORITY 4: Check for availability questions
+    const hasAvailabilityIntent = availabilityKeywords.some(keyword => text.includes(keyword));
+    if (hasAvailabilityIntent) {
+      console.log(`✅ Is a booking request: Availability question`);
+      return true;
+    }
+    
+    // PRIORITY 5: Check for service + time/date combination
+    const hasServiceAndTime = serviceKeywords.some(service => text.includes(service)) &&
+                             timeKeywords.some(time => text.includes(time));
+    if (hasServiceAndTime) {
+      console.log(`✅ Is a booking request: Service + time combination`);
+      return true;
+    }
+    
+    // PRIORITY 6: If in booking conversation, treat as booking request
+    if (inBookingConversation) {
+      console.log(`✅ Is a booking request: In booking conversation`);
+      return true;
+    }
+    
+    // PRIORITY 7: Check for time/date keywords (SIMPLIFIED - treat as booking request)
+    const hasTimeKeywords = timeKeywords.some(keyword => text.includes(keyword));
+    if (hasTimeKeywords) {
+      console.log(`✅ Is a booking request: Contains time/date keywords`);
+      return true;
+    }
+    
+    // PRIORITY 8: If it's a simple greeting, it's NOT a booking request
+    if (this.isSimpleGreeting(smsText)) {
+      console.log(`❌ Not a booking request: Simple greeting without booking context`);
+      return false;
+    }
+    
+    // Default: not a booking request
+    console.log(`❌ Not a booking request: No clear booking intent detected`);
+    return false;
+  }
+
+  /**
+   * Check if message is a reschedule request
+   */
+  private isRescheduleRequest(smsText: string): boolean {
+    const text = smsText.toLowerCase();
+    const rescheduleKeywords = [
+      'reschedule', 'change appointment', 'move appointment', 'change time',
+      'move time', 'change date', 'move date', 'reschedule appointment'
+    ];
+    
+    return rescheduleKeywords.some(keyword => text.includes(keyword));
+  }
+
+  /**
+   * Check if message is a cancel request
+   */
+  private isCancelRequest(smsText: string): boolean {
+    const text = smsText.toLowerCase();
+    const cancelKeywords = [
+      'cancel', 'cancellation', 'cancel appointment', 'cancel booking',
+      'cancel my appointment', 'cancel my booking'
+    ];
+    
+    return cancelKeywords.some(keyword => text.includes(keyword));
+  }
+
+  /**
+   * Improved business question detection
+   */
+  private isBusinessQuestion(smsText: string): boolean {
+    const text = smsText.toLowerCase().trim();
+    
+    // Business question keywords - expanded for better coverage
+    const businessKeywords = [
+      'what services', 'services do you offer', 'what do you offer',
+      'when are you open', 'what are your hours', 'hours of operation',
+      'where are you', 'what\'s your address', 'location', 'directions',
+      'how much', 'cost', 'price', 'pricing', 'what does it cost',
+      'do you have', 'do you offer', 'can you tell me', 'what time',
+      'what days', 'are you open', 'when do you', 'where do you',
+      'head spa cost', 'how much is', 'what\'s the price', 'what\'s the cost',
+      'tell me about', 'information about', 'details about', 'what about',
+      'do you do', 'can you do', 'offer any', 'have any', 'provide any'
+    ];
+    
+    // Check if message contains business question keywords
+    const isBusinessQuestion = businessKeywords.some(keyword => text.includes(keyword));
+    
+    console.log(`🔍 Business question analysis for: "${smsText}"`);
+    console.log(`🔍 Is business question:`, isBusinessQuestion);
+    
+    return isBusinessQuestion;
+  }
+
+  /**
+   * Improved simple greeting detection
+   */
+  private isSimpleGreeting(smsText: string): boolean {
+    const text = smsText.toLowerCase().trim();
+    
+    const simpleGreetings = [
+      'hi', 'hello', 'hey', 'good morning', 'good afternoon', 'good evening'
+    ];
+    
+    const result = simpleGreetings.some(greeting => text === greeting);
+    
+    console.log('isSimpleGreeting debug:', {
+      originalMessage: smsText,
+      trimmedMessage: text,
+      simpleGreetings: simpleGreetings,
+      result: result
+    });
+    
+    return result;
+  }
+
+  /**
+   * Get conversation state for a phone number
+   */
+  private getConversationState(phoneNumber: string): BookingConversationState | undefined {
+    const state = this.conversationStates.get(phoneNumber);
+    
+    if (state) {
+      // Check if the state is stale (older than 6 minutes - reduced from 8)
+      const now = new Date();
+      const timeDiff = now.getTime() - state.lastUpdated.getTime();
+      const sixMinutes = 6 * 60 * 1000; // 6 minutes in milliseconds
+      
+      if (timeDiff > sixMinutes) {
+        console.log(`🔄 Clearing stale conversation state for ${phoneNumber} (${Math.round(timeDiff / 60000)} minutes old)`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      // Check for malformed time data and clear if found
+      if (state.selectedTime && 
+          (state.selectedTime.includes('00 am') || 
+           state.selectedTime.includes('00 pm') ||
+           state.selectedTime === 'undefined' ||
+           state.selectedTime === 'null' ||
+           state.selectedTime === '' ||
+           state.selectedTime.length < 2)) {
+        console.log(`🔄 Clearing conversation state with malformed time: ${state.selectedTime}`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      // Check for malformed service data and clear if found
+      if (state.selectedService && 
+          (state.selectedService === 'undefined' ||
+           state.selectedService === 'null' ||
+           state.selectedService === '' ||
+           state.selectedService.length < 2)) {
+        console.log(`🔄 Clearing conversation state with malformed service: ${state.selectedService}`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      // Check for malformed date data and clear if found
+      if (state.selectedDate && 
+          (state.selectedDate === 'undefined' ||
+           state.selectedDate === 'null' ||
+           state.selectedDate === '' ||
+           state.selectedDate.length < 2)) {
+        console.log(`🔄 Clearing conversation state with malformed date: ${state.selectedDate}`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      // If conversation has been in the same step for more than 2 minutes, clear it (reduced from 3)
+      if (state.conversationStep !== 'initial' && timeDiff > 2 * 60 * 1000) {
+        console.log(`🔄 Clearing conversation state stuck in step: ${state.conversationStep} for ${Math.round(timeDiff / 60000)} minutes`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      // Additional validation: Check if the state makes logical sense
+      if (state.conversationStep === 'time_selected' && !state.selectedTime) {
+        console.log(`🔄 Clearing conversation state: time_selected step but no time selected`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      if (state.conversationStep === 'date_selected' && !state.selectedDate) {
+        console.log(`🔄 Clearing conversation state: date_selected step but no date selected`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      if (state.conversationStep === 'service_selected' && !state.selectedService) {
+        console.log(`🔄 Clearing conversation state: service_selected step but no service selected`);
+        this.conversationStates.delete(phoneNumber);
+        return undefined;
+      }
+      
+      return state;
+    }
+    
+    return undefined;
+  }
+
+  /**
+   * Update conversation state for a phone number
+   */
+  private updateConversationState(phoneNumber: string, updates: Partial<BookingConversationState>): void {
+    const currentState = this.conversationStates.get(phoneNumber);
+    
+    const newState: BookingConversationState = {
+      phoneNumber,
+      selectedService: updates.selectedService || currentState?.selectedService,
+      selectedDate: updates.selectedDate || currentState?.selectedDate,
+      selectedTime: updates.selectedTime || currentState?.selectedTime,
+      lastUpdated: new Date(),
+      conversationStep: updates.conversationStep || currentState?.conversationStep || 'initial'
+    };
+    
+    this.conversationStates.set(phoneNumber, newState);
+    
+    console.log(`📝 Updated conversation state for ${phoneNumber}:`, {
+      step: newState.conversationStep,
+      service: newState.selectedService,
+      date: newState.selectedDate,
+      time: newState.selectedTime
+    });
+  }
+
+  /**
+   * Clear conversation state for a phone number
+   */
+  private clearConversationState(phoneNumber: string): void {
+    const wasDeleted = this.conversationStates.delete(phoneNumber);
+    if (wasDeleted) {
+      console.log(`🗑️ Cleared conversation state for ${phoneNumber}`);
+    }
   }
 
   /**
@@ -71,7 +489,7 @@ export class SMSAutoRespondService {
    */
   async processIncomingSMS(sms: IncomingSMS): Promise<SMSAutoRespondResult> {
     try {
-      console.log('Processing incoming SMS for auto-response:', {
+      console.log('SMS Auto Responder - Processing incoming SMS:', {
         from: sms.from,
         body: sms.body.substring(0, 50) + '...',
         timestamp: sms.timestamp
@@ -125,71 +543,46 @@ export class SMSAutoRespondService {
       // Find or create client
       const client = await this.findOrCreateClient(sms.from);
       
-      // Build context for LLM
-      const context = await this.buildContext(client, sms);
+      // Determine message intent
+      const intent = this.getMessageIntent(sms.body, sms.from);
+      console.log('SMS Auto Responder - Message intent:', {
+        smsBody: sms.body,
+        intent: intent
+      });
 
-      // Generate AI response
-      const prompt = `You are a helpful customer service representative for a business. 
-      A customer has sent an SMS message. Please provide a helpful, professional, and concise response.
-      
-      Customer message: "${sms.body}"
-      
-      Business context: ${JSON.stringify(context, null, 2)}
-      
-      Please respond in a friendly, professional manner. Keep the response under ${this.config.maxResponseLength} characters.
-      If the message requires immediate attention or is urgent, acknowledge it and let them know someone will contact them soon.`;
-
-      const llmResponse = await this.llmService.generateResponse(prompt, context, 'sms');
-      
-      if (!llmResponse.success || !llmResponse.message) {
-        console.log('LLM failed to generate response, using fallback');
-        const fallbackResponse = this.generateFallbackResponse(sms.body, context);
-        return await this.sendFallbackResponse(sms, fallbackResponse, client);
+      // Clear conversation state if intent changes significantly
+      const conversationState = this.getConversationState(sms.from);
+      if (conversationState && 
+          conversationState.conversationStep !== 'initial' && 
+          intent !== 'booking' && 
+          intent !== 'reschedule' && 
+          intent !== 'cancel') {
+        console.log('🔄 Clearing conversation state due to intent change');
+        this.clearConversationState(sms.from);
       }
 
-      const confidence = llmResponse.confidence || 0.5;
-      
-      // Check confidence threshold
-      if (confidence < this.config.confidenceThreshold) {
-        return {
-          success: true,
-          responseSent: false,
-          reason: `Confidence too low (${(confidence * 100).toFixed(0)}% < ${(this.config.confidenceThreshold * 100).toFixed(0)}%)`
-        };
-      }
-
-      // Truncate response if too long
-      let response = llmResponse.message;
-      if (response.length > this.config.maxResponseLength) {
-        response = response.substring(0, this.config.maxResponseLength - 3) + '...';
-      }
-
-      // Send SMS response
-      const smsResult = await sendSMS(sms.from, response);
-      
-      if (smsResult.success) {
-        console.log('SMS auto-response sent successfully:', {
-          to: sms.from,
-          messageId: smsResult.messageId,
-          confidence: confidence
-        });
-
-        // Log the auto-response
-        await this.logAutoResponse(sms, response, confidence, client);
-
-        return {
-          success: true,
-          responseSent: true,
-          response: response,
-          confidence: confidence
-        };
-      } else {
-        console.error('Failed to send SMS auto-response:', smsResult.error);
-        return {
-          success: false,
-          responseSent: false,
-          error: smsResult.error
-        };
+      // Handle different intents
+      switch (intent) {
+        case 'booking':
+          console.log('SMS Auto Responder - Processing booking request');
+          return await this.handleBookingRequest(sms, client);
+          
+        case 'reschedule':
+          console.log('SMS Auto Responder - Processing reschedule request');
+          return await this.handleRescheduleRequest(sms, client);
+          
+        case 'cancel':
+          console.log('SMS Auto Responder - Processing cancel request');
+          return await this.handleCancelRequest(sms, client);
+          
+        case 'business_question':
+          console.log('SMS Auto Responder - Processing business question');
+          return await this.handleBusinessQuestion(sms, client);
+          
+        case 'general':
+        default:
+          console.log('SMS Auto Responder - Processing general message');
+          return await this.handleGeneralMessage(sms, client);
       }
 
     } catch (error: any) {
@@ -229,25 +622,24 @@ export class SMSAutoRespondService {
           city: null,
           state: null,
           zipCode: null,
-          country: null,
-          dateOfBirth: null,
-          gender: null,
-          emergencyContact: null,
-          emergencyPhone: null,
-          medicalConditions: null,
-          allergies: null,
-          preferences: null,
-          notes: null,
-          isActive: true,
-          emailVerified: false,
-          phoneVerified: false,
-          lastLogin: null,
           profilePicture: null,
           squareCustomerId: null,
           resetToken: null,
           resetTokenExpiry: null,
           createdAt: null,
-          updatedAt: null
+          // Add required fields with defaults
+          emailAccountManagement: true,
+          emailAppointmentReminders: true,
+          emailPromotions: false,
+          smsAccountManagement: false,
+          smsAppointmentReminders: true,
+          smsPromotions: false,
+          twoFactorEnabled: false,
+          twoFactorSecret: null,
+          twoFactorBackupCodes: null,
+          twoFactorMethod: 'authenticator',
+          twoFactorEmailCode: null,
+          twoFactorEmailCodeExpiry: null
         };
         console.log('Using temporary client for SMS auto-respond:', client);
       }
@@ -271,13 +663,13 @@ export class SMSAutoRespondService {
   private async buildContext(client: any, sms: IncomingSMS): Promise<any> {
     try {
       // Get recent appointments for context
-      const appointments = await this.storage.getAppointments();
+      const appointments = await this.storage.getAllAppointments();
       const clientAppointments = appointments.filter((apt: any) => 
         apt.client_id === client.id
       ).slice(-5); // Last 5 appointments
 
       // Get business information
-      const business = await this.storage.getBusinessInfo();
+      const businessSettings = await this.storage.getBusinessSettings();
 
       return {
         client: {
@@ -287,9 +679,9 @@ export class SMSAutoRespondService {
           recent_appointments: clientAppointments
         },
         business: {
-          name: business?.name || 'Our Business',
-          services: business?.services || [],
-          hours: business?.hours || '9 AM - 5 PM'
+          name: businessSettings?.businessName || 'Our Business',
+          services: [],
+          hours: '9 AM - 5 PM'
         },
         message_type: 'SMS',
         timestamp: sms.timestamp
@@ -308,6 +700,243 @@ export class SMSAutoRespondService {
         message_type: 'SMS'
       };
     }
+  }
+
+  /**
+   * Build enhanced context for LLM with comprehensive RAG data
+   */
+  private async buildEnhancedContext(client: any, sms: IncomingSMS): Promise<any> {
+    try {
+      console.log('🔍 Building enhanced RAG context for client:', client.id);
+      
+      // 1. Get real-time business data
+      const businessSettings = await this.storage.getBusinessSettings();
+      const services = await this.storage.getAllServices();
+      const staff = await this.storage.getAllStaff();
+      const businessKnowledge = await this.storage.getBusinessKnowledge();
+      
+      // 2. Get real-time availability data
+      const existingAppointments = await this.storage.getAllAppointments();
+      const today = new Date();
+      const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      // Filter appointments for next 7 days
+      const upcomingAppointments = existingAppointments.filter((apt: any) => {
+        const aptDate = new Date(apt.startTime);
+        return aptDate >= today && aptDate <= nextWeek;
+      });
+      
+      // 3. Get client-specific data
+      const clientAppointments = existingAppointments.filter((apt: any) => 
+        apt.client_id === client.id
+      ).slice(-10); // Last 10 appointments for better context
+      
+      const clientPreferences = {
+        emailAccountManagement: client.emailAccountManagement || false,
+        emailAppointmentReminders: client.emailAppointmentReminders || false,
+        emailPromotions: client.emailPromotions || false,
+        smsAccountManagement: client.smsAccountManagement || false,
+        smsAppointmentReminders: client.smsAppointmentReminders || false,
+        smsPromotions: client.smsPromotions || false,
+      };
+      
+      // 4. Get staff details with schedules
+      const staffWithSchedules = await Promise.all(
+        staff.map(async (s) => {
+          const user = await this.storage.getUser(s.userId);
+          const schedules = await this.storage.getStaffSchedulesByStaffId(s.id);
+          const staffServices = await this.storage.getStaffServices(s.id);
+          
+          return {
+            id: s.id,
+            name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Unknown',
+            title: s.title,
+            bio: s.bio || undefined,
+            schedules: schedules,
+            services: staffServices.map((ss: any) => {
+              const service = services.find(svc => svc.id === ss.serviceId);
+              return service ? service.name : 'Unknown Service';
+            })
+          };
+        })
+      );
+      
+      // 5. Get real-time availability for next 7 days
+      const availabilityData = await this.generateAvailabilityData(services, staffWithSchedules, upcomingAppointments);
+      
+      // 6. Categorize business knowledge for better retrieval
+      const categorizedKnowledge = this.categorizeBusinessKnowledge(businessKnowledge);
+      
+      console.log('📊 Enhanced RAG Context Summary:');
+      console.log(`- Services: ${services.length}`);
+      console.log(`- Staff: ${staff.length}`);
+      console.log(`- Business Knowledge: ${businessKnowledge.length} entries`);
+      console.log(`- Upcoming Appointments: ${upcomingAppointments.length}`);
+      console.log(`- Client Appointments: ${clientAppointments.length}`);
+      console.log(`- Availability Slots: ${availabilityData.totalSlots}`);
+      
+      return {
+        // Client Information
+        client: {
+          id: client.id,
+          name: `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username,
+          phone: client.phone,
+          email: client.email,
+          preferences: clientPreferences,
+          recent_appointments: clientAppointments.map((apt: any) => ({
+            id: apt.id,
+            service: apt.serviceName,
+            date: apt.startTime,
+            status: apt.status,
+            totalAmount: apt.totalAmount
+          })),
+          total_appointments: clientAppointments.length
+        },
+        
+        // Business Information
+        business: {
+          name: businessSettings?.businessName || 'Glo Head Spa',
+          type: 'salon and spa',
+          settings: businessSettings,
+          current_time: new Date().toISOString(),
+          timezone: 'America/Chicago'
+        },
+        
+        // Real-time Service Data
+        services: services.map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description || undefined,
+          price: s.price,
+          duration: s.duration
+        })),
+        
+        // Real-time Staff Data
+        staff: staffWithSchedules,
+        
+        // Real-time Availability
+        availability: {
+          next_7_days: availabilityData.next7Days,
+          total_slots: availabilityData.totalSlots,
+          popular_times: availabilityData.popularTimes,
+          busy_days: availabilityData.busyDays
+        },
+        
+        // Business Knowledge (FAQ) - Categorized
+        businessKnowledge: {
+          all: businessKnowledge,
+          categorized: categorizedKnowledge,
+          categories: Object.keys(categorizedKnowledge)
+        },
+        
+        // Appointment Data
+        appointments: {
+          upcoming: upcomingAppointments.length,
+          client_history: clientAppointments.length,
+          recent_bookings: upcomingAppointments.slice(0, 5)
+        },
+        
+        // Message Context
+        message: {
+          type: 'SMS',
+          timestamp: sms.timestamp,
+          body: sms.body,
+          from: sms.from
+        }
+      };
+      
+    } catch (error) {
+      console.error('Error building enhanced RAG context:', error);
+      // Fallback to basic context
+      return this.buildContext(client, sms);
+    }
+  }
+  
+  /**
+   * Generate real-time availability data
+   */
+  private async generateAvailabilityData(services: any[], staffWithSchedules: any[], upcomingAppointments: any[]) {
+    const today = new Date();
+    const next7Days = [];
+    let totalSlots = 0;
+    const popularTimes: { [key: string]: number } = {};
+    const busyDays: { [key: string]: number } = {};
+    
+    // Generate availability for next 7 days
+    for (let i = 0; i < 7; i++) {
+      const targetDate = new Date(today);
+      targetDate.setDate(today.getDate() + i);
+      const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+      
+      // Count appointments for this day
+      const dayAppointments = upcomingAppointments.filter((apt: any) => {
+        const aptDate = new Date(apt.startTime);
+        return aptDate.toDateString() === targetDate.toDateString();
+      });
+      
+      busyDays[dayName] = dayAppointments.length;
+      
+      // Calculate available slots for this day
+      let daySlots = 0;
+      for (const staff of staffWithSchedules) {
+        const daySchedules = staff.schedules.filter((schedule: any) => 
+          schedule.dayOfWeek === dayName && !schedule.isBlocked
+        );
+        
+        for (const schedule of daySchedules) {
+          // Calculate slots based on schedule and service durations
+          const startTime = new Date(`2000-01-01T${schedule.startTime}`);
+          const endTime = new Date(`2000-01-01T${schedule.endTime}`);
+          const durationMs = endTime.getTime() - startTime.getTime();
+          
+          // Assume average service duration of 60 minutes
+          const slotsPerDay = Math.floor(durationMs / (60 * 60 * 1000));
+          daySlots += slotsPerDay;
+          
+          // Track popular times
+          const timeSlot = `${startTime.getHours()}:00`;
+          popularTimes[timeSlot] = (popularTimes[timeSlot] || 0) + 1;
+        }
+      }
+      
+      totalSlots += daySlots;
+      next7Days.push({
+        date: targetDate.toISOString().split('T')[0],
+        day: dayName,
+        available_slots: daySlots,
+        booked_appointments: dayAppointments.length,
+        availability_percentage: daySlots > 0 ? ((daySlots - dayAppointments.length) / daySlots * 100).toFixed(1) : '0'
+      });
+    }
+    
+    return {
+      next7Days,
+      totalSlots,
+      popularTimes: Object.entries(popularTimes)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([time, count]) => ({ time, count })),
+      busyDays: Object.entries(busyDays)
+        .sort(([,a], [,b]) => b - a)
+        .map(([day, count]) => ({ day, count }))
+    };
+  }
+  
+  /**
+   * Categorize business knowledge for better retrieval
+   */
+  private categorizeBusinessKnowledge(businessKnowledge: any[]) {
+    const categorized: { [key: string]: any[] } = {};
+    
+    businessKnowledge.forEach(item => {
+      const category = item.category || 'general';
+      if (!categorized[category]) {
+        categorized[category] = [];
+      }
+      categorized[category].push(item);
+    });
+    
+    return categorized;
   }
 
   /**
@@ -370,6 +999,14 @@ export class SMSAutoRespondService {
   async updateConfig(newConfig: Partial<SMSAutoRespondConfig>): Promise<void> {
     this.config = { ...this.config, ...newConfig };
     console.log('SMS auto-respond configuration updated:', this.config);
+  }
+
+  /**
+   * Update auto-respond phone numbers
+   */
+  async updateAutoRespondPhoneNumbers(phoneNumbers: string[]): Promise<void> {
+    this.config.autoRespondPhoneNumbers = phoneNumbers;
+    console.log('SMS auto-respond phone numbers updated:', phoneNumbers);
   }
 
   /**
@@ -478,6 +1115,575 @@ export class SMSAutoRespondService {
         averageConfidence: 0,
         topReasons: []
       };
+    }
+  }
+
+  /**
+   * Ensure OpenAI API key is available
+   */
+  private async ensureOpenAIKey(): Promise<boolean> {
+    try {
+      const apiKey = process.env.OPENAI_API_KEY;
+      return !!apiKey;
+    } catch (error) {
+      console.error('Error checking OpenAI API key:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Health check for SMS auto-respond service
+   */
+  async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; configLoaded: boolean; openAIKeyAvailable: boolean; storageConnected: boolean; issues: string[] }> {
+    const issues: string[] = [];
+    
+    try {
+      // Check if config is loaded
+      if (!this.configLoaded) {
+        issues.push('Configuration not loaded');
+      }
+      
+      // Check if OpenAI key is available
+      const openAIKeyAvailable = await this.ensureOpenAIKey();
+      if (!openAIKeyAvailable) {
+        issues.push('OpenAI API key not available');
+      }
+      
+      // Check if storage is connected
+      let storageConnected = false;
+      try {
+        await this.storage.getAllServices();
+        storageConnected = true;
+      } catch (error) {
+        issues.push('Storage connection failed');
+      }
+      
+      const status = issues.length === 0 ? 'healthy' : 'unhealthy';
+      
+      return {
+        status,
+        configLoaded: this.configLoaded,
+        openAIKeyAvailable,
+        storageConnected,
+        issues
+      };
+    } catch (error) {
+      console.error('Error during health check:', error);
+      return {
+        status: 'unhealthy',
+        configLoaded: this.configLoaded,
+        openAIKeyAvailable: false,
+        storageConnected: false,
+        issues: ['Health check failed']
+      };
+    }
+  }
+
+  /**
+   * Handle booking request
+   */
+  private async handleBookingRequest(sms: IncomingSMS, client: any): Promise<SMSAutoRespondResult> {
+    try {
+      // Get current conversation state
+      const conversationState = this.getConversationState(sms.from);
+      console.log('SMS Auto Responder - Current conversation state:', conversationState);
+      
+      // Parse the booking request
+      const parsedRequest = await this.appointmentBookingService.parseBookingRequest(sms.body, sms.from);
+      console.log('SMS Auto Responder - Parsed request:', parsedRequest);
+      
+      // FIXED: PRIORITY 1 - If no service is specified, ask for service selection FIRST
+      if (!parsedRequest.serviceName) {
+        console.log('🎯 No service specified in parsed request, asking for service selection');
+        
+        // Clear any existing conversation state to start fresh
+        if (conversationState) {
+          console.log('🧹 Clearing existing conversation state to start fresh');
+          this.clearConversationState(sms.from);
+        }
+        
+        // Always fetch current services from database to ensure we don't offer deleted services
+        let serviceList = '';
+        try {
+          const currentServices = await this.storage.getAllServices();
+          serviceList = currentServices.map((service: any) => 
+            `• ${service.name} - $${service.price} (${service.duration} minutes)`
+          ).join('\n');
+        } catch (error) {
+          console.error('Error fetching services for booking request:', error);
+          serviceList = '• Signature Head Spa - $99 (60 minutes)'; // Minimal fallback
+        }
+        
+        const response = `Great! I'd be happy to help you book an appointment. What type of service would you like?\n\n` +
+                         `Our services include:\n` +
+                         `${serviceList}\n\n` +
+                         `Just let me know which service you'd like to book! 💆‍♀️✨`;
+        
+        await this.sendSMSResponse(sms, response, 0.9, client);
+        
+        return {
+          success: true,
+          responseSent: true,
+          response: response,
+          confidence: 0.9
+        };
+      }
+      
+      // Handle case where date is specified (with or without service) - PRIORITY 1
+      if (parsedRequest.date) {
+        console.log('📅 Date specified, processing date selection');
+        
+        // Get or create conversation state
+        let currentState = conversationState || {
+          phoneNumber: sms.from,
+          conversationStep: 'initial',
+          lastUpdated: new Date()
+        };
+        
+        // Update conversation state with date
+        this.updateConversationState(sms.from, {
+          ...currentState,
+          selectedDate: parsedRequest.date,
+          selectedService: parsedRequest.serviceName || currentState.selectedService,
+          conversationStep: 'date_selected'
+        });
+        
+        // Use the appointment booking service to find available slots
+        try {
+          const enhancedRequest = {
+            serviceName: parsedRequest.serviceName || currentState.selectedService || 'signature head spa',
+            date: parsedRequest.date,
+            time: parsedRequest.time,
+            clientPhone: sms.from,
+            clientName: client.firstName
+          };
+          
+          console.log('🔍 Processing booking request with context:', {
+            request: enhancedRequest,
+            conversationState: this.getConversationState(sms.from)
+          });
+          
+          // Use the existing appointment booking service to find available slots
+          const bookingResult = await this.appointmentBookingService.processBookingRequestWithContext(
+            enhancedRequest, 
+            sms.from,
+            this.getConversationState(sms.from)
+          );
+          
+          if (bookingResult.success && bookingResult.appointment) {
+            // Appointment was successfully booked
+            console.log('SMS Auto Responder - Appointment booked successfully:', bookingResult.appointment);
+            this.clearConversationState(sms.from);
+            
+            await this.sendSMSResponse(sms, bookingResult.message, 1.0, client);
+            
+            return {
+              success: true,
+              responseSent: true,
+              response: bookingResult.message,
+              confidence: 1.0
+            };
+          } else {
+            // Need more information or error
+            console.log('SMS Auto Responder - Booking request processed:', bookingResult.message);
+            
+            await this.sendSMSResponse(sms, bookingResult.message, 0.9, client);
+            
+            return {
+              success: true,
+              responseSent: true,
+              response: bookingResult.message,
+              confidence: 0.9
+            };
+          }
+          
+        } catch (error) {
+          console.error('Error processing booking with date:', error);
+          
+          const response = `I'm sorry, but I'm having trouble processing your booking request for ${parsedRequest.date}. Please try again or call us at 9189325396 for assistance. 📞`;
+          await this.sendSMSResponse(sms, response, 0.7, client);
+          
+          return {
+            success: true,
+            responseSent: true,
+            response: response,
+            confidence: 0.7
+          };
+        }
+      }
+      
+      // Handle case where service is specified but no date/time - PRIORITY 2
+      if (parsedRequest.serviceName && !parsedRequest.date && !parsedRequest.time) {
+        console.log('🎯 Service specified but no date/time, asking for date selection');
+        
+        // Update conversation state with selected service
+        this.updateConversationState(sms.from, {
+          selectedService: parsedRequest.serviceName,
+          conversationStep: 'service_selected'
+        });
+        
+        // Fetch current services for dynamic response
+        let serviceList: string;
+        try {
+          const currentServices = await this.storage.getAllServices();
+          serviceList = currentServices.map((service: any) => 
+            `• ${service.name} - $${service.price} (${service.duration} minutes)`
+          ).join('\n');
+        } catch (error) {
+          console.error('Error fetching services for service selection:', error);
+          serviceList = '• Signature Head Spa - $99 (60 minutes)'; // Minimal fallback
+        }
+        
+        const response = `Great choice! I'd be happy to help you book a ${parsedRequest.serviceName} appointment. When would you like to come in? Here are some available times:\n\n` +
+                         `• Saturday, July 26 at 12:00 PM\n` +
+                         `• Saturday, July 26 at 12:30 PM\n` +
+                         `• Saturday, July 26 at 3:30 PM\n` +
+                         `• Saturday, July 26 at 4:00 PM\n` +
+                         `• Sunday, July 27 at 10:30 AM\n\n` +
+                         `Just let me know which date and time works best for you! 📅`;
+        
+        await this.sendSMSResponse(sms, response, 0.95, client);
+        
+        return {
+          success: true,
+          responseSent: true,
+          response: response,
+          confidence: 0.95
+        };
+      }
+      
+      // Default case - ask for more information
+      const response = `Great! I'd be happy to help you book an appointment. What date would you like to come in?`;
+      await this.sendSMSResponse(sms, response, 0.8, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.8
+      };
+      
+    } catch (error: any) {
+      console.error('Error handling booking request:', error);
+      return {
+        success: false,
+        responseSent: false,
+        error: error.message || 'Failed to handle booking request'
+      };
+    }
+  }
+
+  /**
+   * Handle reschedule request
+   */
+  private async handleRescheduleRequest(sms: IncomingSMS, client: any): Promise<SMSAutoRespondResult> {
+    const response = `I'd be happy to help you reschedule your appointment. Please call us at 9189325396 and we'll get that sorted out for you right away! 📞`;
+    await this.sendSMSResponse(sms, response, 0.9, client);
+    
+    return {
+      success: true,
+      responseSent: true,
+      response: response,
+      confidence: 0.9
+    };
+  }
+
+  /**
+   * Handle cancel request
+   */
+  private async handleCancelRequest(sms: IncomingSMS, client: any): Promise<SMSAutoRespondResult> {
+    const response = `I understand you'd like to cancel your appointment. Please call us at 9189325396 and we'll help you with that. We'd hate to see you go! 📞`;
+    await this.sendSMSResponse(sms, response, 0.9, client);
+    
+    return {
+      success: true,
+      responseSent: true,
+      response: response,
+      confidence: 0.9
+    };
+  }
+
+  /**
+   * Handle business question with enhanced RAG
+   */
+  private async handleBusinessQuestion(sms: IncomingSMS, client: any): Promise<SMSAutoRespondResult> {
+    try {
+      console.log('🔍 Handling business question with enhanced RAG');
+      
+      // Build enhanced RAG context
+      const enhancedContext = await this.buildEnhancedContext(client, sms);
+      
+      // Use LLM service with enhanced context for better responses
+      const llmContext = {
+        clientName: enhancedContext.client.name,
+        clientPhone: enhancedContext.client.phone,
+        businessName: enhancedContext.business.name,
+        businessType: enhancedContext.business.type,
+        availableServices: enhancedContext.services,
+        availableStaff: enhancedContext.staff,
+        businessKnowledge: enhancedContext.businessKnowledge.all,
+        clientPreferences: enhancedContext.client.preferences,
+        availability: enhancedContext.availability,
+        appointments: enhancedContext.appointments
+      };
+      
+      // Generate response using LLM with enhanced context
+      const llmResponse = await this.llmService.generateResponse(sms.body, llmContext, 'sms');
+      
+      if (llmResponse.success && llmResponse.message) {
+        await this.sendSMSResponse(sms, llmResponse.message, llmResponse.confidence || 0.9, client);
+        
+        return {
+          success: true,
+          responseSent: true,
+          response: llmResponse.message,
+          confidence: llmResponse.confidence || 0.9
+        };
+      }
+      
+      // Fallback to hardcoded responses if LLM fails
+      return await this.handleBusinessQuestionFallback(sms, client, enhancedContext);
+      
+    } catch (error) {
+      console.error('Error in enhanced business question handler:', error);
+      // Fallback to original method
+      return await this.handleBusinessQuestionFallback(sms, client);
+    }
+  }
+  
+  /**
+   * Improved fallback business question handler with better responses
+   */
+  private async handleBusinessQuestionFallback(sms: IncomingSMS, client: any, context?: any): Promise<SMSAutoRespondResult> {
+    const text = sms.body.toLowerCase().trim();
+    const customerName = client.firstName || 'there';
+    
+    // Always fetch current services from database to ensure we don't offer deleted services
+    let services;
+    try {
+      const currentServices = await this.storage.getAllServices();
+      services = currentServices.map((service: any) => ({
+        name: service.name,
+        price: service.price,
+        duration: service.duration
+      }));
+    } catch (error) {
+      console.error('Error fetching services for business question:', error);
+      // Fallback to context if database fails
+      services = context?.services || [];
+    }
+    
+    // Handle service questions
+    if (text.includes('services') || text.includes('what do you offer') || text.includes('do you offer')) {
+      const serviceList = services.map((s: any) => `• ${s.name} - $${s.price} (${s.duration} minutes)`).join('\n');
+      
+      const response = `Hi ${customerName}! We offer a variety of services:\n\n${serviceList}\n\nLet me know if you'd like to book an appointment or have any other questions! 😊`;
+      await this.sendSMSResponse(sms, response, 0.95, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.95
+      };
+    }
+    
+    // Handle pricing questions
+    if (text.includes('how much') || text.includes('cost') || text.includes('price') || text.includes('pricing')) {
+      const serviceList = services.map((s: any) => `• ${s.name} - $${s.price} (${s.duration} minutes)`).join('\n');
+      
+      const response = `Hi ${customerName}! Here are our current prices:\n\n${serviceList}\n\nLet me know if you'd like to book an appointment or have any other questions! 😊`;
+      await this.sendSMSResponse(sms, response, 0.95, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.95
+      };
+    }
+    
+    // Handle haircut-specific questions
+    if (text.includes('haircut') || text.includes('hair cut') || text.includes('hair styling')) {
+      const haircutServices = services.filter((s: any) => s.name.toLowerCase().includes('haircut'));
+      const serviceList = haircutServices.map((s: any) => `• ${s.name} - $${s.price} (${s.duration} minutes)`).join('\n');
+      
+      const response = `Hi ${customerName}! Yes, we do offer haircuts!\n\n${serviceList}\n\nWould you like to book an appointment? 💇‍♀️✨`;
+      await this.sendSMSResponse(sms, response, 0.95, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.95
+      };
+    }
+    
+    // Handle hours questions
+    if (text.includes('hours') || text.includes('open') || text.includes('when') || text.includes('what time')) {
+      const response = `Hi ${customerName}! We're open Wednesday-Saturday from 10 AM to 8 PM. We'd love to see you! What service would you like to book? 📅`;
+      await this.sendSMSResponse(sms, response, 0.95, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.95
+      };
+    }
+    
+    // Handle location questions
+    if (text.includes('where') || text.includes('location') || text.includes('address')) {
+      const response = `Hi ${customerName}! We're located at 123 Main Street, Tulsa, OK 74103. We'd love to see you! What service would you like to book? 📍`;
+      await this.sendSMSResponse(sms, response, 0.95, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.95
+      };
+    }
+    
+    // Default business question response
+    const response = `Hi ${customerName}! Thanks for your question. I'd be happy to help you with information about our services, pricing, hours, or location. What would you like to know? 💆‍♀️✨`;
+    await this.sendSMSResponse(sms, response, 0.8, client);
+    
+    return {
+      success: true,
+      responseSent: true,
+      response: response,
+      confidence: 0.8
+    };
+  }
+
+  /**
+   * Improved general message handler with better responses
+   */
+  private async handleGeneralMessage(sms: IncomingSMS, client: any): Promise<SMSAutoRespondResult> {
+    const text = sms.body.toLowerCase().trim();
+    const customerName = client.firstName || 'there';
+    
+    // Handle simple greetings
+    if (this.isSimpleGreeting(sms.body)) {
+      const response = `Hi ${customerName}! 👋 How can I help you today?`;
+      await this.sendSMSResponse(sms, response, 0.9, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.9
+      };
+    }
+    
+    // Handle thank you messages
+    if (text.includes('thank') || text.includes('thanks')) {
+      const response = `You're very welcome, ${customerName}! We're here to help. If you need anything else, just let us know! 😊`;
+      await this.sendSMSResponse(sms, response, 0.9, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.9
+      };
+    }
+    
+    // Handle confusion/uncertainty
+    const confusionKeywords = [
+      'don\'t know', 'not sure', 'confused', 'what do you mean', 'i don\'t understand',
+      'you don\'t know', 'what service', 'which service', 'clarify', 'explain',
+      'help me', 'i need help', 'what should i do', 'i\'m lost'
+    ];
+    
+    if (confusionKeywords.some(keyword => text.includes(keyword))) {
+      // Always fetch current services from database to ensure we don't offer deleted services
+      let serviceList = '';
+      try {
+        const currentServices = await this.storage.getAllServices();
+        serviceList = currentServices.map((service: any) => 
+          `• ${service.name} - $${service.price} (${service.duration} minutes)`
+        ).join('\n');
+      } catch (error) {
+        console.error('Error fetching services for confusion response:', error);
+        serviceList = '• Signature Head Spa - $99 (60 minutes)'; // Minimal fallback
+      }
+      
+      const response = `No worries, ${customerName}! Let me help you. We offer:\n\n` +
+                       `${serviceList}\n\n` +
+                       `Just let me know which service you'd like to book! 💆‍♀️✨`;
+      await this.sendSMSResponse(sms, response, 0.9, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.9
+      };
+    }
+    
+    // Handle help requests
+    if (text.includes('help') || text.includes('assist')) {
+      const response = `Hi ${customerName}! I'm here to help! I can help you:\n\n` +
+                       `• Book an appointment\n` +
+                       `• Check our services and prices\n` +
+                       `• Find our hours and location\n` +
+                       `• Answer any questions\n\n` +
+                       `What would you like to know? 💆‍♀️✨`;
+      await this.sendSMSResponse(sms, response, 0.9, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.9
+      };
+    }
+    
+    // Handle general questions or unclear messages
+    if (text.includes('what') || text.includes('how') || text.includes('when') || text.includes('where') || text.includes('why')) {
+      const response = `Hi ${customerName}! I'd be happy to help you with information about our services, pricing, hours, or booking an appointment. What would you like to know? 😊`;
+      await this.sendSMSResponse(sms, response, 0.8, client);
+      
+      return {
+        success: true,
+        responseSent: true,
+        response: response,
+        confidence: 0.8
+      };
+    }
+    
+    // Default general response for anything else
+    const response = `Hi ${customerName}! 👋 How can I help you today?`;
+    await this.sendSMSResponse(sms, response, 0.8, client);
+    
+    return {
+      success: true,
+      responseSent: true,
+      response: response,
+      confidence: 0.8
+    };
+  }
+
+  /**
+   * Send SMS response
+   */
+  private async sendSMSResponse(sms: IncomingSMS, response: string, confidence: number, client: any): Promise<void> {
+    try {
+      const targetPhone = sms.from;
+      
+      // Always send real SMS, even in development mode
+      const smsResult = await sendSMS(targetPhone, response);
+      
+      if (smsResult.success) {
+        console.log('SMS response sent successfully');
+        await this.logAutoResponse(sms, response, confidence, client);
+      } else {
+        console.error('Failed to send SMS response:', smsResult.error);
+      }
+    } catch (error) {
+      console.error('Error sending SMS response:', error);
     }
   }
 } 

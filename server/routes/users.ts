@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage";
 import { z } from "zod";
-import { insertUserSchema, insertUserColorPreferencesSchema } from "@shared/schema";
+import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema } from "@shared/schema";
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
@@ -22,21 +22,50 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
   // Get all users
   app.get("/api/users", async (req, res) => {
     try {
-      console.log("GET /api/users called");
-      const users = await storage.getAllUsers();
+      console.log("GET /api/users called - DEBUG VERSION");
+      const { search, role } = req.query;
+      let users;
+      
+      if (search && typeof search === 'string') {
+        // Search users by name, email, or phone
+        users = await storage.searchUsers(search);
+      } else if (role && typeof role === 'string') {
+        // Filter users by role
+        users = await storage.getUsersByRole(role);
+      } else {
+        users = await storage.getAllUsers();
+      }
+      
       console.log("Users found:", users.length);
+      if (users.length > 0) {
+        console.log("First user object:", users[0]);
+        console.log("First user keys:", Object.keys(users[0]));
+      }
       
       // Remove sensitive information
-      const safeUsers = users.map(user => ({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      }));
+      const safeUsers = users.map(user => {
+        const { password, ...userWithoutPassword } = user;
+        return userWithoutPassword;
+      });
+      
+      // Debug log: print the first user object and its keys
+      if (safeUsers.length > 0) {
+        console.log('API response - first user object:', safeUsers[0]);
+        console.log('API response - first user keys:', Object.keys(safeUsers[0]));
+        
+        // Check if phone field exists in the response
+        const firstUser = safeUsers[0];
+        console.log('Phone field check:', {
+          hasPhone: 'phone' in firstUser,
+          phoneValue: firstUser.phone,
+          phoneType: typeof firstUser.phone,
+          phoneLength: firstUser.phone?.length
+        });
+        
+        // Check how many users have phone numbers
+        const usersWithPhones = safeUsers.filter((u: any) => u.phone && u.phone.trim() !== '');
+        console.log('Users with phones in API response:', usersWithPhones.length, 'out of', safeUsers.length);
+      }
 
       res.json(safeUsers);
     } catch (error: any) {
@@ -46,7 +75,7 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
   });
 
   // Update user
-  app.put("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
+  app.put("/api/users/:id", validateBody(updateUserSchema), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       console.log("Updating user with data:", JSON.stringify(req.body, null, 2));
@@ -57,12 +86,20 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       res.json(updatedUser);
     } catch (error: any) {
       console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user: " + error.message });
+      
+      // Handle specific error types
+      if (error.message.includes("already in use by another user")) {
+        res.status(409).json({ error: error.message });
+      } else if (error.message.includes("User not found")) {
+        res.status(404).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to update user: " + error.message });
+      }
     }
   });
 
   // Patch user (partial update)
-  app.patch("/api/users/:id", validateBody(insertUserSchema.partial()), async (req, res) => {
+  app.patch("/api/users/:id", validateBody(updateUserSchema), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       console.log("PATCH - Updating user with data:", JSON.stringify(req.body, null, 2));
@@ -73,7 +110,15 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       res.json(updatedUser);
     } catch (error: any) {
       console.error("Error updating user:", error);
-      res.status(500).json({ error: "Failed to update user: " + error.message });
+      
+      // Handle specific error types
+      if (error.message.includes("already in use by another user")) {
+        res.status(409).json({ error: error.message });
+      } else if (error.message.includes("User not found")) {
+        res.status(404).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to update user: " + error.message });
+      }
     }
   });
 
@@ -124,7 +169,6 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         lastName: user.lastName,
         role: user.role,
         createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
       };
 
       res.json(safeUser);

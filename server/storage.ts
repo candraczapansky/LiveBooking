@@ -10,6 +10,7 @@ import {
   appointments, Appointment, InsertAppointment,
   appointmentHistory, AppointmentHistory, InsertAppointmentHistory,
   cancelledAppointments, CancelledAppointment, InsertCancelledAppointment,
+  appointmentPhotos, AppointmentPhoto, InsertAppointmentPhoto,
   memberships, Membership, InsertMembership,
   clientMemberships, ClientMembership, InsertClientMembership,
   payments, Payment, InsertPayment,
@@ -38,7 +39,11 @@ import {
   payrollChecks, PayrollCheck, InsertPayrollCheck,
   checkSoftwareLogs, CheckSoftwareLog, InsertCheckSoftwareLog,
   staffEarnings, StaffEarnings, InsertStaffEarnings,
-  systemConfig, SystemConfig, InsertSystemConfig
+  systemConfig, SystemConfig, InsertSystemConfig,
+  aiMessagingConfig, AiMessagingConfig, InsertAiMessagingConfig,
+  conversationFlows, ConversationFlow, InsertConversationFlow,
+  noteTemplates, NoteTemplate, InsertNoteTemplate, UpdateNoteTemplate,
+  noteHistory, NoteHistory, InsertNoteHistory, UpdateNoteHistory
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
@@ -62,6 +67,7 @@ export interface IStorage {
   // Service Category operations
   createServiceCategory(category: InsertServiceCategory): Promise<ServiceCategory>;
   getServiceCategory(id: number): Promise<ServiceCategory | undefined>;
+  getServiceCategoryByName(name: string): Promise<ServiceCategory | undefined>;
   getAllServiceCategories(): Promise<ServiceCategory[]>;
   updateServiceCategory(id: number, categoryData: Partial<InsertServiceCategory>): Promise<ServiceCategory>;
   deleteServiceCategory(id: number): Promise<boolean>;
@@ -83,6 +89,7 @@ export interface IStorage {
   // Service operations
   createService(service: InsertService): Promise<Service>;
   getService(id: number): Promise<Service | undefined>;
+  getServiceByName(name: string): Promise<Service | undefined>;
   getServicesByCategory(categoryId: number): Promise<Service[]>;
   getAllServices(): Promise<Service[]>;
   updateService(id: number, serviceData: Partial<InsertService>): Promise<Service>;
@@ -119,6 +126,7 @@ export interface IStorage {
   getAllAppointments(): Promise<Appointment[]>;
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
+  getAppointmentsByService(serviceId: number): Promise<Appointment[]>;
   getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
@@ -139,6 +147,12 @@ export interface IStorage {
   getCancelledAppointmentsByClient(clientId: number): Promise<CancelledAppointment[]>;
   getCancelledAppointmentsByStaff(staffId: number): Promise<CancelledAppointment[]>;
   getCancelledAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<CancelledAppointment[]>;
+
+  // Appointment Photo operations
+  createAppointmentPhoto(photo: InsertAppointmentPhoto): Promise<AppointmentPhoto>;
+  getAppointmentPhotos(appointmentId: number): Promise<AppointmentPhoto[]>;
+  getAppointmentPhoto(id: number): Promise<AppointmentPhoto | undefined>;
+  deleteAppointmentPhoto(id: number): Promise<boolean>;
   moveAppointmentToCancelled(appointmentId: number, cancellationReason?: string, cancelledBy?: number, cancelledByRole?: string): Promise<CancelledAppointment>;
 
   // Membership operations
@@ -363,18 +377,47 @@ export interface IStorage {
   updateSystemConfig(key: string, value: string, description?: string): Promise<SystemConfig>;
   deleteSystemConfig(key: string): Promise<boolean>;
   getSystemConfigByCategory(category: string): Promise<SystemConfig[]>;
+
+  // AI Messaging Configuration
+  getAiMessagingConfig(): Promise<AiMessagingConfig | undefined>;
+  createAiMessagingConfig(config: InsertAiMessagingConfig): Promise<AiMessagingConfig>;
+  updateAiMessagingConfig(id: number, config: Partial<InsertAiMessagingConfig>): Promise<AiMessagingConfig>;
+  deleteAiMessagingConfig(id: number): Promise<boolean>;
+
+  // Conversation Flows
+  getConversationFlows(): Promise<any[]>;
+  getConversationFlow(id: string): Promise<any | undefined>;
+  saveConversationFlow(flow: any): Promise<any>;
+  updateConversationFlow(flow: any): Promise<any>;
+  deleteConversationFlow(id: string): Promise<boolean>;
+
+  // Note Template operations
+  createNoteTemplate(template: InsertNoteTemplate): Promise<NoteTemplate>;
+  getNoteTemplate(id: number): Promise<NoteTemplate | undefined>;
+  getAllNoteTemplates(): Promise<NoteTemplate[]>;
+  getNoteTemplatesByCategory(category: string): Promise<NoteTemplate[]>;
+  getActiveNoteTemplates(): Promise<NoteTemplate[]>;
+  updateNoteTemplate(id: number, templateData: UpdateNoteTemplate): Promise<NoteTemplate>;
+  deleteNoteTemplate(id: number): Promise<boolean>;
+
+  // Note History operations
+  createNoteHistory(history: InsertNoteHistory): Promise<NoteHistory>;
+  getNoteHistoryByClient(clientId: number): Promise<NoteHistory[]>;
+  getNoteHistoryByAppointment(appointmentId: number): Promise<NoteHistory[]>;
+  getAllNoteHistory(): Promise<NoteHistory[]>;
+  updateNoteHistory(id: number, historyData: UpdateNoteHistory): Promise<NoteHistory>;
+  deleteNoteHistory(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
   constructor() {
     // PostgreSQL storage - no in-memory structures needed
-    // Initialize with sample data for demo purposes
     this.initializeConnection();
-    // Initialize sample data asynchronously without blocking
-    this.initializeSampleData().catch(error => {
-      console.error('Sample data initialization failed:', error);
-      // Don't throw error to prevent server startup failure
-    });
+    // Sample data initialization disabled to prevent automatic recreation of deleted data
+    // this.initializeSampleData().catch(error => {
+    //   console.error('Sample data initialization failed:', error);
+    //   // Don't throw error to prevent server startup failure
+    // });
   }
 
   private async initializeConnection() {
@@ -391,6 +434,13 @@ export class DatabaseStorage implements IStorage {
   private async initializeSampleData() {
     try {
       console.log('Starting sample data initialization...');
+      
+      // Check if sample data has already been initialized
+      const sampleDataFlag = await this.getSystemConfig('sample_data_initialized');
+      if (sampleDataFlag && sampleDataFlag.value === 'true') {
+        console.log('Sample data initialization skipped - flag indicates it has already been initialized');
+        return;
+      }
       
       // Create admin user if not exists
       const existingAdmin = await this.getUserByUsername('admin');
@@ -528,6 +578,64 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
+      // Create sample note templates
+      const existingTemplates = await this.getAllNoteTemplates();
+      
+      if (!existingTemplates.find(t => t.name === 'Follow-up Consultation')) {
+        console.log('Creating Follow-up Consultation template...');
+        await this.createNoteTemplate({
+          name: 'Follow-up Consultation',
+          description: 'Standard follow-up consultation notes',
+          content: 'Client returned for follow-up consultation. Discussed previous treatment results and current concerns. Recommended next steps based on client goals and skin/hair condition.',
+          category: 'appointment',
+          isActive: true
+        });
+      }
+
+      if (!existingTemplates.find(t => t.name === 'New Client Welcome')) {
+        console.log('Creating New Client Welcome template...');
+        await this.createNoteTemplate({
+          name: 'New Client Welcome',
+          description: 'Welcome notes for first-time clients',
+          content: 'First-time client visit. Completed consultation and discussed client goals. Explained services and treatment options. Client showed interest in [specific services]. Scheduled follow-up appointment.',
+          category: 'appointment',
+          isActive: true
+        });
+      }
+
+      if (!existingTemplates.find(t => t.name === 'Treatment Notes')) {
+        console.log('Creating Treatment Notes template...');
+        await this.createNoteTemplate({
+          name: 'Treatment Notes',
+          description: 'Standard treatment session notes',
+          content: 'Treatment completed successfully. Client reported [comfort level]. Used [products/tools]. Client was satisfied with results. Recommended home care routine: [specific recommendations].',
+          category: 'treatment',
+          isActive: true
+        });
+      }
+
+      if (!existingTemplates.find(t => t.name === 'Aftercare Instructions')) {
+        console.log('Creating Aftercare Instructions template...');
+        await this.createNoteTemplate({
+          name: 'Aftercare Instructions',
+          description: 'Post-treatment care instructions',
+          content: 'Aftercare instructions provided: [specific instructions]. Client understands care routine. Advised to avoid [restrictions] for [time period]. Scheduled follow-up in [timeframe].',
+          category: 'aftercare',
+          isActive: true
+        });
+      }
+
+      if (!existingTemplates.find(t => t.name === 'Client Preferences')) {
+        console.log('Creating Client Preferences template...');
+        await this.createNoteTemplate({
+          name: 'Client Preferences',
+          description: 'Notes about client preferences and history',
+          content: 'Client preferences noted: [specific preferences]. Previous treatments: [history]. Allergies/sensitivities: [if any]. Preferred communication method: [preference].',
+          category: 'client',
+          isActive: true
+        });
+      }
+
       // Create sample staff user (if not exists)
       const existingStylist = await this.getUserByUsername('stylist1');
       if (!existingStylist) {
@@ -569,14 +677,18 @@ export class DatabaseStorage implements IStorage {
       // Create sample services only if they don't exist
       const existingServices = await this.getAllServices();
       
-      if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style')) {
+      // Get the actual category IDs for reference
+      const hairServicesCategory = existingCategories.find(c => c.name === 'Hair Services');
+      const facialTreatmentsCategory = existingCategories.find(c => c.name === 'Facial Treatments');
+      
+      if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style') && hairServicesCategory) {
         console.log('Creating Women\'s Haircut & Style service...');
         await this.createService({
           name: 'Women\'s Haircut & Style',
           description: 'Professional haircut with wash, cut, and styling',
           duration: 60,
           price: 85.00,
-          categoryId: 1, // Hair Services category
+          categoryId: hairServicesCategory.id,
           roomId: 3, // Styling Station Area
           bufferTimeBefore: 10,
           bufferTimeAfter: 10,
@@ -584,14 +696,14 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find(s => s.name === 'Color & Highlights')) {
+      if (!existingServices.find(s => s.name === 'Color & Highlights') && hairServicesCategory) {
         console.log('Creating Color & Highlights service...');
         await this.createService({
           name: 'Color & Highlights',
           description: 'Full color service with highlights and toning',
           duration: 120,
           price: 150.00,
-          categoryId: 1, // Hair Services category
+          categoryId: hairServicesCategory.id,
           roomId: 3, // Styling Station Area
           bufferTimeBefore: 15,
           bufferTimeAfter: 15,
@@ -599,14 +711,14 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find(s => s.name === 'Deep Cleansing Facial')) {
+      if (!existingServices.find(s => s.name === 'Deep Cleansing Facial') && facialTreatmentsCategory) {
         console.log('Creating Deep Cleansing Facial service...');
         await this.createService({
           name: 'Deep Cleansing Facial',
           description: 'Relaxing facial treatment with deep pore cleansing and moisturizing',
           duration: 90,
           price: 95.00,
-          categoryId: 2, // Facial Treatments category
+          categoryId: facialTreatmentsCategory.id,
           roomId: 1, // Treatment Room 1
           bufferTimeBefore: 10,
           bufferTimeAfter: 10,
@@ -615,6 +727,18 @@ export class DatabaseStorage implements IStorage {
       }
 
       console.log('Sample data initialization completed successfully');
+      
+      // Set flag to prevent future initialization
+      try {
+        await this.setSystemConfig({
+          key: 'sample_data_initialized',
+          value: 'true',
+          description: 'Flag to prevent sample data from being recreated'
+        });
+        console.log('Sample data initialization flag set');
+      } catch (flagError) {
+        console.log('Could not set sample data flag (this is optional)');
+      }
     } catch (error) {
       console.error('Error during sample data initialization:', error);
       // Don't throw error to prevent server startup failure
@@ -637,10 +761,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
-    const users = await db.select().from(users).where(eq(users.role, role));
-    console.log('getUsersByRole - First user sample:', users[0]);
-    console.log('getUsersByRole - First user keys:', Object.keys(users[0] || {}));
-    return users;
+    return await db.select().from(users).where(eq(users.role, role));
   }
 
   async searchUsers(query: string): Promise<User[]> {
@@ -662,7 +783,19 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     try {
       console.log('Storage: Creating user with data:', insertUser);
-      const [user] = await db.insert(users).values(insertUser).returning();
+      
+      // Handle empty phone numbers - generate unique placeholder to avoid unique constraint violations
+      const processedUser = { ...insertUser };
+      if (processedUser.phone === '' || processedUser.phone === null) {
+        // Generate a unique placeholder phone number
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        const processId = process.pid || Math.floor(Math.random() * 10000);
+        processedUser.phone = `555-000-${timestamp.toString().slice(-4)}-${processId.toString().slice(-4)}`;
+        console.log('Storage: Generated placeholder phone for new user:', processedUser.phone);
+      }
+      
+      const [user] = await db.insert(users).values(processedUser).returning();
       console.log('Storage: User created successfully:', user);
       return user;
     } catch (error) {
@@ -673,162 +806,67 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: number, userData: Partial<InsertUser>): Promise<User> {
     try {
-      // First attempt with Drizzle ORM
-      const [updatedUser] = await db.update(users).set(userData).where(eq(users.id, id)).returning();
-      if (!updatedUser) {
-        throw new Error('User not found');
-      }
-      return updatedUser;
-    } catch (error) {
+      console.log('Updating user with data:', userData);
+      console.log('Profile picture in userData:', userData.profilePicture);
+      console.log('Profile picture type:', typeof userData.profilePicture);
+      console.log('Profile picture length:', userData.profilePicture?.length);
       
-      // Fallback to direct SQL for field mapping issues
-      const updateFields: string[] = [];
-      const values: any[] = [];
-
-      // Map frontend field names to database column names
-      Object.keys(userData).forEach(key => {
-        const value = (userData as any)[key];
-        if (value !== undefined) {
-          switch (key) {
-            case 'firstName':
-              updateFields.push('first_name = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'lastName':
-              updateFields.push('last_name = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'zipCode':
-              updateFields.push('zip_code = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'profilePicture':
-              updateFields.push('profile_picture = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'squareCustomerId':
-              updateFields.push('stripe_customer_id = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'emailAccountManagement':
-              updateFields.push('email_account_management = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'emailAppointmentReminders':
-              updateFields.push('email_appointment_reminders = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'emailPromotions':
-              updateFields.push('email_promotions = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'smsAccountManagement':
-              updateFields.push('sms_account_management = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'smsAppointmentReminders':
-              updateFields.push('sms_appointment_reminders = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'smsPromotions':
-              updateFields.push('sms_promotions = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorEnabled':
-              updateFields.push('two_factor_enabled = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorSecret':
-              updateFields.push('two_factor_secret = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorBackupCodes':
-              updateFields.push('two_factor_backup_codes = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorMethod':
-              updateFields.push('two_factor_method = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorEmailCode':
-              updateFields.push('two_factor_email_code = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'twoFactorEmailCodeExpiry':
-              updateFields.push('two_factor_email_code_expiry = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'resetToken':
-              updateFields.push('reset_token = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'resetTokenExpiry':
-              updateFields.push('reset_token_expiry = $' + (values.length + 1));
-              values.push(value);
-              break;
-            case 'createdAt':
-              updateFields.push('created_at = $' + (values.length + 1));
-              values.push(value);
-              break;
-            default:
-              // Fields that don't need mapping (email, phone, username, password, etc.)
-              updateFields.push(`${key} = $` + (values.length + 1));
-              values.push(value);
-              break;
-          }
-        }
-      });
-
-      if (updateFields.length === 0) {
-        throw new Error('No fields to update');
-      }
-
-      values.push(id);
-      const updateQuery = `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${values.length} RETURNING *`;
-      
-      // Use sql template literal for Drizzle with proper parameterized query
-      try {
-        const result = await db.execute(sql.raw(updateQuery));
-        
-        if (!result.rows || result.rows.length === 0) {
+      // Check if email is being updated and validate it doesn't conflict with other users
+      if (userData.email) {
+        const existingUser = await this.getUser(id);
+        if (!existingUser) {
           throw new Error('User not found');
         }
         
-        return result.rows[0] as User;
-      } catch (sqlError) {
-        
-        // Final fallback - let's try a simpler approach with individual field updates
-        try {
-          const user = await this.getUser(id);
-          if (!user) {
-            throw new Error('User not found');
+        // If email is being changed, check if the new email belongs to a different user
+        if (existingUser.email !== userData.email) {
+          const userWithNewEmail = await this.getUserByEmail(userData.email);
+          if (userWithNewEmail && userWithNewEmail.id !== id) {
+            throw new Error(`Email ${userData.email} is already in use by another user`);
           }
-          
-          // Since Drizzle is having issues, let's try updating with just the basic fields
-          const simpleUpdate: any = {};
-          
-          // Only update fields that don't need special mapping
-          Object.keys(userData).forEach(key => {
-            const value = (userData as any)[key];
-            if (value !== undefined && !['firstName', 'lastName', 'zipCode', 'profilePicture'].includes(key)) {
-              simpleUpdate[key] = value;
-            }
-          });
-          
-          if (Object.keys(simpleUpdate).length > 0) {
-            const [updatedUser] = await db.update(users).set(simpleUpdate).where(eq(users.id, id)).returning();
-            if (updatedUser) {
-              return updatedUser;
-            }
-          }
-          
-          // If still failing, return the original user (at least no crash)
-          return user;
-          
-        } catch (finalError) {
-          throw new Error('Failed to update user profile');
         }
       }
+      
+      // Handle phone numbers - only generate placeholder if phone is empty or null
+      const processedData = { ...userData };
+      console.log('Phone number received:', processedData.phone);
+      console.log('Phone number type:', typeof processedData.phone);
+      console.log('Phone number length:', processedData.phone?.length);
+      console.log('Phone number is empty string:', processedData.phone === '');
+      console.log('Phone number is null:', processedData.phone === null);
+      console.log('Phone number is undefined:', processedData.phone === undefined);
+      
+      if (processedData.phone === '' || processedData.phone === null || processedData.phone === undefined) {
+        // Generate a unique placeholder phone number
+        const timestamp = Date.now();
+        const randomSuffix = Math.random().toString(36).substring(2, 8);
+        const processId = process.pid || Math.floor(Math.random() * 10000);
+        processedData.phone = `555-000-${timestamp.toString().slice(-4)}-${processId.toString().slice(-4)}`;
+        console.log('Generated placeholder phone for update:', processedData.phone);
+      } else {
+        // Keep the provided phone number as-is
+        console.log('Using provided phone number:', processedData.phone);
+      }
+      
+      // Use Drizzle ORM directly - it should handle field mapping automatically
+      console.log('Final processed data being sent to database:', processedData);
+      console.log('Profile picture in processed data:', processedData.profilePicture);
+      console.log('Profile picture type:', typeof processedData.profilePicture);
+      console.log('Profile picture length:', processedData.profilePicture?.length);
+      
+      const [updatedUser] = await db.update(users).set(processedData).where(eq(users.id, id)).returning();
+      
+      if (!updatedUser) {
+        throw new Error('User not found');
+      }
+      
+      console.log('User updated successfully:', updatedUser);
+      return updatedUser;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      
+      // Re-throw the error instead of falling back to original user
+      throw error;
     }
   }
 
@@ -900,6 +938,11 @@ export class DatabaseStorage implements IStorage {
 
   async getServiceCategory(id: number): Promise<ServiceCategory | undefined> {
     const [category] = await db.select().from(serviceCategories).where(eq(serviceCategories.id, id));
+    return category;
+  }
+
+  async getServiceCategoryByName(name: string): Promise<ServiceCategory | undefined> {
+    const [category] = await db.select().from(serviceCategories).where(eq(serviceCategories.name, name));
     return category;
   }
 
@@ -988,6 +1031,11 @@ export class DatabaseStorage implements IStorage {
 
   async getService(id: number): Promise<Service | undefined> {
     const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
+  }
+
+  async getServiceByName(name: string): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.name, name));
     return service;
   }
 
@@ -1263,6 +1311,17 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
+  async getAppointmentsByService(serviceId: number): Promise<Appointment[]> {
+    const appointmentList = await db.select().from(appointments).where(eq(appointments.serviceId, serviceId)).orderBy(desc(appointments.startTime));
+    
+    // Convert local datetime strings to Date objects for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
+    }));
+  }
+
   async getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]> {
     const appointmentList = await db.select().from(appointments).where(
       and(
@@ -1512,6 +1571,40 @@ export class DatabaseStorage implements IStorage {
     await this.deleteAppointment(appointmentId);
 
     return cancelledAppointment;
+  }
+
+  // Appointment Photo operations
+  async createAppointmentPhoto(photo: InsertAppointmentPhoto): Promise<AppointmentPhoto> {
+    const [newPhoto] = await db.insert(appointmentPhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async getAppointmentPhotos(appointmentId: number): Promise<AppointmentPhoto[]> {
+    const photos = await db
+      .select()
+      .from(appointmentPhotos)
+      .where(eq(appointmentPhotos.appointmentId, appointmentId))
+      .orderBy(desc(appointmentPhotos.createdAt));
+    
+    return photos.map((photo: any) => ({
+      ...photo,
+      createdAt: this.convertLocalToDate(photo.createdAt)
+    }));
+  }
+
+  async getAppointmentPhoto(id: number): Promise<AppointmentPhoto | undefined> {
+    const [photo] = await db.select().from(appointmentPhotos).where(eq(appointmentPhotos.id, id));
+    if (!photo) return undefined;
+    
+    return {
+      ...photo,
+      createdAt: this.convertLocalToDate(photo.createdAt)
+    };
+  }
+
+  async deleteAppointmentPhoto(id: number): Promise<boolean> {
+    const result = await db.delete(appointmentPhotos).where(eq(appointmentPhotos.id, id));
+    return result.rowCount > 0;
   }
 
   // Membership operations
@@ -2451,7 +2544,7 @@ export class DatabaseStorage implements IStorage {
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
-        let fieldsData = form.fields;
+        let fieldsData: any = form.fields;
         if (typeof fieldsData === 'string') {
           // Try to parse once
           fieldsData = JSON.parse(fieldsData);
@@ -2464,7 +2557,7 @@ export class DatabaseStorage implements IStorage {
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = []; // Return empty array instead of string
+        form.fields = []; // Return empty array
       }
     } else {
       form.fields = []; // Ensure fields is always an array
@@ -2482,7 +2575,7 @@ export class DatabaseStorage implements IStorage {
       if (parsedForm.fields) {
         try {
           // Handle double-encoded JSON strings
-          let fieldsData = parsedForm.fields;
+          let fieldsData: any = parsedForm.fields;
           if (typeof fieldsData === 'string') {
             // Try to parse once
             fieldsData = JSON.parse(fieldsData);
@@ -2495,10 +2588,10 @@ export class DatabaseStorage implements IStorage {
         } catch (error) {
           console.error('Error parsing form fields JSON:', error);
           console.error('Raw fields data that caused error:', parsedForm.fields);
-          parsedForm.fields = []; // Return empty array instead of string
+          (parsedForm as any).fields = []; // Return empty array
         }
       } else {
-        parsedForm.fields = []; // Ensure fields is always an array
+        (parsedForm as any).fields = []; // Ensure fields is always an array
       }
       return parsedForm;
     });
@@ -2522,7 +2615,7 @@ export class DatabaseStorage implements IStorage {
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
-        let fieldsData = form.fields;
+        let fieldsData: any = form.fields;
         if (typeof fieldsData === 'string') {
           // Try to parse once
           fieldsData = JSON.parse(fieldsData);
@@ -2535,7 +2628,7 @@ export class DatabaseStorage implements IStorage {
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = []; // Return empty array instead of string
+        form.fields = []; // Return empty array
       }
     } else {
       form.fields = []; // Ensure fields is always an array
@@ -2959,11 +3052,9 @@ export class DatabaseStorage implements IStorage {
 
   async getAllSystemConfig(category?: string): Promise<SystemConfig[]> {
     try {
-      let query = db.select().from(systemConfig);
-      if (category) {
-        query = query.where(eq(systemConfig.category, category));
-      }
-      return await query;
+      // Note: category field doesn't exist in the current schema, so we ignore category filtering
+      const results = await db.select().from(systemConfig);
+      return results;
     } catch (error) {
       console.error('Error getting all system config:', error);
       throw error;
@@ -3015,13 +3106,231 @@ export class DatabaseStorage implements IStorage {
 
   async getSystemConfigByCategory(category: string): Promise<SystemConfig[]> {
     try {
-      return await db.select().from(systemConfig).where(eq(systemConfig.category, category));
+      // Note: category field doesn't exist in the current schema, so we return all configs
+      const results = await db.select().from(systemConfig);
+      return results;
     } catch (error) {
       console.error('Error getting system config by category:', error);
       throw error;
     }
   }
+
+  // AI Messaging Configuration methods
+  async getAiMessagingConfig(): Promise<AiMessagingConfig | undefined> {
+    try {
+      const result = await db.select().from(aiMessagingConfig).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error('Error getting AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  async createAiMessagingConfig(config: InsertAiMessagingConfig): Promise<AiMessagingConfig> {
+    try {
+      const result = await db.insert(aiMessagingConfig).values(config).returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  async updateAiMessagingConfig(id: number, config: Partial<InsertAiMessagingConfig>): Promise<AiMessagingConfig> {
+    try {
+      const result = await db
+        .update(aiMessagingConfig)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(aiMessagingConfig.id, id))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  async deleteAiMessagingConfig(id: number): Promise<boolean> {
+    try {
+      const result = await db.delete(aiMessagingConfig).where(eq(aiMessagingConfig.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  // Conversation Flow methods
+  async getConversationFlows(): Promise<any[]> {
+    try {
+      const flows = await db.select().from(conversationFlows).orderBy(desc(conversationFlows.createdAt));
+      
+      // Parse the steps JSON for each flow
+      return flows.map(flow => ({
+        ...flow,
+        steps: flow.steps ? JSON.parse(flow.steps) : []
+      }));
+    } catch (error) {
+      console.error('Error getting conversation flows:', error);
+      throw error;
+    }
+  }
+
+  async getConversationFlow(id: string): Promise<any | undefined> {
+    try {
+      const result = await db.select().from(conversationFlows).where(eq(conversationFlows.id, id)).limit(1);
+      if (!result[0]) return undefined;
+      
+      const flow = result[0];
+      return {
+        ...flow,
+        steps: flow.steps ? JSON.parse(flow.steps) : []
+      };
+    } catch (error) {
+      console.error('Error getting conversation flow:', error);
+      throw error;
+    }
+  }
+
+  async saveConversationFlow(flow: any): Promise<any> {
+    try {
+      // Generate UUID if not provided
+      if (!flow.id) {
+        flow.id = `flow_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
+      const flowData = {
+        id: flow.id,
+        name: flow.name,
+        description: flow.description,
+        steps: JSON.stringify(flow.steps || []),
+        isActive: flow.isActive !== undefined ? flow.isActive : true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      const result = await db.insert(conversationFlows).values(flowData).returning();
+      const savedFlow = result[0];
+      
+      return {
+        ...savedFlow,
+        steps: JSON.parse(savedFlow.steps)
+      };
+    } catch (error) {
+      console.error('Error saving conversation flow:', error);
+      throw error;
+    }
+  }
+
+  async updateConversationFlow(flow: any): Promise<any> {
+    try {
+      if (!flow.id) {
+        throw new Error('Flow ID is required for updates');
+      }
+      
+      const updateData = {
+        name: flow.name,
+        description: flow.description,
+        steps: JSON.stringify(flow.steps || []),
+        isActive: flow.isActive !== undefined ? flow.isActive : true,
+        updatedAt: new Date()
+      };
+      
+      const result = await db
+        .update(conversationFlows)
+        .set(updateData)
+        .where(eq(conversationFlows.id, flow.id))
+        .returning();
+      
+      const updatedFlow = result[0];
+      return {
+        ...updatedFlow,
+        steps: JSON.parse(updatedFlow.steps)
+      };
+    } catch (error) {
+      console.error('Error updating conversation flow:', error);
+      throw error;
+    }
+  }
+
+  async deleteConversationFlow(id: string): Promise<boolean> {
+    try {
+      const result = await db.delete(conversationFlows).where(eq(conversationFlows.id, id));
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting conversation flow:', error);
+      throw error;
+    }
+  }
+
+  // Note Template operations
+  async createNoteTemplate(template: InsertNoteTemplate): Promise<NoteTemplate> {
+    const [newTemplate] = await db.insert(noteTemplates).values(template).returning();
+    return newTemplate;
+  }
+
+  async getNoteTemplate(id: number): Promise<NoteTemplate | undefined> {
+    const [template] = await db.select().from(noteTemplates).where(eq(noteTemplates.id, id));
+    return template;
+  }
+
+  async getAllNoteTemplates(): Promise<NoteTemplate[]> {
+    return await db.select().from(noteTemplates);
+  }
+
+  async getNoteTemplatesByCategory(category: string): Promise<NoteTemplate[]> {
+    return await db.select().from(noteTemplates).where(eq(noteTemplates.category, category));
+  }
+
+  async getActiveNoteTemplates(): Promise<NoteTemplate[]> {
+    return await db.select().from(noteTemplates).where(eq(noteTemplates.isActive, true));
+  }
+
+  async updateNoteTemplate(id: number, templateData: UpdateNoteTemplate): Promise<NoteTemplate> {
+    const [updatedTemplate] = await db
+      .update(noteTemplates)
+      .set({ ...templateData, updatedAt: new Date() })
+      .where(eq(noteTemplates.id, id))
+      .returning();
+    return updatedTemplate;
+  }
+
+  async deleteNoteTemplate(id: number): Promise<boolean> {
+    const result = await db.delete(noteTemplates).where(eq(noteTemplates.id, id));
+    return result.rowCount > 0;
+  }
+
+  // Note History operations
+  async createNoteHistory(history: InsertNoteHistory): Promise<NoteHistory> {
+    const [newHistory] = await db.insert(noteHistory).values(history).returning();
+    return newHistory;
+  }
+
+  async getNoteHistoryByClient(clientId: number): Promise<NoteHistory[]> {
+    return await db.select().from(noteHistory).where(eq(noteHistory.clientId, clientId)).orderBy(desc(noteHistory.createdAt));
+  }
+
+  async getNoteHistoryByAppointment(appointmentId: number): Promise<NoteHistory[]> {
+    return await db.select().from(noteHistory).where(eq(noteHistory.appointmentId, appointmentId)).orderBy(desc(noteHistory.createdAt));
+  }
+
+  async getAllNoteHistory(): Promise<NoteHistory[]> {
+    return await db.select().from(noteHistory).orderBy(desc(noteHistory.createdAt));
+  }
+
+  async updateNoteHistory(id: number, historyData: UpdateNoteHistory): Promise<NoteHistory> {
+    const [updatedHistory] = await db
+      .update(noteHistory)
+      .set(historyData)
+      .where(eq(noteHistory.id, id))
+      .returning();
+    return updatedHistory;
+  }
+
+  async deleteNoteHistory(id: number): Promise<boolean> {
+    const result = await db.delete(noteHistory).where(eq(noteHistory.id, id));
+    return result.rowCount > 0;
+  }
 }
 
-export const storage = new DatabaseStorage();
 export { DatabaseStorage as PgStorage };

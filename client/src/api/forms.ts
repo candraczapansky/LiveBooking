@@ -22,10 +22,10 @@ export interface Form {
 
 // Save a new form to the database
 export async function createForm(formData: CreateFormData): Promise<Form> {
-  // Convert fields array to JSON string for database storage
+  // Send fields as array, let the storage layer handle JSON conversion
   const dataToSend = {
     ...formData,
-    fields: formData.fields ? JSON.stringify(formData.fields) : null,
+    fields: formData.fields || null,
   };
 
   const response = await fetch('/api/forms', {
@@ -46,10 +46,10 @@ export async function createForm(formData: CreateFormData): Promise<Form> {
 
 // Update an existing form
 export async function updateForm(id: number, formData: Partial<CreateFormData>): Promise<Form> {
-  // Convert fields array to JSON string for database storage
+  // Send fields as array, let the storage layer handle JSON conversion
   const dataToSend = {
     ...formData,
-    fields: formData.fields ? JSON.stringify(formData.fields) : undefined,
+    fields: formData.fields || undefined,
   };
 
   const response = await fetch(`/api/forms/${id}`, {

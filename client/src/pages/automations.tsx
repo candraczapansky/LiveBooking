@@ -62,7 +62,7 @@ const smsRuleSchema = z.object({
   name: z.string().min(1, "Name is required"),
   trigger: z.string().min(1, "Trigger is required"),
   timing: z.string().min(1, "Timing is required"),
-  template: z.string().min(1, "Template is required").max(160, "SMS messages must be 160 characters or less"),
+  template: z.string().min(1, "Template is required").max(500, "SMS messages must be 500 characters or less"),
   active: z.boolean().default(true),
   customTriggerName: z.string().optional(),
 });
@@ -839,7 +839,7 @@ export default function Automations() {
                                   />
                                 </FormControl>
                                 <FormDescription>
-                                  Max 160 characters. Variables: {templateVariables.slice(0, 5).join(", ")}, etc.
+                                  Max 500 characters. Variables: {templateVariables.slice(0, 5).join(", ")}, etc.
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
@@ -847,7 +847,7 @@ export default function Automations() {
                           />
                           
                           <p className="text-sm text-gray-600">
-                            SMS messages must be 160 characters or less
+                            SMS messages must be 500 characters or less
                           </p>
                           
                           <FormField

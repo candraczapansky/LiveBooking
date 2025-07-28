@@ -1,8 +1,11 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import AppointmentPhotos from "./appointment-photos";
+import { NoteInput } from "@/components/ui/note-input";
+import { useLocation } from "wouter";
 
 import {
   Dialog,
@@ -15,18 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  Scissors, 
-  DollarSign, 
-  Edit, 
-  Trash2,
-  CheckCircle,
-  XCircle,
-  AlertCircle
-} from "lucide-react";
+import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 interface AppointmentDetailsProps {
@@ -45,7 +37,11 @@ const AppointmentDetails = ({
   onDelete 
 }: AppointmentDetailsProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotes, setEditedNotes] = useState("");
+  const [location, setLocation] = useLocation();
 
   // Fetch appointment details
   const { data: appointment, isLoading } = useQuery({
@@ -104,6 +100,31 @@ const AppointmentDetails = ({
     enabled: !!staff?.userId
   });
 
+  // Update notes mutation
+  const updateNotesMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      if (!appointmentId) throw new Error('No appointment ID');
+      return apiRequest("PUT", `/api/appointments/${appointmentId}`, {
+        notes: notes || null
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      setIsEditingNotes(false);
+      toast({
+        title: "Success",
+        description: "Notes updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update notes.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'confirmed': return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -156,10 +177,61 @@ const AppointmentDetails = ({
     }
   };
 
+  const handleStartEditNotes = () => {
+    setEditedNotes(appointment?.notes || "");
+    setIsEditingNotes(true);
+  };
+
+  const handleCancelEditNotes = () => {
+    setIsEditingNotes(false);
+    setEditedNotes("");
+  };
+
+  const handleSaveNotes = async () => {
+    if (!appointment) return;
+
+    try {
+      // Update appointment notes
+      await updateNotesMutation.mutateAsync(editedNotes);
+
+      // Also save to note history
+      await fetch('/api/note-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: appointment.clientId,
+          appointmentId: appointment.id,
+          noteContent: editedNotes,
+          noteType: 'appointment',
+          createdBy: 1, // TODO: Get actual user ID from auth context
+          createdByRole: 'staff'
+        })
+      });
+
+      setIsEditingNotes(false);
+      toast({
+        title: "Notes Updated",
+        description: "Appointment notes have been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update notes. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Loading Appointment</DialogTitle>
+            <DialogDescription>
+              Please wait while we load the appointment details.
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
           </div>
@@ -340,14 +412,91 @@ const AppointmentDetails = ({
           </Card>
 
           {/* Notes */}
-          {appointment.notes && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Notes</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-medium text-gray-900 dark:text-gray-100">Notes</h3>
+                <div className="flex items-center gap-2">
+                  {!isEditingNotes && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setLocation(`/clients/${appointment?.clientId}`)}
+                        className="flex items-center gap-2"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                        View Note History
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleStartEditNotes}
+                        className="flex items-center gap-2"
+                      >
+                        <Edit className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+              
+              {isEditingNotes ? (
+                <div className="space-y-4">
+                  <NoteInput
+                    value={editedNotes}
+                    onChange={setEditedNotes}
+                    placeholder="Add notes for this appointment..."
+                    category="appointment"
+                    showTemplateSelector={true}
+                    rows={4}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveNotes}
+                      disabled={updateNotesMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      <Save className="h-4 w-4" />
+                      {updateNotesMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCancelEditNotes}
+                      disabled={updateNotesMutation.isPending}
+                      className="flex items-center gap-2"
+                    >
+                      <X className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  {appointment.notes ? (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500 italic">No notes added yet</p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Progress Photos */}
+          <Card>
+            <CardContent className="pt-6">
+              <AppointmentPhotos 
+                appointmentId={appointmentId!} 
+                onPhotosUpdated={() => {
+                  // Optionally refresh appointment data if needed
+                }}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         <DialogFooter className="flex gap-2">

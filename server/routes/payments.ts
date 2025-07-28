@@ -23,7 +23,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   const squareClient = new SquareClient({
     accessToken: process.env.SQUARE_ACCESS_TOKEN || '',
     environment: squareEnvironment,
-  });
+  } as any);
 
   // Create payment
   app.post("/api/payments", validateRequest(insertPaymentSchema), asyncHandler(async (req: Request, res: Response) => {
@@ -52,11 +52,22 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     if (clientId) {
       payments = await storage.getPaymentsByClient(parseInt(clientId as string));
     } else if (staffId) {
-      payments = await storage.getPaymentsByStaff(parseInt(staffId as string));
+      // Note: getPaymentsByStaff doesn't exist, so we'll get all payments and filter
+      const allPayments = await storage.getAllPayments();
+      payments = allPayments.filter(p => p.staffId === parseInt(staffId as string));
     } else if (startDate && endDate) {
-      payments = await storage.getPaymentsByDateRange(new Date(startDate as string), new Date(endDate as string));
+      // Note: getPaymentsByDateRange doesn't exist, so we'll get all payments and filter
+      const allPayments = await storage.getAllPayments();
+      const start = new Date(startDate as string);
+      const end = new Date(endDate as string);
+      payments = allPayments.filter(p => {
+        const paymentDate = p.paymentDate ? new Date(p.paymentDate) : new Date();
+        return paymentDate >= start && paymentDate <= end;
+      });
     } else if (status) {
-      payments = await storage.getPaymentsByStatus(status as string);
+      // Note: getPaymentsByStatus doesn't exist, so we'll get all payments and filter
+      const allPayments = await storage.getAllPayments();
+      payments = allPayments.filter(p => p.status === status);
     } else {
       payments = await storage.getAllPayments();
     }

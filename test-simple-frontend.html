@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Frontend API Test</title>
+</head>
+<body>
+    <h1>Frontend API Test</h1>
+    <button onclick="testAPI()">Test API Call</button>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing API...</p>';
+            
+            try {
+                // Test the exact same API call the frontend makes
+                const response = await fetch('/api/users?role=client');
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Look for test clients
+                    const testClients = data.filter(client => 
+                        client.email.includes('test.user') || 
+                        client.email.includes('frontend.test') ||
+                        client.email.includes('debug.test')
+                    );
+                    
+                    resultsDiv.innerHTML = `
+                        <h3>✅ API Test Successful</h3>
+                        <p>Total clients: ${data.length}</p>
+                        <p>Test clients found: ${testClients.length}</p>
+                        <h4>Test Clients:</h4>
+                        <ul>
+                            ${testClients.map(client => 
+                                `<li>${client.firstName} ${client.lastName} (${client.email})</li>`
+                            ).join('')}
+                        </ul>
+                        <h4>Recent Clients:</h4>
+                        <ul>
+                            ${data.slice(-5).map(client => 
+                                `<li>${client.firstName} ${client.lastName} (${client.email})</li>`
+                            ).join('')}
+                        </ul>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<h3>❌ API Test Failed</h3><p>Status: ${response.status}</p>`;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<h3>❌ API Test Error</h3><p>Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

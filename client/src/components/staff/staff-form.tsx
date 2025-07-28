@@ -190,7 +190,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         }
 
         const user = await userResponse.json();
-        userId = user.id;
+        userId = user.user.id; // Fix: access user.id from the nested response structure
         console.log(`Successfully created user with username: ${username}, userId: ${userId}`);
       } catch (error) {
         console.error("User creation error:", error);

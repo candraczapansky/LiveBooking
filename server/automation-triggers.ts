@@ -1,7 +1,6 @@
 import { sendEmail } from './email';
 import { sendSMS } from './sms';
 import type { IStorage } from './storage';
-import { storage } from './storage';
 import type { AutomationRule } from '@shared/schema';
 
 // Automation rules are now stored in the database via storage layer

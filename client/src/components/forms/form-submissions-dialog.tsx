@@ -546,8 +546,21 @@ export function FormSubmissionsDialog({
     const map: Record<string, string> = {};
     parsedFields.forEach((field) => {
       const label = field.config?.label || field.id;
+      
+      // Map the original field ID
       map[field.id] = label;
+      
+      // Also map the cleaned field ID (without timestamp) for better matching
+      // This helps when form data uses field IDs like "field_1753634868182_street"
+      const cleanFieldId = field.id.replace(/^field_\d+_/, '');
+      if (cleanFieldId !== field.id) {
+        map[cleanFieldId] = label;
+      }
+      
       console.log('Mapping field', field.id, 'to label:', label);
+      if (cleanFieldId !== field.id) {
+        console.log('Also mapping cleaned field', cleanFieldId, 'to label:', label);
+      }
     });
     
     console.log('Final fieldLabelMap:', map);
@@ -556,7 +569,34 @@ export function FormSubmissionsDialog({
 
   // Function to get field label from field ID
   const getFieldLabel = (fieldId: string) => {
-    const label = fieldLabelMap?.[fieldId] || fieldId;
+    // First try to get the label from the fieldLabelMap
+    let label = fieldLabelMap?.[fieldId];
+    
+    // If not found, try to clean the field ID and look again
+    if (!label) {
+      // Remove "field_" prefix and timestamp if present
+      // Pattern: field_1753634868182_street -> street
+      const cleanFieldId = fieldId.replace(/^field_\d+_/, '');
+      label = fieldLabelMap?.[cleanFieldId];
+    }
+    
+    // If still not found, try to extract a readable name from the field ID
+    if (!label) {
+      // Remove "field_" prefix and timestamp, then convert to readable format
+      const cleanFieldId = fieldId.replace(/^field_\d+_/, '');
+      // Convert camelCase or snake_case to readable format
+      label = cleanFieldId
+        .replace(/([A-Z])/g, ' $1') // Add space before capital letters
+        .replace(/_/g, ' ') // Replace underscores with spaces
+        .replace(/^\w/, c => c.toUpperCase()) // Capitalize first letter
+        .trim();
+    }
+    
+    // Fallback to the original field ID if all else fails
+    if (!label) {
+      label = fieldId;
+    }
+    
     console.log('getFieldLabel called for', fieldId, 'returning:', label);
     return label;
   };

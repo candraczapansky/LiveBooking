@@ -30,7 +30,7 @@ import FAQManagement from "@/components/llm/faq-management";
 import CategoryManagement from "@/components/llm/category-management";
 import LLMTest from "@/components/llm/llm-test";
 import AutoRespondSettings from "@/components/llm/auto-respond-settings";
-import SMSAutoRespondSettings from "@/components/llm/sms-auto-respond-settings";
+import SMSAutoRespondSettingsNew from "@/components/llm/sms-auto-respond-settings-new";
 import { Input } from "@/components/ui/input";
 
 export default function AIMessagingPage() {
@@ -40,43 +40,13 @@ export default function AIMessagingPage() {
 
   useDocumentTitle("AI Messaging");
 
-  // Fetch recent conversations (mock data for now)
+  // Fetch recent conversations from API
   const { data: recentConversations = [] } = useQuery({
     queryKey: ["/api/llm/conversations"],
     queryFn: async () => {
-      // Mock data - in real implementation, this would fetch from API
-      return [
-        {
-          id: 1,
-          clientName: "Sarah Johnson",
-          clientEmail: "sarah@example.com",
-          lastMessage: "Hi, I'd like to book an appointment for a haircut",
-          channel: "email",
-          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          status: "pending",
-          confidence: 0.92
-        },
-        {
-          id: 2,
-          clientName: "Mike Chen",
-          clientEmail: "mike@example.com",
-          lastMessage: "What are your prices for hair coloring?",
-          channel: "sms",
-          timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-          status: "responded",
-          confidence: 0.88
-        },
-        {
-          id: 3,
-          clientName: "Emily Davis",
-          clientEmail: "emily@example.com",
-          lastMessage: "Can I reschedule my appointment for next week?",
-          channel: "email",
-          timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-          status: "pending",
-          confidence: 0.95
-        }
-      ];
+      const response = await fetch("/api/llm/conversations");
+      if (!response.ok) throw new Error("Failed to fetch conversations");
+      return response.json();
     }
   });
 
@@ -304,12 +274,12 @@ export default function AIMessagingPage() {
                               </Badge>
                             </div>
                             <p className="text-gray-600 dark:text-gray-400 mb-2">
-                              {conversation.lastMessage}
+                              {conversation.clientMessage}
                             </p>
                             <div className="flex items-center gap-4 text-sm text-gray-500">
                               <span className="flex items-center gap-1">
                                 <Calendar className="h-3 w-3" />
-                                {formatTimeAgo(conversation.timestamp)}
+                                {formatTimeAgo(conversation.createdAt)}
                               </span>
                               <span className="flex items-center gap-1">
                                 <MailIcon className="h-3 w-3" />
@@ -394,7 +364,7 @@ export default function AIMessagingPage() {
               </TabsContent>
 
               <TabsContent value="sms-auto-respond" className="space-y-6">
-                <SMSAutoRespondSettings />
+                <SMSAutoRespondSettingsNew />
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-6">

@@ -823,12 +823,12 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   });
 
   // --- Chart Data ---
-  const chartData = staffMetrics.map(s => ({
+  const chartData = staffMetrics.map((s: any) => ({
     name: s.name,
     revenue: s.totalRevenue,
     utilization: Math.round(s.utilization)
   }));
-  const hasChartData = chartData.some(s => s.revenue > 0 || s.utilization > 0);
+  const hasChartData = chartData.some((s: any) => s.revenue > 0 || s.utilization > 0);
 
   // --- Render ---
   return (
@@ -892,7 +892,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {staffMetrics.map((s) => (
+                {staffMetrics.map((s: any) => (
                   <tr key={s.id}>
                     <td className="px-4 py-2 text-sm">{s.name}</td>
                     <td className="px-4 py-2 text-sm">{s.role}</td>

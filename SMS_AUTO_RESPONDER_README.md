@@ -69,7 +69,7 @@ npm run test-sms
 ### ✅ Configuration Options
 - **Enable/Disable** - Toggle the entire system
 - **Confidence Threshold** - Set minimum AI confidence (0-100%)
-- **Response Length** - Set maximum response length (50-160 characters)
+- **Response Length** - Set maximum response length (50-500 characters)
 - **Business Hours** - Configure start/end times and timezone
 - **Excluded Keywords** - Words that prevent auto-response
 - **Excluded Phone Numbers** - Numbers that won't trigger auto-responses
@@ -102,7 +102,7 @@ npm run test-sms
 {
   "enabled": true,
   "confidenceThreshold": 0.7,
-  "maxResponseLength": 160,
+  "maxResponseLength": 500,
   "businessHoursOnly": false,
   "businessHours": {
     "start": "09:00",

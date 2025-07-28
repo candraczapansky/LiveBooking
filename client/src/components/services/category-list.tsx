@@ -152,12 +152,10 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
         description: "Category deleted successfully",
       });
       setIsDeleteDialogOpen(false);
-      // Select first category or null if no categories left
-      if (categories?.length > 0) {
-        const firstCategoryId = categories.find((cat: ServiceCategory) => cat.id !== categoryToDelete)?.id || null;
-        if (firstCategoryId) {
-          onCategorySelect(firstCategoryId);
-        }
+      
+      // Clear the selected category if it was the one that was deleted
+      if (selectedCategoryId === categoryToDelete) {
+        onCategorySelect(0); // Clear selection
       }
     },
     onError: (error) => {

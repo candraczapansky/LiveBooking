@@ -200,6 +200,12 @@ export class JotformIntegration {
         let service = services.find(s => s.name.toLowerCase() === serviceInfo.name.toLowerCase());
         
         if (!service) {
+          // Check if automatic service creation is disabled
+          if (process.env.DISABLE_AUTOMATIC_SERVICE_CREATION === 'true') {
+            console.log('Automatic service creation is disabled. Cannot create service from JotForm submission.');
+            throw new Error('Automatic service creation is disabled. Please create services manually through the web interface.');
+          }
+
           // Create new service
           const categories = await this.storage.getAllServiceCategories();
           let category = categories.find(c => c.name.toLowerCase() === (serviceInfo.categoryName || 'General Services').toLowerCase());

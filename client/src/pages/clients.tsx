@@ -54,7 +54,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { NoteInput } from "@/components/ui/note-input";
+
 import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download, Upload, FileText } from "lucide-react";
 import { 
   DropdownMenu,
@@ -69,6 +71,10 @@ import { getInitials, getFullName } from "@/lib/utils";
 import ClientPaymentMethods from "@/components/payment/client-payment-methods";
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
+import ClientAnalytics from "@/components/client/client-analytics";
+import ClientCommunication from "@/components/client/client-communication";
+import ClientSearchFilters from "@/components/client/client-search-filters";
+import ClientNoteHistory from "@/components/client/client-note-history";
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
 
@@ -83,6 +89,8 @@ type Client = {
   city?: string;
   state?: string;
   zipCode?: string;
+  notes?: string;
+
   emailAccountManagement?: boolean;
   emailAppointmentReminders?: boolean;
   emailPromotions?: boolean;
@@ -94,7 +102,7 @@ type Client = {
 };
 
 const clientFormSchema = z.object({
-  email: z.string(),
+  email: z.string().email("Please enter a valid email address"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
@@ -102,13 +110,13 @@ const clientFormSchema = z.object({
   city: z.string().optional(),
   state: z.string().optional(),
   zipCode: z.string().optional(),
-  // Communication preferences
-  emailAccountManagement: z.boolean().optional(),
-  emailAppointmentReminders: z.boolean().optional(),
-  emailPromotions: z.boolean().optional(),
-  smsAccountManagement: z.boolean().optional(),
-  smsAppointmentReminders: z.boolean().optional(),
-  smsPromotions: z.boolean().optional(),
+  notes: z.string().optional(),
+  emailAccountManagement: z.boolean().default(true),
+  emailAppointmentReminders: z.boolean().default(true),
+  emailPromotions: z.boolean().default(false),
+  smsAccountManagement: z.boolean().default(false),
+  smsAppointmentReminders: z.boolean().default(true),
+  smsPromotions: z.boolean().default(false),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -138,6 +146,16 @@ const ClientsPage = () => {
     skipped: number;
     errors: string[];
   } | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Enhanced search and filter state
+  const [filters, setFilters] = useState({
+    status: 'all',
+    communicationPreferences: [] as string[],
+    appointmentStatus: 'all',
+    spendingRange: 'all',
+    lastVisit: 'all',
+  });
 
   
   // Create a file input element programmatically as a fallback
@@ -176,12 +194,38 @@ const ClientsPage = () => {
   }, [location]);
 
   const { data: clients, isLoading } = useQuery({
-    queryKey: ['/api/users?role=client'],
+    queryKey: ['/api/users?role=client', refreshTrigger],
     queryFn: async () => {
-      const response = await fetch('/api/users?role=client');
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
-    }
+      console.log('Fetching client list...');
+      const response = await apiRequest("GET", "/api/users?role=client");
+      const data = await response.json();
+      console.log('Client list fetched:', { count: data.length, recentClients: data.slice(-3) });
+      
+      // Debug: Check if phone numbers are in the API response
+      if (data.length > 0) {
+        const sampleClient = data[0];
+        console.log('Sample client from API:', {
+          id: sampleClient.id,
+          firstName: sampleClient.firstName,
+          lastName: sampleClient.lastName,
+          phone: sampleClient.phone,
+          phoneType: typeof sampleClient.phone,
+          phoneLength: sampleClient.phone?.length,
+          hasPhone: !!sampleClient.phone
+        });
+        
+        // Check how many clients have phone numbers
+        const clientsWithPhones = data.filter((c: any) => c.phone && c.phone.trim() !== '');
+        console.log('Total clients with phones:', clientsWithPhones.length, 'out of', data.length);
+      }
+      
+      return data;
+    },
+    staleTime: 0, // Always consider data stale
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchOnMount: true, // Refetch when component mounts
+    refetchOnReconnect: true, // Refetch when reconnecting
+    gcTime: 0 // Don't cache data in garbage collection
   });
 
   const addForm = useForm<ClientFormValues>({
@@ -195,6 +239,7 @@ const ClientsPage = () => {
       city: "",
       state: "",
       zipCode: "",
+      notes: "",
       emailAccountManagement: true,
       emailAppointmentReminders: true,
       emailPromotions: false,
@@ -215,6 +260,7 @@ const ClientsPage = () => {
       city: "",
       state: "",
       zipCode: "",
+      notes: "",
       emailAccountManagement: true,
       emailAppointmentReminders: true,
       emailPromotions: false,
@@ -257,15 +303,35 @@ const ClientsPage = () => {
 
   const updateClientMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Partial<ClientFormValues> }) => {
-      return apiRequest("PUT", `/api/users/${id}`, data);
+      console.log('updateClientMutation.mutationFn called with:', { id, data });
+      console.log('Data being sent to backend:', JSON.stringify(data, null, 2));
+      
+      const response = await apiRequest("PUT", `/api/users/${id}`, data);
+      console.log('updateClientMutation response status:', response.status);
+      console.log('updateClientMutation response headers:', response.headers);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('updateClientMutation error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      console.log('updateClientMutation response data:', responseData);
+      console.log('Backend returned user data:', JSON.stringify(responseData, null, 2));
+      return responseData;
     },
-    onSuccess: () => {
-      // Invalidate all user-related queries with aggressive cache clearing
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
-      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
-      // Force refetch client data for appointment forms
-      queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+    onSuccess: (updatedClient) => {
+      console.log('updateClientMutation onSuccess called with:', updatedClient);
+      
+      // Update the local clients array directly
+      queryClient.setQueryData(['/api/users?role=client', refreshTrigger], (oldData: any) => {
+        if (!oldData) return oldData;
+        return oldData.map((client: any) => 
+          client.id === updatedClient.id ? updatedClient : client
+        );
+      });
+      
       toast({
         title: "Success",
         description: "Client updated successfully",
@@ -275,9 +341,19 @@ const ClientsPage = () => {
       setSelectedClient(null);
     },
     onError: (error) => {
+      console.error('updateClientMutation onError called with:', error);
+      
+      // Show user-friendly error messages
+      let errorMessage = error.message;
+      if (error.message.includes("already in use by another user")) {
+        errorMessage = "This email address is already in use by another client. Please use a different email address.";
+      } else if (error.message.includes("Failed to update client")) {
+        errorMessage = "Failed to update client. Please try again.";
+      }
+      
       toast({
         title: "Error",
-        description: `Failed to update client: ${error.message}`,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -288,12 +364,9 @@ const ClientsPage = () => {
       return apiRequest("DELETE", `/api/users/${id}`);
     },
     onSuccess: () => {
-      // Invalidate all user-related queries with aggressive cache clearing
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
-      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
-      // Force refetch client data for appointment forms
-      queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+      // Invalidate and refetch to get updated list
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client', refreshTrigger] });
+      
       toast({
         title: "Success",
         description: "Client deleted successfully",
@@ -319,6 +392,7 @@ const ClientsPage = () => {
       console.log('Import response received:', response);
       const results = await response.json();
       console.log('Import results:', results);
+      setIsImporting(false);
       
       // Log any errors for debugging
       if (results.errors && results.errors.length > 0) {
@@ -327,19 +401,53 @@ const ClientsPage = () => {
       
       setImportResults(results);
       
-      // Invalidate client queries to refresh the list
+      // Clear search query to show all clients including newly imported ones
+      setSearchQuery('');
+      
+      // More aggressive cache invalidation to ensure fresh data
+      console.log('Invalidating cache and refetching...');
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
       queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
       queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
-      queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+      queryClient.removeQueries({ queryKey: ['/api/users'] });
+      
+      // Force refetch with fresh data
+      await queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+      
+      // Clear all queries and force a complete refresh
+      queryClient.clear();
+      
+      // Additional cache clearing for good measure
+      setTimeout(() => {
+        console.log('Forcing additional cache refresh...');
+        queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+        queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+      }, 1000);
+      
+      // Create a more detailed success message
+      let description = `Imported ${results.imported} clients, skipped ${results.skipped}.`;
+      
+      if (results.imported > 0) {
+        description += ` Search cleared to show all clients.`;
+        if (results.skipped > 0) {
+          description += ` Note: Some duplicates were modified to avoid conflicts.`;
+        }
+      }
       
       toast({
         title: "Import Complete",
-        description: `Imported ${results.imported} clients, skipped ${results.skipped}`,
+        description: description,
       });
+      
+      // Show detailed results in console for debugging
+      if (results.imported > 0) {
+        console.log('✅ Imported clients should now be visible in the list.');
+        console.log('💡 Try searching by: "Test", "User", or "test.user" to find them.');
+      }
     },
     onError: (error) => {
       console.error('Import mutation error:', error);
+      setIsImporting(false);
       toast({
         title: "Import Failed",
         description: `Failed to import clients: ${error.message || 'Unknown error occurred'}`,
@@ -353,11 +461,64 @@ const ClientsPage = () => {
   };
 
   const handleEditClient = (values: ClientFormValues) => {
+    console.log('=== handleEditClient called ===');
+    console.log('handleEditClient called with values:', values);
+    console.log('selectedClient:', selectedClient);
+    console.log('Form validation errors:', editForm.formState.errors);
+    console.log('Form is valid:', editForm.formState.isValid);
+    console.log('Form is dirty:', editForm.formState.isDirty);
+    
     if (selectedClient) {
-      updateClientMutation.mutate({
-        id: selectedClient.id,
-        data: values
+      // Convert to backend field names
+      const backendData = {
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: values.phone,
+        address: values.address,
+        city: values.city,
+        state: values.state,
+        zipCode: values.zipCode,
+        notes: values.notes,
+
+        emailAccountManagement: values.emailAccountManagement,
+        emailAppointmentReminders: values.emailAppointmentReminders,
+        emailPromotions: values.emailPromotions,
+        smsAccountManagement: values.smsAccountManagement,
+        smsAppointmentReminders: values.smsAppointmentReminders,
+        smsPromotions: values.smsPromotions,
+      };
+      
+      // Remove undefined values to avoid sending them to backend
+      Object.keys(backendData).forEach(key => {
+        if (backendData[key as keyof typeof backendData] === undefined) {
+          delete backendData[key as keyof typeof backendData];
+        }
       });
+      
+      console.log('Calling updateClientMutation with:', {
+        id: selectedClient.id,
+        data: backendData
+      });
+      console.log('Phone number being sent:', backendData.phone);
+      console.log('Phone number type:', typeof backendData.phone);
+      console.log('Phone number length:', backendData.phone?.length);
+      console.log('Is placeholder phone:', backendData.phone?.startsWith('555-000-'));
+      console.log('Original client phone:', selectedClient?.phone);
+      console.log('New phone number:', backendData.phone);
+      console.log('Phone number changed:', selectedClient?.phone !== backendData.phone);
+      console.log('Trying to update phone from:', selectedClient?.phone, 'to:', backendData.phone);
+      
+      // Log the exact data being sent
+      const mutationData = {
+        id: selectedClient.id,
+        data: backendData
+      };
+      console.log('Mutation data:', JSON.stringify(mutationData, null, 2));
+      
+      updateClientMutation.mutate(mutationData);
+    } else {
+      console.error('No selectedClient found');
     }
   };
 
@@ -368,24 +529,36 @@ const ClientsPage = () => {
   };
 
   const openEditDialog = (client: Client) => {
-    setSelectedClient(client);
+    console.log('=== OPEN EDIT DIALOG CALLED ===');
+    console.log('Opening edit dialog for client:', client);
+    
+    // Get the latest client data from the cache
+    const latestClientData = queryClient.getQueryData(['/api/users?role=client', refreshTrigger]) as Client[];
+    const latestClient = latestClientData?.find(c => c.id === client.id) || client;
+    
+    console.log('Using latest client data:', latestClient);
+    console.log('Phone number being loaded into form:', latestClient.phone);
+    setSelectedClient(latestClient);
     editForm.reset({
-      email: client.email,
-      firstName: client.firstName || "",
-      lastName: client.lastName || "",
-      phone: client.phone || "",
-      address: client.address || "",
-      city: client.city || "",
-      state: client.state || "",
-      zipCode: client.zipCode || "",
-      emailAccountManagement: client.emailAccountManagement ?? true,
-      emailAppointmentReminders: client.emailAppointmentReminders ?? true,
-      emailPromotions: client.emailPromotions ?? false,
-      smsAccountManagement: client.smsAccountManagement ?? true,
-      smsAppointmentReminders: client.smsAppointmentReminders ?? true,
-      smsPromotions: client.smsPromotions ?? false,
+      email: latestClient.email,
+      firstName: latestClient.firstName || "",
+      lastName: latestClient.lastName || "",
+      phone: latestClient.phone || "",
+      address: latestClient.address || "",
+      city: latestClient.city || "",
+      state: latestClient.state || "",
+      zipCode: latestClient.zipCode || "",
+      notes: latestClient.notes || "",
+
+      emailAccountManagement: latestClient.emailAccountManagement ?? true,
+      emailAppointmentReminders: latestClient.emailAppointmentReminders ?? true,
+      emailPromotions: latestClient.emailPromotions ?? false,
+      smsAccountManagement: latestClient.smsAccountManagement ?? false,
+      smsAppointmentReminders: latestClient.smsAppointmentReminders ?? true,
+      smsPromotions: latestClient.smsPromotions ?? false,
     });
     setIsEditDialogOpen(true);
+    console.log('Edit dialog should now be open');
   };
 
   const openDeleteDialog = (client: Client) => {
@@ -401,7 +574,11 @@ const ClientsPage = () => {
   const handleBackToList = () => {
     setViewMode('list');
     setClientDetail(null);
+    // Clean up URL to remove client ID
+    window.history.replaceState({}, '', '/clients');
   };
+
+
 
   // CSV Import handlers
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -463,123 +640,164 @@ const ClientsPage = () => {
 
     setIsImporting(true);
     
-    // First, let's read the file content to debug
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      console.log('File content preview (first 500 chars):', content.substring(0, 500));
-      console.log('File content length:', content.length);
-      console.log('File content lines:', content.split('\n').length);
-      
-      // Now parse the CSV
-      Papa.parse(importFile, {
-        header: true,
-        skipEmptyLines: true,
-        encoding: 'UTF-8',
-        delimiter: ',',
-        complete: (results) => {
+        // First try with headers
+    Papa.parse(importFile as any, {
+      header: true, // Parse with headers to detect column names
+      skipEmptyLines: true,
+      complete: (results) => {
         console.log('CSV parse results:', results);
-        console.log('CSV meta:', results.meta);
-        console.log('CSV errors:', results.errors);
-        console.log('Raw data sample:', results.data.slice(0, 3));
         console.log('Total rows parsed:', results.data.length);
+        console.log('CSV headers:', results.meta.fields);
         
-        const clients = results.data as any[];
-        
-        // Log the first few rows to see the structure
-        console.log('First 3 rows structure:', clients.slice(0, 3).map((row, index) => ({
-          rowIndex: index,
-          keys: Object.keys(row),
-          values: row
-        })));
-        
-        if (clients.length === 0) {
+        if (results.data.length === 0) {
           setIsImporting(false);
           toast({
             title: "No data found",
-            description: `The CSV file appears to be empty or has no valid data. Parsed ${results.data.length} rows.`,
+            description: "The CSV file appears to be empty.",
             variant: "destructive",
           });
           return;
         }
         
-        // Validate and transform the data for new format: Last name, First name, Email, Phone number
-        const validClients = clients.map((row: any, index: number) => {
-          // Get all column names to help with debugging
-          const columnNames = Object.keys(row);
-          console.log(`Row ${index + 1} columns:`, columnNames);
-          
-          // Try multiple possible column names for each field, including the unusual ones from the CSV
-          const email = row.email || row.Email || row.EMAIL || row['email'] || row['Email'] || 
-                       row['narevalo2007@gmail.com'] || ''; // Handle the unusual email column
-          const firstName = row.firstName || row['First Name'] || row['first name'] || row.first_name || 
-                           row['firstName'] || row['First Name'] || row.nelly || ''; // Handle the unusual firstName column
-          const lastName = row.lastName || row['Last Name'] || row['last name'] || row.last_name || 
-                          row['lastName'] || row['Last Name'] || row.A || ''; // Handle the unusual lastName column
-          const phone = row.phone || row.Phone || row.PHONE || row['phone'] || row['Phone'] || 
-                       row['9182619317'] || ''; // Handle the unusual phone column
-          
-          // Debug the extracted values for the first few rows
-          if (index < 5) {
-            console.log(`Row ${index + 1} extracted values:`, {
-              email: email,
-              firstName: firstName,
-              lastName: lastName,
-              phone: phone,
-              originalRow: row
-            });
-          }
-          
-          // Log phone extraction details for debugging
-          console.log(`Row ${index + 1} phone extraction:`, {
-            'row.phone': row.phone,
-            'row.Phone': row.Phone,
-            'row.PHONE': row.PHONE,
-            'row["phone"]': row['phone'],
-            'row["Phone"]': row['Phone'],
-            'row["9182619317"]': row['9182619317'],
-            'final phone value': phone
-          });
-          
-          // Skip completely empty rows (check if any field has data)
-          const hasAnyData = email.trim() || firstName.trim() || lastName.trim() || phone.trim();
-          if (!hasAnyData) {
-            console.log(`Row ${index + 1} is completely empty, skipping:`, row);
-            return null;
-          }
-          
-          // Log any rows with missing email for debugging
-          if (!email || email.trim() === '') {
-            console.log(`Row ${index + 1} has missing email, will generate placeholder:`, row);
-          }
-          
-          return {
-            email: email.trim(), // Keep as empty string, backend will generate placeholder
-            firstName: firstName.trim(),
-            lastName: lastName.trim(),
-            phone: phone.trim(),
-            // Set default values for other fields
-            address: '',
-            city: '',
-            state: '',
-            zipCode: '',
-            emailAccountManagement: true,
-            emailAppointmentReminders: true,
-            emailPromotions: false,
-            smsAccountManagement: true,
-            smsAppointmentReminders: true,
-            smsPromotions: false,
-          };
-        }).filter(Boolean); // Remove null entries
-
-        console.log('Valid clients to import:', validClients);
+        // Log the first few rows to debug
+        console.log('First 3 rows:', results.data.slice(0, 3));
+        console.log('Raw CSV data sample:', results.data.slice(0, 3).map((row: any) => Object.keys(row)));
+        console.log('Available fields in first row:', results.data.length > 0 ? Object.keys(results.data[0] as any) : []);
+        console.log('Data structure analysis:');
+        results.data.slice(0, 3).forEach((row: any, index: number) => {
+          console.log(`Row ${index} type:`, typeof row, 'isArray:', Array.isArray(row), 'keys:', Object.keys(row));
+        });
         
-        // Debug: Show phone numbers being imported
-        const clientsWithPhones = validClients.filter(client => client.phone && client.phone.trim() !== '');
-        console.log('Clients with phone numbers:', clientsWithPhones.length, 'out of', validClients.length);
-        if (clientsWithPhones.length > 0) {
-          console.log('Sample phone numbers:', clientsWithPhones.slice(0, 3).map(c => ({ name: `${c.firstName} ${c.lastName}`, phone: c.phone })));
+        // Transform the parsed data into client objects
+        const validClients = results.data
+          .map((row: any, index: number) => {
+            // Handle different possible column names with more flexible matching
+            const firstName = String(row.firstName || row['First Name'] || row['first_name'] || row['First'] || row['firstname'] || row['FirstName'] || '').trim();
+            const lastName = String(row.lastName || row['Last Name'] || row['last_name'] || row['Last'] || row['lastname'] || row['LastName'] || '').trim();
+            const email = String(row.email || row['Email'] || row['email'] || '').trim();
+            const phone = String(row.phone || row['Phone'] || row['phone'] || row['Phone Number'] || row['phonenumber'] || row['PhoneNumber'] || '').trim();
+            
+            console.log(`Row ${index + 1}: ${firstName} ${lastName}, ${email}, ${phone}`);
+            
+            return {
+              firstName,
+              lastName,
+              email,
+              phone
+            };
+          })
+          .filter(client => {
+            // Basic validation - require at least firstName OR lastName
+            const hasName = client.firstName || client.lastName;
+            const isValid = hasName;
+            if (!isValid) {
+              console.log(`Skipping invalid row: firstName="${client.firstName}", lastName="${client.lastName}", email="${client.email}"`);
+            }
+            return isValid;
+          });
+        
+        // If no valid clients found, try alternative parsing
+        if (validClients.length === 0 && results.data.length > 0) {
+          console.log('No valid clients found with standard parsing, trying alternative method...');
+          
+          // Check if the headers look like data (not column names)
+          const headers = results.meta.fields;
+          const firstRow = results.data[0];
+          
+          console.log('Headers look like data:', headers);
+          console.log('First row:', firstRow);
+          
+          // If headers look like data (not typical column names), treat them as data
+          if (headers && headers.length >= 4 && 
+              !headers.some((header: string) => 
+                header.toLowerCase().includes('first') || 
+                header.toLowerCase().includes('last') || 
+                header.toLowerCase().includes('name') || 
+                header.toLowerCase().includes('email') || 
+                header.toLowerCase().includes('phone')
+              )) {
+            console.log('Headers appear to be data, treating as data rows...');
+            
+            // Include the header row as data and parse all rows
+            const allRows = [headers, ...results.data];
+            console.log('All rows to process:', allRows.length);
+            console.log('Sample rows:', allRows.slice(0, 3));
+            
+            const alternativeClients = allRows
+              .map((row: any, index: number) => {
+                console.log(`Processing row ${index}:`, row);
+                
+                // Handle both array and object formats
+                let firstName, lastName, email, phone;
+                
+                if (Array.isArray(row)) {
+                  // Row is an array
+                  firstName = String(row[0] || '').trim();
+                  lastName = String(row[1] || '').trim();
+                  email = String(row[2] || '').trim();
+                  phone = String(row[3] || '').trim();
+                } else if (typeof row === 'object' && row !== null) {
+                  // Row is an object with field names as keys
+                  const keys = Object.keys(row);
+                  if (keys.length >= 4) {
+                    const values = Object.values(row);
+                    firstName = String(values[0] || '').trim();
+                    lastName = String(values[1] || '').trim();
+                    email = String(values[2] || '').trim();
+                    phone = String(values[3] || '').trim();
+                  } else {
+                    return null;
+                  }
+                } else {
+                  return null;
+                }
+                
+                console.log(`Row ${index} parsed:`, { firstName, lastName, email, phone });
+                
+                return {
+                  firstName,
+                  lastName,
+                  email,
+                  phone
+                };
+              })
+              .filter((client): client is { firstName: string; lastName: string; email: string; phone: string } => 
+                client !== null && Boolean(client.firstName || client.lastName));
+            
+            if (alternativeClients.length > 0) {
+              console.log(`Found ${alternativeClients.length} clients with alternative parsing`);
+              validClients.push(...alternativeClients);
+            }
+          } else {
+            // Try parsing without headers if the first row looks like data
+            const alternativeClients = results.data
+              .map((row: any, index: number) => {
+                // If the row has numeric keys, it might be parsed without headers
+                const keys = Object.keys(row);
+                if (keys.length >= 4 && keys.every((key: string) => !isNaN(Number(key)))) {
+                  // This looks like data parsed without headers
+                  const values = Object.values(row);
+                  return {
+                    firstName: String(values[0] || '').trim(),
+                    lastName: String(values[1] || '').trim(),
+                    email: String(values[2] || '').trim(),
+                    phone: String(values[3] || '').trim()
+                  };
+                }
+                return null;
+              })
+              .filter((client): client is { firstName: string; lastName: string; email: string; phone: string } => 
+                client !== null && Boolean(client.firstName || client.lastName));
+            
+            if (alternativeClients.length > 0) {
+              console.log(`Found ${alternativeClients.length} clients with alternative parsing`);
+              validClients.push(...alternativeClients);
+            }
+          }
         }
+        
+        console.log(`Valid clients to import: ${validClients.length}`);
+        console.log('Sample clients:', validClients.slice(0, 3));
         
         // Check if we have any valid clients to import
         if (validClients.length === 0) {
@@ -611,35 +829,79 @@ const ClientsPage = () => {
           });
         }
         
-        // Debug: Show phone number status
-        if (clientsWithPhones.length === 0) {
-          toast({
-            title: "No phone numbers found",
-            description: "No phone numbers were extracted from the CSV file. Check your column headers.",
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Phone numbers detected",
-            description: `${clientsWithPhones.length} out of ${validClients.length} clients have phone numbers.`,
-          });
-        }
-        
+        // Import the clients
+        console.log('Sending import request with', validClients.length, 'clients');
+        console.log('Sample client data being sent:', validClients.slice(0, 3).map(client => ({
+          firstName: client.firstName,
+          lastName: client.lastName,
+          email: client.email,
+          phone: client.phone,
+          phoneType: typeof client.phone,
+          phoneLength: client.phone?.length
+        })));
         importClientsMutation.mutate(validClients);
-        setIsImporting(false);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error('CSV parse error:', error);
-        setIsImporting(false);
-        toast({
-          title: "CSV Parse Error",
-          description: `Failed to parse CSV file: ${error.message}`,
-          variant: "destructive",
+        // Try parsing without headers as fallback
+        console.log('Trying fallback parsing without headers...');
+        Papa.parse(importFile as any, {
+          header: false, // Parse without headers
+          skipEmptyLines: true,
+          complete: (fallbackResults) => {
+            console.log('Fallback parse results:', fallbackResults);
+            
+            if (fallbackResults.data.length === 0) {
+              setIsImporting(false);
+              toast({
+                title: "CSV Parse Error",
+                description: `Failed to parse CSV file: ${error.message}`,
+                variant: "destructive",
+              });
+              return;
+            }
+            
+            // Skip the first row if it looks like headers
+            const dataRows = fallbackResults.data.slice(1);
+            const validClients = dataRows
+              .map((row: any, index: number) => {
+                if (Array.isArray(row) && row.length >= 4) {
+                  return {
+                    firstName: String(row[0] || '').trim(),
+                    lastName: String(row[1] || '').trim(),
+                    email: String(row[2] || '').trim(),
+                    phone: String(row[3] || '').trim()
+                  };
+                }
+                return null;
+              })
+              .filter((client): client is { firstName: string; lastName: string; email: string; phone: string } => 
+                client !== null && Boolean(client.firstName || client.lastName));
+            
+            if (validClients.length > 0) {
+              console.log(`Found ${validClients.length} clients with fallback parsing`);
+              importClientsMutation.mutate(validClients);
+            } else {
+              setIsImporting(false);
+              toast({
+                title: "CSV Parse Error",
+                description: `Failed to parse CSV file: ${error.message}`,
+                variant: "destructive",
+              });
+            }
+          },
+          error: (fallbackError) => {
+            console.error('Fallback parse error:', fallbackError);
+            setIsImporting(false);
+            toast({
+              title: "CSV Parse Error",
+              description: `Failed to parse CSV file: ${error.message}`,
+              variant: "destructive",
+            });
+          }
         });
       }
     });
-    };
-    reader.readAsText(importFile);
   };
 
   const resetImportDialog = () => {
@@ -651,32 +913,32 @@ const ClientsPage = () => {
   const downloadSampleCSV = () => {
     const sampleData = [
       {
-        lastName: 'Doe',
         firstName: 'John',
+        lastName: 'Doe',
         email: 'john.doe@example.com',
         phone: '(555) 123-4567'
       },
       {
-        lastName: 'Smith',
         firstName: 'Jane',
+        lastName: 'Smith',
         email: 'jane.smith@example.com',
         phone: '(555) 987-6543'
       },
       {
-        lastName: 'Johnson',
         firstName: 'Mike',
+        lastName: 'Johnson',
         email: '',
         phone: '(555) 111-2222'
       },
       {
-        lastName: 'Wilson',
         firstName: 'Bob',
+        lastName: 'Wilson',
         email: 'bob.wilson@example.com',
         phone: ''
       },
       {
-        lastName: '',
         firstName: 'Alice',
+        lastName: '',
         email: '',
         phone: ''
       }
@@ -754,13 +1016,162 @@ const ClientsPage = () => {
     });
   };
 
-  const filteredClients = clients?.filter((client: Client) =>
-    client.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (client.firstName && client.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (client.lastName && client.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (client.phone && client.phone.includes(searchQuery))
-  );
+  // Enhanced filtering logic
+  const filteredClients = clients?.filter((client: Client) => {
+    // Basic search filter
+    const matchesSearch = 
+      client.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (client.firstName && client.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.lastName && client.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (client.phone && client.phone.includes(searchQuery));
+
+    if (!matchesSearch) return false;
+
+    // Apply additional filters if they're set
+    if (filters.status !== 'all') {
+      // This would need to be implemented with actual client status logic
+      // For now, we'll just pass through
+    }
+
+    if (filters.communicationPreferences.length > 0) {
+      // This would need to be implemented with actual communication preferences logic
+      // For now, we'll just pass through
+    }
+
+    return true;
+  });
+
+  // Debug logging for client list
+  console.log('Client list debug:', {
+    totalClients: clients?.length || 0,
+    searchQuery,
+    filteredClientsCount: filteredClients?.length || 0,
+    recentClients: clients?.slice(-3).map((c: Client) => ({ firstName: c.firstName, lastName: c.lastName, email: c.email })),
+    isLoading,
+    hasData: !!clients,
+    searchQueryLength: searchQuery.length
+  });
+
+  // Debug: Check for imported clients specifically
+  if (searchQuery && searchQuery.length > 0) {
+    const searchLower = searchQuery.toLowerCase();
+    const matchingClients = clients?.filter((client: Client) => {
+      return (
+        (client.firstName && client.firstName.toLowerCase().includes(searchLower)) ||
+        (client.lastName && client.lastName.toLowerCase().includes(searchLower)) ||
+        (client.email && client.email.toLowerCase().includes(searchLower)) ||
+        (client.username && client.username.toLowerCase().includes(searchLower))
+      );
+    });
+    
+    // Also try splitting the search query to check individual words
+    const searchWords = searchQuery.toLowerCase().split(' ').filter(word => word.length > 0);
+    const wordMatchingClients = clients?.filter((client: Client) => {
+      return searchWords.some(word => 
+        (client.firstName && client.firstName.toLowerCase().includes(word)) ||
+        (client.lastName && client.lastName.toLowerCase().includes(word)) ||
+        (client.email && client.email.toLowerCase().includes(word)) ||
+        (client.username && client.username.toLowerCase().includes(word))
+      );
+    });
+    
+    console.log('Search debug:', {
+      searchQuery,
+      searchWords,
+      matchingClients: matchingClients?.length || 0,
+      wordMatchingClients: wordMatchingClients?.length || 0,
+      sampleMatches: matchingClients?.slice(0, 3).map((c: Client) => ({
+        firstName: c.firstName,
+        lastName: c.lastName,
+        email: c.email,
+        username: c.username
+      }))
+    });
+  }
+
+  // Additional debug for filtered clients
+  if (filteredClients && filteredClients.length > 0) {
+    console.log('Filtered clients sample:', filteredClients.slice(0, 3).map((c: Client) => ({ 
+      firstName: c.firstName, 
+      lastName: c.lastName, 
+      email: c.email 
+    })));
+  }
+
+  // Debug: Show recent clients to see if imported ones are there
+  if (clients && clients.length > 0) {
+    const recentClients = clients.slice(-5); // Last 5 clients
+    console.log('Recent clients (last 5):', recentClients.map((c: Client) => ({
+      id: c.id,
+      firstName: c.firstName,
+      lastName: c.lastName,
+      email: c.email,
+      phone: c.phone,
+      phoneType: typeof c.phone,
+      phoneLength: c.phone?.length,
+      username: c.username,
+      createdAt: c.createdAt
+    })));
+    
+    // Also check for any clients with "Davis" in the name
+    const davisClients = clients.filter((c: Client) => 
+      (c.firstName && c.firstName.toLowerCase().includes('davis')) ||
+      (c.lastName && c.lastName.toLowerCase().includes('davis'))
+    );
+    console.log('Davis clients found:', davisClients.length);
+    if (davisClients.length > 0) {
+      console.log('Sample Davis clients:', davisClients.slice(0, 3).map((c: Client) => ({
+        id: c.id,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        email: c.email,
+        phone: c.phone,
+        phoneType: typeof c.phone,
+        phoneLength: c.phone?.length
+      })));
+      
+      // Check if any Davis clients have phone numbers
+      const davisClientsWithPhones = davisClients.filter((c: Client) => c.phone && c.phone.trim() !== '');
+      console.log('Davis clients with phones:', davisClientsWithPhones.length);
+      if (davisClientsWithPhones.length > 0) {
+        console.log('Sample Davis clients with phones:', davisClientsWithPhones.slice(0, 3).map((c: Client) => ({
+          id: c.id,
+          firstName: c.firstName,
+          lastName: c.lastName,
+          phone: c.phone,
+          phoneType: typeof c.phone,
+          phoneLength: c.phone?.length
+        })));
+      }
+    }
+  }
+
+  // Extract client ID from URL if navigating from appointment details
+  const urlClientId = location.includes('/clients/') ? 
+    parseInt(location.split('/clients/')[1]?.split('?')[0]) : null;
+
+  // Fetch client details if client ID is in URL
+  const { data: urlClientData } = useQuery({
+    queryKey: ['/api/users', urlClientId],
+    queryFn: async () => {
+      if (!urlClientId) return null;
+      const response = await apiRequest("GET", `/api/users/${urlClientId}`);
+      if (!response.ok) {
+        throw new Error('Client not found');
+      }
+      return response.json();
+    },
+    enabled: !!urlClientId,
+  });
+
+  // Set client detail when URL client data is available
+  useEffect(() => {
+    if (urlClientData && urlClientId) {
+      setClientDetail(urlClientData);
+      setViewMode('detail');
+    }
+  }, [urlClientData, urlClientId]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
@@ -785,17 +1196,22 @@ const ClientsPage = () => {
                     </p>
                   </div>
                   
-                  {/* Search Section */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-500 dark:text-gray-400" />
-                    <Input
-                      type="search"
-                      placeholder="Search clients..."
-                      className="pl-10 h-12 sm:h-10 text-base sm:text-sm w-full"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                  </div>
+                  {/* Enhanced Search & Filters */}
+                  <ClientSearchFilters
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    filters={filters}
+                    onFiltersChange={setFilters}
+                    onClearFilters={() => setFilters({
+                      status: 'all',
+                      communicationPreferences: [],
+                      appointmentStatus: 'all',
+                      spendingRange: 'all',
+                      lastVisit: 'all',
+                    })}
+                    totalClients={clients?.length || 0}
+                    filteredClients={filteredClients?.length || 0}
+                  />
                   
                   {/* Action Buttons - Mobile First Design */}
                   <div className="space-y-3">
@@ -887,6 +1303,11 @@ const ClientsPage = () => {
                 <CardTitle className="text-lg sm:text-xl">All Clients</CardTitle>
                 <CardDescription>
                   View and manage all your salon clients
+                  {process.env.NODE_ENV === 'development' && (
+                    <div className="mt-2 text-xs text-gray-400">
+                      Debug: {filteredClients?.length || 0} clients, search: "{searchQuery}"
+                    </div>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-6">
@@ -896,21 +1317,35 @@ const ClientsPage = () => {
                   </div>
                 ) : filteredClients?.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      console.log('Rendering empty state:', {
+                        filteredClientsLength: filteredClients?.length,
+                        searchQuery,
+                        hasClients: !!filteredClients
+                      });
+                      return null;
+                    })()}
                     No clients found. {searchQuery ? 'Try a different search term.' : 'Add your first client!'}
                   </div>
                 ) : (
                   <>
+                    {/* Debug info */}
+                    {(() => {
+                      console.log('Rendering client list:', {
+                        isLoading,
+                        filteredClientsLength: filteredClients?.length,
+                        searchQuery,
+                        hasClients: !!filteredClients
+                      });
+                      return null;
+                    })()}
+                    
                     {/* Mobile Card Layout - Hidden on Desktop */}
-                    <div className="block sm:hidden space-y-3">
+                    <div className="block sm:hidden space-y-3" key={`mobile-${searchQuery}`}>
                       {filteredClients?.map((client: Client) => (
                         <Card key={client.id} className="p-4 hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3 flex-1 min-w-0">
-                              <Avatar className="h-12 w-12 flex-shrink-0">
-                                <AvatarFallback className="text-sm font-medium">
-                                  {getInitials(client.firstName, client.lastName)}
-                                </AvatarFallback>
-                              </Avatar>
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-base text-gray-900 dark:text-gray-100 truncate">
                                   {getFullName(client.firstName, client.lastName)}
@@ -963,7 +1398,7 @@ const ClientsPage = () => {
                     </div>
 
                     {/* Desktop Table Layout - Hidden on Mobile */}
-                    <div className="hidden sm:block">
+                    <div className="hidden sm:block" key={`desktop-${searchQuery}`}>
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -977,21 +1412,15 @@ const ClientsPage = () => {
                           {filteredClients?.map((client: Client) => (
                             <TableRow key={client.id}>
                               <TableCell>
-                                <div className="flex items-center space-x-3">
-                                  <Avatar>
-                                    <AvatarFallback>
-                                      {getInitials(client.firstName, client.lastName)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <div className="font-medium">
-                                      {getFullName(client.firstName, client.lastName)}
-                                    </div>
-                                  </div>
+                                <div className="font-medium">
+                                  {getFullName(client.firstName, client.lastName)}
                                 </div>
                               </TableCell>
                               <TableCell>{client.email}</TableCell>
-                              <TableCell>{client.phone || "-"}</TableCell>
+                              <TableCell>
+                                {client.phone || "-"}
+                                {/* Debug: {JSON.stringify({phone: client.phone, type: typeof client.phone})} */}
+                              </TableCell>
                               <TableCell className="text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -1048,12 +1477,7 @@ const ClientsPage = () => {
                 {/* Client Information Card */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="text-lg">
-                          {getInitials(clientDetail?.firstName, clientDetail?.lastName)}
-                        </AvatarFallback>
-                      </Avatar>
+                    <CardTitle>
                       <div>
                         <h3 className="text-xl font-semibold">
                           {getFullName(clientDetail?.firstName, clientDetail?.lastName) || 'Client'}
@@ -1101,6 +1525,14 @@ const ClientsPage = () => {
                             <span className="text-gray-500 dark:text-gray-400">ZIP Code:</span>
                             <span className="ml-2">{clientDetail?.zipCode || "Not provided"}</span>
                           </div>
+                          {clientDetail?.notes && (
+                            <div>
+                              <span className="text-gray-500 dark:text-gray-400">Notes:</span>
+                              <div className="ml-2 mt-1 p-3 bg-gray-50 dark:bg-gray-800 rounded-md text-sm">
+                                {clientDetail.notes}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1161,6 +1593,24 @@ const ClientsPage = () => {
                   </CardContent>
                 </Card>
 
+                {/* Client Analytics */}
+                {clientDetail && (
+                  <ClientAnalytics 
+                    clientId={clientDetail.id} 
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
+                  />
+                )}
+
+                {/* Client Communication */}
+                {clientDetail && (
+                  <ClientCommunication 
+                    clientId={clientDetail.id}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
+                    clientEmail={clientDetail.email}
+                    clientPhone={clientDetail.phone}
+                  />
+                )}
+
                 {/* Payment Methods */}
                 {clientDetail && (
                   <ClientPaymentMethods 
@@ -1177,6 +1627,14 @@ const ClientsPage = () => {
                   <ClientFormSubmissions 
                     clientId={clientDetail.id} 
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
+                  />
+                )}
+
+                {/* Notes History */}
+                {clientDetail && (
+                  <ClientNoteHistory 
+                    clientId={clientDetail.id} 
+                    clientName={`${clientDetail.firstName || ''} ${clientDetail.lastName || ''}`.trim() || 'Client'}
                   />
                 )}
               </div>
@@ -1329,6 +1787,32 @@ const ClientsPage = () => {
                   />
                 </div>
               </div>
+              
+              {/* Notes Section */}
+              <div className="space-y-4">
+                <FormField
+                  control={addForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormControl>
+                        <NoteInput
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Add notes about this client..."
+                          category="client"
+                          showTemplateSelector={true}
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+
               
               {/* Communication Preferences Section */}
               <div className="space-y-4 border-t pt-4">
@@ -1547,8 +2031,23 @@ const ClientsPage = () => {
               Update the client's information below.
             </DialogDescription>
           </DialogHeader>
+          
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(handleEditClient)} className="space-y-4" noValidate>
+            <form onSubmit={editForm.handleSubmit(handleEditClient)} className="space-y-4 pb-4">
+              {/* Debug form submission */}
+              <div className="hidden">
+                <button 
+                  type="button" 
+                  onClick={() => {
+                    console.log('=== MANUAL FORM SUBMISSION TEST ===');
+                    const values = editForm.getValues();
+                    console.log('Form values before submission:', values);
+                    handleEditClient(values);
+                  }}
+                >
+                  Manual Submit Test
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
@@ -1578,9 +2077,7 @@ const ClientsPage = () => {
                   )}
                 />
               </div>
-              
 
-              
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={editForm.control}
@@ -1589,20 +2086,7 @@ const ClientsPage = () => {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <input
-                          type="text" 
-                          placeholder="Enter email address" 
-                          autoComplete="off"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          spellCheck="false"
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-                          style={{
-                            borderColor: 'hsl(var(--border))',
-                            boxShadow: 'none'
-                          }}
-                          {...field} 
-                        />
+                        <Input placeholder="john@example.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1616,77 +2100,111 @@ const ClientsPage = () => {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(123) 456-7890" {...field} value={field.value || ""} />
+                        <Input 
+                          placeholder="(555) 123-4567" 
+                          {...field}
+                          onChange={(e) => {
+                            console.log('Phone field changed:', e.target.value);
+                            field.onChange(e);
+                          }}
+                          onBlur={() => {
+                            console.log('Phone field blur, current value:', field.value);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
-              
-              {/* Address Section */}
-              <div className="space-y-4">
+
+              <div className="grid grid-cols-1 gap-4">
                 <FormField
                   control={editForm.control}
                   name="address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Street Address (Optional)</FormLabel>
+                      <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Input placeholder="123 Main Street" {...field} value={field.value || ""} />
+                        <Input placeholder="123 Main St" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input placeholder="City" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
                 
-                <div className="grid grid-cols-3 gap-4">
-                  <FormField
-                    control={editForm.control}
-                    name="city"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>City (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="New York" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={editForm.control}
-                    name="state"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>State (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="NY" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={editForm.control}
-                    name="zipCode"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>ZIP Code (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="10001" {...field} value={field.value || ""} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={editForm.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input placeholder="State" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={editForm.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="12345" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-              
+
+              <div className="grid grid-cols-1 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <NoteInput
+                          value={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Add notes about this client..."
+                          category="client"
+                          showTemplateSelector={true}
+                          rows={3}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+
+
               {/* Communication Preferences Section */}
-              <div className="space-y-4 border-t pt-4">
+              <div className="space-y-4 border-t pt-4 pb-2">
                 <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">Communication Preferences</h4>
                 
                 <div className="space-y-3">
@@ -1831,6 +2349,20 @@ const ClientsPage = () => {
                 <Button type="submit" disabled={updateClientMutation.isPending}>
                   {updateClientMutation.isPending ? "Updating..." : "Update Client"}
                 </Button>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => {
+                    console.log('=== MANUAL SUBMIT TEST ===');
+                    const values = editForm.getValues();
+                    console.log('Form values:', values);
+                    console.log('Form is valid:', editForm.formState.isValid);
+                    console.log('Form errors:', editForm.formState.errors);
+                    handleEditClient(values);
+                  }}
+                >
+                  Test Submit
+                </Button>
               </DialogFooter>
             </form>
           </Form>
@@ -1870,9 +2402,13 @@ const ClientsPage = () => {
             <DialogDescription>
               Upload a CSV file to import multiple clients at once. Download the sample file to see the format. 
               <br />
-              <span className="text-green-600 font-medium">✓ All fields are optional! Missing emails will be auto-generated.</span>
+              <span className="text-green-600 font-medium">✓ Required columns: First Name, Last Name (Email and Phone are optional)</span>
+              <br />
+              <span className="text-blue-600 font-medium">📋 Supported column names: firstName/First Name/first_name, lastName/Last Name/last_name, email/Email, phone/Phone/Phone Number</span>
               <br />
               <span className="text-orange-600 font-medium">Note: Large files (over 1000 clients) should be split into smaller batches for better performance.</span>
+              <br />
+              <span className="text-blue-600 font-medium">💡 Duplicate emails/phones will be modified to avoid conflicts. Search by first name or "test.user" to find imported clients.</span>
             </DialogDescription>
           </DialogHeader>
           

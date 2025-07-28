@@ -29,7 +29,9 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     } else if (date) {
       appointments = await storage.getAppointmentsByDate(new Date(date as string));
     } else if (status) {
-      appointments = await storage.getAppointmentsByStatus(status as string);
+      // Filter appointments by status from all appointments
+      const allAppointments = await storage.getAllAppointments();
+      appointments = allAppointments.filter(apt => apt.status === status);
     } else {
       appointments = await storage.getAllAppointments();
     }
@@ -70,17 +72,19 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     LoggerService.info("Creating new appointment", { ...context, appointmentData });
 
     // Validate appointment time conflicts
-    const conflictingAppointments = await storage.getConflictingAppointments(
-      appointmentData.staffId,
-      appointmentData.date,
-      appointmentData.startTime,
-      appointmentData.endTime
+    const allAppointments = await storage.getAllAppointments();
+    const conflictingAppointments = allAppointments.filter(apt => 
+      apt.staffId === appointmentData.staffId &&
+      apt.status !== 'cancelled' &&
+      apt.status !== 'completed' &&
+      ((new Date(apt.startTime) <= new Date(appointmentData.endTime) && 
+        new Date(apt.endTime) >= new Date(appointmentData.startTime)))
     );
 
     if (conflictingAppointments.length > 0) {
       LoggerService.warn("Appointment time conflict detected", { 
         ...context, 
-        conflictingAppointments: conflictingAppointments.map(apt => apt.id) 
+        conflictingAppointments: conflictingAppointments.map((apt: any) => apt.id) 
       });
       throw new ConflictError("Appointment time conflicts with existing appointments");
     }
@@ -109,7 +113,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 <p>Your appointment has been confirmed:</p>
                 <ul>
                   <li><strong>Service:</strong> ${service.name}</li>
-                  <li><strong>Date:</strong> ${new Date(newAppointment.date).toLocaleDateString()}</li>
+                  <li><strong>Date:</strong> ${new Date(newAppointment.startTime).toLocaleDateString()}</li>
                   <li><strong>Time:</strong> ${newAppointment.startTime} - ${newAppointment.endTime}</li>
                   <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
                 </ul>
@@ -122,7 +126,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
         // Send SMS confirmation
         if (client.smsAppointmentReminders && client.phone) {
-          const message = `Your Glo Head Spa appointment for ${service.name} on ${new Date(newAppointment.date).toLocaleDateString()} at ${newAppointment.startTime} has been confirmed.`;
+          const message = `Your Glo Head Spa appointment for ${service.name} on ${new Date(newAppointment.startTime).toLocaleDateString()} at ${newAppointment.startTime} has been confirmed.`;
           await sendSMS(client.phone, message);
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
         }
@@ -175,20 +179,22 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     // Check for time conflicts if time is being updated
-    if (updateData.date || updateData.startTime || updateData.endTime) {
-      const conflictingAppointments = await storage.getConflictingAppointments(
-        updateData.staffId || existingAppointment.staffId,
-        updateData.date || existingAppointment.date,
-        updateData.startTime || existingAppointment.startTime,
-        updateData.endTime || existingAppointment.endTime,
-        appointmentId // Exclude current appointment
+    if (updateData.startTime || updateData.endTime) {
+      const allAppointments = await storage.getAllAppointments();
+      const conflictingAppointments = allAppointments.filter((apt: any) => 
+        apt.id !== appointmentId &&
+        apt.staffId === (updateData.staffId || existingAppointment.staffId) &&
+        apt.status !== 'cancelled' &&
+        apt.status !== 'completed' &&
+        ((new Date(apt.startTime) <= new Date(updateData.endTime || existingAppointment.endTime) && 
+          new Date(apt.endTime) >= new Date(updateData.startTime || existingAppointment.startTime)))
       );
 
       if (conflictingAppointments.length > 0) {
         LoggerService.warn("Appointment update time conflict detected", { 
           ...context, 
           appointmentId,
-          conflictingAppointments: conflictingAppointments.map(apt => apt.id) 
+          conflictingAppointments: conflictingAppointments.map((apt: any) => apt.id) 
         });
         throw new ConflictError("Updated appointment time conflicts with existing appointments");
       }
@@ -233,7 +239,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     } else if (staffId) {
       appointments = await storage.getCancelledAppointmentsByStaff(parseInt(staffId as string));
     } else {
-      appointments = await storage.getCancelledAppointments();
+      appointments = await storage.getAllCancelledAppointments();
     }
 
     res.json(appointments);
@@ -300,7 +306,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>This is a reminder for your upcoming appointment:</p>
               <ul>
                 <li><strong>Service:</strong> ${service.name}</li>
-                <li><strong>Date:</strong> ${new Date(appointment.date).toLocaleDateString()}</li>
+                <li><strong>Date:</strong> ${new Date(appointment.startTime).toLocaleDateString()}</li>
                 <li><strong>Time:</strong> ${appointment.startTime} - ${appointment.endTime}</li>
                 <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
               </ul>
