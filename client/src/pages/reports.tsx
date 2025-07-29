@@ -3,7 +3,7 @@ import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -223,7 +223,13 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+  const { data: salesHistory = [], isLoading, refetch } = useQuery({ 
+    queryKey: ["/api/sales-history"],
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0, // Always consider data stale for real-time updates
+  });
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
   
   // Filter sales by date range and completed status
@@ -238,6 +244,14 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
 
   return (
     <div className="space-y-4 md:space-y-6">
+      {isLoading && (
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Refreshing sales data... This page updates automatically every 30 seconds.
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
         <Card>
           <CardContent className="p-4 md:p-6">
@@ -267,10 +281,10 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
               <div className="ml-3 md:ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
-                    Avg Transaction
+                    Total Transactions
                   </dt>
                   <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    {formatPrice(totalTransactions > 0 ? totalRevenue / totalTransactions : 0)}
+                    {totalTransactions}
                   </dd>
                 </dl>
               </div>
@@ -329,10 +343,34 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
-  const { data: appointments = [] } = useQuery({ queryKey: ["/api/appointments"] });
-  const { data: payments = [] } = useQuery({ queryKey: ["/api/payments"] });
-  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
+  const { data: services = [], isLoading: servicesLoading } = useQuery({ 
+    queryKey: ["/api/services"],
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({ 
+    queryKey: ["/api/appointments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: payments = [], isLoading: paymentsLoading } = useQuery({ 
+    queryKey: ["/api/payments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: salesHistory = [], isLoading: salesLoading } = useQuery({ 
+    queryKey: ["/api/sales-history"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
 
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
 
@@ -479,6 +517,15 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
 
   return (
     <div className="space-y-6">
+      {/* Loading indicator */}
+      {(servicesLoading || appointmentsLoading || paymentsLoading || salesLoading) && (
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Refreshing service data... This page updates automatically every 30 seconds.
+          </AlertDescription>
+        </Alert>
+      )}
       {/* Overview Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
@@ -727,14 +774,18 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  // Data fetching
+  // Data fetching with real-time updates
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery({ 
     queryKey: ["/api/staff"],
     queryFn: async () => {
       const response = await fetch('/api/staff');
       if (!response.ok) throw new Error('Failed to fetch staff');
       return response.json();
-    }
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
   });
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({ 
     queryKey: ["/api/appointments"],
@@ -742,10 +793,26 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
       const response = await fetch('/api/appointments');
       if (!response.ok) throw new Error('Failed to fetch appointments');
       return response.json();
-    }
+    },
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
   });
-  const { data: salesHistory = [] } = useQuery({ queryKey: ["/api/sales-history"] });
-  const { data: services = [] } = useQuery({ queryKey: ["/api/services"] });
+  const { data: salesHistory = [], isLoading: salesLoading } = useQuery({ 
+    queryKey: ["/api/sales-history"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: services = [], isLoading: servicesLoading } = useQuery({ 
+    queryKey: ["/api/services"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
 
   // Loading/Error states
   if (staffLoading || appointmentsLoading) {
@@ -765,29 +832,41 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
   const staffMetrics = staff.map((staffMember: any) => {
     // Robust staff ID
     const staffId = staffMember.userId || staffMember.user?.id || staffMember.id;
-    // Appointments for this staff
+    
+    // Appointments for this staff within date range
     const staffAppointments = (appointments as any[]).filter(
-      (apt: any) => apt.staffId === staffId && apt.date && new Date(apt.date) >= startDate && new Date(apt.date) <= endDate
+      (apt: any) => {
+        const aptDate = new Date(apt.startTime);
+        return apt.staffId === staffId && aptDate >= startDate && aptDate <= endDate;
+      }
     );
-    // Completed appointments
+    
+    // Completed appointments (services that have been checked out/paid)
     const completedAppointments = staffAppointments.filter(
-      (apt: any) => apt.status === 'completed' || apt.paymentStatus === 'paid'
+      (apt: any) => apt.paymentStatus === 'paid'
     );
-    // Sales for this staff
+    
+    // Sales for this staff within date range
     const staffSales = (salesHistory as any[]).filter(
-      (sale: any) => sale.staffId === staffId && sale.transactionDate && new Date(sale.transactionDate) >= startDate && new Date(sale.transactionDate) <= endDate
+      (sale: any) => {
+        const saleDate = new Date(sale.transactionDate || sale.transaction_date);
+        return sale.staffId === staffId && saleDate >= startDate && saleDate <= endDate;
+      }
     );
+    
     // Revenue from sales
     const totalRevenue = staffSales.reduce((sum: number, sale: any) => {
       const amount = Number(sale.totalAmount);
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
+    
     // Revenue from completed appointments (fallback)
     const appointmentRevenue = completedAppointments.reduce((sum: number, apt: any) => {
       const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
       const price = Number(service?.price);
       return sum + (isNaN(price) ? 0 : price);
     }, 0);
+    
     // Use the higher of the two
     const finalRevenue = Math.max(totalRevenue, appointmentRevenue);
     // Average ticket
@@ -919,7 +998,11 @@ const TimeClockReport = ({ }: {
   customEndDate?: string; 
 }) => {
   const { data: timeEntries = [], isLoading, refetch } = useQuery({ 
-    queryKey: ["/api/time-clock-entries"] 
+    queryKey: ["/api/time-clock-entries"],
+    refetchInterval: 15000, // Refetch every 15 seconds for time clock data
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
   });
   
   const [syncing, setSyncing] = useState(false);
@@ -1112,6 +1195,31 @@ const ReportsPage = () => {
   const { isOpen: sidebarOpen } = useSidebar();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const queryClient = useQueryClient();
+
+  // Auto-update the last update time every 30 seconds to show live status
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setLastUpdateTime(new Date());
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Real-time data refresh effect
+  React.useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      // Invalidate all report-related queries to trigger refetch
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-history"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-clock-entries"] });
+    }, 30000); // Refresh every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [queryClient]);
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
@@ -1144,6 +1252,14 @@ const ReportsPage = () => {
                     <p className="text-sm md:text-base text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                       {selectedReport ? getReportDescription(selectedReport) : "Comprehensive analytics and insights for your salon business"}
                     </p>
+                    {selectedReport && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                          <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                          <span>Real-time updates enabled</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {selectedReport && (
@@ -1234,9 +1350,29 @@ const ReportsPage = () => {
                       )}
                     </div>
                     
-                    <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">
-                      Export Report
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span>Live</span>
+                        <span>•</span>
+                        <span>Updated {lastUpdateTime.toLocaleTimeString()}</span>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          queryClient.invalidateQueries();
+                          setLastUpdateTime(new Date());
+                        }}
+                        className="min-h-[44px]"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Refresh
+                      </Button>
+                      <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">
+                        Export Report
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1244,12 +1380,48 @@ const ReportsPage = () => {
 
             {/* Content */}
             {selectedReport ? (
-              <SpecificReportView 
-                reportType={selectedReport} 
-                timePeriod={timePeriod}
-                customStartDate={customStartDate}
-                customEndDate={customEndDate}
-              />
+              <div className="space-y-4">
+                {/* Real-time data status */}
+                <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                          <span className="text-sm font-medium text-green-700 dark:text-green-300">Live Data</span>
+                        </div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          Auto-refreshing every 30 seconds • Last updated: {lastUpdateTime.toLocaleTimeString()}
+                        </span>
+                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                          <span>📊 Live Reports</span>
+                          <span>🔄 Auto-refresh</span>
+                          <span>⚡ Real-time</span>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          queryClient.invalidateQueries();
+                          setLastUpdateTime(new Date());
+                        }}
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                        Refresh Now
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <SpecificReportView 
+                  reportType={selectedReport} 
+                  timePeriod={timePeriod}
+                  customStartDate={customStartDate}
+                  customEndDate={customEndDate}
+                />
+              </div>
             ) : (
               <ReportsLandingPage onSelectReport={setSelectedReport} />
             )}

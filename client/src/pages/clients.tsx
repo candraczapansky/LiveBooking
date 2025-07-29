@@ -122,6 +122,7 @@ const clientFormSchema = z.object({
 type ClientFormValues = z.infer<typeof clientFormSchema>;
 
 const ClientsPage = () => {
+  console.log('DEBUG: clients.tsx loaded');
   useDocumentTitle("Clients | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -1150,6 +1151,7 @@ const ClientsPage = () => {
   // Extract client ID from URL if navigating from appointment details
   const urlClientId = location.includes('/clients/') ? 
     parseInt(location.split('/clients/')[1]?.split('?')[0]) : null;
+  console.log('DEBUG: location:', location, 'urlClientId:', urlClientId);
 
   // Fetch client details if client ID is in URL
   const { data: urlClientData } = useQuery({

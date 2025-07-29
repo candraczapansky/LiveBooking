@@ -4,10 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development OPENAI_API_KEY=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 tsx server/index.ts",
+    "dev": "NODE_ENV=development DISABLE_AUTOMATIC_SERVICE_CREATION=true OPENAI_API_KEY=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 tsx server/index.ts",
     "start-clean": "./start-app.sh",
     "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outfile=dist/index.js",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "NODE_ENV=production DISABLE_AUTOMATIC_SERVICE_CREATION=true node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "setup-sms": "node setup-twilio-sms.js",

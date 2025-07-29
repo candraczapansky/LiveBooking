@@ -95,6 +95,7 @@ function Router() {
         <Route path="/dashboard" component={Dashboard} />
         <Route path="/services" component={Services} />
         <Route path="/clients" component={Clients} />
+        <Route path="/clients/:clientId" component={Clients} />
         <Route path="/clients-import" component={ClientsImport} />
         <Route path="/staff" component={Staff} />
         <Route path="/pos" component={PointOfSale} />

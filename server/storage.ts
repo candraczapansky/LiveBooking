@@ -117,6 +117,7 @@ export interface IStorage {
   getAllStaffServices(): Promise<StaffService[]>;
   getStaffServicesByService(serviceId: number): Promise<StaffService[]>;
   getStaffServiceById(id: number): Promise<StaffService | undefined>;
+  getStaffServiceAssignment(staffId: number, serviceId: number): Promise<StaffService | undefined>;
   updateStaffService(id: number, data: Partial<InsertStaffService>): Promise<StaffService>;
   removeServiceFromStaff(staffId: number, serviceId: number): Promise<boolean>;
 
@@ -1167,6 +1168,18 @@ export class DatabaseStorage implements IStorage {
       return staffService;
     } catch (error) {
       console.error('Error getting staff service by id:', error);
+      return undefined;
+    }
+  }
+
+  async getStaffServiceAssignment(staffId: number, serviceId: number): Promise<StaffService | undefined> {
+    try {
+      const [staffService] = await db.select().from(staffServices).where(
+        and(eq(staffServices.staffId, staffId), eq(staffServices.serviceId, serviceId))
+      );
+      return staffService;
+    } catch (error) {
+      console.error('Error getting staff service assignment:', error);
       return undefined;
     }
   }

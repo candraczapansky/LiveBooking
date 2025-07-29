@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import AppointmentPhotos from "./appointment-photos";
 import { NoteInput } from "@/components/ui/note-input";
 import { useLocation } from "wouter";
+import SquarePaymentForm from "./square-payment-form";
 
 import {
   Dialog,
@@ -18,7 +19,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 
 interface AppointmentDetailsProps {
@@ -42,6 +44,12 @@ const AppointmentDetails = ({
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
   const [location, setLocation] = useLocation();
+  const [isProcessingCashPayment, setIsProcessingCashPayment] = useState(false);
+  const [isProcessingCardPayment, setIsProcessingCardPayment] = useState(false);
+  const [isProcessingGiftCardPayment, setIsProcessingGiftCardPayment] = useState(false);
+  const [showPaymentOptions, setShowPaymentOptions] = useState(false);
+  const [showCardPayment, setShowCardPayment] = useState(false);
+  const [giftCardCode, setGiftCardCode] = useState("");
 
   // Fetch appointment details
   const { data: appointment, isLoading } = useQuery({
@@ -219,6 +227,115 @@ const AppointmentDetails = ({
         description: "Failed to update notes. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleCashPayment = async () => {
+    if (!appointmentId || !appointment) return;
+    
+    setIsProcessingCashPayment(true);
+    try {
+      // Create a payment record for cash payment
+      await apiRequest("POST", "/api/payments", {
+        clientId: appointment.clientId,
+        appointmentId: appointmentId,
+        amount: appointment.totalAmount || 0,
+        totalAmount: appointment.totalAmount || 0,
+        method: "cash",
+        status: "completed"
+      });
+
+      // Update appointment payment status
+      await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
+        ...appointment,
+        paymentStatus: "paid"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      
+      toast({
+        title: "Cash Payment Recorded",
+        description: "Appointment marked as paid with cash.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record cash payment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingCashPayment(false);
+    }
+  };
+
+  const handleCardPayment = () => {
+    setShowCardPayment(true);
+  };
+
+  const handleCardPaymentSuccess = () => {
+    setShowCardPayment(false);
+    setShowPaymentOptions(false);
+    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+    toast({
+      title: "Card Payment Successful",
+      description: "Payment processed successfully.",
+    });
+  };
+
+  const handleCardPaymentError = (error: string) => {
+    toast({
+      title: "Payment Error",
+      description: error,
+      variant: "destructive",
+    });
+  };
+
+  const handleCardPaymentCancel = () => {
+    setShowCardPayment(false);
+  };
+
+  const handleGiftCardPayment = async () => {
+    if (!appointmentId || !appointment || !giftCardCode.trim()) return;
+    
+    setIsProcessingGiftCardPayment(true);
+    try {
+      // Create a payment record for gift card payment
+      await apiRequest("POST", "/api/payments", {
+        clientId: appointment.clientId,
+        appointmentId: appointmentId,
+        amount: appointment.totalAmount || 0,
+        totalAmount: appointment.totalAmount || 0,
+        method: "gift_card",
+        status: "completed",
+        notes: `Gift card payment with code: ${giftCardCode}`
+      });
+
+      // Update appointment payment status
+      await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
+        ...appointment,
+        paymentStatus: "paid"
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      
+      toast({
+        title: "Gift Card Payment Recorded",
+        description: "Appointment marked as paid with gift card.",
+      });
+      
+      // Reset gift card code
+      setGiftCardCode("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to record gift card payment.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingGiftCardPayment(false);
     }
   };
 
@@ -407,6 +524,109 @@ const AppointmentDetails = ({
                 <p className="text-sm">
                   <span className="font-medium">Status:</span> {appointment.paymentStatus}
                 </p>
+                
+                {/* Payment Options - Only show if not already paid */}
+                {appointment.paymentStatus !== 'paid' && (
+                  <div className="pt-3 space-y-3">
+                    {!showPaymentOptions ? (
+                      <Button
+                        onClick={() => setShowPaymentOptions(true)}
+                        className="w-full bg-green-600 hover:bg-green-700"
+                      >
+                        <DollarSign className="h-4 w-4 mr-2" />
+                        Pay {formatPrice(appointment.totalAmount || 0)}
+                      </Button>
+                    ) : (
+                      <div className="space-y-3">
+                        {/* Cash Payment */}
+                        <Button
+                          onClick={handleCashPayment}
+                          disabled={isProcessingCashPayment}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          {isProcessingCashPayment ? (
+                            <div className="flex items-center gap-2">
+                              <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
+                              Processing...
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-4 w-4" />
+                              Pay Cash
+                            </div>
+                          )}
+                        </Button>
+
+                        {/* Credit/Debit Card Payment */}
+                        <Button
+                          onClick={handleCardPayment}
+                          disabled={isProcessingCardPayment}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            Pay with Card (Test Mode)
+                          </div>
+                        </Button>
+
+                        {/* Gift Card Payment */}
+                        <div className="space-y-2">
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter gift card code"
+                              value={giftCardCode}
+                              onChange={(e) => setGiftCardCode(e.target.value)}
+                              className="flex-1"
+                            />
+                            <Button
+                              onClick={handleGiftCardPayment}
+                              disabled={isProcessingGiftCardPayment || !giftCardCode.trim()}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {isProcessingGiftCardPayment ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
+                                  Processing
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Gift className="h-3 w-3" />
+                                  Use Gift Card
+                                </div>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Back Button */}
+                        <Button
+                          onClick={() => setShowPaymentOptions(false)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          Back
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Square Card Payment Form */}
+                    {showCardPayment && appointment && (
+                      <div className="pt-4 border-t">
+                        <SquarePaymentForm
+                          amount={appointment.totalAmount || 0}
+                          appointmentId={appointmentId!}
+                          clientId={appointment.clientId}
+                          onSuccess={handleCardPaymentSuccess}
+                          onError={handleCardPaymentError}
+                          onCancel={handleCardPaymentCancel}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

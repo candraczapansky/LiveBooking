@@ -29,6 +29,7 @@ interface PayrollData {
   totalHours: number;
   hourlyWage: number;
   totalHourlyPay: number;
+  totalTips: number;
   totalEarnings: number;
   appointments: any[];
 }
@@ -66,6 +67,17 @@ interface Appointment {
   startTime: string;
 }
 
+interface Payment {
+  id: number;
+  appointmentId: number;
+  amount: number;
+  tipAmount: number;
+  totalAmount: number;
+  method: string;
+  status: string;
+  paymentDate: string;
+}
+
 export default function PayrollReport({ timePeriod, customStartDate, customEndDate }: PayrollReportProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [selectedStaff, setSelectedStaff] = useState<string>("all");
@@ -93,11 +105,15 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     queryKey: ['/api/appointments'],
   });
 
+  const { data: payments, isLoading: paymentsLoading } = useQuery<Payment[]>({
+    queryKey: ['/api/payments'],
+  });
+
   const { data: staffServices = [] } = useQuery<any[]>({
     queryKey: ['/api/staff-services'],
   });
 
-  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading;
+  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading;
 
   // Refresh data function
   const refreshData = async () => {
@@ -106,7 +122,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       queryClient.invalidateQueries({ queryKey: ['/api/users'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/services'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] })
+      queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] })
     ]);
     toast({
       title: "Data Refreshed",
@@ -154,6 +171,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       let totalCommission = 0;
       let totalHours = 0;
       let totalHourlyPay = 0;
+      let totalTips = 0;
       const totalServices = staffAppointments.length;
 
       // Calculate earnings for each appointment
@@ -216,13 +234,19 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             appointmentEarnings = 0;
         }
 
+        // Find payment for this appointment
+        const payment = payments?.find(p => p.appointmentId === apt.id);
+        if (payment) {
+          totalTips += payment.tipAmount;
+        }
+
         totalCommission += appointmentEarnings;
       });
 
       // Calculate total earnings
-      let totalEarnings = totalCommission;
+      let totalEarnings = totalCommission + totalTips;
       if (staffMember.commissionType === 'hourly') {
-        totalEarnings = totalHourlyPay;
+        totalEarnings = totalHourlyPay + totalTips;
       }
 
       return {
@@ -237,11 +261,12 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         totalHours,
         hourlyWage: staffMember.hourlyRate || 0,
         totalHourlyPay,
+        totalTips,
         totalEarnings,
         appointments: staffAppointments,
       };
     });
-  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate]);
+  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate, payments]);
 
   // Filter by selected staff member
   const filteredPayrollData = selectedStaff === "all" 
@@ -254,12 +279,14 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     const totalRevenue = filteredPayrollData.reduce((sum, data) => sum + data.totalRevenue, 0);
     const totalPayroll = filteredPayrollData.reduce((sum, data) => sum + data.totalEarnings, 0);
     const totalServices = filteredPayrollData.reduce((sum, data) => sum + data.totalServices, 0);
+    const totalTips = filteredPayrollData.reduce((sum, data) => sum + data.totalTips, 0);
 
     return {
       totalStaff,
       totalRevenue,
       totalPayroll,
       totalServices,
+      totalTips,
     };
   }, [filteredPayrollData]);
 
@@ -278,6 +305,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         'Total Services',
         'Total Revenue',
         'Total Commission',
+        'Total Tips',
         'Total Hours',
         'Hourly Wage',
         'Total Hourly Pay',
@@ -293,6 +321,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         data.totalServices,
         data.totalRevenue.toFixed(2),
         data.totalCommission.toFixed(2),
+        data.totalTips.toFixed(2),
         data.totalHours,
         data.hourlyWage.toFixed(2),
         data.totalHourlyPay.toFixed(2),
@@ -403,7 +432,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
           totalCommission: staffMember.totalCommission,
           totalHourlyPay: staffMember.totalHourlyPay || 0,
           totalServices: staffMember.totalServices,
-          totalRevenue: staffMember.totalRevenue
+          totalRevenue: staffMember.totalRevenue,
+          totalTips: staffMember.totalTips
         }),
         timeEntriesData: JSON.stringify([]),
         appointmentsData: JSON.stringify(staffMember.appointments),
@@ -595,6 +625,16 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             <div className="text-2xl font-bold">{summaryStats.totalServices}</div>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tips</CardTitle>
+            <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalTips)}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Payroll Table */}
@@ -616,6 +656,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                     <TableHead>Commission Type</TableHead>
                     <TableHead className="text-right">Services</TableHead>
                     <TableHead className="text-right">Revenue</TableHead>
+                    <TableHead className="text-right">Tips</TableHead>
                     <TableHead className="text-right">Hours</TableHead>
                     <TableHead className="text-right">Total Earnings</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -637,6 +678,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                       </TableCell>
                       <TableCell className="text-right">{data.totalServices}</TableCell>
                       <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
                       <TableCell className="text-right">
                         {data.totalHours > 0 ? `${data.totalHours.toFixed(1)}h` : '-'}
                       </TableCell>

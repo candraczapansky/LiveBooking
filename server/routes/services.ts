@@ -26,7 +26,20 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     } else if (active !== undefined) {
       services = await storage.getServicesByStatus(active === 'true');
     } else if (staffId) {
-      services = await storage.getServicesByStaff(parseInt(staffId as string));
+      const staffServices = await storage.getStaffServices(parseInt(staffId as string));
+      // Get detailed service information for staff
+      services = await Promise.all(
+        staffServices.map(async (staffService) => {
+          const service = await storage.getService(staffService.serviceId);
+          return {
+            staffServiceId: staffService.id,
+            staffId: staffService.staffId,
+            customRate: staffService.customRate,
+            customCommissionRate: staffService.customCommissionRate,
+            ...service
+          };
+        })
+      );
     } else {
       services = await storage.getAllServices();
     }
@@ -247,18 +260,7 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     res.json({ success: true, message: "Service category deleted successfully" });
   }));
 
-  // Get services by staff member
-  app.get("/api/staff/:staffId/services", asyncHandler(async (req: Request, res: Response) => {
-    const staffId = parseInt(req.params.staffId);
-    const context = getLogContext(req);
-
-    LoggerService.debug("Fetching staff services", { ...context, staffId });
-
-    const services = await storage.getServicesByStaff(staffId);
-
-    LoggerService.info("Staff services fetched", { ...context, staffId, count: services.length });
-    res.json(services);
-  }));
+  // Get services by staff member - Route moved to main routes.ts to avoid conflicts
 
   // Assign service to staff member
   app.post("/api/staff/:staffId/services/:serviceId", asyncHandler(async (req: Request, res: Response) => {

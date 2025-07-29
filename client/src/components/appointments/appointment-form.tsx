@@ -149,8 +149,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       const response = await fetch(`/api/staff/${selectedStaffId}/services`);
       if (!response.ok) throw new Error('Failed to fetch services for staff');
       const data = await response.json();
-      // Extract the service objects from the staff-service relationship
-      return data.map((item: any) => item.service || item);
+      // The backend returns service data directly, no need to extract
+      return data;
     },
     enabled: open && !!selectedStaffId,
   });
