@@ -372,15 +372,20 @@ const AppointmentDetails = ({
     );
   }
 
-  const startTime = new Date(appointment.startTime);
-  const endTime = new Date(appointment.endTime);
+  // Safely create Date objects with validation
+  const startTime = appointment.startTime ? new Date(appointment.startTime) : new Date();
+  const endTime = appointment.endTime ? new Date(appointment.endTime) : new Date();
+  
+  // Validate that the dates are valid
+  const isValidStartTime = !isNaN(startTime.getTime());
+  const isValidEndTime = !isNaN(endTime.getTime());
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {getStatusIcon(appointment.status)}
+            {getStatusIcon(appointment.status || 'pending')}
             Appointment Details
           </DialogTitle>
           <DialogDescription>
@@ -391,11 +396,11 @@ const AppointmentDetails = ({
         <div className="space-y-6">
           {/* Status and Payment Status */}
           <div className="flex gap-4">
-            <Badge className={getStatusColor(appointment.status)}>
-              {appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)}
+            <Badge className={getStatusColor(appointment.status || 'pending')}>
+              {(appointment.status || 'pending').charAt(0).toUpperCase() + (appointment.status || 'pending').slice(1)}
             </Badge>
-            <Badge className={getPaymentStatusColor(appointment.paymentStatus)}>
-              {appointment.paymentStatus.charAt(0).toUpperCase() + appointment.paymentStatus.slice(1)}
+            <Badge className={getPaymentStatusColor(appointment.paymentStatus || 'pending')}>
+              {(appointment.paymentStatus || 'pending').charAt(0).toUpperCase() + (appointment.paymentStatus || 'pending').slice(1)}
             </Badge>
           </div>
 
@@ -407,10 +412,13 @@ const AppointmentDetails = ({
                   <Calendar className="h-5 w-5 text-gray-500" />
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {format(startTime, "EEEE, MMMM d, yyyy")}
+                      {isValidStartTime ? format(startTime, "EEEE, MMMM d, yyyy") : "Date not available"}
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {format(startTime, "h:mm a")} - {format(endTime, "h:mm a")}
+                      {isValidStartTime && isValidEndTime 
+                        ? `${format(startTime, "h:mm a")} - ${format(endTime, "h:mm a")}`
+                        : "Time not available"
+                      }
                     </p>
                   </div>
                 </div>
@@ -421,7 +429,10 @@ const AppointmentDetails = ({
                       Duration
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60))} minutes
+                      {isValidStartTime && isValidEndTime 
+                        ? `${Math.round((endTime.getTime() - startTime.getTime()) / (1000 * 60))} minutes`
+                        : "Duration not available"
+                      }
                     </p>
                   </div>
                 </div>
@@ -522,11 +533,11 @@ const AppointmentDetails = ({
                   <span className="font-medium">Amount:</span> {formatPrice(appointment.totalAmount || 0)}
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Status:</span> {appointment.paymentStatus}
+                  <span className="font-medium">Status:</span> {appointment.paymentStatus || 'pending'}
                 </p>
                 
                 {/* Payment Options - Only show if not already paid */}
-                {appointment.paymentStatus !== 'paid' && (
+                {(appointment.paymentStatus || 'pending') !== 'paid' && (
                   <div className="pt-3 space-y-3">
                     {!showPaymentOptions ? (
                       <Button

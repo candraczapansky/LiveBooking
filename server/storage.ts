@@ -128,6 +128,7 @@ export interface IStorage {
   getAppointmentsByClient(clientId: number): Promise<any[]>;
   getAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByService(serviceId: number): Promise<Appointment[]>;
+  getAppointmentsByLocation(locationId: number): Promise<Appointment[]>;
   getActiveAppointmentsByStaff(staffId: number): Promise<Appointment[]>;
   getAppointmentsByStaffAndDateRange(staffId: number, startDate: Date, endDate: Date): Promise<Appointment[]>;
   getAppointmentsByDate(date: Date): Promise<Appointment[]>;
@@ -740,6 +741,43 @@ export class DatabaseStorage implements IStorage {
       } catch (flagError) {
         console.log('Could not set sample data flag (this is optional)');
       }
+      
+      // Create default automation rules
+      try {
+        const existingRules = await this.getAllAutomationRules();
+        if (existingRules.length === 0) {
+          console.log('Creating default automation rules...');
+          
+          // Create booking confirmation email rule
+          await this.createAutomationRule({
+            name: 'Booking Confirmation Email',
+            trigger: 'booking_confirmation',
+            type: 'email',
+            subject: 'Appointment Confirmation - Glo Head Spa',
+            template: `Hi {client_name},
+
+Your appointment has been confirmed!
+
+Service: {service_name}
+Date: {appointment_date}
+Time: {appointment_time}
+Staff: {staff_name}
+
+We look forward to seeing you!
+
+Best regards,
+Glo Head Spa`,
+            active: true,
+            sentCount: 0,
+            lastRun: null,
+            customTriggerName: null
+          });
+          
+          console.log('Default automation rules created successfully');
+        }
+      } catch (error) {
+        console.log('Error creating automation rules:', error);
+      }
     } catch (error) {
       console.error('Error during sample data initialization:', error);
       // Don't throw error to prevent server startup failure
@@ -1326,6 +1364,17 @@ export class DatabaseStorage implements IStorage {
 
   async getAppointmentsByService(serviceId: number): Promise<Appointment[]> {
     const appointmentList = await db.select().from(appointments).where(eq(appointments.serviceId, serviceId)).orderBy(desc(appointments.startTime));
+    
+    // Convert local datetime strings to Date objects for frontend
+    return appointmentList.map((appointment: any) => ({
+      ...appointment,
+      startTime: this.convertLocalToDate(appointment.startTime),
+      endTime: this.convertLocalToDate(appointment.endTime)
+    }));
+  }
+
+  async getAppointmentsByLocation(locationId: number): Promise<Appointment[]> {
+    const appointmentList = await db.select().from(appointments).where(eq(appointments.locationId, locationId)).orderBy(desc(appointments.startTime));
     
     // Convert local datetime strings to Date objects for frontend
     return appointmentList.map((appointment: any) => ({

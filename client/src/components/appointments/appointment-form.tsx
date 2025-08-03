@@ -6,7 +6,9 @@ import { z } from "zod";
 import { format, addMinutes } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useLocation } from "@/contexts/LocationContext";
 import AppointmentCheckout from "./appointment-checkout";
+import { ClientCreationDialog } from "./client-creation-dialog";
 
 import {
   Dialog,
@@ -32,18 +34,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
+  Calendar,
+  Clock,
+  CreditCard,
+  DollarSign,
+  Loader2,
+  Search,
+  User,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { NoteInput } from "@/components/ui/note-input";
-import { Loader2, Calendar as CalendarIcon, Clock, CreditCard, DollarSign } from "lucide-react";
 import { cn, formatPrice } from "@/lib/utils";
 
 // Define the form schema
@@ -121,8 +127,11 @@ const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => 
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated, appointments }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [clientSearchValue, setClientSearchValue] = useState("");
+  const [showClientCreationDialog, setShowClientCreationDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { selectedLocation } = useLocation();
   
   // Form setup
   const form = useForm<AppointmentFormValues>({
@@ -146,9 +155,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     queryKey: ['/api/staff', selectedStaffId, 'services'],
     queryFn: async () => {
       if (!selectedStaffId) return [];
-      const response = await fetch(`/api/staff/${selectedStaffId}/services`);
-      if (!response.ok) throw new Error('Failed to fetch services for staff');
+      const response = await apiRequest("GET", `/api/staff/${selectedStaffId}/services`);
       const data = await response.json();
+      console.log('Loaded services for staff', selectedStaffId, ':', data);
       // The backend returns service data directly, no need to extract
       return data;
     },
@@ -158,6 +167,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // Fetch staff schedules for time slot filtering
   const { data: schedules = [] } = useQuery({
     queryKey: ['/api/schedules'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/schedules");
+      return response.json();
+    },
     enabled: open,
   });
 
@@ -165,8 +178,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const { data: staff, isLoading: isLoadingStaff } = useQuery({
     queryKey: ['/api/staff'],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
+      const response = await apiRequest("GET", "/api/staff");
       return response.json();
     },
     enabled: open
@@ -174,11 +186,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   
   // Get clients
   const { data: clients, isLoading: isLoadingClients, refetch: refetchClients } = useQuery({
-    queryKey: ['/api/users?role=client'],
+    queryKey: ['/api/users?role=client', clientSearchValue],
     queryFn: async () => {
-      const response = await fetch('/api/users?role=client');
-      if (!response.ok) throw new Error('Failed to fetch clients');
-      return response.json();
+      const searchParam = clientSearchValue.trim() ? `&search=${encodeURIComponent(clientSearchValue.trim())}` : '';
+      const response = await apiRequest("GET", `/api/users?role=client${searchParam}`);
+      const data = await response.json();
+      console.log('📋 Fetched clients:', {
+        count: data?.length,
+        searchTerm: clientSearchValue,
+        firstClient: data?.[0],
+        sampleClients: data?.slice(0, 3)
+      });
+      return data;
     },
     enabled: open,
     staleTime: 0, // Always fetch fresh data
@@ -190,8 +209,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     queryKey: ['/api/appointments', appointmentId],
     queryFn: async () => {
       if (!appointmentId || appointmentId < 0) return null;
-      const response = await fetch(`/api/appointments/${appointmentId}`);
-      if (!response.ok) throw new Error('Failed to fetch appointment');
+      const response = await apiRequest("GET", `/api/appointments/${appointmentId}`);
       return response.json();
     },
     enabled: open && !!appointmentId && appointmentId > 0
@@ -340,6 +358,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         notes: appointment.notes || "",
       });
       
+      // Set client search value to the selected client's name for editing
+      const selectedClient = clients?.find((client: any) => client.id.toString() === appointment.clientId?.toString());
+      if (selectedClient) {
+        setClientSearchValue(`${selectedClient.firstName} ${selectedClient.lastName}`);
+      } else {
+        setClientSearchValue("");
+      }
+      
 
     }
   }, [appointment, appointmentId]);
@@ -374,6 +400,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: "10:00",
         notes: "",
       });
+      // Reset client search value when closing
+      setClientSearchValue("");
     } else if (!appointmentId) {
       // Only reset with defaults for new appointments, not when editing existing ones
       const resetDate = selectedDate || new Date();
@@ -386,6 +414,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: "10:00",
         notes: "",
       });
+      // Reset client search value for new appointments
+      setClientSearchValue("");
       // Force the date field to update and clear any validation errors
       form.setValue('date', resetDate);
       form.clearErrors('date');
@@ -473,13 +503,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         selectedTime: values.time,
         localDate: localDate,
         localDateString: formatLocalDateTime(localDate),
-        endTimeString: formatLocalDateTime(endTime)
+        endTimeString: formatLocalDateTime(endTime),
+        locationId: selectedLocation?.id
       });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
+        locationId: selectedLocation?.id || null,
         startTime: localDate.toISOString(),
         endTime: endTime.toISOString(),
         status: "confirmed",
@@ -492,6 +524,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       // Force refresh of appointments data with multiple cache invalidation strategies
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments/active'] });
+      
+      // Invalidate location-specific queries
+      if (selectedLocation?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments', selectedLocation.id] });
+      }
       
       // Force refetch to ensure latest data is loaded
       queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
@@ -582,13 +619,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         selectedTime: values.time,
         localDate: localDate,
         localDateString: formatLocalDateTime(localDate),
-        endTimeString: formatLocalDateTime(endTime)
+        endTimeString: formatLocalDateTime(endTime),
+        locationId: selectedLocation?.id
       });
 
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
         clientId: parseInt(values.clientId),
+        locationId: selectedLocation?.id || null,
         startTime: localDate.toISOString(),
         endTime: endTime.toISOString(),
         status: "confirmed",
@@ -600,6 +639,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      
+      // Invalidate location-specific queries
+      if (selectedLocation?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments', selectedLocation.id] });
+      }
+      
       onOpenChange(false);
       toast({
         title: "Success",
@@ -633,6 +678,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      
+      // Invalidate location-specific queries
+      if (selectedLocation?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments', selectedLocation.id] });
+      }
+      
       onOpenChange(false);
       toast({
         title: "Success",
@@ -659,6 +710,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const handleFormSubmit = (values: AppointmentFormValues) => {
     console.log('Form submitted with values:', values);
     console.log('Form validation errors:', form.formState.errors);
+    console.log('ClientId in form values:', values.clientId);
+    console.log('ClientId type:', typeof values.clientId);
     
     // Always use selectedDate if no date in form values
     const finalDate = values.date || selectedDate || new Date();
@@ -671,6 +724,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     };
     
     console.log('Corrected values for submission:', correctedValues);
+    console.log('ClientId in corrected values:', correctedValues.clientId);
     
     if (appointmentId && appointmentId > 0) {
       console.log('Calling updateMutation.mutate');
@@ -772,10 +826,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           <SelectValue placeholder="Select a staff member first" />
                         </SelectTrigger>
                         <SelectContent>
-                          {staff?.map((staffMember: any) => {
+                          {staff?.map((staffMember: any, index: number) => {
                             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
                             return (
-                              <SelectItem key={staffMember.id} value={staffMember.id.toString()}>
+                              <SelectItem key={`${staffMember.id}-${index}`} value={staffMember.id.toString()}>
                                 {staffName} - {staffMember.title}
                               </SelectItem>
                             );
@@ -813,10 +867,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {services?.map((service: any) => {
-                            console.log('Rendering service in dropdown:', service);
+                          {services?.filter((service: any, index: number, self: any[]) => 
+                            // Remove duplicates based on service ID
+                            index === self.findIndex((s: any) => s.id === service.id)
+                          ).map((service: any, index: number) => {
+                            console.log('Rendering service in dropdown:', service, 'index:', index);
                             return (
-                              <SelectItem key={service.id} value={service.id.toString()}>
+                              <SelectItem key={`${service.id}-${index}`} value={service.id.toString()}>
                                 {service.name} - {formatPrice(service.price)}
                               </SelectItem>
                             );
@@ -847,22 +904,121 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   <FormItem>
                     <FormLabel>Client</FormLabel>
                     <FormControl>
-                      <Select 
-                        disabled={isLoading || isLoadingClients} 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {clients?.map((client: any) => (
-                            <SelectItem key={client.id} value={client.id.toString()}>
-                              {client.firstName} {client.lastName} - {client.email}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        {/* Client Search Input */}
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Search by name, email, or phone number..."
+                            value={clientSearchValue}
+                            onChange={(e) => {
+                              console.log('🔍 Search input changed:', {
+                                oldValue: clientSearchValue,
+                                newValue: e.target.value,
+                                length: e.target.value.length
+                              });
+                              setClientSearchValue(e.target.value);
+                              // Clear selected client when typing
+                              if (field.value) {
+                                field.onChange("");
+                              }
+                            }}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setShowClientCreationDialog(true);
+                            }}
+                          >
+                            <User className="h-4 w-4 mr-1" />
+                            Add New
+                          </Button>
+                        </div>
+                        
+                        {/* Search Instructions */}
+                        {!clientSearchValue && !field.value && (
+                          <div className="text-xs text-muted-foreground p-2 bg-muted rounded">
+                            💡 Type to search for clients by name, email, or phone number
+                          </div>
+                        )}
+                        
+                        {/* Search Results */}
+                        <div className="border rounded-md max-h-48 overflow-y-auto">
+                          {(() => {
+                            if (!clients || clients.length === 0) {
+                              return (
+                                <div className="p-3 text-sm text-muted-foreground text-center">
+                                  {clientSearchValue.trim() ? 'No clients found. Try a different search term or add a new client.' : 'Type to search for clients...'}
+                                </div>
+                              );
+                            }
+                            
+                            console.log('🔍 Search results:', {
+                              searchTerm: clientSearchValue,
+                              totalClients: clients?.length,
+                              searchValue: clientSearchValue.toLowerCase().trim()
+                            });
+                            
+                            return clients.map((client: any) => (
+                              <div
+                                key={client.id}
+                                className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
+                                onClick={() => {
+                                  console.log('Client selected:', client);
+                                  console.log('Setting clientId to:', client.id.toString());
+                                  field.onChange(client.id.toString());
+                                  setClientSearchValue(`${client.firstName} ${client.lastName}`);
+                                  console.log('Form clientId after selection:', form.getValues('clientId'));
+                                }}
+                              >
+                                <div className="font-medium">
+                                  {client.firstName} {client.lastName}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {client.email}
+                                  {client.phone && ` • ${client.phone}`}
+                                </div>
+                              </div>
+                            ));
+                          })()}
+                        </div>
+                        
+                        {/* Hidden input to ensure clientId is captured */}
+                        <input 
+                          type="hidden" 
+                          value={field.value || ""} 
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                        
+                        {/* Selected Client Display */}
+                        {field.value && (
+                          <div className="p-3 bg-accent rounded-md">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium">
+                                  {clients?.find((client: any) => client.id.toString() === field.value)?.firstName} {clients?.find((client: any) => client.id.toString() === field.value)?.lastName}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {clients?.find((client: any) => client.id.toString() === field.value)?.email}
+                                </div>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  field.onChange("");
+                                  setClientSearchValue("");
+                                }}
+                              >
+                                Clear
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -876,50 +1032,34 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant={"outline"}
-                            className={cn(
-                              "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isLoading}
-                            onClick={() => {
-                              console.log('Date button clicked, current field value:', field.value);
-                              console.log('Current form date value:', form.getValues('date'));
-                              console.log('Selected date prop:', selectedDate);
-                            }}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={(date) => {
-                            console.log('Calendar date selected:', date);
-                            field.onChange(date);
-                            if (date) {
+                    <FormControl>
+                      <div className="space-y-2">
+                        <Input
+                          type="date"
+                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              // Parse the date string and create a date in local timezone
+                              const [year, month, day] = e.target.value.split('-').map(Number);
+                              const date = new Date(year, month - 1, day); // month is 0-indexed
+                              console.log('Date input changed:', e.target.value, 'to local date:', date);
+                              field.onChange(date);
                               // Force form validation after date selection
                               form.trigger('date');
+                            } else {
+                              field.onChange(null);
                             }
                           }}
-                          disabled={(date) =>
-                            date < new Date(new Date().setHours(0, 0, 0, 0))
-                          }
-                          initialFocus
+                          min={format(new Date(), "yyyy-MM-dd")}
+                          className="w-full"
                         />
-                      </PopoverContent>
-                    </Popover>
+                        {field.value && (
+                          <div className="text-sm text-muted-foreground">
+                            Selected: {format(field.value, "PPP")}
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -956,8 +1096,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           ) : availableTimeSlots.length === 0 ? (
                             <div className="p-2 text-gray-500 text-sm">No available times for this staff member on this day. Please choose another date or staff member.</div>
                           ) : (
-                            availableTimeSlots.map((slot) => (
-                              <SelectItem key={slot.value} value={slot.value}>
+                            availableTimeSlots.map((slot, index) => (
+                              <SelectItem key={`${slot.value}-${index}`} value={slot.value}>
                                 {slot.label}
                               </SelectItem>
                             ))
@@ -1065,16 +1205,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                 )}
                 
                 <Button 
-                  type="button"
+                  type="submit"
                   disabled={isLoading}
-                  onClick={(e) => {
-                    console.log('Button clicked!');
-                    console.log('Form values:', form.getValues());
-                    console.log('Form is valid:', form.formState.isValid);
-                    // Bypass form validation and call handleFormSubmit directly
-                    const values = form.getValues();
-                    handleFormSubmit(values);
-                  }}
                 >
                   {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {appointmentId && appointmentId > 0 ? "Update Appointment" : "Create Appointment"}
@@ -1128,6 +1260,25 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           }}
         />
       )}
+      
+      {/* Client Creation Dialog */}
+      <ClientCreationDialog
+        open={showClientCreationDialog}
+        onOpenChange={setShowClientCreationDialog}
+        onClientCreated={(newClient) => {
+          // Set the newly created client as selected
+          form.setValue("clientId", newClient.id.toString());
+          setClientSearchValue(`${newClient.firstName} ${newClient.lastName}`);
+          
+          // Refetch clients to include the new one
+          refetchClients();
+          
+          toast({
+            title: "Client Created",
+            description: `${newClient.firstName} ${newClient.lastName} has been added and selected.`,
+          });
+        }}
+      />
     </>
   );
 };

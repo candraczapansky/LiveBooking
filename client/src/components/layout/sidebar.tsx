@@ -27,7 +27,8 @@ import {
   FileText,
   Bot,
   Receipt,
-  StickyNote
+  StickyNote,
+  Building2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -166,6 +167,7 @@ const Sidebar = () => {
     { icon: <Package />, label: "Products", href: "/products" },
     { icon: <DollarSign />, label: "Point of Sale", href: "/pos" },
     { icon: <Gift />, label: "Gift Certificates", href: "/gift-certificates" },
+    { icon: <Building2 />, label: "Locations", href: "/locations" },
     { icon: <MapPin />, label: "Rooms", href: "/rooms" },
     { icon: <Monitor />, label: "Devices", href: "/devices" },
     { icon: <CreditCard />, label: "Memberships", href: "/memberships" },

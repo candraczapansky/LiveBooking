@@ -80,6 +80,7 @@ export const rooms = pgTable("rooms", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  locationId: integer("location_id").references(() => locations.id),
   capacity: integer("capacity").default(1),
   isActive: boolean("is_active").default(true),
 });
@@ -115,6 +116,7 @@ export const services = pgTable("services", {
   duration: integer("duration").notNull(), // in minutes
   price: doublePrecision("price").notNull(),
   categoryId: integer("category_id").notNull(),
+  locationId: integer("location_id").references(() => locations.id),
   roomId: integer("room_id"),
   bufferTimeBefore: integer("buffer_time_before").default(0), // in minutes
   bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
@@ -157,6 +159,7 @@ export const staff = pgTable("staff", {
   userId: integer("user_id").notNull(),
   title: text("title").notNull(),
   bio: text("bio"),
+  locationId: integer("location_id").references(() => locations.id),
   commissionType: text("commission_type").notNull().default("commission"), // commission, hourly, fixed, hourly_plus_commission
   commissionRate: doublePrecision("commission_rate"), // percentage for commission (0-1)
   hourlyRate: doublePrecision("hourly_rate"), // hourly wage
@@ -187,6 +190,7 @@ export const appointments = pgTable("appointments", {
   clientId: integer("client_id").notNull(),
   serviceId: integer("service_id").notNull(),
   staffId: integer("staff_id").notNull(),
+  locationId: integer("location_id").references(() => locations.id),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   status: text("status").notNull().default("pending"), // pending, confirmed, cancelled, completed
@@ -870,6 +874,41 @@ export const insertBusinessSettingsSchema = createInsertSchema(businessSettings)
 
 export type BusinessSettings = typeof businessSettings.$inferSelect;
 export type InsertBusinessSettings = z.infer<typeof insertBusinessSettingsSchema>;
+
+// Locations schema
+export const locations = pgTable("locations", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  timezone: text("timezone").default("America/New_York"),
+  isActive: boolean("is_active").default(true),
+  isDefault: boolean("is_default").default(false),
+  description: text("description"),
+  businessHours: text("business_hours"), // JSON string for business hours
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateLocationSchema = createInsertSchema(locations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+export type Location = typeof locations.$inferSelect;
+export type InsertLocation = z.infer<typeof insertLocationSchema>;
+export type UpdateLocation = z.infer<typeof updateLocationSchema>;
 
 // Automation Rules schema
 export const automationRules = pgTable("automation_rules", {

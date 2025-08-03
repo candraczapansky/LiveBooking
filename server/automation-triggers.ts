@@ -79,6 +79,8 @@ export async function triggerAutomations(
   
   // Get all automation rules from database
   const allRules = await storage.getAllAutomationRules();
+  console.log("🔧 ALL AUTOMATION RULES:", allRules.length);
+  console.log("🔧 ALL RULES:", allRules);
   
   const relevantRules = allRules.filter(rule => {
     if (!rule.active) return false;
@@ -89,6 +91,9 @@ export async function triggerAutomations(
     
     return rule.trigger === trigger;
   });
+
+  console.log("🔧 RELEVANT RULES FOR TRIGGER:", trigger, relevantRules.length);
+  console.log("🔧 RELEVANT RULES:", relevantRules);
 
   if (relevantRules.length === 0) {
     console.log(`No active automation rules found for trigger: ${trigger}`);
@@ -172,7 +177,7 @@ export async function triggerAutomations(
         
         const emailSent = await sendEmail({
           to: client.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@beautybook.com',
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           subject,
           text: processedTemplate,
           html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`
@@ -214,7 +219,10 @@ export async function triggerAutomations(
 
 // Specific trigger functions
 export async function triggerBookingConfirmation(appointmentData: any, storage: IStorage) {
+  console.log("🔧 TRIGGERING BOOKING CONFIRMATION AUTOMATION");
+  console.log("🔧 Appointment data:", appointmentData);
   await triggerAutomations('booking_confirmation', appointmentData, storage);
+  console.log("🔧 BOOKING CONFIRMATION AUTOMATION COMPLETED");
 }
 
 export async function triggerAppointmentReminder(appointmentData: any, storage: IStorage) {

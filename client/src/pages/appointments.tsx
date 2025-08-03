@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useLocation } from "@/contexts/LocationContext";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentForm from "@/components/appointments/appointment-form";
 import AppointmentCheckout from "@/components/appointments/appointment-checkout";
@@ -24,6 +25,7 @@ const AppointmentsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { isOpen: sidebarOpen } = useSidebar();
+  const { selectedLocation } = useLocation();
   
   // State
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -38,10 +40,12 @@ const AppointmentsPage = () => {
 
   // Queries
   const { data: appointments = [], isLoading: appointmentsLoading, refetch } = useQuery({
-    queryKey: ['/api/appointments'],
+    queryKey: ['/api/appointments', selectedLocation?.id],
     queryFn: async () => {
-      const response = await fetch('/api/appointments');
-      if (!response.ok) throw new Error('Failed to fetch appointments');
+      const url = selectedLocation?.id 
+        ? `/api/appointments?locationId=${selectedLocation.id}`
+        : '/api/appointments';
+      const response = await apiRequest("GET", url);
       return response.json();
     },
     refetchOnMount: true, // Always refetch when component mounts
@@ -49,19 +53,23 @@ const AppointmentsPage = () => {
   });
 
   const { data: staff = [] } = useQuery({
-    queryKey: ['/api/staff'],
+    queryKey: ['/api/staff', selectedLocation?.id],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
+      const url = selectedLocation?.id 
+        ? `/api/staff?locationId=${selectedLocation.id}`
+        : '/api/staff';
+      const response = await apiRequest("GET", url);
       return response.json();
     },
   });
 
   const { data: services = [] } = useQuery({
-    queryKey: ['/api/services'],
+    queryKey: ['/api/services', selectedLocation?.id],
     queryFn: async () => {
-      const response = await fetch('/api/services');
-      if (!response.ok) throw new Error('Failed to fetch services');
+      const url = selectedLocation?.id 
+        ? `/api/services?locationId=${selectedLocation.id}`
+        : '/api/services';
+      const response = await apiRequest("GET", url);
       return response.json();
     },
   });
@@ -69,14 +77,20 @@ const AppointmentsPage = () => {
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
     queryFn: async () => {
-      const response = await fetch('/api/users');
-      if (!response.ok) throw new Error('Failed to fetch users');
+      const response = await apiRequest("GET", '/api/users');
       return response.json();
     },
   });
 
   const { data: schedules = [] } = useQuery({
-    queryKey: ['/api/schedules'],
+    queryKey: ['/api/schedules', selectedLocation?.id],
+    queryFn: async () => {
+      const url = selectedLocation?.id 
+        ? `/api/schedules?locationId=${selectedLocation.id}`
+        : '/api/schedules';
+      const response = await apiRequest("GET", url);
+      return response.json();
+    },
   });
 
   // Force refetch appointments when component mounts (after login)
@@ -369,7 +383,7 @@ const AppointmentsPage = () => {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All Staff</SelectItem>
-                            {staff.map((s: any) => (
+                            {staff?.map((s: any) => (
                               <SelectItem key={s.id} value={s.id.toString()}>
                                 {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
                               </SelectItem>
@@ -383,12 +397,12 @@ const AppointmentsPage = () => {
                 <CardContent>
                   <div
                     className="overflow-x-auto w-full"
-                    style={{ minWidth: `${filteredResources.length * 300}px` }}
+                    style={{ minWidth: `${(filteredResources?.length || 0) * 300}px` }}
                   >
                     <BigCalendar
-                      events={filteredAppointments.map((apt: any) => {
-                        const client = users.find((u: any) => u.id === apt.clientId);
-                        const service = services.find((s: any) => s.id === apt.serviceId);
+                      events={filteredAppointments?.map((apt: any) => {
+                        const client = users?.find((u: any) => u.id === apt.clientId);
+                        const service = services?.find((s: any) => s.id === apt.serviceId);
                         
                         // Always convert to Date objects to avoid calendar errors
                         const startDate = apt.startTime ? new Date(apt.startTime) : new Date();
@@ -405,11 +419,11 @@ const AppointmentsPage = () => {
                             serviceColor: service?.color || '#3B82F6', // Use service color or default blue
                           },
                         };
-                      })}
-                      resources={filteredResources.map((s: any) => ({
+                      }) || []}
+                      resources={filteredResources?.map((s: any) => ({
                         resourceId: s.id,
                         resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
-                      }))}
+                      })) || []}
                       backgroundEvents={getBackgroundEvents()}
                       onSelectEvent={(event) => handleAppointmentClick(event.id)}
                       onSelectSlot={handleSelectSlot}

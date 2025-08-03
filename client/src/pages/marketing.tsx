@@ -65,7 +65,10 @@ import {
   Trash2,
   AlertTriangle,
   Eye,
-  Users
+  Users,
+  UserX,
+  Clock,
+  MailX
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -97,6 +100,25 @@ type Promo = {
   usageLimit: number;
   usedCount: number;
   active: boolean;
+};
+
+type OptOut = {
+  id: number;
+  userId: number;
+  email: string;
+  unsubscribedAt: string;
+  campaignId?: number;
+  reason?: string;
+  ipAddress?: string;
+  user?: {
+    firstName?: string;
+    lastName?: string;
+    username: string;
+    phone?: string;
+  };
+  campaign?: {
+    name: string;
+  };
 };
 
 const campaignFormSchema = z.object({
@@ -149,6 +171,7 @@ const MarketingPage = () => {
   const [emailTemplateHtml, setEmailTemplateHtml] = useState<string>("");
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const emailEditorRef = useRef<EmailTemplateEditorRef>(null);
+  const [optOutSearchQuery, setOptOutSearchQuery] = useState("");
 
 
 
@@ -216,6 +239,11 @@ const MarketingPage = () => {
   // Fetch SMS configuration status
   const { data: smsConfig } = useQuery<any>({
     queryKey: ['/api/sms-config-status'],
+  });
+
+  // Fetch opt-outs
+  const { data: optOuts = [], isLoading: optOutsLoading } = useQuery<any[]>({
+    queryKey: ['/api/unsubscribes'],
   });
 
   // Create campaign mutation
@@ -454,6 +482,13 @@ const MarketingPage = () => {
     promo.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const filteredOptOuts = (optOuts as any[]).filter((optOut: any) =>
+    optOut.email.toLowerCase().includes(optOutSearchQuery.toLowerCase()) ||
+    (optOut.user?.firstName && optOut.user.firstName.toLowerCase().includes(optOutSearchQuery.toLowerCase())) ||
+    (optOut.user?.lastName && optOut.user.lastName.toLowerCase().includes(optOutSearchQuery.toLowerCase())) ||
+    (optOut.reason && optOut.reason.toLowerCase().includes(optOutSearchQuery.toLowerCase()))
+  );
+
 
 
   const onPromoSubmit = (data: PromoFormValues) => {
@@ -521,6 +556,10 @@ const MarketingPage = () => {
                 <TabsTrigger value="promos" className="flex items-center">
                   <Tag className="h-4 w-4 mr-2" />
                   Promo Codes
+                </TabsTrigger>
+                <TabsTrigger value="optouts" className="flex items-center">
+                  <UserX className="h-4 w-4 mr-2" />
+                  Opt Outs
                 </TabsTrigger>
               </TabsList>
               
@@ -762,6 +801,125 @@ const MarketingPage = () => {
                             </div>
                           </div>
                         </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Opt Outs Tab */}
+              <TabsContent value="optouts">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-medium">Opted Out Clients</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      View and manage clients who have opted out of marketing communications.
+                    </p>
+                  </div>
+                  <div className="mt-4 sm:mt-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                    <div className="relative flex-1 sm:flex-initial">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <Input
+                        type="search"
+                        placeholder="Search opt-outs..."
+                        className="pl-8 w-full sm:w-[250px]"
+                        value={optOutSearchQuery}
+                        onChange={(e) => setOptOutSearchQuery(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {optOutsLoading ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                      <p className="mt-4 text-sm text-gray-500">Loading opt-outs...</p>
+                    </CardContent>
+                  </Card>
+                ) : filteredOptOuts.length === 0 ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <MailX className="h-12 w-12 text-gray-400 mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No Opt-Outs Found</h3>
+                      <p className="text-sm text-gray-500 mb-4 text-center max-w-md">
+                        {optOutSearchQuery 
+                          ? "No opt-outs match your search criteria. Try a different search term."
+                          : "No clients have opted out of marketing communications yet."}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {filteredOptOuts.map((optOut) => (
+                      <Card key={optOut.id} className="overflow-hidden">
+                        <CardHeader className="pb-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <Badge variant="destructive" className="mb-2">
+                                Opted Out
+                              </Badge>
+                              <CardTitle className="text-lg">{optOut.email}</CardTitle>
+                            </div>
+                            <UserX className="h-5 w-5 text-red-500" />
+                          </div>
+                          <CardDescription>
+                            {optOut.user?.firstName && optOut.user?.lastName 
+                              ? `${optOut.user.firstName} ${optOut.user.lastName}`
+                              : optOut.user?.username || 'Unknown User'}
+                          </CardDescription>
+                        </CardHeader>
+                        
+                        <CardContent className="pb-4">
+                          <div className="space-y-2">
+                            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                              <Clock className="h-4 w-4 mr-1" />
+                              {new Date(optOut.unsubscribedAt).toLocaleDateString()}
+                            </div>
+                            
+                            {optOut.reason && (
+                              <div className="text-sm">
+                                <span className="font-medium">Reason:</span>{" "}
+                                <span className="text-gray-600 dark:text-gray-400">{optOut.reason}</span>
+                              </div>
+                            )}
+                            
+                            {optOut.campaign?.name && (
+                              <div className="text-sm">
+                                <span className="font-medium">Campaign:</span>{" "}
+                                <span className="text-gray-600 dark:text-gray-400">{optOut.campaign.name}</span>
+                              </div>
+                            )}
+                            
+                            {optOut.user?.phone && (
+                              <div className="text-sm">
+                                <span className="font-medium">Phone:</span>{" "}
+                                <span className="text-gray-600 dark:text-gray-400">{optOut.user.phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                        
+                        <CardFooter className="pt-0">
+                          <div className="flex justify-between items-center w-full">
+                            <div className="text-xs text-gray-500">
+                              ID: {optOut.id}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                toast({
+                                  title: "Feature Coming Soon",
+                                  description: "Opt-out management actions will be available soon!",
+                                });
+                              }}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View Details
+                            </Button>
+                          </div>
+                        </CardFooter>
                       </Card>
                     ))}
                   </div>

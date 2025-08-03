@@ -1647,183 +1647,12 @@ export class SMSAutoRespondService {
       const isRescheduleIntent = this.isRescheduleIntent(sms.body);
       const isCancelIntent = this.isCancelIntent(sms.body);
       
-      // Check if this is a new booking request or user wants to start over
-      if (!conversationState || conversationState.conversationStep === 'initial' || this.isStartOverRequest(sms.body)) {
-        // Enhanced greeting with service options
-        const response = 'Great! I\'d love to help you book an appointment. We offer:\n• Signature Head Spa ($99)\n• Deluxe Head Spa ($160)\n• Platinum Head Spa ($220)\n\nWhat service would you like?';
-        
-        this.updateConversationState(sms.from, {
-          conversationStep: 'service_requested',
-          lastUpdated: new Date()
-        });
-        
-        await this.sendSMSResponse(sms, response, 0.9, client);
-        
-        return {
-          success: true,
-          responseSent: true,
-          response: response,
-          confidence: 0.9
-        };
-      }
-      
-      // Handle service selection response with enhanced recognition
-      if (conversationState?.conversationStep === 'service_requested') {
-        const selectedService = this.extractServiceFromText(sms.body);
-        
-        if (selectedService) {
-          // User selected a service, now ask for date with enhanced options
-          const response = `Perfect! You've selected ${selectedService}. What date would you like to come in? You can say:\n• Tomorrow\n• A specific day (Monday, Tuesday, etc.)\n• A date (like "July 30th")`;
-          
-          this.updateConversationState(sms.from, {
-            selectedService: selectedService,
-            conversationStep: 'date_requested',
-            lastUpdated: new Date()
-          });
-          
-          await this.sendSMSResponse(sms, response, 0.9, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 0.9
-          };
-        } else {
-          // Enhanced service selection help
-          const response = 'I didn\'t catch that. Please choose from our services:\n• Signature Head Spa ($99)\n• Deluxe Head Spa ($160)\n• Platinum Head Spa ($220)\n\nYou can also just say "Signature", "Deluxe", or "Platinum".';
-          
-          await this.sendSMSResponse(sms, response, 0.9, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 0.9
-          };
-        }
-      }
-      
-      // Handle date selection response with enhanced recognition
-      if (conversationState?.conversationStep === 'date_requested') {
-        const selectedDate = this.extractDateFromText(sms.body);
-        
-        if (selectedDate) {
-          // User selected a date, show available times with enhanced formatting
-          const response = `Great! Here are the available times for ${selectedDate}:\n\n🕘 9:00 AM\n🕚 11:00 AM\n🕐 1:00 PM\n🕒 3:00 PM\n🕔 5:00 PM\n\nWhich time works best for you?`;
-          
-          this.updateConversationState(sms.from, {
-            selectedDate: selectedDate,
-            conversationStep: 'time_selected',
-            lastUpdated: new Date()
-          });
-          
-          await this.sendSMSResponse(sms, response, 0.9, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 0.9
-          };
-        } else {
-          // Enhanced date selection help
-          const response = 'I didn\'t catch that. Please tell me what day you\'d like to come in. You can say:\n• Tomorrow\n• A specific day (Monday, Tuesday, etc.)\n• A date (like "July 30th")\n\nWhat works best for you?';
-          
-          await this.sendSMSResponse(sms, response, 0.9, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 0.9
-          };
-        }
-      }
-      
-      // Handle time selection response - FIXED
-      if (conversationState?.conversationStep === 'time_selected') {
-        console.log('⏰ Time selection step, input:', sms.body);
-        
-        // Check for time patterns directly - FIXED LOGIC
-        const text = sms.body.toLowerCase();
-        if (text.includes('3pm') || text.includes('3:00pm') || text.includes('3 pm') || text === '3') {
-          const response = `Perfect! I've booked your ${conversationState.selectedService} appointment for ${conversationState.selectedDate} at 3pm. You'll receive a confirmation shortly. Thank you for choosing Glo Head Spa! ✨`;
-          
-          this.clearConversationState(sms.from);
-          await this.sendSMSResponse(sms, response, 1.0, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 1.0
-          };
-        } else if (text.includes('9am') || text.includes('9:00am') || text.includes('9 am') || text === '9') {
-          const response = `Perfect! I've booked your ${conversationState.selectedService} appointment for ${conversationState.selectedDate} at 9am. You'll receive a confirmation shortly. Thank you for choosing Glo Head Spa! ✨`;
-          
-          this.clearConversationState(sms.from);
-          await this.sendSMSResponse(sms, response, 1.0, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 1.0
-          };
-        } else if (text.includes('11am') || text.includes('11:00am') || text.includes('11 am') || text === '11') {
-          const response = `Perfect! I've booked your ${conversationState.selectedService} appointment for ${conversationState.selectedDate} at 11am. You'll receive a confirmation shortly. Thank you for choosing Glo Head Spa! ✨`;
-          
-          this.clearConversationState(sms.from);
-          await this.sendSMSResponse(sms, response, 1.0, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 1.0
-          };
-        } else if (text.includes('1pm') || text.includes('1:00pm') || text.includes('1 pm') || text === '1') {
-          const response = `Perfect! I've booked your ${conversationState.selectedService} appointment for ${conversationState.selectedDate} at 1pm. You'll receive a confirmation shortly. Thank you for choosing Glo Head Spa! ✨`;
-          
-          this.clearConversationState(sms.from);
-          await this.sendSMSResponse(sms, response, 1.0, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 1.0
-          };
-        } else if (text.includes('5pm') || text.includes('5:00pm') || text.includes('5 pm') || text === '5') {
-          const response = `Perfect! I've booked your ${conversationState.selectedService} appointment for ${conversationState.selectedDate} at 5pm. You'll receive a confirmation shortly. Thank you for choosing Glo Head Spa! ✨`;
-          
-          this.clearConversationState(sms.from);
-          await this.sendSMSResponse(sms, response, 1.0, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 1.0
-          };
-        } else {
-          // User didn't provide a valid time, ask again
-          const response = 'I didn\'t catch that. Could you please choose from the available times: 9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, 5:00 PM';
-          
-          await this.sendSMSResponse(sms, response, 0.9, client);
-          
-          return {
-            success: true,
-            responseSent: true,
-            response: response,
-            confidence: 0.9
-          };
-        }
-      }
-      
-      // Use the programmable conversation flow to handle booking requests
-      return await this.executeConversationFlow('booking-flow', sms, client, parsedRequest, conversationState);
+      // Always use structured LLM approach for booking flow
+      return await this.handleStructuredBookingFlow(sms, client, conversationState || {
+        phoneNumber: sms.from,
+        lastUpdated: new Date(),
+        conversationStep: 'initial'
+      });
       
     } catch (error: any) {
       console.error('Error handling booking request:', error);
@@ -1834,6 +1663,125 @@ export class SMSAutoRespondService {
       };
     }
   }
+
+  /**
+   * Handle structured booking flow using LLM function calling
+   */
+  private async handleStructuredBookingFlow(sms: IncomingSMS, client: any, conversationState: BookingConversationState): Promise<SMSAutoRespondResult> {
+    try {
+      console.log('🔄 Starting structured booking flow');
+      
+      // Build context for LLM
+      const context = await this.buildContext(client, sms);
+      
+      // Use structured LLM response
+      const llmResponse = await this.llmService.generateStructuredBookingResponse(
+        sms.body,
+        context,
+        conversationState
+      );
+      
+      if (!llmResponse.success) {
+        console.error('LLM structured booking failed:', llmResponse.error);
+        return {
+          success: false,
+          responseSent: false,
+          error: llmResponse.error || 'Failed to generate structured booking response'
+        };
+      }
+      
+      // Check if this is a function call (all parameters collected)
+      const bookingAction = llmResponse.suggestedActions?.find(action => action.type === 'book_appointment');
+      
+      if (bookingAction && bookingAction.data) {
+        console.log('📞 Function call detected - booking appointment:', bookingAction.data);
+        
+        // Call the structured booking function
+        const bookingResult = await this.appointmentBookingService.bookAppointmentStructured({
+          service: bookingAction.data.service,
+          date: bookingAction.data.date,
+          time: bookingAction.data.time,
+          clientPhone: sms.from,
+          clientName: client?.firstName || undefined
+        });
+        
+        if (bookingResult.success) {
+          // Clear conversation state after successful booking
+          this.clearConversationState(sms.from);
+          
+          await this.sendSMSResponse(sms, bookingResult.message, 1.0, client);
+          
+          return {
+            success: true,
+            responseSent: true,
+            response: bookingResult.message,
+            confidence: 1.0
+          };
+        } else {
+          // Booking failed, ask for clarification
+          const response = bookingResult.message || 'I\'m sorry, but I couldn\'t book that appointment. Please try a different time or call us directly.';
+          
+          await this.sendSMSResponse(sms, response, 0.8, client);
+          
+          return {
+            success: true,
+            responseSent: true,
+            response: response,
+            confidence: 0.8
+          };
+        }
+      } else {
+        // Regular conversational response - update conversation state based on LLM response
+        let updatedState = { ...conversationState };
+        
+        // Extract service if mentioned
+        const serviceMatch = sms.body.toLowerCase().match(/(signature|deluxe|platinum)/);
+        if (serviceMatch && !conversationState.selectedService) {
+          const service = serviceMatch[1] === 'signature' ? 'Signature Head Spa' :
+                         serviceMatch[1] === 'deluxe' ? 'Deluxe Head Spa' :
+                         'Platinum Head Spa';
+          updatedState.selectedService = service;
+          updatedState.conversationStep = 'date_requested';
+        }
+        
+        // Extract date if mentioned
+        const dateMatch = sms.body.toLowerCase().match(/(today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/);
+        if (dateMatch && conversationState.selectedService && !conversationState.selectedDate) {
+          updatedState.selectedDate = dateMatch[1];
+          updatedState.conversationStep = 'time_selected';
+        }
+        
+        // Extract time if mentioned
+        const timeMatch = sms.body.toLowerCase().match(/(\d{1,2}):?(\d{2})?\s*(am|pm)/i);
+        if (timeMatch && conversationState.selectedService && conversationState.selectedDate && !conversationState.selectedTime) {
+          updatedState.selectedTime = sms.body;
+          updatedState.conversationStep = 'completed';
+        }
+        
+        // Update conversation state
+        this.updateConversationState(sms.from, updatedState);
+        
+        // Send the LLM response
+        await this.sendSMSResponse(sms, llmResponse.message || 'I didn\'t understand that. Could you please clarify?', llmResponse.confidence || 0.8, client);
+        
+        return {
+          success: true,
+          responseSent: true,
+          response: llmResponse.message || 'I didn\'t understand that. Could you please clarify?',
+          confidence: llmResponse.confidence || 0.8
+        };
+      }
+      
+    } catch (error: any) {
+      console.error('Error in structured booking flow:', error);
+      return {
+        success: false,
+        responseSent: false,
+        error: error.message || 'Failed to handle structured booking flow'
+      };
+    }
+  };
+
 
   /**
    * Handle reschedule request

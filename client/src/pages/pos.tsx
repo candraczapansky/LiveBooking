@@ -49,6 +49,7 @@ import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
+import SquareTerminalIntegration from "@/components/payment/square-terminal-integration";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -1314,6 +1315,7 @@ export default function PointOfSale() {
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Credit/Debit Card</SelectItem>
+                  <SelectItem value="terminal">Square Terminal</SelectItem>
                   <SelectItem value="gift_card">Gift Card</SelectItem>
                 </SelectContent>
               </Select>
@@ -1365,6 +1367,44 @@ export default function PointOfSale() {
                       description: error,
                       variant: "destructive",
                     });
+                  }}
+                />
+              </div>
+            )}
+
+            {paymentMethod === "terminal" && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Square Terminal Payment</label>
+                <SquareTerminalIntegration
+                  amount={getSubtotal()}
+                  tipAmount={tipAmount}
+                  clientId={selectedClient?.id}
+                  description="POS Terminal Transaction"
+                  onSuccess={(paymentData) => {
+                    console.log('Terminal payment successful, processing POS transaction...');
+                    // Process transaction after successful terminal payment
+                    const transaction = {
+                      clientId: selectedClient?.id,
+                      items: cart,
+                      subtotal: getSubtotal(),
+                      tax: getTax(),
+                      tipAmount: tipAmount,
+                      total: getGrandTotal(),
+                      paymentMethod: "terminal",
+                    };
+                    console.log('POS transaction data:', transaction);
+                    processTransactionMutation.mutate(transaction);
+                  }}
+                  onError={(error) => {
+                    console.error('Terminal payment error:', error);
+                    toast({
+                      title: "Terminal Payment Failed",
+                      description: error,
+                      variant: "destructive",
+                    });
+                  }}
+                  onCancel={() => {
+                    setIsCheckoutOpen(false);
                   }}
                 />
               </div>

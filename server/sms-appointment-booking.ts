@@ -31,6 +31,22 @@ interface BookingResult {
   error?: string;
 }
 
+// Add new interface for structured booking
+interface StructuredBookingRequest {
+  service: string;
+  date: string;
+  time: string;
+  clientPhone: string;
+  clientName?: string;
+}
+
+interface StructuredBookingResponse {
+  success: boolean;
+  message: string;
+  appointment?: any;
+  error?: string;
+}
+
 export class SMSAppointmentBookingService {
   private storage: IStorage;
 
@@ -497,6 +513,176 @@ export class SMSAppointmentBookingService {
         message: 'Sorry, I encountered an issue while booking your appointment. Please call us directly or try again later.'
       };
     }
+  }
+
+  /**
+   * Structured booking function for LLM function calling
+   * This is called when all parameters (service, date, time) are collected
+   */
+  async bookAppointmentStructured(request: StructuredBookingRequest): Promise<StructuredBookingResponse> {
+    try {
+      console.log('📞 Structured booking called with:', request);
+      
+      // Parse the date and time
+      const parsedDate = this.parseDate(request.date);
+      const parsedTime = this.parseTime(request.time);
+      
+      if (!parsedDate || !parsedTime) {
+        return {
+          success: false,
+          message: 'I need a valid date and time to book your appointment. Please provide both clearly.',
+          error: 'Invalid date or time format'
+        };
+      }
+
+      // Create appointment request
+      const appointmentRequest: AppointmentBookingRequest = {
+        serviceName: request.service,
+        date: request.date,
+        time: request.time,
+        clientPhone: request.clientPhone,
+        clientName: request.clientName
+      };
+
+      // Find available slots
+      const availableSlots = await this.findAvailableSlots(appointmentRequest);
+      
+      if (availableSlots.length === 0) {
+        return {
+          success: false,
+          message: 'I\'m sorry, but that time is not available. Please choose a different time or date.',
+          error: 'No available slots'
+        };
+      }
+
+      // Find the best matching slot
+      const targetDateTime = new Date(parsedDate);
+      targetDateTime.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
+      
+      const bestSlot = availableSlots.find(slot => {
+        const slotTime = new Date(slot.startTime);
+        return Math.abs(slotTime.getTime() - targetDateTime.getTime()) < 30 * 60 * 1000; // Within 30 minutes
+      }) || availableSlots[0];
+
+      // Book the appointment
+      const bookingResult = await this.bookAppointment(appointmentRequest, bestSlot);
+      
+      if (bookingResult.success) {
+        return {
+          success: true,
+          message: bookingResult.message,
+          appointment: bookingResult.appointment
+        };
+      } else {
+        return {
+          success: false,
+          message: bookingResult.message,
+          error: bookingResult.error
+        };
+      }
+
+    } catch (error: any) {
+      console.error('Error in structured booking:', error);
+      return {
+        success: false,
+        message: 'I encountered an issue while booking your appointment. Please call us directly or try again later.',
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * Parse date string into Date object
+   */
+  private parseDate(dateStr: string): Date | null {
+    const text = dateStr.toLowerCase();
+    
+    // Handle relative dates
+    if (text.includes('today')) {
+      return new Date();
+    } else if (text.includes('tomorrow')) {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      return tomorrow;
+    } else if (text.includes('next week')) {
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      return nextWeek;
+    }
+    
+    // Handle day names
+    const dayMap: { [key: string]: number } = {
+      'monday': 1, 'tuesday': 2, 'wednesday': 3, 'thursday': 4,
+      'friday': 5, 'saturday': 6, 'sunday': 0
+    };
+    
+    for (const [day, dayNum] of Object.entries(dayMap)) {
+      if (text.includes(day)) {
+        const today = new Date();
+        const targetDay = new Date();
+        const daysUntilTarget = (dayNum - today.getDay() + 7) % 7;
+        targetDay.setDate(today.getDate() + daysUntilTarget);
+        return targetDay;
+      }
+    }
+    
+    // Handle specific dates (like "July 30th")
+    const dateMatch = text.match(/(\w+)\s+(\d+)(?:st|nd|rd|th)?/);
+    if (dateMatch) {
+      const monthStr = dateMatch[1];
+      const day = parseInt(dateMatch[2]);
+      const monthMap: { [key: string]: number } = {
+        'january': 0, 'february': 1, 'march': 2, 'april': 3,
+        'may': 4, 'june': 5, 'july': 6, 'august': 7,
+        'september': 8, 'october': 9, 'november': 10, 'december': 11
+      };
+      
+      const month = monthMap[monthStr.toLowerCase()];
+      if (month !== undefined && day >= 1 && day <= 31) {
+        const date = new Date();
+        date.setMonth(month);
+        date.setDate(day);
+        return date;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Parse time string into hours and minutes
+   */
+  private parseTime(timeStr: string): { hours: number; minutes: number } | null {
+    const text = timeStr.toLowerCase();
+    
+    // Handle various time formats
+    const timePatterns = [
+      /(\d{1,2}):?(\d{2})?\s*(am|pm)/i,
+      /(\d{1,2})\s*(am|pm)/i,
+      /(\d{1,2})/i
+    ];
+    
+    for (const pattern of timePatterns) {
+      const match = text.match(pattern);
+      if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = match[2] ? parseInt(match[2]) : 0;
+        const period = match[3]?.toLowerCase();
+        
+        // Convert to 24-hour format
+        if (period === 'pm' && hours !== 12) {
+          hours += 12;
+        } else if (period === 'am' && hours === 12) {
+          hours = 0;
+        }
+        
+        if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+          return { hours, minutes };
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**

@@ -57,6 +57,10 @@ interface LLMResponse {
     data?: any;
   }>;
   confidence?: number;
+  functionCall?: {
+    name: string;
+    arguments: any;
+  };
 }
 
 export class LLMService {
@@ -117,6 +121,81 @@ export class LLMService {
       return {
         success: false,
         error: error.message || 'Failed to generate response'
+      };
+    }
+  }
+
+  /**
+   * Generate structured booking response for SMS appointment booking
+   * This method is specifically designed for the appointment booking flow
+   */
+  async generateStructuredBookingResponse(
+    clientMessage: string,
+    context: MessageContext,
+    conversationState: any
+  ): Promise<LLMResponse> {
+    try {
+      const systemPrompt = this.buildStructuredBookingPrompt(context, conversationState);
+      const userPrompt = this.buildUserPrompt(clientMessage, context, 'sms');
+
+      // Define the book_appointment function schema
+      const functions = [
+        {
+          name: 'book_appointment',
+          description: 'Book an appointment when all required parameters (service, date, time) are collected',
+          parameters: {
+            type: 'object',
+            properties: {
+              service: {
+                type: 'string',
+                description: 'The service name (e.g., "Signature Head Spa", "Deluxe Head Spa", "Platinum Head Spa")',
+                enum: ['Signature Head Spa', 'Deluxe Head Spa', 'Platinum Head Spa']
+              },
+              date: {
+                type: 'string',
+                description: 'The appointment date in YYYY-MM-DD format (e.g., "2024-08-01")'
+              },
+              time: {
+                type: 'string',
+                description: 'The appointment time in HH:MM AM/PM format (e.g., "10:30 AM", "2:00 PM")'
+              }
+            },
+            required: ['service', 'date', 'time']
+          }
+        }
+      ];
+
+      const response = await this.callOpenAI(systemPrompt, userPrompt, functions);
+      
+      if (!response.success) {
+        return response;
+      }
+
+      // If function call is detected, return it directly
+      if (response.functionCall && response.functionCall.name === 'book_appointment') {
+        return {
+          success: true,
+          message: 'Function call detected - booking appointment',
+          functionCall: response.functionCall,
+          confidence: 1.0
+        };
+      }
+
+      // Parse the response for structured booking
+      const parsedResponse = this.parseStructuredBookingResponse(response.message || '');
+      
+      return {
+        success: true,
+        message: parsedResponse.message,
+        suggestedActions: parsedResponse.actions,
+        confidence: parsedResponse.confidence
+      };
+
+    } catch (error: any) {
+      console.error('LLM Service Error:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to generate structured booking response'
       };
     }
   }
@@ -272,6 +351,56 @@ Example actions:
     return prompt;
   }
 
+  /**
+   * Build system prompt specifically for structured booking conversations
+   */
+  private buildStructuredBookingPrompt(context: MessageContext, conversationState: any): string {
+    const businessName = context.businessName || 'Glo Head Spa';
+    const businessType = context.businessType || 'salon and spa';
+    
+    let prompt = `You are an AI assistant for ${businessName}, a ${businessType}. You are specifically handling an appointment booking conversation.
+
+CRITICAL BOOKING FLOW RULES:
+1. You are in a structured booking conversation
+2. You must collect: service, date, and time
+3. Once ALL THREE are collected, you MUST call the book_appointment function
+4. Do NOT continue asking questions once all parameters are collected
+5. Be friendly and enthusiastic throughout the process
+
+Current Conversation State:
+- Service: ${conversationState?.selectedService || 'Not selected'}
+- Date: ${conversationState?.selectedDate || 'Not selected'}
+- Time: ${conversationState?.selectedTime || 'Not selected'}
+
+Available Services:
+- Signature Head Spa ($99)
+- Deluxe Head Spa ($160)
+- Platinum Head Spa ($220)
+
+Booking Flow Steps:
+1. If no service selected: Ask "What service would you like? We offer Signature Head Spa ($99), Deluxe Head Spa ($160), or Platinum Head Spa ($220)."
+2. If service selected but no date: Ask "Great! What date would you like to come in? You can say 'tomorrow', 'Monday', or a specific date."
+3. If service and date selected but no time: Ask "Perfect! What time works for you? We have availability at 9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, and 5:00 PM."
+4. If ALL THREE are collected: Call the book_appointment function with the collected information
+
+IMPORTANT FUNCTION CALLING RULES:
+- When ALL THREE parameters (service, date, time) are collected, you MUST call the book_appointment function
+- The function requires: service (string), date (YYYY-MM-DD format), time (HH:MM AM/PM format)
+- Do NOT ask for more information once all three are collected
+- Call the function immediately when all parameters are available
+- The function will handle the actual booking process
+
+Example function call when all parameters are collected:
+- Service: "Signature Head Spa"
+- Date: "2024-08-01" (tomorrow)
+- Time: "10:30 AM"
+- Result: Call book_appointment function with these exact parameters
+
+Do NOT continue the conversation after calling the function. The function will handle the booking confirmation.`;
+
+    return prompt;
+  }
+
   private buildUserPrompt(clientMessage: string, context: MessageContext, channel: 'email' | 'sms'): string {
     let prompt = `Client Message: "${clientMessage}"`;
 
@@ -325,7 +454,7 @@ Example actions:
     return prompt;
   }
 
-  private async callOpenAI(systemPrompt: string, userPrompt: string): Promise<LLMResponse> {
+  private async callOpenAI(systemPrompt: string, userPrompt: string, functions?: any[]): Promise<LLMResponse> {
     try {
       // Get API key from database first, then fallback to environment variable
       const apiKey = await this.ensureApiKey();
@@ -344,21 +473,29 @@ Example actions:
       console.log('LLM Service: Model:', this.config.model);
       console.log('LLM Service: Max tokens:', this.config.maxTokens);
 
+      const requestBody: any = {
+        model: this.config.model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        max_tokens: this.config.maxTokens,
+        temperature: this.config.temperature
+      };
+
+      // Add functions if provided
+      if (functions && functions.length > 0) {
+        requestBody.functions = functions;
+        requestBody.function_call = 'auto';
+      }
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: this.config.model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          max_tokens: this.config.maxTokens,
-          temperature: this.config.temperature
-        })
+        body: JSON.stringify(requestBody)
       });
 
       console.log('LLM Service: Response status:', response.status);
@@ -374,8 +511,9 @@ Example actions:
 
       const data = await response.json();
       const message = data.choices?.[0]?.message?.content;
+      const functionCall = data.choices?.[0]?.message?.function_call;
 
-      if (!message) {
+      if (!message && !functionCall) {
         console.error('LLM Service: No response generated from OpenAI');
         return {
           success: false,
@@ -384,11 +522,20 @@ Example actions:
       }
 
       console.log('LLM Service: Successfully generated response');
-      console.log('LLM Service: Response preview:', message.substring(0, 100) + '...');
+      if (message) {
+        console.log('LLM Service: Response preview:', message.substring(0, 100) + '...');
+      }
+      if (functionCall) {
+        console.log('LLM Service: Function call detected:', functionCall.name);
+      }
 
       return {
         success: true,
-        message
+        message,
+        functionCall: functionCall ? {
+          name: functionCall.name,
+          arguments: JSON.parse(functionCall.arguments)
+        } : undefined
       };
 
     } catch (error: any) {
@@ -454,6 +601,55 @@ Example actions:
       actions,
       confidence: Math.min(confidence, 1.0)
     };
+  }
+
+  /**
+   * Parse structured booking response for function calling
+   */
+  private parseStructuredBookingResponse(response: string): {
+    message: string;
+    actions: Array<{
+      type: 'book_appointment' | 'send_info' | 'follow_up' | 'escalate';
+      description: string;
+      data?: any;
+    }>;
+    confidence: number;
+  } {
+    const actions: Array<{
+      type: 'book_appointment' | 'send_info' | 'follow_up' | 'escalate';
+      description: string;
+      data?: any;
+    }> = [];
+
+    // Check if this is a function call response
+    try {
+      const functionCallMatch = response.match(/\{[\s]*"function"[\s]*:[\s]*"book_appointment"[\s]*,[\s]*"service"[\s]*:[\s]*"([^"]+)"[\s]*,[\s]*"date"[\s]*:[\s]*"([^"]+)"[\s]*,[\s]*"time"[\s]*:[\s]*"([^"]+)"[\s]*\}/);
+      
+      if (functionCallMatch) {
+        const [, service, date, time] = functionCallMatch;
+        
+        actions.push({
+          type: 'book_appointment',
+          description: 'Book appointment with collected parameters',
+          data: {
+            service,
+            date,
+            time
+          }
+        });
+        
+        return {
+          message: 'Function call detected - booking appointment',
+          actions,
+          confidence: 1.0
+        };
+      }
+    } catch (error) {
+      console.log('No function call detected in response');
+    }
+
+    // If no function call, parse as regular response
+    return this.parseLLMResponse(response);
   }
 
   async saveConversation(

@@ -147,6 +147,7 @@ const ClientsPage = () => {
     skipped: number;
     errors: string[];
   } | null>(null);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Enhanced search and filter state
@@ -387,6 +388,7 @@ const ClientsPage = () => {
   const importClientsMutation = useMutation({
     mutationFn: async (clients: any[]) => {
       console.log('Sending import request with', clients.length, 'clients');
+      setImportProgress({ current: 0, total: clients.length });
       return apiRequest("POST", "/api/clients/import", { clients });
     },
     onSuccess: async (response) => {
@@ -394,6 +396,7 @@ const ClientsPage = () => {
       const results = await response.json();
       console.log('Import results:', results);
       setIsImporting(false);
+      setImportProgress(null);
       
       // Log any errors for debugging
       if (results.errors && results.errors.length > 0) {
@@ -444,11 +447,23 @@ const ClientsPage = () => {
       if (results.imported > 0) {
         console.log('✅ Imported clients should now be visible in the list.');
         console.log('💡 Try searching by: "Test", "User", or "test.user" to find them.');
+        
+        // Trigger a refresh of the client list
+        setRefreshTrigger(prev => prev + 1);
+        console.log('🔄 Triggered client list refresh');
+        
+        // Aggressively invalidate and refetch client data
+        queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+        queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
+        queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+        console.log('🔄 Aggressively invalidated and refetched client queries');
       }
     },
     onError: (error) => {
       console.error('Import mutation error:', error);
       setIsImporting(false);
+      setImportProgress(null);
       toast({
         title: "Import Failed",
         description: `Failed to import clients: ${error.message || 'Unknown error occurred'}`,
@@ -673,10 +688,11 @@ const ClientsPage = () => {
         const validClients = results.data
           .map((row: any, index: number) => {
             // Handle different possible column names with more flexible matching
-            const firstName = String(row.firstName || row['First Name'] || row['first_name'] || row['First'] || row['firstname'] || row['FirstName'] || '').trim();
-            const lastName = String(row.lastName || row['Last Name'] || row['last_name'] || row['Last'] || row['lastname'] || row['LastName'] || '').trim();
-            const email = String(row.email || row['Email'] || row['email'] || '').trim();
-            const phone = String(row.phone || row['Phone'] || row['phone'] || row['Phone Number'] || row['phonenumber'] || row['PhoneNumber'] || '').trim();
+            // Based on the console logs, the actual headers are: ['Last name', 'First name', 'Email', 'Mobile phone']
+            const firstName = String(row['First name'] || row['firstName'] || row['First Name'] || row['first_name'] || row['First'] || row['firstname'] || row['FirstName'] || '').trim();
+            const lastName = String(row['Last name'] || row['lastName'] || row['Last Name'] || row['last_name'] || row['Last'] || row['lastname'] || row['LastName'] || '').trim();
+            const email = String(row['Email'] || row['email'] || '').trim();
+            const phone = String(row['Mobile phone'] || row['phone'] || row['Phone'] || row['phone'] || row['Phone Number'] || row['phonenumber'] || row['PhoneNumber'] || '').trim();
             
             console.log(`Row ${index + 1}: ${firstName} ${lastName}, ${email}, ${phone}`);
             
@@ -715,7 +731,8 @@ const ClientsPage = () => {
                 header.toLowerCase().includes('last') || 
                 header.toLowerCase().includes('name') || 
                 header.toLowerCase().includes('email') || 
-                header.toLowerCase().includes('phone')
+                header.toLowerCase().includes('phone') ||
+                header.toLowerCase().includes('mobile')
               )) {
             console.log('Headers appear to be data, treating as data rows...');
             
@@ -732,20 +749,21 @@ const ClientsPage = () => {
                 let firstName, lastName, email, phone;
                 
                 if (Array.isArray(row)) {
-                  // Row is an array
-                  firstName = String(row[0] || '').trim();
-                  lastName = String(row[1] || '').trim();
+                  // Row is an array - based on the headers ['Last name', 'First name', 'Email', 'Mobile phone']
+                  // The order should be: [lastName, firstName, email, phone]
+                  lastName = String(row[0] || '').trim();
+                  firstName = String(row[1] || '').trim();
                   email = String(row[2] || '').trim();
                   phone = String(row[3] || '').trim();
                 } else if (typeof row === 'object' && row !== null) {
                   // Row is an object with field names as keys
                   const keys = Object.keys(row);
                   if (keys.length >= 4) {
-                    const values = Object.values(row);
-                    firstName = String(values[0] || '').trim();
-                    lastName = String(values[1] || '').trim();
-                    email = String(values[2] || '').trim();
-                    phone = String(values[3] || '').trim();
+                    // Try to map based on the actual headers: ['Last name', 'First name', 'Email', 'Mobile phone']
+                    firstName = String(row['First name'] || row['firstName'] || row['First Name'] || '').trim();
+                    lastName = String(row['Last name'] || row['lastName'] || row['Last Name'] || '').trim();
+                    email = String(row['Email'] || row['email'] || '').trim();
+                    phone = String(row['Mobile phone'] || row['phone'] || row['Phone'] || '').trim();
                   } else {
                     return null;
                   }
@@ -777,10 +795,12 @@ const ClientsPage = () => {
                 const keys = Object.keys(row);
                 if (keys.length >= 4 && keys.every((key: string) => !isNaN(Number(key)))) {
                   // This looks like data parsed without headers
+                  // Based on the headers ['Last name', 'First name', 'Email', 'Mobile phone']
+                  // The order should be: [lastName, firstName, email, phone]
                   const values = Object.values(row);
                   return {
-                    firstName: String(values[0] || '').trim(),
-                    lastName: String(values[1] || '').trim(),
+                    firstName: String(values[1] || '').trim(),
+                    lastName: String(values[0] || '').trim(),
                     email: String(values[2] || '').trim(),
                     phone: String(values[3] || '').trim()
                   };
@@ -811,19 +831,13 @@ const ClientsPage = () => {
           return;
         }
         
-        // Check if the import is too large
-        if (validClients.length > 1000) {
-          setIsImporting(false);
-          toast({
-            title: "Import too large",
-            description: `Cannot import ${validClients.length} clients at once. Please split your file into smaller batches of 1000 or fewer clients.`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
         // Show progress for large imports
-        if (validClients.length > 100) {
+        if (validClients.length > 1000) {
+          toast({
+            title: "Large import detected",
+            description: `Importing ${validClients.length} clients. This may take several minutes. Please be patient...`,
+          });
+        } else if (validClients.length > 100) {
           toast({
             title: "Large import detected",
             description: `Importing ${validClients.length} clients. This may take a few moments...`,
@@ -867,9 +881,11 @@ const ClientsPage = () => {
             const validClients = dataRows
               .map((row: any, index: number) => {
                 if (Array.isArray(row) && row.length >= 4) {
+                  // Based on the headers ['Last name', 'First name', 'Email', 'Mobile phone']
+                  // The order should be: [lastName, firstName, email, phone]
                   return {
-                    firstName: String(row[0] || '').trim(),
-                    lastName: String(row[1] || '').trim(),
+                    firstName: String(row[1] || '').trim(),
+                    lastName: String(row[0] || '').trim(),
                     email: String(row[2] || '').trim(),
                     phone: String(row[3] || '').trim()
                   };
@@ -908,6 +924,7 @@ const ClientsPage = () => {
   const resetImportDialog = () => {
     setImportFile(null);
     setImportResults(null);
+    setImportProgress(null);
     setIsImportDialogOpen(false);
   };
 
@@ -2408,7 +2425,7 @@ const ClientsPage = () => {
               <br />
               <span className="text-blue-600 font-medium">📋 Supported column names: firstName/First Name/first_name, lastName/Last Name/last_name, email/Email, phone/Phone/Phone Number</span>
               <br />
-              <span className="text-orange-600 font-medium">Note: Large files (over 1000 clients) should be split into smaller batches for better performance.</span>
+              <span className="text-green-600 font-medium">✓ Large imports supported: Up to 25,000 clients per import</span>
               <br />
               <span className="text-blue-600 font-medium">💡 Duplicate emails/phones will be modified to avoid conflicts. Search by first name or "test.user" to find imported clients.</span>
             </DialogDescription>
@@ -2486,6 +2503,32 @@ const ClientsPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Import Progress */}
+            {importProgress && isImporting && (
+              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Import Progress</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Processing clients...</span>
+                    <span className="font-medium">{importProgress.current} / {importProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ 
+                        width: `${Math.min((importProgress.current / importProgress.total) * 100, 100)}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-blue-700">
+                    {importProgress.total > 1000 
+                      ? "Large import in progress. This may take several minutes..."
+                      : "Import in progress..."}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Import Results */}
             {importResults && (

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getInitials, getFullName } from "@/lib/utils";
+import LocationSelector from "@/components/location/location-selector";
 
 import { useSidebar } from "@/contexts/SidebarContext";
 
@@ -103,6 +104,9 @@ const Header = () => {
             </div>
           </div>
           <div className="flex items-center space-x-1 sm:space-x-2">
+            <div className="hidden md:block mr-4">
+              <LocationSelector variant="compact" showLabel={false} />
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="flex items-center space-x-1 sm:space-x-2 p-1 sm:p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md min-w-0">

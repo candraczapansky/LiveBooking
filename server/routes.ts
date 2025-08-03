@@ -51,7 +51,7 @@ import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
 import { AutoRespondService } from "./auto-respond-service";
 import { SMSAutoRespondService } from "./sms-auto-respond-service";
-import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerPaymentRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes } from "./routes/index";
+import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerPaymentRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes, registerLocationRoutes } from "./routes/index";
 import { getConfigStatus, validateConfig, DatabaseConfig } from "./config";
 import { hashPassword, comparePassword } from "./utils/password";
 import { insertUserSchema, updateUserSchema } from "@shared/schema";
@@ -144,6 +144,9 @@ try {
 
 
 export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
+  // Create HTTP server
+  const server = createServer(app);
+  
   // Initialize LLM Service
   const llmService = new LLMService(storage);
   // Initialize PayrollAutoSync
@@ -158,6 +161,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerServiceRoutes(app, storage);
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
+  registerLocationRoutes(app);
 
 
 
@@ -191,7 +195,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     return res.status(201).json(clientWithoutPassword);
   });
 
-  // Simple CSV client import route
+  // Enhanced CSV client import route
   app.post("/api/clients/import", async (req, res) => {
     try {
       const { clients } = req.body;
@@ -200,17 +204,48 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         return res.status(400).json({ error: "Invalid clients data" });
       }
 
+      // Add a reasonable limit to prevent server overload
+      if (clients.length > 25000) {
+        return res.status(400).json({ 
+          error: "Import too large. Maximum 25,000 clients per import allowed." 
+        });
+      }
+
       const results = {
         imported: 0,
         skipped: 0,
         errors: [] as string[]
       };
 
+      console.log(`Processing ${clients.length} clients...`);
+      console.log('Sample client data:', clients.slice(0, 3));
+      console.log('First client validation check:', {
+        firstName: clients[0]?.firstName,
+        lastName: clients[0]?.lastName,
+        hasFirstName: !!clients[0]?.firstName,
+        hasLastName: !!clients[0]?.lastName,
+        firstNameType: typeof clients[0]?.firstName,
+        lastNameType: typeof clients[0]?.lastName
+      });
+
       for (const clientData of clients) {
         try {
-          // Basic validation
-          if (!clientData.firstName || !clientData.lastName) {
-            results.errors.push(`Row ${results.imported + results.skipped + 1}: Missing first name or last name`);
+          // Basic validation - require at least one name field
+          if (!clientData.firstName && !clientData.lastName) {
+            console.log(`Skipping client - missing both names:`, clientData);
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Missing both first name and last name`);
+            results.skipped++;
+            continue;
+          }
+
+          // Ensure we have at least one name field
+          const firstName = clientData.firstName?.trim() || '';
+          const lastName = clientData.lastName?.trim() || '';
+          
+          // If both are empty, skip
+          if (!firstName && !lastName) {
+            console.log(`Skipping client - both names empty after trim:`, clientData);
+            results.errors.push(`Row ${results.imported + results.skipped + 1}: Missing both first name and last name`);
             results.skipped++;
             continue;
           }
@@ -287,8 +322,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           // Create user with all required fields
           const newClient = {
             email,
-            firstName: clientData.firstName.trim(),
-            lastName: clientData.lastName.trim(),
+            firstName: firstName,
+            lastName: lastName,
             phone,
             username,
             password,
@@ -310,15 +345,17 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           });
 
           results.imported++;
-          console.log(`Imported client: ${createdUser.firstName} ${createdUser.lastName} - Phone: ${createdUser.phone}`);
+          console.log(`✅ Imported client: ${createdUser.firstName} ${createdUser.lastName} - Phone: ${createdUser.phone}`);
 
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`Error processing client:`, clientData, error);
           results.errors.push(`Row ${results.imported + results.skipped + 1}: ${errorMessage}`);
           results.skipped++;
         }
       }
 
+      console.log(`Import completed: ${results.imported} imported, ${results.skipped} skipped, ${results.errors.length} errors`);
       return res.status(200).json(results);
     } catch (error) {
       console.error("CSV import error:", error);
@@ -378,7 +415,12 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         users = await storage.searchUsers(search);
       } else if (role && typeof role === 'string') {
         // Filter users by role
+        console.log('🔍 Filtering users by role:', role);
         users = await storage.getUsersByRole(role);
+        console.log('🔍 Users found with role filter:', users.length);
+        if (users.length > 0) {
+          console.log('🔍 First user with role filter:', users[0]);
+        }
       } else {
         users = await storage.getAllUsers();
       }
@@ -688,13 +730,24 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   
   // Services routes
   app.get("/api/services", async (req, res) => {
-    const { categoryId } = req.query;
+    const { categoryId, locationId } = req.query;
     
     let services;
     if (categoryId) {
       services = await storage.getServicesByCategory(parseInt(categoryId as string));
     } else {
       services = await storage.getAllServices();
+    }
+    
+    // Filter by location if specified
+    if (locationId) {
+      const filteredServices = services.filter(service => service.locationId === parseInt(locationId as string));
+      // If no services found for the location, return all services (fallback)
+      if (filteredServices.length === 0) {
+        console.log(`No services found for location ${locationId}, returning all services as fallback`);
+      } else {
+        services = filteredServices;
+      }
     }
     
     return res.status(200).json(services);
@@ -782,7 +835,23 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Staff routes
   app.get("/api/staff", async (req, res) => {
     try {
-      const allStaff = await storage.getAllStaff();
+      const { locationId } = req.query;
+      let allStaff;
+      
+      if (locationId) {
+        // Filter staff by location
+        allStaff = await storage.getAllStaff();
+        const filteredStaff = allStaff.filter(staff => staff.locationId === parseInt(locationId as string));
+        // If no staff found for the location, return all staff (fallback)
+        if (filteredStaff.length === 0) {
+          console.log(`No staff found for location ${locationId}, returning all staff as fallback`);
+        } else {
+          allStaff = filteredStaff;
+        }
+      } else {
+        allStaff = await storage.getAllStaff();
+      }
+      
       console.log("Current staff in storage:", allStaff);
       
       // Get user details for each staff member
@@ -1280,6 +1349,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const existingEnd = new Date(appointment.endTime);
       
       // Check for any overlap: new appointment starts before existing ends AND new appointment ends after existing starts
+      // Fixed to allow back-to-back appointments (new appointment can start exactly when previous ends)
       return newStart < existingEnd && newEnd > existingStart;
     });
     
@@ -2520,6 +2590,225 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
+  // Square Terminal integration for in-person payments
+  app.post("/api/square-terminal/payment", async (req, res) => {
+    try {
+      const { 
+        amount, 
+        tipAmount = 0, 
+        appointmentId, 
+        description, 
+        type = "terminal_payment",
+        clientId 
+      } = req.body;
+      
+      if (!amount) {
+        return res.status(400).json({ error: "Amount is required" });
+      }
+
+      const totalAmount = amount + tipAmount;
+
+      // Create payment request for Square Terminal
+      const terminalPaymentData = {
+        amount_money: {
+          amount: Math.round(totalAmount * 100), // Convert to cents
+          currency: 'USD'
+        },
+        idempotency_key: `${Date.now()}-${Math.random()}`,
+        note: description || (type === "terminal_payment" ? "Terminal Transaction" : "Appointment Payment"),
+        reference_id: appointmentId?.toString() || "",
+        location_id: process.env.SQUARE_LOCATION_ID,
+        source_id: "terminal", // Indicates this is a terminal payment
+        tip_money: tipAmount > 0 ? {
+          amount: Math.round(tipAmount * 100),
+          currency: 'USD'
+        } : undefined
+      };
+
+      console.log('Creating Square Terminal payment request:', JSON.stringify(terminalPaymentData, null, 2));
+      
+      // Send payment request to Square Terminal
+      const terminalResponse = await fetch('https://connect.squareup.com/v2/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${squareAccessToken}`,
+          'Content-Type': 'application/json',
+          'Square-Version': '2023-10-18'
+        },
+        body: JSON.stringify(terminalPaymentData)
+      });
+
+      const responseData = await terminalResponse.json();
+      console.log('Square Terminal response:', JSON.stringify(responseData, null, 2));
+      
+      if (!terminalResponse.ok || responseData.payment?.status === 'FAILED') {
+        console.log('Square Terminal payment failed:', responseData);
+        
+        let errorMessage = 'Terminal payment declined';
+        if (responseData.payment?.card_details?.errors?.length > 0) {
+          const cardError = responseData.payment.card_details.errors[0];
+          switch(cardError.code) {
+            case 'GENERIC_DECLINE':
+              errorMessage = 'Card declined by issuing bank. Please try a different card or payment method.';
+              break;
+            case 'INSUFFICIENT_FUNDS':
+              errorMessage = 'Insufficient funds. Please try a different card.';
+              break;
+            case 'CVV_FAILURE':
+              errorMessage = 'CVV verification failed. Please check your security code.';
+              break;
+            case 'INVALID_CARD':
+              errorMessage = 'Invalid card information. Please check your card details.';
+              break;
+            case 'CARD_EXPIRED':
+              errorMessage = 'Card has expired. Please use a different card.';
+              break;
+            default:
+              errorMessage = cardError.detail || 'Terminal payment declined. Please try a different card.';
+          }
+        } else if (responseData.errors?.length > 0) {
+          errorMessage = responseData.errors[0].detail || 'Terminal payment processing failed';
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const response = { payment: responseData.payment };
+
+      // Save payment record to database if Square Terminal payment was successful
+      if (response.payment && response.payment.status === 'COMPLETED') {
+        const paymentRecord = await storage.createPayment({
+          clientId: clientId || 1, // Default client for terminal sales
+          amount: amount,
+          tipAmount: tipAmount,
+          totalAmount: totalAmount,
+          method: 'terminal',
+          status: 'completed',
+          type: type,
+          description: description || (type === "terminal_payment" ? "Terminal Transaction" : "Appointment Payment"),
+          squarePaymentId: response.payment.id,
+          paymentDate: new Date(),
+          appointmentId: appointmentId || null
+        });
+        
+        console.log('Terminal payment record saved to database:', paymentRecord);
+
+        // Create sales history record
+        if (type === "terminal_payment") {
+          await createSalesHistoryRecord(paymentRecord, 'terminal_sale');
+        } else if (appointmentId) {
+          await createSalesHistoryRecord(paymentRecord, 'appointment');
+        }
+      }
+
+      res.json({ 
+        payment: response.payment,
+        paymentId: response.payment?.id,
+        success: true
+      });
+    } catch (error: any) {
+      console.error('Square Terminal payment error:', error);
+      res.status(500).json({ 
+        error: "Error processing terminal payment: " + error.message 
+      });
+    }
+  });
+
+  // Get Square Terminal status
+  app.get("/api/square-terminal/status", async (req, res) => {
+    try {
+      // Check if Square Terminal is connected and available
+      const terminalStatus = {
+        connected: true, // This would be checked via Square Terminal API
+        locationId: process.env.SQUARE_LOCATION_ID,
+        environment: squareEnvironment === SquareEnvironment.Production ? 'Production' : 'Sandbox',
+        lastSync: new Date().toISOString()
+      };
+
+      res.json(terminalStatus);
+    } catch (error: any) {
+      console.error('Square Terminal status check error:', error);
+      res.status(500).json({ 
+        error: "Error checking terminal status: " + error.message 
+      });
+    }
+  });
+
+  // Create Square Terminal checkout session
+  app.post("/api/square-terminal/checkout", async (req, res) => {
+    try {
+      const { 
+        amount, 
+        tipAmount = 0, 
+        appointmentId, 
+        description, 
+        clientId,
+        items = [] 
+      } = req.body;
+      
+      if (!amount) {
+        return res.status(400).json({ error: "Amount is required" });
+      }
+
+      const totalAmount = amount + tipAmount;
+
+      // Create checkout session for Square Terminal
+      const checkoutData = {
+        checkout: {
+          amount_money: {
+            amount: Math.round(totalAmount * 100),
+            currency: 'USD'
+          },
+          tip_money: tipAmount > 0 ? {
+            amount: Math.round(tipAmount * 100),
+            currency: 'USD'
+          } : undefined,
+          note: description || "Terminal Checkout",
+          reference_id: appointmentId?.toString() || "",
+          location_id: process.env.SQUARE_LOCATION_ID,
+          additional_recipients: items.length > 0 ? items.map((item: any) => ({
+            amount_money: {
+              amount: Math.round(item.price * 100),
+              currency: 'USD'
+            },
+            description: item.name
+          })) : undefined
+        }
+      };
+
+      console.log('Creating Square Terminal checkout session:', JSON.stringify(checkoutData, null, 2));
+      
+      // Create checkout session
+      const checkoutResponse = await fetch('https://connect.squareup.com/v2/checkouts', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${squareAccessToken}`,
+          'Content-Type': 'application/json',
+          'Square-Version': '2023-10-18'
+        },
+        body: JSON.stringify(checkoutData)
+      });
+
+      const responseData = await checkoutResponse.json();
+      console.log('Square Terminal checkout response:', JSON.stringify(responseData, null, 2));
+      
+      if (!checkoutResponse.ok) {
+        throw new Error(responseData.errors?.[0]?.detail || 'Failed to create checkout session');
+      }
+
+      res.json({ 
+        checkout: responseData.checkout,
+        checkoutId: responseData.checkout?.id,
+        success: true
+      });
+    } catch (error: any) {
+      console.error('Square Terminal checkout error:', error);
+      res.status(500).json({ 
+        error: "Error creating terminal checkout: " + error.message 
+      });
+    }
+  });
+
   // Test Square connection
   app.get("/api/test-square-connection", async (req, res) => {
     try {
@@ -3163,14 +3452,66 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
-  // Get unsubscribe statistics
+  // Get unsubscribe statistics with user and campaign details
   app.get("/api/unsubscribes", async (req, res) => {
     try {
       const unsubscribes = await storage.getAllEmailUnsubscribes();
-      res.json(unsubscribes);
+      
+      // Enhance with user and campaign details
+      const enhancedUnsubscribes = await Promise.all(
+        unsubscribes.map(async (unsubscribe) => {
+          const user = await storage.getUser(unsubscribe.userId);
+          const campaign = unsubscribe.campaignId ? await storage.getMarketingCampaign(unsubscribe.campaignId) : null;
+          
+          return {
+            ...unsubscribe,
+            user: user ? {
+              firstName: user.firstName,
+              lastName: user.lastName,
+              username: user.username,
+              phone: user.phone,
+            } : null,
+            campaign: campaign ? {
+              name: campaign.name,
+            } : null,
+          };
+        })
+      );
+      
+      res.json(enhancedUnsubscribes);
     } catch (error: any) {
       console.error('Error fetching unsubscribes:', error);
       res.status(500).json({ error: "Error fetching unsubscribes: " + error.message });
+    }
+  });
+
+  // Manually add an opt-out (for testing/admin purposes)
+  app.post("/api/unsubscribes", async (req, res) => {
+    try {
+      const { userId, email, reason, campaignId } = req.body;
+      
+      if (!userId || !email) {
+        return res.status(400).json({ error: "userId and email are required" });
+      }
+
+      // Check if user already unsubscribed
+      const existingUnsubscribe = await storage.getEmailUnsubscribe(userId);
+      if (existingUnsubscribe) {
+        return res.status(400).json({ error: "User is already unsubscribed" });
+      }
+
+      const unsubscribe = await storage.createEmailUnsubscribe({
+        userId,
+        email,
+        campaignId: campaignId || null,
+        reason: reason || null,
+        ipAddress: req.ip || null,
+      });
+
+      res.status(201).json(unsubscribe);
+    } catch (error: any) {
+      console.error('Error creating unsubscribe:', error);
+      res.status(500).json({ error: "Error creating unsubscribe: " + error.message });
     }
   });
 
@@ -4187,7 +4528,27 @@ Thank you for choosing Glo Head Spa!
   // Staff Schedule routes
   app.get("/api/schedules", async (req: Request, res: Response) => {
     try {
-      const schedules = await storage.getAllStaffSchedules();
+      const { locationId } = req.query;
+      let schedules = await storage.getAllStaffSchedules();
+      
+      // Filter schedules by location if specified
+      if (locationId) {
+        const staffInLocation = await storage.getAllStaff();
+        const staffIdsInLocation = staffInLocation
+          .filter(staff => staff.locationId === parseInt(locationId as string))
+          .map(staff => staff.id);
+        
+        const filteredSchedules = schedules.filter(schedule => 
+          staffIdsInLocation.includes(schedule.staffId)
+        );
+        // If no schedules found for the location, return all schedules (fallback)
+        if (filteredSchedules.length === 0) {
+          console.log(`No schedules found for location ${locationId}, returning all schedules as fallback`);
+        } else {
+          schedules = filteredSchedules;
+        }
+      }
+      
       res.json(schedules);
     } catch (error) {
       console.error("Error fetching staff schedules:", error);
@@ -6976,942 +7337,11 @@ If you didn't attempt to log in, please ignore this email and contact support im
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
 </Response>`;
+
       res.set('Content-Type', 'text/xml');
-      res.send(twiml);
+      res.status(500).send(twiml);
     }
   });
 
-  // Test SMS auto-respond with sample message
-  app.post("/api/sms-auto-respond/test", async (req, res) => {
-    try {
-      const { from, to, body } = req.body;
-
-      if (!from || !to || !body) {
-        return res.status(400).json({ error: "From, to, and body are required" });
-      }
-
-      const result = await smsAutoRespondService.processIncomingSMS({
-        from,
-        to,
-        body,
-        timestamp: new Date().toISOString(),
-        messageId: `test_${Date.now()}`
-      });
-
-      res.json(result);
-    } catch (error: any) {
-      console.error("Error testing SMS auto-respond:", error);
-      res.status(500).json({ error: "Failed to test SMS auto-respond: " + error.message });
-    }
-  });
-
-  // Test SMS auto-respond FAQ integration (bypasses SMS sending)
-  app.post("/api/sms-auto-respond/test-faq", async (req, res) => {
-    try {
-      const { from, to, body } = req.body;
-
-      if (!from || !body) {
-        return res.status(400).json({ error: "From and body are required" });
-      }
-
-      // Get FAQ data directly
-      const businessKnowledge = await storage.getBusinessKnowledge();
-      
-      // Create a test client
-      const testClient = {
-        id: 0,
-        phone: from,
-        firstName: 'Test',
-        lastName: 'Client',
-        email: '',
-        username: 'test_client',
-        password: 'temp',
-        role: 'client',
-        address: null,
-        city: null,
-        state: null,
-        zipCode: null,
-        createdAt: null
-      };
-
-      // Build context with FAQ data
-      const context = await smsAutoRespondService['buildContext'](testClient, {
-        from,
-        to: to || '+1234567890',
-        body,
-        timestamp: new Date().toISOString(),
-        messageId: `test_faq_${Date.now()}`
-      });
-
-      // Generate LLM response
-      const llmContext = {
-        clientName: context.client.name,
-        clientPhone: context.client.phone,
-        businessName: context.business.name,
-        businessType: 'salon and spa',
-        availableServices: context.business.services,
-        businessKnowledge: context.knowledge_base || [],
-        conversationHistory: [],
-        clientPreferences: {
-          smsAccountManagement: true,
-          smsAppointmentReminders: true,
-          smsPromotions: false
-        }
-      };
-
-      const llmResponse = await llmService.generateResponse(body, llmContext, 'sms');
-
-      res.json({
-        success: true,
-        faqData: {
-          count: businessKnowledge?.length || 0,
-          entries: businessKnowledge?.map((kb: any) => ({ title: kb.title, category: kb.category })) || []
-        },
-        llmResponse: {
-          success: llmResponse.success,
-          message: llmResponse.message,
-          confidence: llmResponse.confidence,
-          error: llmResponse.error
-        },
-        context: {
-          businessName: context.business.name,
-          services: context.business.services.length,
-          knowledgeBaseCount: context.knowledge_base?.length || 0
-        }
-      });
-    } catch (error: any) {
-      console.error("Error testing SMS auto-respond FAQ:", error);
-      res.status(500).json({ error: "Failed to test SMS auto-respond FAQ: " + error.message });
-    }
-  });
-
-  // Conversation Flow Management
-  // Get all conversation flows
-  app.get("/api/sms-auto-respond/conversation-flows", async (req, res) => {
-    try {
-      const flows = await storage.getConversationFlows();
-      res.json(flows || []);
-    } catch (error: any) {
-      console.error("Error getting conversation flows:", error);
-      res.status(500).json({ error: "Failed to get conversation flows: " + error.message });
-    }
-  });
-
-  // Create or update conversation flow
-  app.post("/api/sms-auto-respond/conversation-flows", async (req, res) => {
-    try {
-      const flow = req.body;
-      
-      if (!flow.name || !flow.steps || !Array.isArray(flow.steps)) {
-        return res.status(400).json({ error: "Flow name and steps array are required" });
-      }
-
-      const savedFlow = await storage.saveConversationFlow(flow);
-      res.json(savedFlow);
-    } catch (error: any) {
-      console.error("Error saving conversation flow:", error);
-      res.status(500).json({ error: "Failed to save conversation flow: " + error.message });
-    }
-  });
-
-  // Update conversation flow
-  app.put("/api/sms-auto-respond/conversation-flows", async (req, res) => {
-    try {
-      const flow = req.body;
-      
-      if (!flow.id || !flow.name || !flow.steps || !Array.isArray(flow.steps)) {
-        return res.status(400).json({ error: "Flow ID, name and steps array are required" });
-      }
-
-      const updatedFlow = await storage.updateConversationFlow(flow);
-      res.json(updatedFlow);
-    } catch (error: any) {
-      console.error("Error updating conversation flow:", error);
-      res.status(500).json({ error: "Failed to update conversation flow: " + error.message });
-    }
-  });
-
-  // Delete conversation flow
-  app.delete("/api/sms-auto-respond/conversation-flows/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      if (!id) {
-        return res.status(400).json({ error: "Flow ID is required" });
-      }
-
-      await storage.deleteConversationFlow(id);
-      res.json({ success: true, message: "Conversation flow deleted successfully" });
-    } catch (error: any) {
-      console.error("Error deleting conversation flow:", error);
-      res.status(500).json({ error: "Failed to delete conversation flow: " + error.message });
-    }
-  });
-
-  // Configuration status endpoint
-  app.get("/api/config/status", async (req, res) => {
-    try {
-      const dbConfig = new DatabaseConfig(storage);
-      const status = await getConfigStatus(dbConfig);
-      const validation = await validateConfig(dbConfig);
-      
-      res.json({
-        status,
-        validation,
-        message: validation.isValid 
-          ? "All required configuration is set" 
-          : "Some configuration is missing"
-      });
-    } catch (error) {
-      console.error('Error getting config status:', error);
-      res.status(500).json({ error: "Failed to get configuration status" });
-    }
-  });
-
-  // Set OpenAI API key
-  app.post("/api/config/openai", async (req, res) => {
-    try {
-      const { apiKey } = req.body;
-      
-      if (!apiKey) {
-        return res.status(400).json({ error: "API key is required" });
-      }
-
-      const dbConfig = new DatabaseConfig(storage);
-      await dbConfig.setOpenAIKey(apiKey);
-      
-      res.json({ 
-        success: true, 
-        message: "OpenAI API key configured successfully",
-        configured: true
-      });
-    } catch (error) {
-      console.error('Error setting OpenAI API key:', error);
-      res.status(500).json({ error: "Failed to set OpenAI API key" });
-    }
-  });
-
-  // Get all system configuration
-  app.get("/api/config/system", async (req, res) => {
-    try {
-      const dbConfig = new DatabaseConfig(storage);
-      const allConfig = await storage.getAllSystemConfig();
-      
-      res.json({
-        success: true,
-        config: allConfig
-      });
-    } catch (error) {
-      console.error('Error getting system config:', error);
-      res.status(500).json({ error: "Failed to get system configuration" });
-    }
-  });
-
-  // Set system configuration
-  app.post("/api/config/system", async (req, res) => {
-    try {
-      const { key, value, description, category, isEncrypted } = req.body;
-      
-      if (!key || !value) {
-        return res.status(400).json({ error: "Key and value are required" });
-      }
-
-      const dbConfig = new DatabaseConfig(storage);
-      await dbConfig.setConfig(key, value, description, category, isEncrypted);
-      
-      res.json({ 
-        success: true, 
-        message: "Configuration updated successfully"
-      });
-    } catch (error) {
-      console.error('Error setting system config:', error);
-      res.status(500).json({ error: "Failed to set system configuration" });
-    }
-  });
-
-  // Business Knowledge (FAQ) endpoints
-  app.get('/api/business-knowledge', async (req, res) => {
-    try {
-      const entries = await storage.getBusinessKnowledge();
-      res.json(entries);
-    } catch (error) {
-      console.error('Error fetching business knowledge:', error);
-      res.status(500).json({ error: 'Failed to fetch business knowledge' });
-    }
-  });
-
-  app.post('/api/business-knowledge', async (req, res) => {
-    try {
-      const { question, answer, category, priority } = req.body;
-      const entry = await storage.createBusinessKnowledge({
-        title: question,
-        content: answer,
-        category,
-        priority: priority || 1
-      });
-      res.json(entry);
-    } catch (error) {
-      console.error('Error adding business knowledge:', error);
-      res.status(500).json({ error: 'Failed to add business knowledge' });
-    }
-  });
-
-  app.put('/api/business-knowledge/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { question, answer, category, priority } = req.body;
-      const entry = await storage.updateBusinessKnowledge(parseInt(id), {
-        title: question,
-        content: answer,
-        category,
-        priority: priority || 1
-      });
-      res.json(entry);
-    } catch (error) {
-      console.error('Error updating business knowledge:', error);
-      res.status(500).json({ error: 'Failed to update business knowledge' });
-    }
-  });
-
-  app.delete('/api/business-knowledge/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteBusinessKnowledge(parseInt(id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting business knowledge:', error);
-      res.status(500).json({ error: 'Failed to delete business knowledge' });
-    }
-  });
-
-  // Business Knowledge Categories endpoints
-  app.get('/api/business-knowledge/categories', async (req, res) => {
-    try {
-      const categories = await storage.getBusinessKnowledgeCategories();
-      res.json(categories);
-    } catch (error) {
-      console.error('Error fetching business knowledge categories:', error);
-      res.status(500).json({ error: 'Failed to fetch business knowledge categories' });
-    }
-  });
-
-  app.post('/api/business-knowledge/categories', async (req, res) => {
-    try {
-      const { name, description, color } = req.body;
-      const category = await storage.createBusinessKnowledgeCategory({
-        name,
-        description,
-        color: color || '#3B82F6'
-      });
-      res.json(category);
-    } catch (error) {
-      console.error('Error adding business knowledge category:', error);
-      res.status(500).json({ error: 'Failed to add business knowledge category' });
-    }
-  });
-
-  app.put('/api/business-knowledge/categories/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { name, description, color } = req.body;
-      const category = await storage.updateBusinessKnowledgeCategory(parseInt(id), {
-        name,
-        description,
-        color: color || '#3B82F6'
-      });
-      res.json(category);
-    } catch (error) {
-      console.error('Error updating business knowledge category:', error);
-      res.status(500).json({ error: 'Failed to update business knowledge category' });
-    }
-  });
-
-  app.delete('/api/business-knowledge/categories/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-      await storage.deleteBusinessKnowledgeCategory(parseInt(id));
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Error deleting business knowledge category:', error);
-      res.status(500).json({ error: 'Failed to delete business knowledge category' });
-    }
-  });
-
-  // Check Software routes
-  app.get("/api/check-software/providers", async (req, res) => {
-    try {
-      const providers = await storage.getCheckSoftwareProviders();
-      res.json(providers);
-    } catch (error) {
-      console.error('Error fetching check software providers:', error);
-      res.status(500).json({ error: 'Failed to fetch check software providers' });
-    }
-  });
-
-  app.post("/api/check-software/providers", async (req, res) => {
-    try {
-      const provider = await storage.createCheckSoftwareProvider(req.body);
-      res.json(provider);
-    } catch (error) {
-      console.error('Error creating check software provider:', error);
-      res.status(500).json({ error: 'Failed to create check software provider' });
-    }
-  });
-
-  app.put("/api/check-software/providers/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const provider = await storage.updateCheckSoftwareProvider(parseInt(id), req.body);
-      res.json(provider);
-    } catch (error) {
-      console.error('Error updating check software provider:', error);
-      res.status(500).json({ error: 'Failed to update check software provider' });
-    }
-  });
-
-  app.delete("/api/check-software/providers/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const success = await storage.deleteCheckSoftwareProvider(parseInt(id));
-      if (success) {
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: 'Check software provider not found' });
-      }
-    } catch (error) {
-      console.error('Error deleting check software provider:', error);
-      res.status(500).json({ error: 'Failed to delete check software provider' });
-    }
-  });
-
-  app.get("/api/check-software/checks", async (req, res) => {
-    try {
-      const { staffId, status } = req.query;
-      const checks = await storage.getPayrollChecks(
-        staffId ? parseInt(staffId as string) : undefined,
-        status as string
-      );
-      res.json(checks);
-    } catch (error) {
-      console.error('Error fetching payroll checks:', error);
-      res.status(500).json({ error: 'Failed to fetch payroll checks' });
-    }
-  });
-
-  app.post("/api/check-software/issue-check", async (req, res) => {
-    try {
-      const { payrollHistoryId, checkData } = req.body;
-      
-      // Initialize check software service
-      const { CheckSoftwareService } = await import('./check-software-service');
-      const checkSoftwareService = new CheckSoftwareService(storage);
-      
-      const result = await checkSoftwareService.issuePayrollCheck(payrollHistoryId, checkData);
-      
-      if (result.success) {
-        res.json(result);
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error) {
-      console.error('Error issuing payroll check:', error);
-      res.status(500).json({ error: 'Failed to issue payroll check' });
-    }
-  });
-
-  app.post("/api/check-software/void-check/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { reason } = req.body;
-      
-      // Initialize check software service
-      const { CheckSoftwareService } = await import('./check-software-service');
-      const checkSoftwareService = new CheckSoftwareService(storage);
-      
-      const success = await checkSoftwareService.voidPayrollCheck(parseInt(id), reason);
-      
-      if (success) {
-        res.json({ success: true });
-      } else {
-        res.status(400).json({ error: 'Failed to void payroll check' });
-      }
-    } catch (error) {
-      console.error('Error voiding payroll check:', error);
-      res.status(500).json({ error: 'Failed to void payroll check' });
-    }
-  });
-
-  app.get("/api/check-software/logs", async (req, res) => {
-    try {
-      const { providerId, action } = req.query;
-      const logs = await storage.getCheckSoftwareLogs(
-        providerId ? parseInt(providerId as string) : undefined,
-        action as string
-      );
-      res.json(logs);
-    } catch (error) {
-      console.error('Error fetching check software logs:', error);
-      res.status(500).json({ error: 'Failed to fetch check software logs' });
-    }
-  });
-
-  // Payroll processing route
-  app.post("/api/payroll/process", async (req, res) => {
-    try {
-      const { staffId, periodStart, periodEnd, periodType = 'monthly' } = req.body;
-      
-      if (!staffId || !periodStart || !periodEnd) {
-        return res.status(400).json({ error: 'Staff ID, period start, and period end are required' });
-      }
-
-      // Check if payroll already exists for this period
-      const existingPayroll = await storage.getPayrollHistoryByPeriod(
-        staffId, 
-        new Date(periodStart), 
-        new Date(periodEnd)
-      );
-
-      if (existingPayroll) {
-        return res.status(400).json({ error: 'Payroll already exists for this period' });
-      }
-
-      // Calculate payroll for the staff member
-      const payrollData = await calculatePayrollForStaff(
-        { id: staffId },
-        null,
-        new Date(periodStart),
-        new Date(periodEnd)
-      );
-
-      if (!payrollData) {
-        return res.status(400).json({ error: 'No payroll data found for this period' });
-      }
-
-      // Create payroll history record
-      const payrollHistory = await storage.createPayrollHistory({
-        staffId,
-        periodStart: new Date(periodStart),
-        periodEnd: new Date(periodEnd),
-        periodType,
-        totalHours: payrollData.totalHours || 0,
-        totalEarnings: payrollData.totalEarnings || 0,
-        commissionType: payrollData.commissionType || 'commission',
-        hourlyRate: payrollData.hourlyRate,
-        fixedRate: payrollData.fixedRate,
-        payrollStatus: 'generated',
-        notes: `Payroll processed for ${periodType} period`
-      });
-
-      res.json(payrollHistory);
-    } catch (error) {
-      console.error('Error processing payroll:', error);
-      res.status(500).json({ error: 'Failed to process payroll' });
-    }
-  });
-
-  // Staff earnings route
-  app.get("/api/staff-earnings", async (req, res) => {
-    try {
-      const { startDate, endDate, staffId } = req.query;
-      
-      let earnings = await storage.getAllStaffEarnings();
-      
-      // Filter by date range
-      if (startDate && endDate) {
-        const start = new Date(startDate as string);
-        const end = new Date(endDate as string);
-        earnings = earnings.filter(earning => {
-          const earningDate = new Date(earning.earningsDate);
-          return earningDate >= start && earningDate <= end;
-        });
-      }
-      
-      // Filter by staff ID
-      if (staffId) {
-        earnings = earnings.filter(earning => earning.staffId === parseInt(staffId as string));
-      }
-      
-      res.json(earnings);
-    } catch (error) {
-      console.error('Error fetching staff earnings:', error);
-      res.status(500).json({ error: 'Failed to fetch staff earnings' });
-    }
-  });
-
-  // LLM Test endpoint
-  app.post('/api/llm/test', async (req, res) => {
-    try {
-      const { message, businessKnowledge } = req.body;
-      
-      console.log('=== LLM TEST DEBUG ===');
-      console.log('Message:', message);
-      console.log('Business Knowledge received:', businessKnowledge);
-      
-      if (!message) {
-        return res.status(400).json({ error: 'Message is required' });
-      }
-
-
-
-      // Create context from business knowledge
-      let context = "You are a helpful AI assistant for a business. Use the following business information to answer questions:\n\n";
-      
-      if (businessKnowledge && businessKnowledge.length > 0) {
-        context += "Business Knowledge:\n";
-        businessKnowledge.forEach((item: any) => {
-          context += `Q: ${item.question}\nA: ${item.answer}\n\n`;
-        });
-      } else {
-        context += "No specific business knowledge available. Provide general helpful responses.\n\n";
-      }
-
-      context += `User Question: ${message}\n\nPlease provide a helpful, professional response based on the business knowledge above.`;
-
-      // For now, we'll use a simple response generation
-      // In a real implementation, this would call OpenAI or another LLM service
-      const response = generateTestResponse(message, businessKnowledge);
-      
-
-      
-      res.json({
-        response: response.text,
-        confidence: response.confidence,
-        sources: response.sources
-      });
-    } catch (error) {
-      console.error('Error testing LLM:', error);
-      res.status(500).json({ error: 'Failed to generate AI response' });
-    }
-  });
-
-  // Helper function to generate test responses
-  function generateTestResponse(message: string, businessKnowledge: any[]) {
-    const lowerMessage = message.toLowerCase();
-    
-    // First, check for specific question types that should have priority
-    // These should override general business knowledge matches
-    
-    // Hours/Operating hours questions - check business knowledge first
-    if (lowerMessage.includes('hours') || 
-        lowerMessage.includes('open') || 
-        lowerMessage.includes('time') ||
-        lowerMessage.includes('when are you open') ||
-        lowerMessage.includes('what time') ||
-        lowerMessage.includes('operating hours')) {
-      
-      // Check if there's a business knowledge entry for hours
-      if (businessKnowledge && businessKnowledge.length > 0) {
-        console.log('Checking business knowledge for hours...');
-        console.log('Business knowledge items:');
-        businessKnowledge.forEach((item: any, index: number) => {
-          console.log(`  ${index + 1}. Category: "${item.category}", Question: "${item.question}", Answer: "${item.answer}"`);
-        });
-        
-                 const hoursEntry = businessKnowledge.find(item => {
-           // More flexible matching - check if any field contains hours-related keywords
-           const hasHoursKeyword = (text: string) => {
-             if (!text) return false;
-             const lowerText = text.toLowerCase();
-             return lowerText.includes('hours') || lowerText.includes('open') || lowerText.includes('time') || lowerText.includes('when');
-           };
-           
-           const categoryMatch = item.category && item.category.toLowerCase().includes('hours');
-           const titleMatch = item.title && hasHoursKeyword(item.title);
-           const contentMatch = item.content && hasHoursKeyword(item.content);
-           const questionMatch = item.question && hasHoursKeyword(item.question);
-           const answerMatch = item.answer && hasHoursKeyword(item.answer);
-           
-           const matches = categoryMatch || titleMatch || contentMatch || questionMatch || answerMatch;
-           
-           console.log(`Item "${item.question}": categoryMatch=${categoryMatch}, questionMatch=${questionMatch}, answerMatch=${answerMatch}, matches=${matches}`);
-           
-           return matches;
-         });
-        
-        if (hoursEntry) {
-          console.log('Found hours entry:', hoursEntry);
-          return {
-            text: hoursEntry.content || hoursEntry.answer,
-            confidence: 0.9,
-            sources: [hoursEntry]
-          };
-        } else {
-          console.log('No hours entry found');
-        }
-      } else {
-        console.log('No business knowledge available');
-      }
-      
-      // Fallback to default response if no business knowledge found
-      return {
-        text: "Our business hours are typically Monday through Friday, 9 AM to 6 PM, and Saturday 10 AM to 4 PM. We're closed on Sundays. For specific holiday hours, please contact us directly.",
-        confidence: 0.8,
-        sources: []
-      };
-    }
-
-    // Pricing questions
-    if (lowerMessage.includes('price') || 
-        lowerMessage.includes('cost') || 
-        lowerMessage.includes('how much') ||
-        lowerMessage.includes('pricing')) {
-      return {
-        text: "I'd be happy to help you with pricing information. Could you please specify which service you're interested in? You can also check our services page for detailed pricing.",
-        confidence: 0.7,
-        sources: []
-      };
-    }
-
-    // Appointment/Booking questions
-    if (lowerMessage.includes('appointment') || 
-        lowerMessage.includes('book') || 
-        lowerMessage.includes('schedule') ||
-        lowerMessage.includes('reservation')) {
-      return {
-        text: "To book an appointment, you can call us directly, use our online booking system, or send us a message with your preferred date and time. We'll get back to you to confirm the details.",
-        confidence: 0.8,
-        sources: []
-      };
-    }
-
-    // Location questions
-    if (lowerMessage.includes('location') || 
-        lowerMessage.includes('address') || 
-        lowerMessage.includes('where') ||
-        lowerMessage.includes('directions')) {
-      return {
-        text: "We're located in the heart of the city. For our exact address and directions, please check our contact information on our website or give us a call.",
-        confidence: 0.7,
-        sources: []
-      };
-    }
-
-    // Now check for relevant business knowledge with better matching
-    if (businessKnowledge && businessKnowledge.length > 0) {
-      let bestMatch = null;
-      let bestScore = 0;
-
-      for (const item of businessKnowledge) {
-        const question = item.question.toLowerCase();
-        const answer = item.answer.toLowerCase();
-        
-        // Calculate relevance score
-        let score = 0;
-        
-        // Check for exact word matches in the question
-        const questionWords = question.split(/\s+/);
-        const messageWords = lowerMessage.split(/\s+/);
-        
-        for (const word of messageWords) {
-          if (word.length > 2 && questionWords.includes(word)) {
-            score += 2; // Higher score for question matches
-          }
-        }
-        
-        // Check for phrase matches
-        if (question.includes(lowerMessage) || lowerMessage.includes(question)) {
-          score += 5; // High score for phrase matches
-        }
-        
-        // Check answer content for relevant keywords
-        if (answer.includes(lowerMessage)) {
-          score += 1; // Lower score for answer matches
-        }
-
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = item;
-        }
-      }
-
-      // Only use business knowledge if we have a good match (score > 1)
-      if (bestMatch && bestScore > 1) {
-        return {
-          text: `Based on our business information: ${bestMatch.answer}`,
-          confidence: Math.min(0.9, 0.6 + (bestScore * 0.1)),
-          sources: [bestMatch.question]
-        };
-      }
-    }
-
-    // Default response for questions we can't answer
-    return {
-      text: "Thank you for your question! I'd be happy to help you. Could you please provide more specific details about what you're looking for? You can also check our FAQ section or contact us directly for personalized assistance.",
-      confidence: 0.5,
-      sources: []
-    };
-  }
-
-  // LLM Conversation Flow Management
-  app.get("/api/conversation-flows", async (req, res) => {
-    try {
-      // For now, return the default booking flow
-      const defaultFlow = {
-        id: 'booking-flow',
-        name: 'Appointment Booking Flow',
-        description: 'Handle appointment booking requests with proper conversation management',
-        steps: [
-          {
-            id: 'step-1',
-            type: 'trigger',
-            name: 'Booking Request',
-            content: 'book, appointment, schedule, want to book, need appointment',
-            order: 1
-          },
-          {
-            id: 'step-2',
-            type: 'condition',
-            name: 'Check Service',
-            content: 'hasService',
-            order: 2,
-            conditions: { hasService: false }
-          },
-          {
-            id: 'step-3',
-            type: 'response',
-            name: 'Ask for Service',
-            content: 'Great! I\'d be happy to help you book an appointment. What type of service would you like?\n\nOur services include:\n• Signature Head Spa - $99 (60 minutes)\n• Deluxe Head Spa - $160 (90 minutes)\n• Platinum Head Spa - $220 (120 minutes)\n\nJust let me know which service you\'d like to book! 💆‍♀️✨',
-            order: 3
-          },
-          {
-            id: 'step-4',
-            type: 'condition',
-            name: 'Check Date',
-            content: 'hasDate',
-            order: 4,
-            conditions: { hasService: true, hasDate: false }
-          },
-          {
-            id: 'step-5',
-            type: 'response',
-            name: 'Ask for Date',
-            content: 'Perfect! What date would you like to come in? You can say "tomorrow", "Friday", or any day that works for you. 📅',
-            order: 5
-          },
-          {
-            id: 'step-6',
-            type: 'condition',
-            name: 'Check Time',
-            content: 'hasTime',
-            order: 6,
-            conditions: { hasService: true, hasDate: true, hasTime: false }
-          },
-          {
-            id: 'step-7',
-            type: 'action',
-            name: 'Show Available Times',
-            content: 'showAvailableTimes',
-            order: 7
-          },
-          {
-            id: 'step-8',
-            type: 'action',
-            name: 'Book Appointment',
-            content: 'bookAppointment',
-            order: 8
-          }
-        ],
-        isActive: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      
-      res.json([defaultFlow]);
-    } catch (error: any) {
-      console.error('Error fetching conversation flows:', error);
-      res.status(500).json({ error: "Failed to fetch conversation flows: " + error.message });
-    }
-  });
-
-  app.post("/api/conversation-flows", async (req, res) => {
-    try {
-      const flow = req.body;
-      
-      // Validate flow structure
-      if (!flow.name || !flow.steps || !Array.isArray(flow.steps)) {
-        return res.status(400).json({ error: "Invalid flow structure" });
-      }
-      
-      // For now, just return success (in a real implementation, this would save to database)
-      res.json({ 
-        success: true, 
-        message: "Flow created successfully",
-        flow: { ...flow, id: `flow-${Date.now()}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-      });
-    } catch (error: any) {
-      console.error('Error creating conversation flow:', error);
-      res.status(500).json({ error: "Failed to create conversation flow: " + error.message });
-    }
-  });
-
-  app.put("/api/conversation-flows/:id", async (req, res) => {
-    try {
-      const flowId = req.params.id;
-      const flow = req.body;
-      
-      // Validate flow structure
-      if (!flow.name || !flow.steps || !Array.isArray(flow.steps)) {
-        return res.status(400).json({ error: "Invalid flow structure" });
-      }
-      
-      // For now, just return success (in a real implementation, this would update in database)
-      res.json({ 
-        success: true, 
-        message: "Flow updated successfully",
-        flow: { ...flow, id: flowId, updatedAt: new Date().toISOString() }
-      });
-    } catch (error: any) {
-      console.error('Error updating conversation flow:', error);
-      res.status(500).json({ error: "Failed to update conversation flow: " + error.message });
-    }
-  });
-
-  app.delete("/api/conversation-flows/:id", async (req, res) => {
-    try {
-      const flowId = req.params.id;
-      
-      // For now, just return success (in a real implementation, this would delete from database)
-      res.json({ 
-        success: true, 
-        message: "Flow deleted successfully" 
-      });
-    } catch (error: any) {
-      console.error('Error deleting conversation flow:', error);
-      res.status(500).json({ error: "Failed to delete conversation flow: " + error.message });
-    }
-  });
-
-  // Test conversation flow execution
-  app.post("/api/conversation-flows/:id/test", async (req, res) => {
-    try {
-      const flowId = req.params.id;
-      const { message, phoneNumber, client } = req.body;
-      
-      // Simulate conversation flow execution
-      const testResult = {
-        flowId,
-        message,
-        phoneNumber,
-        client,
-        executedStep: 'Ask for Service',
-        response: 'Great! I\'d be happy to help you book an appointment. What type of service would you like?\n\nOur services include:\n• Signature Head Spa - $99 (60 minutes)\n• Deluxe Head Spa - $160 (90 minutes)\n• Platinum Head Spa - $220 (120 minutes)\n\nJust let me know which service you\'d like to book! 💆‍♀️✨',
-        confidence: 0.9,
-        nextStep: 'Check Date',
-        conversationState: {
-          phoneNumber,
-          conversationStep: 'service_requested',
-          lastUpdated: new Date().toISOString()
-        }
-      };
-      
-      res.json(testResult);
-    } catch (error: any) {
-      console.error('Error testing conversation flow:', error);
-      res.status(500).json({ error: "Failed to test conversation flow: " + error.message });
-    }
-  });
-
-  const httpServer = createServer(app);
-
-  return httpServer;
+  return server;
 }

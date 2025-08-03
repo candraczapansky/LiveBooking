@@ -274,6 +274,72 @@ export default function Automations() {
     smsForm.reset();
   };
 
+  // Default automation rule creation functions
+  const createDefaultBookingConfirmation = async () => {
+    const ruleData = {
+      name: "Booking Confirmation Email",
+      type: "email" as const,
+      trigger: "booking_confirmation",
+      timing: "immediately",
+      subject: "Appointment Confirmation - Glo Head Spa",
+      template: `Hi {client_name},
+
+Your appointment has been confirmed!
+
+Service: {service_name}
+Date: {appointment_date}
+Time: {appointment_time}
+Staff: {staff_name}
+
+We look forward to seeing you!
+
+Best regards,
+Glo Head Spa`,
+      active: true,
+      customTriggerName: undefined
+    };
+
+    try {
+      await createRuleMutation.mutateAsync(ruleData);
+      toast({
+        title: "Success",
+        description: "Booking confirmation email rule created successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create booking confirmation rule.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const createDefaultBookingConfirmationSMS = async () => {
+    const ruleData = {
+      name: "Booking Confirmation SMS",
+      type: "sms" as const,
+      trigger: "booking_confirmation",
+      timing: "immediately",
+      template: `Hi {client_name}! Your {service_name} appointment is confirmed for {appointment_date} at {appointment_time}. We look forward to seeing you! - Glo Head Spa`,
+      active: true,
+      customTriggerName: undefined
+    };
+
+    try {
+      await createRuleMutation.mutateAsync(ruleData);
+      toast({
+        title: "Success",
+        description: "Booking confirmation SMS rule created successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create booking confirmation SMS rule.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Other utility functions
   const toggleRuleStatus = async (id: number) => {
     try {
@@ -429,6 +495,37 @@ export default function Automations() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Quick Setup Section */}
+            {Array.isArray(automationRules) && automationRules.length === 0 && (
+              <Card className="mb-6 border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+                <CardHeader>
+                  <CardTitle className="text-blue-800 dark:text-blue-200">Quick Setup</CardTitle>
+                  <CardDescription className="text-blue-600 dark:text-blue-300">
+                    Get started with automated communications by creating a booking confirmation rule.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={() => createDefaultBookingConfirmation()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Create Booking Confirmation Email
+                    </Button>
+                    <Button 
+                      onClick={() => createDefaultBookingConfirmationSMS()}
+                      variant="outline"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      Create Booking Confirmation SMS
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Tabs for Email and SMS Rules */}
             <Tabs defaultValue="email" className="w-full">

@@ -6,4 +6,5 @@ export { registerPaymentRoutes } from './payments';
 export { registerServiceRoutes } from './services';
 export { registerMarketingRoutes } from './marketing';
 export { registerNoteTemplateRoutes } from './note-templates';
-export { registerNoteHistoryRoutes } from './note-history'; 
+export { registerNoteHistoryRoutes } from './note-history';
+export { registerLocationRoutes } from './locations'; 
