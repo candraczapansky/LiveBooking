@@ -77,13 +77,29 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
             };
           }
           
-          // For regular appointments, use the service color if available
+          // For regular appointments
           const appointmentEvent = event as AppointmentEvent;
+          const isPaid = appointmentEvent.resource && (appointmentEvent.resource as any).paymentStatus === 'paid';
+          
+          // If appointment is paid, use green color
+          if (isPaid) {
+            return {
+              style: { 
+                backgroundColor: '#16a34a', // Green color for paid appointments
+                color: '#ffffff',
+                border: '2px solid #15803d',
+                fontWeight: 'bold',
+              },
+              className: 'paid-appointment',
+            };
+          }
+          
+          // For unpaid appointments, use the service color if available
           if (appointmentEvent.resource && (appointmentEvent.resource as any).serviceColor) {
             return {
               style: { 
                 backgroundColor: (appointmentEvent.resource as any).serviceColor,
-                color: '#ffffff', // White text for contrast
+                color: '#ffffff',
                 border: `1px solid ${(appointmentEvent.resource as any).serviceColor}`,
               },
             };

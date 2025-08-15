@@ -52,9 +52,10 @@ class ConversationState:
 class ConversationManager:
     """Manages conversation state and flow for appointment booking"""
     
-    def __init__(self):
+    def __init__(self, db_service=None):
         self.conversations: Dict[str, ConversationState] = {}
         self.logger = logging.getLogger(__name__)
+        self.db_service = db_service
         
         # Available services
         self.services = {
@@ -248,18 +249,71 @@ class ConversationManager:
         message_lower = message.lower()
         
         if message_lower in ["yes", "confirm", "book it", "ok", "sure"]:
-            # Here we would create the appointment in the database
-            # For now, we'll simulate success
-            state.step = "completed"
-            
-            return {
-                "response": f"Excellent! Your appointment is confirmed for {state.selected_date} at {state.selected_time}.\n\n" +
-                           "You'll receive a confirmation email shortly. We look forward to seeing you!\n\n" +
-                           "If you need to make any changes, just text us back.",
-                "step": "completed",
-                "booking_confirmed": True,
-                "requires_booking": False
-            }
+            try:
+                # Create or update client profile
+                client_data = {
+                    "name": state.temp_data["name"],
+                    "email": state.temp_data["email"],
+                    "phone": state.phone_number
+                }
+                
+                if self.db_service:
+                    # Try to find existing client
+                    client = await self.db_service.get_client_by_phone(state.phone_number)
+                    
+                    if client:
+                        # Update existing client
+                        client_id = client.id
+                        await self.db_service.update_client(client_id, client_data)
+                    else:
+                        # Create new client
+                        client = await self.db_service.create_client(client_data)
+                        client_id = client.id
+                    
+                    # Parse date and time
+                    appointment_datetime = self._parse_datetime(state.selected_date, state.selected_time)
+                    service_info = self.services[state.selected_service]
+                    
+                    # Create appointment
+                    appointment = await self.db_service.create_appointment(
+                        client_id=client_id,
+                        date=appointment_datetime,
+                        service=service_info["name"],
+                        duration=service_info["duration"],
+                        notes=f"Booked via SMS on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                    )
+                    
+                    if appointment:
+                        state.step = "completed"
+                        return {
+                            "response": f"Excellent! Your appointment is confirmed for {state.selected_date} at {state.selected_time}.\n\n" +
+                                      "You'll receive a confirmation email shortly. We look forward to seeing you!\n\n" +
+                                      "If you need to make any changes, just text us back.",
+                            "step": "completed",
+                            "booking_confirmed": True,
+                            "requires_booking": False,
+                            "appointment_id": appointment
+                        }
+                    else:
+                        raise Exception("Failed to create appointment")
+                        
+                else:
+                    self.logger.error("Database service not available")
+                    return {
+                        "response": "I apologize, but I'm having trouble accessing our booking system. Please call us directly to book your appointment.",
+                        "step": "error",
+                        "requires_booking": False,
+                        "error": "Database service not available"
+                    }
+                    
+            except Exception as e:
+                self.logger.error(f"Error creating appointment: {str(e)}")
+                return {
+                    "response": "I apologize, but there was an error booking your appointment. Please call us directly to book.",
+                    "step": "error",
+                    "requires_booking": False,
+                    "error": str(e)
+                }
         elif message_lower in ["no", "cancel", "nevermind"]:
             state.step = "greeting"
             return {
@@ -300,4 +354,55 @@ class ConversationManager:
             "selected_time": state.selected_time,
             "client_info": state.client_info.dict() if state.client_info else None,
             "temp_data": state.temp_data
-        } 
+        }
+        
+    def _parse_datetime(self, date_str: str, time_str: str) -> datetime:
+        """Parse date and time strings into datetime object"""
+        try:
+            # Handle relative dates
+            date_lower = date_str.lower()
+            if date_lower == "today":
+                date = datetime.now()
+            elif date_lower == "tomorrow":
+                date = datetime.now() + timedelta(days=1)
+            elif date_lower.startswith("next"):
+                # Handle "next monday", "next tuesday", etc.
+                day_name = date_lower.split()[1]
+                date = self._get_next_day_of_week(day_name)
+            else:
+                # Try to parse as explicit date
+                date = datetime.strptime(date_str, "%B %d")
+                # Add year
+                current_year = datetime.now().year
+                date = date.replace(year=current_year)
+                # If the date is in the past, add a year
+                if date < datetime.now():
+                    date = date.replace(year=current_year + 1)
+            
+            # Parse time
+            time = datetime.strptime(time_str, "%I:%M %p").time()
+            
+            # Combine date and time
+            return datetime.combine(date.date(), time)
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing datetime: {str(e)}")
+            raise ValueError("Invalid date or time format")
+            
+    def _get_next_day_of_week(self, day_name: str) -> datetime:
+        """Get the next occurrence of a day of the week"""
+        days = {
+            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+            "friday": 4, "saturday": 5, "sunday": 6
+        }
+        
+        target_day = days.get(day_name.lower())
+        if target_day is None:
+            raise ValueError(f"Invalid day name: {day_name}")
+            
+        current = datetime.now()
+        days_ahead = target_day - current.weekday()
+        if days_ahead <= 0:  # Target day already happened this week
+            days_ahead += 7
+            
+        return current + timedelta(days=days_ahead)

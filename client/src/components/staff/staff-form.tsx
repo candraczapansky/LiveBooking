@@ -68,6 +68,12 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Fetch locations to allow assigning staff to a business location
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ['/api/locations'],
+    enabled: open,
+  });
+
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
     defaultValues: {
@@ -206,6 +212,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
         hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
+        // Default new staff to default location if it exists
+        locationId: Array.isArray(locations) && locations.find((l: any) => l.isDefault)?.id || undefined,
       };
 
       console.log("Sending staff data to /api/staff:", staffData);
@@ -284,6 +292,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
         photoUrl: data.photo || null,
+        // Keep existing staff location as-is; no change here unless a dedicated control is added
       };
 
       console.log("Sending PATCH request to:", `/api/staff/${staffId}`, "with data:", staffUpdateData);
@@ -563,6 +572,41 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 </FormItem>
               )}
             />
+
+            {/* Staff Location (assign to business location) */}
+            {Array.isArray(locations) && locations.length > 0 && (
+              <div>
+                <FormLabel>Assigned Location</FormLabel>
+                <Select
+                  onValueChange={async (value) => {
+                    if (!staffId) {
+                      // For new staff, selection will be applied on create via defaulting above
+                      return;
+                    }
+                    const idNum = parseInt(value);
+                    try {
+                      await apiRequest("PATCH", `/api/staff/${staffId}`, { locationId: idNum });
+                      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+                      queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId] });
+                    } catch (e) {
+                      console.error('Failed to update staff location', e);
+                    }
+                  }}
+                  value={(staffData?.locationId || locations.find((l: any) => l.isDefault)?.id || '').toString()}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select business location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.filter((l: any) => l.isActive).map((l: any) => (
+                      <SelectItem key={l.id} value={l.id.toString()}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <FormField
               control={form.control}

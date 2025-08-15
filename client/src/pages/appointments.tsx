@@ -371,6 +371,20 @@ const AppointmentsPage = () => {
                       </CardTitle>
                       <CardDescription>
                         View appointments by staff in day, week, or month view. Click an event to edit or view details.
+                        <div className="flex items-center gap-4 mt-2">
+                          <div className="flex items-center gap-1">
+                            <div className="w-4 h-4 bg-green-600 rounded" />
+                            <span className="text-xs">Paid</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-4 h-4 bg-blue-500 rounded" />
+                            <span className="text-xs">Unpaid</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-4 h-4 bg-gray-300 rounded" />
+                            <span className="text-xs">Unavailable</span>
+                          </div>
+                        </div>
                       </CardDescription>
                     </div>
                     {/* Staff Filter Dropdown - Only show for week and month views */}
@@ -417,6 +431,7 @@ const AppointmentsPage = () => {
                           resource: {
                             ...apt,
                             serviceColor: service?.color || '#3B82F6', // Use service color or default blue
+                            paymentStatus: apt.paymentStatus || 'unpaid', // Include payment status
                           },
                         };
                       }) || []}
@@ -468,7 +483,31 @@ const AppointmentsPage = () => {
       {/* Checkout Component */}
       {checkoutAppointment && (
         <AppointmentCheckout
-          appointment={checkoutAppointment}
+          appointment={{
+            id: checkoutAppointment.id,
+            clientName: (() => {
+              const client = users?.find((u: any) => u.id === checkoutAppointment.clientId);
+              return client ? `${client.firstName} ${client.lastName}` : 'Unknown Client';
+            })(),
+            serviceName: (() => {
+              const service = services?.find((s: any) => s.id === checkoutAppointment.serviceId);
+              return service?.name || 'Unknown Service';
+            })(),
+            staffName: (() => {
+              const staffMember = staff?.find((s: any) => s.id === checkoutAppointment.staffId);
+              const staffUser = users?.find((u: any) => u.id === staffMember?.userId);
+              return staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Unknown Staff';
+            })(),
+            startTime: new Date(checkoutAppointment.startTime),
+            endTime: new Date(checkoutAppointment.endTime),
+            amount: (() => {
+              if (checkoutAppointment.totalAmount != null) return checkoutAppointment.totalAmount;
+              const service = services?.find((s: any) => s.id === checkoutAppointment.serviceId);
+              return service?.price || 0;
+            })(),
+            status: checkoutAppointment.status,
+            paymentStatus: checkoutAppointment.paymentStatus || 'unpaid'
+          }}
           isOpen={isCheckoutOpen}
           onClose={() => setIsCheckoutOpen(false)}
           onSuccess={handlePaymentSuccess}

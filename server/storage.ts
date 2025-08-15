@@ -2602,7 +2602,7 @@ Glo Head Spa`,
     if (!result[0]) return undefined;
     
     // Parse fields JSON if it exists
-    const form = { ...result[0] };
+    const form: any = { ...result[0] };
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
@@ -2619,10 +2619,10 @@ Glo Head Spa`,
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = []; // Return empty array
+        (form as any).fields = []; // Return empty array
       }
     } else {
-      form.fields = []; // Ensure fields is always an array
+      (form as any).fields = []; // Ensure fields is always an array
     }
     
     return form;
@@ -2673,7 +2673,7 @@ Glo Head Spa`,
       .returning();
     
     // Parse fields from JSON string to array, similar to getForm method
-    const form = { ...result[0] };
+    const form: any = { ...result[0] };
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
@@ -2690,10 +2690,10 @@ Glo Head Spa`,
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = []; // Return empty array
+        (form as any).fields = []; // Return empty array
       }
     } else {
-      form.fields = []; // Ensure fields is always an array
+      (form as any).fields = []; // Ensure fields is always an array
     }
     
     return form;

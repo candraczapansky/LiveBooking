@@ -70,9 +70,9 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
     queryKey: ['/api/service-categories'],
   });
 
-  // Fetch rooms for location options
-  const { data: rooms = [] } = useQuery<any[]>({
-    queryKey: ['/api/rooms'],
+  // Fetch business locations for location options
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ['/api/locations'],
   });
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -369,11 +369,13 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="All Locations">All Locations</SelectItem>
-                      {(rooms as any[]).map((room: any) => (
-                        <SelectItem key={room.id} value={room.name}>
-                          {room.name}
-                        </SelectItem>
-                      ))}
+                      {(locations as any[])
+                        .filter((loc: any) => loc.isActive)
+                        .map((loc: any) => (
+                          <SelectItem key={loc.id} value={loc.name}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

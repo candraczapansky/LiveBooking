@@ -10,6 +10,7 @@
     "start": "NODE_ENV=production DISABLE_AUTOMATIC_SERVICE_CREATION=true node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
+    "db:fix-schedule-location": "node scripts/fix-staff-schedules-location.js",
     "setup-sms": "node setup-twilio-sms.js",
     "test-sms": "node test-sms-auto-responder.js"
   },

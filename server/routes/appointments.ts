@@ -285,6 +285,17 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       throw new ConflictError("Appointment time conflicts with existing appointments");
     }
 
+    // Ensure totalAmount is set based on service price if not provided
+    try {
+      if (appointmentData.totalAmount == null && appointmentData.serviceId) {
+        const service = await storage.getService(appointmentData.serviceId);
+        appointmentData.totalAmount = service?.price || 0;
+      }
+    } catch {
+      // If fetching service fails, keep default 0
+      if (appointmentData.totalAmount == null) appointmentData.totalAmount = 0;
+    }
+
     const newAppointment = await storage.createAppointment(appointmentData);
 
     LoggerService.logAppointment("created", newAppointment.id, context);
@@ -647,6 +658,19 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         });
         throw new ConflictError("Updated appointment time conflicts with existing appointments");
       }
+    }
+
+    // Ensure totalAmount is set when missing, using the (possibly updated) service
+    try {
+      if (updateData.totalAmount == null) {
+        const serviceIdToUse = updateData.serviceId || existingAppointment.serviceId;
+        if (serviceIdToUse) {
+          const service = await storage.getService(serviceIdToUse);
+          updateData.totalAmount = service?.price || 0;
+        }
+      }
+    } catch {
+      // leave as-is if service lookup fails
     }
 
     const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);

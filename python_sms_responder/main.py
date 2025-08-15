@@ -3,6 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import os
 from dotenv import load_dotenv
+from datetime import datetime
+import aiosmtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 from .sms_service import SMSService
 from .llm_service import LLMService
@@ -12,6 +16,60 @@ from .models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
 
 # Load environment variables
 load_dotenv()
+
+async def send_appointment_confirmation_email(db_service, appointment_id: int, client_email: str):
+    """Send appointment confirmation email"""
+    try:
+        # Get appointment details
+        appointment = await db_service.get_appointment(appointment_id)
+        if not appointment:
+            raise Exception("Appointment not found")
+            
+        # Create email message
+        msg = MIMEMultipart()
+        msg["From"] = os.getenv("SMTP_FROM_EMAIL", "salon@example.com")
+        msg["To"] = client_email
+        msg["Subject"] = "Your Salon Appointment Confirmation"
+        
+        # Format appointment time
+        appointment_time = appointment.date.strftime("%A, %B %d at %I:%M %p")
+        
+        # Email body
+        body = f"""
+        Thank you for booking your appointment with us!
+        
+        Appointment Details:
+        -------------------
+        Service: {appointment.service}
+        Date: {appointment_time}
+        Duration: {appointment.duration} minutes
+        
+        Location:
+        {os.getenv("SALON_NAME", "[Salon Name]")}
+        {os.getenv("SALON_ADDRESS", "[Salon Address]")}
+        {os.getenv("SALON_PHONE", "[Salon Phone]")}
+        
+        Need to make changes?
+        Simply reply to this SMS conversation or call us directly.
+        
+        We look forward to seeing you!
+        """
+        
+        msg.attach(MIMEText(body, "plain"))
+        
+        # Send email
+        await aiosmtplib.send(
+            msg,
+            hostname=os.getenv("SMTP_HOST", "smtp.example.com"),
+            port=int(os.getenv("SMTP_PORT", "587")),
+            username=os.getenv("SMTP_USERNAME", "your_username"),
+            password=os.getenv("SMTP_PASSWORD", "your_password"),
+            use_tls=True
+        )
+        
+    except Exception as e:
+        print(f"Error sending confirmation email: {e}")
+        raise
 
 app = FastAPI(
     title="Salon SMS Responder",
@@ -109,28 +167,46 @@ async def handle_sms_webhook(
         # Log the incoming message
         print(f"Received SMS from {request.From}: {request.Body}")
         
-        # Get services
-        db_service = get_db_service()
-        llm_service = get_llm_service()
-        sms_service = get_sms_service()
-        
-        # Get client information from database
-        client_info = None
-        if db_service:
+        try:
+            # Get services
+            db_service = get_db_service()
+            llm_service = get_llm_service()
+            sms_service = get_sms_service()
+            
+            if not all([db_service, llm_service, sms_service]):
+                raise Exception("Required services not available")
+            
+            # Initialize LLM service with database service
+            llm_service.set_db_service(db_service)
+            
+            # Get client information from database
             client_info = await db_service.get_client_by_phone(request.From)
-        
-        # Generate AI response using LLM
-        ai_response = "Thank you for your message. Please call us directly for assistance."
-        if llm_service:
-            try:
-                ai_response = await llm_service.generate_response(
-                    user_message=request.Body,
-                    client_info=client_info,
-                    phone_number=request.From
-                )
-            except Exception as e:
-                print(f"LLM service error: {e}")
-                ai_response = "I'm sorry, I'm having trouble processing your request. Please call us directly."
+            
+            # Generate AI response using LLM
+            response_data = await llm_service.generate_response(
+                user_message=request.Body,
+                client_info=client_info,
+                phone_number=request.From
+            )
+            
+            # Handle appointment booking if needed
+            if isinstance(response_data, dict) and response_data.get("booking_confirmed"):
+                # Send confirmation email
+                try:
+                    await send_appointment_confirmation_email(
+                        db_service,
+                        response_data["appointment_id"],
+                        response_data.get("client_email")
+                    )
+                except Exception as e:
+                    print(f"Error sending confirmation email: {e}")
+            
+            # Get the response text
+            ai_response = response_data if isinstance(response_data, str) else response_data.get("response", "")
+            
+        except Exception as e:
+            print(f"Error processing SMS: {e}")
+            ai_response = "I'm sorry, I'm having trouble processing your request. Please call us directly."
         
         # Send response via Twilio
         response_sent = False

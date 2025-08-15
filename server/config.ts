@@ -23,7 +23,12 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '5000'),
     nodeEnv: process.env.NODE_ENV || 'development',
-  }
+  },
+  
+  // Helcim Configuration
+  HELCIM_API_TOKEN: process.env.HELCIM_API_TOKEN || '',
+  HELCIM_API_URL: process.env.HELCIM_API_URL || 'https://api.helcim.com/v2',
+  HELCIM_TERMINAL_DEVICE_CODE: process.env.HELCIM_TERMINAL_DEVICE_CODE || 'UOJS'
 };
 
 // Database-backed configuration

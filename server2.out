@@ -1,0 +1,21 @@
+SendGrid initialized with environment API key
+Twilio client initialized successfully
+Square access token not found, using mock responses
+Starting Auto-Renewal Service...
+Checking for memberships that need auto-renewal...
+🔧 HelcimSmartTerminalService initialized with: {
+  apiUrl: 'https://api.helcim.com/v2',
+  apiToken: 'SET',
+  webhookSecret: 'SET',
+  defaultDeviceCode: 'UOJS',
+  defaultCurrency: 'USD'
+}
+Square client not provided, using mock responses
+⚠️  Port 5001 was in use, using port 5003 instead
+6:07:12 PM [express] ✅ Server running on port 5003
+6:07:12 PM [express] 📝 Note: Original port 5001 was busy, using 5003
+No memberships need renewal at this time
+Database connection established successfully
+SMS Service: Using Twilio credentials from database
+Twilio client initialized successfully
+Database connection established successfully

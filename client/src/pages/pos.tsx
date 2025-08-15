@@ -50,6 +50,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
 import SquareTerminalIntegration from "@/components/payment/square-terminal-integration";
+import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 
 // Square payment configuration
 const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
@@ -1316,6 +1317,7 @@ export default function PointOfSale() {
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Credit/Debit Card</SelectItem>
                   <SelectItem value="terminal">Square Terminal</SelectItem>
+                  <SelectItem value="helcim">Helcim Smart Terminal</SelectItem>
                   <SelectItem value="gift_card">Gift Card</SelectItem>
                 </SelectContent>
               </Select>
@@ -1410,6 +1412,53 @@ export default function PointOfSale() {
               </div>
             )}
 
+            {paymentMethod === "helcim" && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Helcim Smart Terminal Payment</label>
+                <SmartTerminalPayment
+                  amount={getSubtotal() + getTax()}
+                  tipAmount={tipAmount}
+                  clientId={selectedClient?.id}
+                  description="POS Terminal Transaction"
+                  onSuccess={(paymentData) => {
+                    console.log('Helcim payment successful, processing POS transaction...');
+                    // Process transaction after successful payment
+                    const transaction = {
+                      clientId: selectedClient?.id,
+                      items: cart,
+                      subtotal: getSubtotal(),
+                      tax: getTax(),
+                      tipAmount: tipAmount,
+                      total: getGrandTotal(),
+                      paymentMethod: "helcim",
+                    };
+                    console.log('POS transaction data:', transaction);
+                    processTransactionMutation.mutate(transaction);
+                    
+                    // Clear cart and close checkout
+                    setCart([]);
+                    setIsCheckoutOpen(false);
+                    setSelectedClient(null);
+                    setTipAmount(0);
+                    setCashReceived("");
+                    
+                    toast({
+                      title: "Payment Successful",
+                      description: `Transaction completed for $${getGrandTotal().toFixed(2)}`,
+                    });
+                    
+                    // Refresh the page to update any cached data
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1500);
+                  }}
+                  onCancel={() => {
+                    setIsCheckoutOpen(false);
+                  }}
+                />
+              </div>
+            )}
+
             {/* Tip Selection */}
             <div className="space-y-3">
               <h4 className="text-md font-medium">Add Tip</h4>
@@ -1448,7 +1497,7 @@ export default function PointOfSale() {
             <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>
               Cancel
             </Button>
-            {paymentMethod !== "card" && (
+            {paymentMethod !== "card" && paymentMethod !== "helcim" && (
               <Button 
                 onClick={processTransaction}
                 disabled={processTransactionMutation.isPending}

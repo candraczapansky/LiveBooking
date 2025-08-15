@@ -21,31 +21,47 @@ class LLMService:
         self.max_tokens = 150
         self.temperature = 0.7
         
-        # Initialize conversation manager
-        self.conversation_manager = ConversationManager()
+        # Initialize conversation manager with database service
+        self.db_service = None  # Will be set via set_db_service
+        self.conversation_manager = None  # Will be initialized when db_service is set
         
         # System prompt for salon context
         self.system_prompt = self._get_system_prompt()
+        
+    def set_db_service(self, db_service):
+        """Set the database service and initialize conversation manager"""
+        self.db_service = db_service
+        self.conversation_manager = ConversationManager(db_service)
     
     def _get_system_prompt(self) -> str:
         """Get the system prompt for salon SMS responses"""
-        return """You are an AI assistant for a professional salon. Your role is to help clients with appointment-related inquiries via SMS. 
+        return """You are an AI assistant for a professional salon. Your role is to help clients with appointment-related inquiries via SMS.
 
 Key responsibilities:
-- Help clients book, reschedule, or cancel appointments
+- Guide clients through the appointment booking process
+- Collect required client information (name, email, appointment details)
+- Help with rescheduling or canceling appointments
 - Provide information about services and pricing
 - Answer questions about salon policies and hours
 - Be friendly, professional, and concise
 - Keep responses under 160 characters when possible
 - If you can't handle a request, offer to have someone call them
 
+Appointment booking flow:
+1. When a client wants to book, first ask for their name if unknown
+2. Then collect their email address
+3. Ask about desired service if not specified
+4. Get preferred date and time
+5. Check availability and confirm booking
+6. Send confirmation details
+
 Important guidelines:
 - Always be polite and professional
 - Keep responses brief and clear
-- If you need more information, ask specific questions
-- For complex requests, offer to have a staff member call them
+- Ask one question at a time to avoid overwhelming
+- Collect information systematically
 - Don't make up information about services or pricing
-- If unsure about availability, suggest they call the salon
+- If unsure about availability, verify before confirming
 
 Current salon hours: Monday-Saturday 9AM-7PM, Sunday 10AM-5PM
 Address: [Salon Address]
