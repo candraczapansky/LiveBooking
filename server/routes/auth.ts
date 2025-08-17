@@ -13,212 +13,344 @@ import {
   asyncHandler 
 } from "../utils/errors";
 import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest } from "../middleware/error-handler";
+import { validateRequest, requireRole } from "../middleware/error-handler";
+import { 
+  generateToken, 
+  authRateLimiter, 
+  validateInput,
+  sanitizeInputString,
+  escapeHtml 
+} from "../middleware/security";
+import { authenticateToken, requireAdmin } from "../middleware/auth";
+
+// Input validation schemas
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+});
+
+const passwordResetSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "New password must be at least 8 characters"),
+});
 
 export function registerAuthRoutes(app: Express, storage: IStorage) {
-  // Login endpoint
-  app.post("/api/login", asyncHandler(async (req: Request, res: Response) => {
-    const { username, password } = req.body;
-    const context = getLogContext(req);
+  
+  // Login endpoint with rate limiting
+  app.post("/api/login", 
+    authRateLimiter,
+    validateInput(loginSchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { username, password } = req.body;
+      const context = getLogContext(req);
 
-    if (!username || !password) {
-      throw new ValidationError("Username and password are required");
-    }
+      // Sanitize inputs
+      const sanitizedUsername = sanitizeInputString(username);
+      const sanitizedPassword = password; // Don't sanitize password
 
-    const user = await storage.getUserByUsername(username);
-    if (!user) {
-      LoggerService.warn("Login attempt with invalid username", { ...context, username });
-      throw new AuthenticationError("Invalid credentials");
-    }
+      if (!sanitizedUsername || !sanitizedPassword) {
+        throw new ValidationError("Username and password are required");
+      }
 
-    const isValidPassword = await comparePassword(password, user.password);
-    if (!isValidPassword) {
-      LoggerService.warn("Login attempt with invalid password", { ...context, username, userId: user.id });
-      throw new AuthenticationError("Invalid credentials");
-    }
+      const user = await storage.getUserByUsername(sanitizedUsername);
+      if (!user) {
+        LoggerService.warn("Login attempt with invalid username", { 
+          ...context, 
+          username: sanitizedUsername,
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+        throw new AuthenticationError("Invalid credentials");
+      }
 
-    LoggerService.logAuthentication("login", user.id, context);
+      const isValidPassword = await comparePassword(sanitizedPassword, user.password);
+      if (!isValidPassword) {
+        LoggerService.warn("Login attempt with invalid password", { 
+          ...context, 
+          username: sanitizedUsername, 
+          userId: user.id,
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+        });
+        throw new AuthenticationError("Invalid credentials");
+      }
 
-    res.json({
-      success: true,
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        firstName: user.firstName,
-        lastName: user.lastName,
-      },
-    });
-  }));
+      // For staff users, fetch their staff ID
+      let staffId = null;
+      if (user.role === 'staff' || user.role === 'admin') {
+        const staffMember = await storage.getStaffByUserId(user.id);
+        if (staffMember) {
+          staffId = staffMember.id;
+        }
+      }
 
-  // Register endpoint
-  app.post("/api/register", validateRequest(insertUserSchema), asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password, firstName, lastName } = req.body;
-    const context = getLogContext(req);
+      // Generate JWT token with staff ID
+      const token = generateToken({ ...user, staffId });
 
-    // Check if user already exists
-    const existingUser = await storage.getUserByUsername(username);
-    if (existingUser) {
-      throw new ConflictError("Username already exists");
-    }
+      LoggerService.logAuthentication("login", user.id, context);
 
-    const existingEmail = await storage.getUserByEmail(email);
-    if (existingEmail) {
-      throw new ConflictError("Email already exists");
-    }
+      res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          staffId,
+        },
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+    })
+  );
 
-    // Hash password
-    const hashedPassword = await hashPassword(password);
+  // Register endpoint with enhanced validation
+  app.post("/api/register", 
+    validateInput(registerSchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { username, email, password, firstName, lastName } = req.body;
+      const context = getLogContext(req);
 
-    // Create user
-    const newUser = await storage.createUser({
-      username,
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: "client",
-    });
+      // Sanitize inputs
+      const sanitizedData = {
+        username: sanitizeInputString(username),
+        email: sanitizeInputString(email),
+        firstName: escapeHtml(firstName),
+        lastName: escapeHtml(lastName),
+        password, // Don't sanitize password
+      };
 
-    LoggerService.logAuthentication("register", newUser.id, context);
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(sanitizedData.username);
+      if (existingUser) {
+        throw new ConflictError("Username already exists");
+      }
 
-    res.status(201).json({
-      success: true,
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        role: newUser.role,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-      },
-    });
-  }));
+      const existingEmail = await storage.getUserByEmail(sanitizedData.email);
+      if (existingEmail) {
+        throw new ConflictError("Email already exists");
+      }
 
-  // Register staff endpoint
-  app.post("/api/register/staff", validateRequest(insertUserSchema), asyncHandler(async (req: Request, res: Response) => {
-    const { username, email, password, firstName, lastName } = req.body;
-    const context = getLogContext(req);
+      // Hash password
+      const hashedPassword = await hashPassword(sanitizedData.password);
 
-    LoggerService.info("Staff registration attempt", { ...context, username, email });
+      // Create user
+      const newUser = await storage.createUser({
+        username: sanitizedData.username,
+        email: sanitizedData.email,
+        password: hashedPassword,
+        firstName: sanitizedData.firstName,
+        lastName: sanitizedData.lastName,
+        role: "client",
+      });
 
-    // Check if user already exists
-    const existingUser = await storage.getUserByUsername(username);
-    if (existingUser) {
-      throw new ConflictError("Username already exists");
-    }
+      // Generate JWT token
+      const token = generateToken(newUser);
 
-    const existingEmail = await storage.getUserByEmail(email);
-    if (existingEmail) {
-      throw new ConflictError("Email already exists");
-    }
+      LoggerService.logAuthentication("register", newUser.id, context);
 
-    // Hash password
-    const hashedPassword = await hashPassword(password);
+      res.status(201).json({
+        success: true,
+        token,
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+        },
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+    })
+  );
 
-    // Create user with staff role
-    const newUser = await storage.createUser({
-      username,
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      role: "staff",
-    });
+  // Register staff endpoint (admin and staff only)
+  app.post("/api/register/staff", 
+    authenticateToken,
+    requireRole(['admin', 'staff']),
+    validateInput(registerSchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { username, email, password, firstName, lastName } = req.body;
+      const context = getLogContext(req);
 
-    LoggerService.logAuthentication("staff_register", newUser.id, context);
+      // Sanitize inputs
+      const sanitizedData = {
+        username: sanitizeInputString(username),
+        email: sanitizeInputString(email),
+        firstName: escapeHtml(firstName),
+        lastName: escapeHtml(lastName),
+        password, // Don't sanitize password
+      };
 
-    res.status(201).json({
-      success: true,
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        role: newUser.role,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-      },
-    });
-  }));
+      // Check if user already exists
+      const existingUser = await storage.getUserByUsername(sanitizedData.username);
+      if (existingUser) {
+        throw new ConflictError("Username already exists");
+      }
 
-  // Forgot password endpoint
-  app.post("/api/forgot-password", asyncHandler(async (req: Request, res: Response) => {
-    const { email } = req.body;
-    const context = getLogContext(req);
+      // For staff registration, allow existing email addresses since staff can also be clients
+      // Only check if the email is already associated with a staff account
+      const existingEmail = await storage.getUserByEmail(sanitizedData.email);
+      console.log('🔍 Staff registration debug:');
+      console.log('- Email being checked:', sanitizedData.email);
+      console.log('- Existing email found:', !!existingEmail);
+      if (existingEmail) {
+        console.log('- Existing user role:', existingEmail.role);
+        console.log('- Existing user ID:', existingEmail.id);
+      }
+      
+      if (existingEmail && existingEmail.role === "staff") {
+        console.log('❌ Blocking: Email already exists for a staff account');
+        throw new ConflictError("Email already exists for a staff account");
+      }
 
-    if (!email) {
-      throw new ValidationError("Email is required");
-    }
+      // If email exists but is for a client, we'll allow it and update the role to staff
+      let newUser;
+      if (existingEmail && existingEmail.role !== "staff") {
+        console.log('✅ Converting existing client to staff');
+        // Update existing user to staff role
+        await storage.updateUser(existingEmail.id, { role: "staff" });
+        newUser = await storage.getUser(existingEmail.id);
+        if (!newUser) {
+          throw new Error("Failed to update existing user to staff role");
+        }
+        console.log('✅ Successfully converted client to staff');
+      } else {
+        console.log('✅ Creating new staff user');
+        // Create new staff user
+        const hashedPassword = await hashPassword(sanitizedData.password);
+        newUser = await storage.createUser({
+          username: sanitizedData.username,
+          email: sanitizedData.email,
+          password: hashedPassword,
+          firstName: sanitizedData.firstName,
+          lastName: sanitizedData.lastName,
+          role: "staff",
+        });
+        console.log('✅ Successfully created new staff user');
+      }
 
-    const user = await storage.getUserByEmail(email);
-    if (!user) {
-      // Don't reveal if email exists or not for security
-      LoggerService.info("Password reset requested for non-existent email", { ...context, email });
-      return res.json({ success: true, message: "If the email exists, a reset link has been sent" });
-    }
+      // Generate JWT token
+      const token = generateToken(newUser);
 
-    // Generate reset token
-    const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const resetExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      LoggerService.logAuthentication("staff_register", newUser.id, context);
 
-    // Store reset token
-    await storage.updateUser(user.id, {
-      resetToken,
-      resetTokenExpiry: resetExpiry,
-    });
+      res.status(201).json({
+        success: true,
+        token,
+        user: {
+          id: newUser.id,
+          username: newUser.username,
+          email: newUser.email,
+          role: newUser.role,
+          firstName: newUser.firstName,
+          lastName: newUser.lastName,
+        },
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      });
+    })
+  );
 
-    // Send reset email
-    const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
-    
-    const emailSent = await sendEmail({
-      to: email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloupheadspa.app',
-      subject: 'Password Reset Request - Glo Head Spa',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #333;">Password Reset Request</h2>
-          <p>Hello ${user.firstName || user.username},</p>
-          <p>You have requested to reset your password for your Glo Head Spa account.</p>
-          <p>Click the link below to reset your password:</p>
-          <a href="${resetLink}" style="display: inline-block; background-color: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 20px 0;">Reset Password</a>
-          <p>This link will expire in 1 hour.</p>
-          <p>If you didn't request this password reset, please ignore this email.</p>
-          <p style="margin-top: 20px; font-size: 12px; color: #666;">
-            Best regards,<br>
-            The Glo Head Spa Team
-          </p>
-        </div>
-      `
-    });
+  // Password reset request
+  app.post("/api/auth/password-reset", 
+    validateInput(passwordResetSchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { email } = req.body;
+      const context = getLogContext(req);
 
-    if (emailSent) {
-      LoggerService.logCommunication("email", "password_reset_sent", { ...context, userId: user.id });
-      res.json({ success: true, message: "If the email exists, a reset link has been sent" });
-    } else {
-      LoggerService.error("Failed to send password reset email", { ...context, userId: user.id });
-      res.status(500).json({ error: "Failed to send reset email" });
-    }
-  }));
+      const sanitizedEmail = sanitizeInputString(email);
 
-  // Reset password endpoint
-  app.post("/api/reset-password", async (req, res) => {
-    try {
+      const user = await storage.getUserByEmail(sanitizedEmail);
+      if (!user) {
+        // Don't reveal if email exists or not
+        LoggerService.warn("Password reset attempt for non-existent email", {
+          ...context,
+          email: sanitizedEmail,
+          ip: req.ip,
+        });
+        
+        return res.json({
+          success: true,
+          message: "If the email exists, a password reset link has been sent.",
+        });
+      }
+
+      // Generate reset token
+      const resetToken = require('crypto').randomBytes(32).toString('hex');
+      const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Store reset token in database
+      await storage.updateUser(user.id, {
+        resetToken,
+        resetTokenExpiry,
+      });
+
+      // Send reset email
+      const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+      
+      try {
+        await sendEmail({
+          to: user.email,
+          subject: "Password Reset Request",
+          html: `
+            <h2>Password Reset Request</h2>
+            <p>You requested a password reset for your account.</p>
+            <p>Click the link below to reset your password:</p>
+            <a href="${resetLink}">Reset Password</a>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you didn't request this, please ignore this email.</p>
+          `,
+        });
+
+        LoggerService.logAuthentication("password_reset_requested", user.id, context);
+
+        res.json({
+          success: true,
+          message: "Password reset link sent to your email.",
+        });
+      } catch (error) {
+        LoggerService.error("Failed to send password reset email", {
+          ...context,
+          userId: user.id,
+          error: error.message,
+        });
+
+        throw new Error("Failed to send password reset email");
+      }
+    })
+  );
+
+  // Password reset confirmation
+  app.post("/api/auth/password-reset/confirm", 
+    asyncHandler(async (req: Request, res: Response) => {
       const { token, newPassword } = req.body;
+      const context = getLogContext(req);
 
       if (!token || !newPassword) {
-        return res.status(400).json({ error: "Token and new password are required" });
+        throw new ValidationError("Token and new password are required");
       }
 
-      // Find user with this reset token
-      const user = await storage.getUserByResetToken(token);
+      // Find user by reset token
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.resetToken === token && u.resetTokenExpiry > new Date());
+
       if (!user) {
-        return res.status(400).json({ error: "Invalid or expired reset token" });
-      }
-
-      // Check if token is expired
-      if (user.resetTokenExpiry && new Date() > user.resetTokenExpiry) {
-        return res.status(400).json({ error: "Reset token has expired" });
+        throw new AuthenticationError("Invalid or expired reset token");
       }
 
       // Hash new password
@@ -231,94 +363,133 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         resetTokenExpiry: null,
       });
 
-      res.json({ success: true, message: "Password reset successfully" });
-    } catch (error: any) {
-      console.error("Reset password error:", error);
-      res.status(500).json({ error: "Failed to reset password: " + error.message });
-    }
-  });
+      LoggerService.logAuthentication("password_reset_completed", user.id, context);
 
-  // Forgot password via SMS endpoint
-  app.post("/api/forgot-password-sms", asyncHandler(async (req: Request, res: Response) => {
-    const { phone } = req.body;
-    const context = getLogContext(req);
-
-    if (!phone) {
-      throw new ValidationError("Phone number is required");
-    }
-
-    // Find user by phone number
-    const user = await storage.getUserByPhone(phone);
-    if (!user) {
-      // Don't reveal if phone exists or not for security
-      LoggerService.info("SMS password reset requested for non-existent phone", { ...context, phone });
-      return res.json({ success: true, message: "If the phone number exists, a reset code has been sent" });
-    }
-
-    // Generate 6-digit reset code
-    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const resetExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-    // Store reset code (using a custom field or separate table in production)
-    // For now, we'll skip storing the reset code in the user table
-    LoggerService.info("SMS reset code generated", { ...context, userId: user.id });
-
-    // Send SMS with reset code
-    const message = `Your Glo Head Spa password reset code is: ${resetCode}. This code expires in 15 minutes.`;
-    
-    if (await isTwilioConfigured()) {
-      const smsSent = await sendSMS(phone, message);
-      if (smsSent) {
-        LoggerService.logCommunication("sms", "password_reset_sent", { ...context, userId: user.id });
-        res.json({ success: true, message: "If the phone number exists, a reset code has been sent" });
-      } else {
-        LoggerService.error("Failed to send SMS reset code", { ...context, userId: user.id });
-        res.status(500).json({ error: "Failed to send reset code" });
-      }
-    } else {
-      // In development/test mode, just return the code
-      LoggerService.info("SMS reset code (test mode)", { ...context, userId: user.id, testCode: resetCode });
-      res.json({ 
-        success: true, 
-        message: "Reset code sent (test mode)", 
-        testCode: resetCode 
+      res.json({
+        success: true,
+        message: "Password has been reset successfully.",
       });
+    })
+  );
+
+  // Change password (authenticated users)
+  app.post("/api/auth/change-password", 
+    validateInput(passwordChangeSchema),
+    asyncHandler(async (req: Request, res: Response) => {
+      const { currentPassword, newPassword } = req.body;
+      const context = getLogContext(req);
+      const currentUser = (req as any).user;
+
+      if (!currentUser) {
+        throw new AuthenticationError("Authentication required");
+      }
+
+      // Get user from database
+      const user = await storage.getUserById(currentUser.id);
+      if (!user) {
+        throw new AuthenticationError("User not found");
+      }
+
+      // Verify current password
+      const isValidPassword = await comparePassword(currentPassword, user.password);
+      if (!isValidPassword) {
+        LoggerService.warn("Invalid current password for password change", {
+          ...context,
+          userId: user.id,
+          ip: req.ip,
+        });
+        throw new AuthenticationError("Current password is incorrect");
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update password
+      await storage.updateUser(user.id, {
+        password: hashedPassword,
+      });
+
+      LoggerService.logAuthentication("password_changed", user.id, context);
+
+      res.json({
+        success: true,
+        message: "Password changed successfully.",
+      });
+    })
+  );
+
+  // Logout endpoint (client-side token removal)
+  app.post("/api/logout", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const currentUser = (req as any).user;
+
+    if (currentUser) {
+      LoggerService.logAuthentication("logout", currentUser.id, context);
     }
+
+    res.json({
+      success: true,
+      message: "Logged out successfully.",
+    });
   }));
 
-  // Change password endpoint
-  app.post("/api/change-password", asyncHandler(async (req: Request, res: Response) => {
-    const { currentPassword, newPassword } = req.body;
-    const userId = (req as any).user?.id;
-    const context = getLogContext(req);
+  // Verify token endpoint
+  app.get("/api/auth/verify", asyncHandler(async (req: Request, res: Response) => {
+    const currentUser = (req as any).user;
 
-    if (!userId) {
-      throw new AuthenticationError("Authentication required");
+    if (!currentUser) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token",
+      });
     }
 
-    if (!currentPassword || !newPassword) {
-      throw new ValidationError("Current password and new password are required");
-    }
-
-    const user = await storage.getUser(userId);
+    // Get fresh user data from database
+    const user = await storage.getUserById(currentUser.id);
     if (!user) {
-      throw new NotFoundError("User");
+      return res.status(401).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
-    // Verify current password
-    const isValidPassword = await comparePassword(currentPassword, user.password);
-    if (!isValidPassword) {
-      LoggerService.warn("Password change attempt with incorrect current password", { ...context, userId });
-      throw new ValidationError("Current password is incorrect");
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        staffId: user.staffId,
+      },
+    });
+  }));
+
+  // Health check endpoint
+  app.get("/api/health", asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // Test database connection
+      await storage.getAllUsers();
+      
+      res.json({
+        success: true,
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        services: {
+          database: "connected",
+          email: process.env.SENDGRID_API_KEY ? "configured" : "not_configured",
+          sms: isTwilioConfigured() ? "configured" : "not_configured",
+        },
+      });
+    } catch (error) {
+      res.status(503).json({
+        success: false,
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error.message,
+      });
     }
-
-    // Hash new password
-    const hashedPassword = await hashPassword(newPassword);
-
-    // Update password
-    await storage.updateUser(userId, { password: hashedPassword });
-
-        LoggerService.logAuthentication("password_change", userId, context);
-    res.json({ success: true, message: "Password changed successfully" });
   }));
 } 

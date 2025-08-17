@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ensureAuthenticated, refreshToken } from "@/lib/auth-helper";
 
 import {
   Card,
@@ -56,7 +57,8 @@ import {
   Phone,
   Mail,
   Globe,
-  Clock
+  Clock,
+  RefreshCw
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -102,6 +104,7 @@ const LocationsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [locationToEdit, setLocationToEdit] = useState<Location | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -114,6 +117,34 @@ const LocationsPage = () => {
     const interval = setInterval(checkSidebarState, 100);
     return () => clearInterval(interval);
   }, []);
+
+  // Ensure authentication on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      setIsAuthenticating(true);
+      try {
+        const isAuth = await ensureAuthenticated();
+        if (!isAuth) {
+          toast({
+            title: "Authentication Required",
+            description: "Please log in to access locations.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        toast({
+          title: "Authentication Error",
+          description: "Please log in to access locations.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsAuthenticating(false);
+      }
+    };
+
+    checkAuth();
+  }, [toast]);
 
   // Form setup
   const form = useForm<LocationFormValues>({
@@ -139,6 +170,7 @@ const LocationsPage = () => {
       const response = await apiRequest("GET", "/api/locations");
       return response.json();
     },
+    enabled: !isAuthenticating, // Only fetch when not authenticating
   });
 
   // Create location mutation
@@ -257,7 +289,18 @@ const LocationsPage = () => {
   });
 
   // Form submission handler
-  const onSubmit = (data: LocationFormValues) => {
+  const onSubmit = async (data: LocationFormValues) => {
+    // Ensure authentication before submitting
+    const isAuth = await ensureAuthenticated();
+    if (!isAuth) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save locations.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (locationToEdit) {
       updateLocationMutation.mutate({ id: locationToEdit.id, data });
     } else {
@@ -285,15 +328,6 @@ const LocationsPage = () => {
 
   // Handle delete location
   const handleDeleteLocation = (location: Location) => {
-    if (location.isDefault) {
-      toast({
-        title: "Cannot delete default location",
-        description: "Please set another location as default first.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (confirm(`Are you sure you want to delete "${location.name}"? This action cannot be undone.`)) {
       deleteLocationMutation.mutate(location.id);
     }
@@ -328,24 +362,46 @@ const LocationsPage = () => {
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <Header />
         
-        <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
             {/* Page Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Locations</h1>
-                <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Locations</h1>
+                <p className="text-lg text-gray-600 dark:text-gray-400">
                   Manage your business locations and settings
                 </p>
               </div>
-              <div className="mt-4 sm:mt-0">
+              <div className="mt-4 sm:mt-0 flex gap-3">
+                <Button 
+                  onClick={async () => {
+                    try {
+                      await refreshToken();
+                      toast({
+                        title: "Token Refreshed",
+                        description: "Authentication token has been refreshed.",
+                      });
+                    } catch (error) {
+                      toast({
+                        title: "Refresh Failed",
+                        description: "Failed to refresh authentication token.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  variant="outline"
+                  className="w-full sm:w-auto hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh Auth
+                </Button>
                 <Button 
                   onClick={() => {
                     setLocationToEdit(null);
                     form.reset();
                     setIsFormOpen(true);
                   }}
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Location
@@ -353,147 +409,161 @@ const LocationsPage = () => {
               </div>
             </div>
             
-            {/* Locations Grid */}
-            {isLoading ? (
+            {/* Authentication Loading */}
+            {isAuthenticating && (
               <div className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
-                <span className="ml-3 text-gray-600 dark:text-gray-400">Loading locations...</span>
+                <span className="ml-3 text-gray-600 dark:text-gray-400">Checking authentication...</span>
               </div>
-            ) : locations.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <Building2 className="h-12 w-12 text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No Locations Found</h3>
-                  <p className="text-sm text-gray-500 mb-4 text-center max-w-md">
-                    Add your first business location to get started.
-                  </p>
-                  <Button 
-                    onClick={() => {
-                      setLocationToEdit(null);
-                      form.reset();
-                      setIsFormOpen(true);
-                    }}
-                  >
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add Location
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                {locations.map((location) => (
-                  <Card key={location.id} className="overflow-hidden">
-                    <CardHeader className="pb-4">
+            )}
+
+            {/* Locations Grid */}
+            {!isAuthenticating && (
+              isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Loading locations...</span>
+                </div>
+              ) : locations.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12">
+                    <Building2 className="h-12 w-12 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No Locations Found</h3>
+                    <p className="text-sm text-gray-500 mb-4 text-center max-w-md">
+                      Add your first business location to get started.
+                    </p>
+                    <Button 
+                      onClick={() => {
+                        setLocationToEdit(null);
+                        form.reset();
+                        setIsFormOpen(true);
+                      }}
+                    >
+                      <PlusCircle className="h-4 w-4 mr-2" />
+                      Add Location
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                  {locations.map((location) => (
+                  <Card key={location.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
+                    <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <CardTitle className="text-lg">{location.name}</CardTitle>
+                          <div className="flex items-center gap-2 mb-3">
+                            <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">{location.name}</CardTitle>
                             {location.isDefault && (
                               <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100">
                                 <Star className="h-3 w-3 mr-1" />
                                 Default
                               </Badge>
                             )}
-                            <Badge variant={location.isActive ? "default" : "secondary"}>
+                            <Badge variant={location.isActive ? "default" : "secondary"} className={location.isActive ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" : "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-100"}>
                               {location.isActive ? "Active" : "Inactive"}
                             </Badge>
                           </div>
-                          <CardDescription className="flex items-center gap-1">
-                            <MapPin className="h-4 w-4" />
-                            {location.address}, {location.city}, {location.state} {location.zipCode}
+                          <CardDescription className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            <span className="font-medium">{location.address}, {location.city}, {location.state} {location.zipCode}</span>
                           </CardDescription>
                         </div>
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pb-4">
-                      <div className="space-y-3">
+                    <CardContent className="pb-4 px-6">
+                      <div className="space-y-4">
                         {location.phone && (
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <Phone className="h-4 w-4 text-gray-500" />
-                            <span>{location.phone}</span>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{location.phone}</span>
                           </div>
                         )}
                         
                         {location.email && (
-                          <div className="flex items-center gap-2 text-sm">
+                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <Mail className="h-4 w-4 text-gray-500" />
-                            <span>{location.email}</span>
+                            <span className="font-medium text-gray-700 dark:text-gray-300">{location.email}</span>
                           </div>
                         )}
                         
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                           <Globe className="h-4 w-4 text-gray-500" />
-                          <span>{location.timezone}</span>
+                          <span className="font-medium text-gray-700 dark:text-gray-300">{location.timezone}</span>
                         </div>
                         
                         {location.description && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            {location.description}
+                          <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-200 dark:border-blue-800">
+                            <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span> {location.description}
                           </div>
                         )}
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="bg-muted/50 pt-4">
-                      <div className="flex justify-between items-center w-full">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditLocation(location)}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          
-                          {!location.isDefault && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleSetDefault(location)}
-                            >
-                              <Star className="h-4 w-4 mr-1" />
-                              Set Default
-                            </Button>
-                          )}
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleToggleActive(location)}
-                          >
-                            {location.isActive ? (
-                              <>
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-4 w-4 mr-1" />
-                                Activate
-                              </>
-                            )}
-                          </Button>
-                        </div>
+                    <CardFooter className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <div className="flex flex-col w-full gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditLocation(location)}
+                          className="w-full hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
                         
                         {!location.isDefault && (
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteLocation(location)}
-                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleSetDefault(location)}
+                            className="w-full hover:bg-yellow-50 hover:text-yellow-700 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-300 transition-colors"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Star className="h-4 w-4 mr-1" />
+                            Set Default
                           </Button>
                         )}
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleToggleActive(location)}
+                          className={`w-full transition-colors ${
+                            location.isActive 
+                              ? "hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-300" 
+                              : "hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-300"
+                          }`}
+                        >
+                          {location.isActive ? (
+                            <>
+                              <XCircle className="h-4 w-4 mr-1" />
+                              Deactivate
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1" />
+                              Activate
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteLocation(location)}
+                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
                       </div>
                     </CardFooter>
                   </Card>
                 ))}
               </div>
-            )}
-          </div>
+            )
+          )}
+        </div>
         </main>
       </div>
       

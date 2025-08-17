@@ -272,9 +272,12 @@ export class AutomationService {
       }
 
       switch (rule.trigger) {
-        case 'booking_confirmation':
         case 'appointment_reminder':
           return client.smsAppointmentReminders === true;
+        case 'booking_confirmation':
+          // Skip SMS automation for booking confirmations to prevent duplicates
+          // SMS confirmations are already sent directly in the appointment creation route
+          return false;
         case 'cancellation':
         case 'after_payment':
           return client.smsAccountManagement === true;

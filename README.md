@@ -1,27 +1,3 @@
-### Helcim Smart Terminal Integration
-
-Environment variables:
-
-```
-HELCIM_API_TOKEN=...
-HELCIM_WEBHOOK_SECRET=...   # base64 webhook verifierToken from Helcim
-HELCIM_TERMINAL_DEVICE_CODE=UOJS
-HELCIM_CURRENCY=USD         # or CAD
-HELCIM_API_URL=https://api.helcim.com/v2
-```
-
-Endpoints (server):
-
-- `POST /api/helcim-smart-terminal/devices/:code/purchase` with body `{ amount: number, currency?: 'USD'|'CAD', appointmentId?: number, clientId?: number, invoiceNumber?, customerCode? }`
-- `POST /api/helcim-smart-terminal/devices/:code/refund` with body `{ amount: number, currency?: 'USD'|'CAD', originalTransactionId: string }`
-- `POST /api/helcim-smart-terminal/webhook` (public HTTPS). Configure this exact URL in Helcim Webhooks. CSRF must be disabled for this path.
-- `POST /api/helcim-smart-terminal/devices/:code/check-readiness` optional ping.
-
-Client endpoints will automatically use `HELCIM_TERMINAL_DEVICE_CODE` and default currency from server health endpoint if not specified.
-
-Notes:
-- Purchase request returns 202 Accepted when dispatched to device; payment completion is received via webhook.
-- Webhook signature is validated using `HELCIM_WEBHOOK_SECRET` (base64).
 # Salon SMS Responder
 
 A robust, production-grade SMS automation system for salon appointment management using Python, FastAPI, Twilio, and OpenAI.

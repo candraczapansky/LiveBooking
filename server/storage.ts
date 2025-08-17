@@ -43,8 +43,14 @@ import {
   aiMessagingConfig, AiMessagingConfig, InsertAiMessagingConfig,
   conversationFlows, ConversationFlow, InsertConversationFlow,
   noteTemplates, NoteTemplate, InsertNoteTemplate, UpdateNoteTemplate,
-  noteHistory, NoteHistory, InsertNoteHistory, UpdateNoteHistory
-} from "@shared/schema";
+  noteHistory, NoteHistory, InsertNoteHistory, UpdateNoteHistory,
+  permissions, Permission, InsertPermission,
+  permissionGroups, PermissionGroup, InsertPermissionGroup,
+  permissionGroupMappings, PermissionGroupMapping, InsertPermissionGroupMapping,
+  userPermissionGroups, UserPermissionGroup, InsertUserPermissionGroup,
+  userDirectPermissions, UserDirectPermission, InsertUserDirectPermission,
+  phoneCalls, PhoneCall, InsertPhoneCall
+} from "../shared/schema";
 import { db } from "./db";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
 
@@ -176,6 +182,7 @@ export interface IStorage {
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
   getPayment(id: number): Promise<Payment | undefined>;
+  getPaymentByHelcimId(helcimPaymentId: string): Promise<Payment | undefined>;
   getPaymentsByClient(clientId: number): Promise<Payment[]>;
   getAllPayments(): Promise<Payment[]>;
   updatePayment(id: number, paymentData: Partial<InsertPayment>): Promise<Payment>;
@@ -190,6 +197,7 @@ export interface IStorage {
 
   // User Square operations
   updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User>;
+  updateUserHelcimCustomerId(userId: number, helcimCustomerId: string): Promise<User>;
 
   // Gift Card operations
   createGiftCard(giftCard: InsertGiftCard): Promise<GiftCard>;
@@ -214,6 +222,7 @@ export interface IStorage {
   createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign>;
   getMarketingCampaign(id: number): Promise<MarketingCampaign | undefined>;
   getAllMarketingCampaigns(): Promise<MarketingCampaign[]>;
+  getMarketingCampaigns(): Promise<MarketingCampaign[]>;
   updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign>;
   deleteMarketingCampaign(id: number): Promise<boolean>;
 
@@ -253,7 +262,7 @@ export interface IStorage {
   deleteUserColorPreferences(userId: number): Promise<boolean>;
 
   // User filtering for campaigns
-  getUsersByAudience(audience: string): Promise<User[]>;
+  getUsersByAudience(audience: string, targetClientIds?: number[]): Promise<User[]>;
   
   // Staff Earnings operations
   createStaffEarnings(earnings: any): Promise<any>;
@@ -409,6 +418,33 @@ export interface IStorage {
   getAllNoteHistory(): Promise<NoteHistory[]>;
   updateNoteHistory(id: number, historyData: UpdateNoteHistory): Promise<NoteHistory>;
   deleteNoteHistory(id: number): Promise<boolean>;
+
+  // Permission operations
+  createPermission(permission: any): Promise<any>;
+  getPermission(id: number): Promise<any | undefined>;
+  getAllPermissions(): Promise<any[]>;
+  getPermissionsByCategory(category: string): Promise<any[]>;
+  updatePermission(id: number, permissionData: any): Promise<any>;
+  deletePermission(id: number): Promise<boolean>;
+
+  // Permission Group operations
+  createPermissionGroup(group: any): Promise<any>;
+  getPermissionGroup(id: number): Promise<any | undefined>;
+  getAllPermissionGroups(): Promise<any[]>;
+  updatePermissionGroup(id: number, groupData: any): Promise<any>;
+  deletePermissionGroup(id: number): Promise<boolean>;
+  assignPermissionsToGroup(groupId: number, permissionIds: number[]): Promise<void>;
+  removePermissionsFromGroup(groupId: number, permissionIds: number[]): Promise<void>;
+
+  // User Permission operations
+  assignPermissionGroupToUser(userId: number, groupId: number): Promise<void>;
+  removePermissionGroupFromUser(userId: number, groupId: number): Promise<void>;
+  getUserPermissionGroups(userId: number): Promise<any[]>;
+  grantDirectPermission(userId: number, permissionId: number): Promise<void>;
+  denyDirectPermission(userId: number, permissionId: number): Promise<void>;
+  removeDirectPermission(userId: number, permissionId: number): Promise<void>;
+  getUserDirectPermissions(userId: number): Promise<any[]>;
+  getUserAllPermissions(userId: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -922,11 +958,241 @@ Glo Head Spa`,
         throw new Error(`Cannot delete user - has ${relatedAppointments.length} associated appointments. Please delete or reassign appointments first.`);
       }
       
+      // Check for related cancelled appointments
+      const relatedCancelledAppointments = await db.select().from(cancelledAppointments).where(eq(cancelledAppointments.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedCancelledAppointments.length} related cancelled appointments for user ${id}`);
+      
+      if (relatedCancelledAppointments.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedCancelledAppointments.length} cancelled appointments`);
+        throw new Error(`Cannot delete user - has ${relatedCancelledAppointments.length} associated cancelled appointments. Please delete or reassign cancelled appointments first.`);
+      }
+      
+      // Check for related appointment history
+      const relatedAppointmentHistory = await db.select().from(appointmentHistory).where(eq(appointmentHistory.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedAppointmentHistory.length} related appointment history records for user ${id}`);
+      
+      if (relatedAppointmentHistory.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedAppointmentHistory.length} appointment history records`);
+        throw new Error(`Cannot delete user - has ${relatedAppointmentHistory.length} associated appointment history records. Please delete or reassign appointment history first.`);
+      }
+      
+      // Check for related client memberships
+      const relatedClientMemberships = await db.select().from(clientMemberships).where(eq(clientMemberships.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedClientMemberships.length} related client memberships for user ${id}`);
+      
+      if (relatedClientMemberships.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedClientMemberships.length} client memberships`);
+        throw new Error(`Cannot delete user - has ${relatedClientMemberships.length} associated client memberships. Please delete or reassign memberships first.`);
+      }
+      
+      // Check for related payments
+      const relatedPayments = await db.select().from(payments).where(eq(payments.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedPayments.length} related payments for user ${id}`);
+      
+      if (relatedPayments.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedPayments.length} payments`);
+        throw new Error(`Cannot delete user - has ${relatedPayments.length} associated payments. Please delete or reassign payments first.`);
+      }
+      
+      // Check for related saved payment methods
+      const relatedSavedPaymentMethods = await db.select().from(savedPaymentMethods).where(eq(savedPaymentMethods.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedSavedPaymentMethods.length} related saved payment methods for user ${id}`);
+      
+      if (relatedSavedPaymentMethods.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedSavedPaymentMethods.length} saved payment methods`);
+        throw new Error(`Cannot delete user - has ${relatedSavedPaymentMethods.length} associated saved payment methods. Please delete or reassign payment methods first.`);
+      }
+      
+      // Check for related saved gift cards
+      const relatedSavedGiftCards = await db.select().from(savedGiftCards).where(eq(savedGiftCards.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedSavedGiftCards.length} related saved gift cards for user ${id}`);
+      
+      if (relatedSavedGiftCards.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedSavedGiftCards.length} saved gift cards`);
+        throw new Error(`Cannot delete user - has ${relatedSavedGiftCards.length} associated saved gift cards. Please delete or reassign gift cards first.`);
+      }
+      
+      // Check for related user permission groups
+      const relatedUserPermissionGroups = await db.select().from(userPermissionGroups).where(eq(userPermissionGroups.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedUserPermissionGroups.length} related user permission groups for user ${id}`);
+      
+      if (relatedUserPermissionGroups.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedUserPermissionGroups.length} user permission groups`);
+        throw new Error(`Cannot delete user - has ${relatedUserPermissionGroups.length} associated user permission groups. Please delete or reassign permission groups first.`);
+      }
+      
+      // Check for related user direct permissions
+      const relatedUserDirectPermissions = await db.select().from(userDirectPermissions).where(eq(userDirectPermissions.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedUserDirectPermissions.length} related user direct permissions for user ${id}`);
+      
+      if (relatedUserDirectPermissions.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedUserDirectPermissions.length} user direct permissions`);
+        throw new Error(`Cannot delete user - has ${relatedUserDirectPermissions.length} associated user direct permissions. Please delete or reassign permissions first.`);
+      }
+      
+      // Check for related notifications
+      const relatedNotifications = await db.select().from(notifications).where(eq(notifications.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedNotifications.length} related notifications for user ${id}`);
+      
+      if (relatedNotifications.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedNotifications.length} notifications`);
+        throw new Error(`Cannot delete user - has ${relatedNotifications.length} associated notifications. Please delete or reassign notifications first.`);
+      }
+      
+      // Check for related phone calls
+      const relatedPhoneCalls = await db.select().from(phoneCalls).where(eq(phoneCalls.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedPhoneCalls.length} related phone calls for user ${id}`);
+      
+      if (relatedPhoneCalls.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedPhoneCalls.length} phone calls`);
+        throw new Error(`Cannot delete user - has ${relatedPhoneCalls.length} associated phone calls. Please delete or reassign phone calls first.`);
+      }
+      
+      // Check for related form submissions
+      const relatedFormSubmissions = await db.select().from(formSubmissions).where(eq(formSubmissions.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedFormSubmissions.length} related form submissions for user ${id}`);
+      
+      if (relatedFormSubmissions.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedFormSubmissions.length} form submissions`);
+        throw new Error(`Cannot delete user - has ${relatedFormSubmissions.length} associated form submissions. Please delete or reassign form submissions first.`);
+      }
+      
+      // Check for related LLM conversations
+      const relatedLLMConversations = await db.select().from(llmConversations).where(eq(llmConversations.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedLLMConversations.length} related LLM conversations for user ${id}`);
+      
+      if (relatedLLMConversations.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedLLMConversations.length} LLM conversations`);
+        throw new Error(`Cannot delete user - has ${relatedLLMConversations.length} associated LLM conversations. Please delete or reassign conversations first.`);
+      }
+      
+      // Check for related note history
+      const relatedNoteHistory = await db.select().from(noteHistory).where(eq(noteHistory.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedNoteHistory.length} related note history for user ${id}`);
+      
+      if (relatedNoteHistory.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedNoteHistory.length} note history records`);
+        throw new Error(`Cannot delete user - has ${relatedNoteHistory.length} associated note history records. Please delete or reassign note history first.`);
+      }
+      
+      // Check for related user color preferences
+      const relatedUserColorPreferences = await db.select().from(userColorPreferences).where(eq(userColorPreferences.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedUserColorPreferences.length} related user color preferences for user ${id}`);
+      
+      if (relatedUserColorPreferences.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedUserColorPreferences.length} user color preferences`);
+        throw new Error(`Cannot delete user - has ${relatedUserColorPreferences.length} associated user color preferences. Please delete or reassign color preferences first.`);
+      }
+      
+      // Check for related email unsubscribes
+      const relatedEmailUnsubscribes = await db.select().from(emailUnsubscribes).where(eq(emailUnsubscribes.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedEmailUnsubscribes.length} related email unsubscribes for user ${id}`);
+      
+      if (relatedEmailUnsubscribes.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedEmailUnsubscribes.length} email unsubscribes`);
+        throw new Error(`Cannot delete user - has ${relatedEmailUnsubscribes.length} associated email unsubscribes. Please delete or reassign email unsubscribes first.`);
+      }
+      
+      // Check for related marketing campaign recipients
+      const relatedMarketingCampaignRecipients = await db.select().from(marketingCampaignRecipients).where(eq(marketingCampaignRecipients.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedMarketingCampaignRecipients.length} related marketing campaign recipients for user ${id}`);
+      
+      if (relatedMarketingCampaignRecipients.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedMarketingCampaignRecipients.length} marketing campaign recipients`);
+        throw new Error(`Cannot delete user - has ${relatedMarketingCampaignRecipients.length} associated marketing campaign recipients. Please delete or reassign marketing campaign recipients first.`);
+      }
+      
+      // Check for related sales history
+      const relatedSalesHistory = await db.select().from(salesHistory).where(eq(salesHistory.clientId, id));
+      console.log(`DatabaseStorage: Found ${relatedSalesHistory.length} related sales history for user ${id}`);
+      
+      if (relatedSalesHistory.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedSalesHistory.length} sales history records`);
+        throw new Error(`Cannot delete user - has ${relatedSalesHistory.length} associated sales history records. Please delete or reassign sales history first.`);
+      }
+      
+      // Check for related staff earnings (if user is staff)
+      const relatedStaffEarnings = await db.select().from(staffEarnings).where(eq(staffEarnings.staffId, id));
+      console.log(`DatabaseStorage: Found ${relatedStaffEarnings.length} related staff earnings for user ${id}`);
+      
+      if (relatedStaffEarnings.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedStaffEarnings.length} staff earnings records`);
+        throw new Error(`Cannot delete user - has ${relatedStaffEarnings.length} associated staff earnings records. Please delete or reassign staff earnings first.`);
+      }
+      
+      // Check for related payroll history (if user is staff)
+      const relatedPayrollHistory = await db.select().from(payrollHistory).where(eq(payrollHistory.staffId, id));
+      console.log(`DatabaseStorage: Found ${relatedPayrollHistory.length} related payroll history for user ${id}`);
+      
+      if (relatedPayrollHistory.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedPayrollHistory.length} payroll history records`);
+        throw new Error(`Cannot delete user - has ${relatedPayrollHistory.length} associated payroll history records. Please delete or reassign payroll history first.`);
+      }
+      
+      // Check for related time clock entries (if user is staff)
+      const relatedTimeClockEntries = await db.select().from(timeClockEntries).where(eq(timeClockEntries.staffId, id));
+      console.log(`DatabaseStorage: Found ${relatedTimeClockEntries.length} related time clock entries for user ${id}`);
+      
+      if (relatedTimeClockEntries.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedTimeClockEntries.length} time clock entries`);
+        throw new Error(`Cannot delete user - has ${relatedTimeClockEntries.length} associated time clock entries. Please delete or reassign time clock entries first.`);
+      }
+      
+      // Check for related staff schedules (if user is staff)
+      const relatedStaffSchedules = await db.select().from(staffSchedules).where(eq(staffSchedules.staffId, id));
+      console.log(`DatabaseStorage: Found ${relatedStaffSchedules.length} related staff schedules for user ${id}`);
+      
+      if (relatedStaffSchedules.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedStaffSchedules.length} staff schedules`);
+        throw new Error(`Cannot delete user - has ${relatedStaffSchedules.length} associated staff schedules. Please delete or reassign staff schedules first.`);
+      }
+      
+      // Check for related staff services (if user is staff)
+      const relatedStaffServices = await db.select().from(staffServices).where(eq(staffServices.staffId, id));
+      console.log(`DatabaseStorage: Found ${relatedStaffServices.length} related staff services for user ${id}`);
+      
+      if (relatedStaffServices.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedStaffServices.length} staff services`);
+        throw new Error(`Cannot delete user - has ${relatedStaffServices.length} associated staff services. Please delete or reassign staff services first.`);
+      }
+      
+      // Check for related staff records
+      const relatedStaff = await db.select().from(staff).where(eq(staff.userId, id));
+      console.log(`DatabaseStorage: Found ${relatedStaff.length} related staff records for user ${id}`);
+      
+      if (relatedStaff.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedStaff.length} staff records`);
+        throw new Error(`Cannot delete user - has ${relatedStaff.length} associated staff records. Please delete or reassign staff records first.`);
+      }
+      
+      // Check for related permission groups created by this user
+      const relatedPermissionGroups = await db.select().from(permissionGroups).where(eq(permissionGroups.createdBy, id));
+      console.log(`DatabaseStorage: Found ${relatedPermissionGroups.length} related permission groups created by user ${id}`);
+      
+      if (relatedPermissionGroups.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedPermissionGroups.length} permission groups created by this user`);
+        throw new Error(`Cannot delete user - has ${relatedPermissionGroups.length} associated permission groups created by this user. Please delete or reassign permission groups first.`);
+      }
+      
+      // Check for related gift cards purchased by this user
+      const relatedGiftCards = await db.select().from(giftCards).where(eq(giftCards.purchasedByUserId, id));
+      console.log(`DatabaseStorage: Found ${relatedGiftCards.length} related gift cards purchased by user ${id}`);
+      
+      if (relatedGiftCards.length > 0) {
+        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedGiftCards.length} gift cards purchased by this user`);
+        throw new Error(`Cannot delete user - has ${relatedGiftCards.length} associated gift cards purchased by this user. Please delete or reassign gift cards first.`);
+      }
+      
+      // If we get here, all checks passed - proceed with deletion
+      console.log(`DatabaseStorage: All checks passed, proceeding with user deletion for ID: ${id}`);
+      
       const result = await db.delete(users).where(eq(users.id, id));
       const success = result.rowCount ? result.rowCount > 0 : false;
       
+      console.log(`DatabaseStorage: User deletion result:`, success);
       return success;
     } catch (error) {
+      console.error(`DatabaseStorage: Error deleting user ${id}:`, error);
       throw error; // Re-throw to bubble up the specific error message
     }
   }
@@ -1282,25 +1548,51 @@ Glo Head Spa`,
   }
 
   async getAppointment(id: number): Promise<Appointment | undefined> {
-    const [appointment] = await db.select().from(appointments).where(eq(appointments.id, id));
-    if (!appointment) return undefined;
+    const appointmentData = await db
+      .select()
+      .from(appointments)
+      .where(eq(appointments.id, id))
+      .leftJoin(services, eq(appointments.serviceId, services.id))
+      .leftJoin(staff, eq(appointments.staffId, staff.id))
+      .leftJoin(users, eq(staff.userId, users.id));
+
+    if (!appointmentData || appointmentData.length === 0) return undefined;
+    
+    const row = appointmentData[0];
+    const appointment = row.appointments;
     
     // Convert local datetime strings to Date objects for frontend
     return {
       ...appointment,
       startTime: this.convertLocalToDate(appointment.startTime),
-      endTime: this.convertLocalToDate(appointment.endTime)
+      endTime: this.convertLocalToDate(appointment.endTime),
+      service: row.services,
+      staff: row.staff ? {
+        ...row.staff,
+        user: row.users
+      } : null
     };
   }
 
   async getAllAppointments(): Promise<Appointment[]> {
-    const appointmentList = await db.select().from(appointments).orderBy(desc(appointments.startTime));
+    const appointmentList = await db
+      .select()
+      .from(appointments)
+      .leftJoin(services, eq(appointments.serviceId, services.id))
+      .leftJoin(staff, eq(appointments.staffId, staff.id))
+      .leftJoin(users, eq(staff.userId, users.id))
+      .orderBy(desc(appointments.startTime));
     
     // Convert local datetime strings to Date objects for frontend
-    return appointmentList.map((appointment: any) => ({
-      ...appointment,
-      startTime: this.convertLocalToDate(appointment.startTime),
-      endTime: this.convertLocalToDate(appointment.endTime)
+    return appointmentList.map((row: any) => ({
+      ...row.appointments,
+      startTime: this.convertLocalToDate(row.appointments.startTime),
+      endTime: this.convertLocalToDate(row.appointments.endTime),
+      service: row.services,
+      staff: row.staff ? {
+        ...row.staff,
+        user: row.users
+      } : null
     }));
   }
 
@@ -1744,6 +2036,11 @@ Glo Head Spa`,
     return result[0];
   }
 
+  async getPaymentByHelcimId(helcimPaymentId: string): Promise<Payment | undefined> {
+    const result = await db.select().from(payments).where(eq(payments.helcimPaymentId, helcimPaymentId));
+    return result[0];
+  }
+
   async getPaymentsByClient(clientId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.clientId, clientId));
   }
@@ -1804,6 +2101,10 @@ Glo Head Spa`,
 
   async updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User> {
     return this.updateUser(userId, { squareCustomerId });
+  }
+
+  async updateUserHelcimCustomerId(userId: number, helcimCustomerId: string): Promise<User> {
+    return this.updateUser(userId, { helcimCustomerId });
   }
 
   // Gift Card operations
@@ -1884,10 +2185,16 @@ Glo Head Spa`,
 
   // Marketing Campaign operations
   async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
+    // Handle targetClientIds - convert array to JSON string if provided
+    const campaignData = { ...campaign };
+    if (campaignData.targetClientIds && Array.isArray(campaignData.targetClientIds)) {
+      campaignData.targetClientIds = JSON.stringify(campaignData.targetClientIds);
+    }
+    
     const [newCampaign] = await db
       .insert(marketingCampaigns)
       .values({
-        ...campaign,
+        ...campaignData,
         sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
       })
       .returning();
@@ -1901,6 +2208,11 @@ Glo Head Spa`,
 
   async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
     return await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
+  }
+
+  async getMarketingCampaigns(): Promise<MarketingCampaign[]> {
+    // Alias for getAllMarketingCampaigns for compatibility
+    return this.getAllMarketingCampaigns();
   }
 
   async updateMarketingCampaign(id: number, campaignData: Partial<InsertMarketingCampaign>): Promise<MarketingCampaign> {
@@ -1978,7 +2290,7 @@ Glo Head Spa`,
   }
 
   // User filtering for campaigns
-  async getUsersByAudience(audience: string): Promise<User[]> {
+  async getUsersByAudience(audience: string, targetClientIds?: number[]): Promise<User[]> {
     switch (audience) {
       case "All Clients":
         return await db.select().from(users).where(eq(users.role, "client"));
@@ -2067,6 +2379,19 @@ Glo Head Spa`,
           }
         }
         return upcomingClients;
+      }
+        
+      case "Specific Clients": {
+        // Return specific clients by their IDs
+        if (targetClientIds && targetClientIds.length > 0) {
+          return await db.select().from(users).where(
+            and(
+              eq(users.role, "client"),
+              inArray(users.id, targetClientIds)
+            )
+          );
+        }
+        return [];
       }
         
       default:
@@ -2602,7 +2927,7 @@ Glo Head Spa`,
     if (!result[0]) return undefined;
     
     // Parse fields JSON if it exists
-    const form: any = { ...result[0] };
+    const form = { ...result[0] };
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
@@ -2619,10 +2944,10 @@ Glo Head Spa`,
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        (form as any).fields = []; // Return empty array
+        form.fields = []; // Return empty array
       }
     } else {
-      (form as any).fields = []; // Ensure fields is always an array
+      form.fields = []; // Ensure fields is always an array
     }
     
     return form;
@@ -2673,7 +2998,7 @@ Glo Head Spa`,
       .returning();
     
     // Parse fields from JSON string to array, similar to getForm method
-    const form: any = { ...result[0] };
+    const form = { ...result[0] };
     if (form.fields) {
       try {
         // Handle double-encoded JSON strings
@@ -2690,10 +3015,10 @@ Glo Head Spa`,
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        (form as any).fields = []; // Return empty array
+        form.fields = []; // Return empty array
       }
     } else {
-      (form as any).fields = []; // Ensure fields is always an array
+      form.fields = []; // Ensure fields is always an array
     }
     
     return form;
@@ -3392,6 +3717,155 @@ Glo Head Spa`,
   async deleteNoteHistory(id: number): Promise<boolean> {
     const result = await db.delete(noteHistory).where(eq(noteHistory.id, id));
     return result.rowCount > 0;
+  }
+
+  // Permission operations
+  async createPermission(permission: any): Promise<any> {
+    // For now, return a placeholder since we need to implement the actual table structure
+    console.log('Creating permission:', permission);
+    return permission;
+  }
+
+  async getPermission(id: number): Promise<any | undefined> {
+    // For now, return undefined since we need to implement the actual table structure
+    console.log('Getting permission by ID:', id);
+    return undefined;
+  }
+
+  async getAllPermissions(): Promise<any[]> {
+    try {
+      const result = await db.select().from(permissions).where(eq(permissions.isActive, true));
+      return result;
+    } catch (error) {
+      console.error('Error getting all permissions:', error);
+      return [];
+    }
+  }
+
+  async getPermissionsByCategory(category: string): Promise<any[]> {
+    // For now, return empty array since we need to implement the actual table structure
+    console.log('Getting permissions by category:', category);
+    return [];
+  }
+
+  async updatePermission(id: number, permissionData: any): Promise<any> {
+    // For now, return the data since we need to implement the actual table structure
+    console.log('Updating permission:', id, permissionData);
+    return permissionData;
+  }
+
+  async deletePermission(id: number): Promise<boolean> {
+    // For now, return false since we need to implement the actual table structure
+    console.log('Deleting permission:', id);
+    return false;
+  }
+
+  // Permission Group operations
+  async createPermissionGroup(group: any): Promise<any> {
+    // For now, return the group since we need to implement the actual table structure
+    console.log('Creating permission group:', group);
+    return group;
+  }
+
+  async getPermissionGroup(id: number): Promise<any | undefined> {
+    // For now, return undefined since we need to implement the actual table structure
+    console.log('Getting permission group by ID:', id);
+    return undefined;
+  }
+
+  async getAllPermissionGroups(): Promise<any[]> {
+    try {
+      const result = await db.select().from(permissionGroups).where(eq(permissionGroups.isActive, true));
+      return result;
+    } catch (error) {
+      console.error('Error getting all permission groups:', error);
+      return [];
+    }
+  }
+
+  async updatePermissionGroup(id: number, groupData: any): Promise<any> {
+    // For now, return the data since we need to implement the actual table structure
+    console.log('Updating permission group:', id, groupData);
+    return groupData;
+  }
+
+  async deletePermissionGroup(id: number): Promise<boolean> {
+    // For now, return false since we need to implement the actual table structure
+    console.log('Deleting permission group:', id);
+    return false;
+  }
+
+  async assignPermissionsToGroup(groupId: number, permissionIds: number[]): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Assigning permissions to group:', groupId, permissionIds);
+  }
+
+  async removePermissionsFromGroup(groupId: number, permissionIds: number[]): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Removing permissions from group:', groupId, permissionIds);
+  }
+
+  // User Permission operations
+  async assignPermissionGroupToUser(userId: number, groupId: number): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Assigning permission group to user:', userId, groupId);
+  }
+
+  async removePermissionGroupFromUser(userId: number, groupId: number): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Removing permission group from user:', userId, groupId);
+  }
+
+  async getUserPermissionGroups(userId: number): Promise<any[]> {
+    try {
+      const result = await db
+        .select({
+          id: permissionGroups.id,
+          name: permissionGroups.name,
+          description: permissionGroups.description,
+          isActive: permissionGroups.isActive,
+          isSystem: permissionGroups.isSystem,
+          assignedAt: userPermissionGroups.assignedAt,
+          expiresAt: userPermissionGroups.expiresAt
+        })
+        .from(userPermissionGroups)
+        .innerJoin(permissionGroups, eq(userPermissionGroups.groupId, permissionGroups.id))
+        .where(and(
+          eq(userPermissionGroups.userId, userId),
+          eq(permissionGroups.isActive, true)
+        ));
+      return result;
+    } catch (error) {
+      console.error('Error getting user permission groups:', error);
+      return [];
+    }
+  }
+
+  async grantDirectPermission(userId: number, permissionId: number): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Granting direct permission to user:', userId, permissionId);
+  }
+
+  async denyDirectPermission(userId: number, permissionId: number): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Denying direct permission to user:', userId, permissionId);
+  }
+
+  async removeDirectPermission(userId: number, permissionId: number): Promise<void> {
+    // For now, just log since we need to implement the actual table structure
+    console.log('Removing direct permission from user:', userId, permissionId);
+  }
+
+  async getUserDirectPermissions(userId: number): Promise<any[]> {
+    // For now, return empty array since we need to implement the actual table structure
+    console.log('Getting user direct permissions:', userId);
+    return [];
+  }
+
+  async getUserAllPermissions(userId: number): Promise<any[]> {
+    // For now, return empty array since we need to implement the actual table structure
+    console.log('Getting user all permissions:', userId);
+    return [];
   }
 }
 

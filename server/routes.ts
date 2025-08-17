@@ -42,19 +42,39 @@ import {
   triggerCustomAutomation,
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
-import { PayrollAutoSync } from "./payroll-auto-sync";
-import { AutoRenewalService } from "./auto-renewal-service";
+
 import { insertPhoneCallSchema, insertCallRecordingSchema } from "@shared/schema";
 import { registerExternalRoutes } from "./external-api";
 import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
 import { AutoRespondService } from "./auto-respond-service";
 import { SMSAutoRespondService } from "./sms-auto-respond-service";
+import { SMSStructuredAssistant } from "./sms-structured-assistant";
 import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes, registerLocationRoutes } from "./routes/index";
-
+import { registerPermissionRoutes } from "./routes/permissions";
+import { registerReportRoutes } from "./routes/reports";
+import { registerMarketingRoutes } from "./routes/marketing";
+import { emailMarketingRoutes, initializeEmailMarketingRoutes } from "./routes/email-marketing";
 import { getConfigStatus, validateConfig, DatabaseConfig } from "./config";
 import { hashPassword, comparePassword } from "./utils/password";
+import { getFormPublicUrl, debugUrlConfig } from "./utils/url";
 import { insertUserSchema, updateUserSchema } from "@shared/schema";
+
+// Extend Express Request interface to include user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: number;
+        username: string;
+        email: string;
+        role: string;
+        firstName?: string;
+        lastName?: string;
+      };
+    }
+  }
+}
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
@@ -84,71 +104,47 @@ function validateBody<T>(schema: z.ZodType<T>) {
   };
 }
 
-// Extend Express Request interface to include user property
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        id: number;
-        username: string;
-        email: string;
-        role: string;
-        firstName?: string;
-        lastName?: string;
-      };
-    }
-  }
-}
-
-// Custom schema for service with staff assignments
-const serviceWithStaffSchema = insertServiceSchema.extend({
-  assignedStaff: z.array(z.object({
-    staffId: z.number(),
-    customRate: z.number().optional(),
-    customCommissionRate: z.number().optional(),
-  })).optional(),
-});
-
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
   customRate: z.number().nullable().optional(),
   customCommissionRate: z.number().nullable().optional(),
 });
 
-// Initialize Square
-
-
-
-
-
+// Helcim is now the primary payment processor
 
 export async function registerRoutes(app: Express, storage: IStorage, autoRenewalService?: any): Promise<Server> {
   // Create HTTP server
   const server = createServer(app);
-  
+
   // Initialize LLM Service
   const llmService = new LLMService(storage);
-  // Initialize PayrollAutoSync
-  const payrollAutoSync = new PayrollAutoSync(storage);
+  
+  // Initialize SMS Auto-Respond Service
+  const smsAutoRespondService = SMSAutoRespondService.getInstance(storage);
+  
+  // Initialize Email Auto-Respond Service
+  const autoRespondService = new AutoRespondService(storage);
+  
+  // Initialize SMS Structured Assistant
+  const smsStructuredAssistant = new SMSStructuredAssistant(storage);
 
   // Register modular routes
   registerAuthRoutes(app, storage);
   registerUserRoutes(app, storage);
   registerAppointmentRoutes(app, storage);
   registerAppointmentPhotoRoutes(app, storage);
+  // registerPaymentRoutes(app, storage); // Temporarily disabled to test Helcim payment
   registerServiceRoutes(app, storage);
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
   registerLocationRoutes(app);
-
-
+  registerReportRoutes(app, storage);
+  registerPermissionRoutes(app, storage);
+  registerMarketingRoutes(app, storage);
   
-
-
-
-
-
-
+  // Initialize and register email marketing routes
+  initializeEmailMarketingRoutes(storage);
+  app.use('/api/email-marketing', emailMarketingRoutes);
 
 
 
@@ -169,12 +165,25 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     
     // Hash password and create new client
     const hashedPassword = await hashPassword(password);
-    const newClient = await storage.createUser({
+    
+    // Ensure default values are set for email preferences
+    const clientData = {
       ...req.body,
       username,
       password: hashedPassword,
-      role: "client"
-    });
+      role: "client",
+      // Set default values for email and SMS preferences
+      emailAppointmentReminders: req.body.emailAppointmentReminders !== undefined ? req.body.emailAppointmentReminders : true,
+      smsAppointmentReminders: req.body.smsAppointmentReminders !== undefined ? req.body.smsAppointmentReminders : true,
+      emailAccountManagement: req.body.emailAccountManagement !== undefined ? req.body.emailAccountManagement : true,
+      smsAccountManagement: req.body.smsAccountManagement !== undefined ? req.body.smsAccountManagement : false,
+      emailPromotions: req.body.emailPromotions !== undefined ? req.body.emailPromotions : false,
+      smsPromotions: req.body.smsPromotions !== undefined ? req.body.smsPromotions : false
+    };
+    
+    console.log('Creating client with data:', JSON.stringify(clientData, null, 2));
+    
+    const newClient = await storage.createUser(clientData);
     
     // Remove password from response
     const { password: _, ...clientWithoutPassword } = newClient;
@@ -715,110 +724,6 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
   
-  // Services routes
-  app.get("/api/services", async (req, res) => {
-    const { categoryId, locationId } = req.query;
-    
-    let services;
-    if (categoryId) {
-      services = await storage.getServicesByCategory(parseInt(categoryId as string));
-    } else {
-      services = await storage.getAllServices();
-    }
-    
-    // Filter by location if specified
-    if (locationId) {
-      const filteredServices = services.filter(service => service.locationId === parseInt(locationId as string));
-      // If no services found for the location, return all services (fallback)
-      if (filteredServices.length === 0) {
-        console.log(`No services found for location ${locationId}, returning all services as fallback`);
-      } else {
-        services = filteredServices;
-      }
-    }
-    
-    return res.status(200).json(services);
-  });
-  
-  app.post("/api/services", validateBody(serviceWithStaffSchema), async (req, res) => {
-    const { assignedStaff, ...serviceData } = req.body;
-    const newService = await storage.createService(serviceData);
-    
-    // Handle staff assignments with custom rates
-    if (assignedStaff && assignedStaff.length > 0) {
-      for (const assignment of assignedStaff) {
-        await storage.assignServiceToStaff({
-          staffId: assignment.staffId,
-          serviceId: newService.id,
-          customRate: assignment.customRate || null,
-          customCommissionRate: assignment.customCommissionRate || null,
-        });
-      }
-    }
-    
-    return res.status(201).json(newService);
-  });
-  
-  app.get("/api/services/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const service = await storage.getService(id);
-    
-    if (!service) {
-      return res.status(404).json({ error: "Service not found" });
-    }
-    
-    return res.status(200).json(service);
-  });
-  
-  app.put("/api/services/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const { assignedStaff, ...serviceData } = req.body;
-    
-    console.log("Backend received update request for service:", id);
-    console.log("Backend received assignedStaff:", assignedStaff);
-    console.log("Backend received serviceData:", serviceData);
-    
-    try {
-      // Update basic service data first
-      const updatedService = await storage.updateService(id, serviceData);
-      
-      // Handle staff assignments with custom rates
-      if (assignedStaff && Array.isArray(assignedStaff)) {
-        // Remove all existing staff assignments for this service
-        const existingAssignments = await storage.getStaffServicesByService(id);
-        for (const assignment of existingAssignments) {
-          await storage.removeServiceFromStaff(assignment.staffId, assignment.serviceId);
-        }
-        
-        // Add new assignments with custom rates
-        for (const assignment of assignedStaff) {
-          await storage.assignServiceToStaff({
-            staffId: assignment.staffId,
-            serviceId: id,
-            customRate: assignment.customRate || null,
-            customCommissionRate: assignment.customCommissionRate || null,
-          });
-        }
-      }
-      
-      return res.status(200).json(updatedService);
-    } catch (error) {
-      console.error("Service update error:", error);
-      return res.status(404).json({ error: "Service not found" });
-    }
-  });
-  
-  app.delete("/api/services/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const deleted = await storage.deleteService(id);
-    
-    if (!deleted) {
-      return res.status(404).json({ error: "Service not found" });
-    }
-    
-    return res.status(204).end();
-  });
-  
   // Staff routes
   app.get("/api/staff", async (req, res) => {
     try {
@@ -1158,6 +1063,62 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     return res.status(204).end();
   });
   
+  // Staff Schedules routes
+  app.get("/api/schedules", async (req, res) => {
+    try {
+      const { staffId } = req.query;
+      
+      let schedules;
+      if (staffId) {
+        schedules = await storage.getStaffSchedulesByStaffId(parseInt(staffId as string));
+      } else {
+        // Get all schedules from all staff
+        schedules = await storage.getAllStaffSchedules();
+      }
+      
+      return res.status(200).json(schedules);
+    } catch (error) {
+      console.error('Error in schedules GET route:', error);
+      return res.status(500).json({ error: 'Failed to fetch schedules' });
+    }
+  });
+
+  app.post("/api/schedules", validateBody(insertStaffScheduleSchema), async (req, res) => {
+    try {
+      const newSchedule = await storage.createStaffSchedule(req.body);
+      return res.status(201).json(newSchedule);
+    } catch (error) {
+      console.error('Error in schedules POST route:', error);
+      return res.status(500).json({ error: 'Failed to create schedule' });
+    }
+  });
+
+  app.put("/api/schedules/:id", validateBody(insertStaffScheduleSchema.partial()), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const updatedSchedule = await storage.updateStaffSchedule(id, req.body);
+      return res.status(200).json(updatedSchedule);
+    } catch (error) {
+      console.error('Error in schedules PUT route:', error);
+      return res.status(500).json({ error: 'Failed to update schedule' });
+    }
+  });
+
+  app.delete("/api/schedules/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteStaffSchedule(id);
+      if (deleted) {
+        return res.status(204).end();
+      } else {
+        return res.status(404).json({ error: 'Schedule not found' });
+      }
+    } catch (error) {
+      console.error('Error in schedules DELETE route:', error);
+      return res.status(500).json({ error: 'Failed to delete schedule' });
+    }
+  });
+  
   // Appointments routes
   app.get("/api/appointments", async (req, res) => {
     try {
@@ -1457,11 +1418,13 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
     
     // Trigger booking confirmation automation
-    try {
+    // DISABLED: This was causing duplicate SMS confirmations since SMS confirmations are handled directly in the appointment creation logic
+    // SMS confirmations are sent directly in the appointment creation route, so automation is not needed here
+    /* try {
       await triggerBookingConfirmation(newAppointment, storage);
     } catch (error) {
       console.error('Failed to trigger booking confirmation automation:', error);
-    }
+    } */
     
     return res.status(201).json(newAppointment);
   });
@@ -1656,20 +1619,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         }
       }
 
-      // Trigger automations based on payment status changes
-      if (existingAppointment && req.body.paymentStatus && existingAppointment.paymentStatus !== req.body.paymentStatus) {
-        try {
-          if (req.body.paymentStatus === 'paid') {
-            console.log('Payment status changed to paid, triggering after payment automations');
-    
-            await triggerCustomAutomation(updatedAppointment, storage, 'checkout completion');
-            await triggerCustomAutomation(updatedAppointment, storage, 'service checkout');
-            console.log('Payment status change automation triggers executed successfully');
-          }
-        } catch (error) {
-          console.error('Failed to trigger payment status change automation:', error);
-        }
-      }
+
       
       return res.status(200).json(updatedAppointment);
     } catch (error) {
@@ -1929,218 +1879,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error('Error updating auto-renewal settings:', error);
       res.status(500).json({ error: "Error updating auto-renewal settings: " + error.message });
     }
-  });
-  
 
-
-  // Cash payment confirmation route
-  app.post("/api/confirm-cash-payment", async (req, res) => {
-    try {
-      const { appointmentId } = req.body;
-      
-      if (!appointmentId) {
-        return res.status(400).json({ error: "Appointment ID is required" });
-      }
-
-      // Get the appointment to verify it exists and get amount
-      const appointment = await storage.getAppointment(appointmentId);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-
-      // Calculate payment amount - use totalAmount if set, otherwise get from service price
-      let paymentAmount = appointment.totalAmount;
-      console.log('Initial paymentAmount from appointment.totalAmount:', paymentAmount);
-      if (!paymentAmount) {
-        const service = await storage.getService(appointment.serviceId);
-        console.log('Service found:', service);
-        paymentAmount = service?.price || 0;
-        console.log('PaymentAmount calculated from service price:', paymentAmount);
-        
-        // Update the appointment with the correct totalAmount for future use
-        await storage.updateAppointment(appointmentId, {
-          status: 'confirmed',
-          paymentStatus: 'paid',
-          totalAmount: paymentAmount
-        });
-      } else {
-        // Update appointment status to paid
-        await storage.updateAppointment(appointmentId, {
-          status: 'confirmed',
-          paymentStatus: 'paid'
-        });
-      }
-
-      console.log('Final paymentAmount for payment creation:', paymentAmount);
-
-      // Create payment record for cash payment
-      const payment = await storage.createPayment({
-        clientId: appointment.clientId,
-        amount: paymentAmount,
-        totalAmount: paymentAmount,
-        method: 'cash',
-        status: 'completed',
-        type: 'appointment',
-        appointmentId: appointmentId
-      });
-
-      // Trigger automatic payroll sync for staff member
-      if (appointment.staffId) {
-        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
-      }
-
-      // Create sales history record
-      await createSalesHistoryRecord(payment, 'appointment');
-
-      // Create notification for payment received
-      try {
-        const client = await storage.getUser(appointment.clientId);
-        await storage.createNotification({
-          type: 'payment_received',
-          title: 'Payment received',
-          description: `$${payment.amount} received from ${client?.firstName} ${client?.lastName}`,
-          relatedId: payment.id,
-          relatedType: 'payment'
-        });
-      } catch (error) {
-        console.error('Failed to create payment notification:', error);
-      }
-
-      // Trigger custom automations for checkout completion
-      try {
-
-        await triggerCustomAutomation(appointment, storage, 'checkout completion');
-        await triggerCustomAutomation(appointment, storage, 'service checkout');
-        console.log('Checkout automation triggers executed successfully');
-      } catch (error) {
-        console.error('Failed to trigger checkout automations:', error);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Cash payment confirmed successfully",
-        appointment 
-      });
-    } catch (error: any) {
-      console.error('Cash payment confirmation error:', error);
-      res.status(500).json({ 
-        error: "Error confirming cash payment: " + error.message 
-      });
-    }
-  });
-
-  // Gift card payment confirmation route
-  app.post("/api/confirm-gift-card-payment", async (req, res) => {
-    try {
-      const { appointmentId, giftCardCode } = req.body;
-      
-      if (!appointmentId || !giftCardCode) {
-        return res.status(400).json({ error: "Appointment ID and gift card code are required" });
-      }
-
-      // Get the appointment to verify it exists and get amount
-      const appointment = await storage.getAppointment(appointmentId);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-
-      // Get the gift card by code
-      const giftCard = await storage.getGiftCardByCode(giftCardCode);
-      if (!giftCard) {
-        return res.status(404).json({ error: "Gift card not found" });
-      }
-
-      // Check if gift card is active
-      if (giftCard.status !== 'active') {
-        return res.status(400).json({ error: "Gift card is not active" });
-      }
-
-      // Check if gift card has expired
-      if (giftCard.expiryDate && new Date() > giftCard.expiryDate) {
-        return res.status(400).json({ error: "Gift card has expired" });
-      }
-
-      // Calculate payment amount - use totalAmount if set, otherwise get from service price
-      let appointmentAmount = appointment.totalAmount;
-      if (!appointmentAmount) {
-        const service = await storage.getService(appointment.serviceId);
-        appointmentAmount = service?.price || 0;
-      }
-
-      // Check if gift card has sufficient balance
-      if (giftCard.currentBalance < appointmentAmount) {
-        return res.status(400).json({ 
-          error: `Insufficient gift card balance. Available: $${giftCard.currentBalance.toFixed(2)}, Required: $${appointmentAmount.toFixed(2)}` 
-        });
-      }
-
-      // Deduct amount from gift card
-      const newBalance = giftCard.currentBalance - appointmentAmount;
-      await storage.updateGiftCard(giftCard.id, {
-        currentBalance: newBalance,
-        status: newBalance <= 0 ? 'used' : 'active'
-      });
-
-      // Create gift card transaction record
-      await storage.createGiftCardTransaction({
-        giftCardId: giftCard.id,
-        appointmentId: appointmentId,
-        transactionType: 'redemption',
-        amount: appointmentAmount,
-        balanceAfter: newBalance,
-        notes: `Payment for appointment #${appointmentId}`
-      });
-
-      // Update appointment status to paid and set totalAmount if missing
-      const updateData: any = {
-        status: 'confirmed',
-        paymentStatus: 'paid'
-      };
-      
-      // If appointment didn't have totalAmount set, update it for future use
-      if (!appointment.totalAmount) {
-        updateData.totalAmount = appointmentAmount;
-      }
-      
-      await storage.updateAppointment(appointmentId, updateData);
-
-      // Create payment record for gift card payment
-      await storage.createPayment({
-        clientId: appointment.clientId,
-        amount: appointmentAmount,
-        totalAmount: appointmentAmount,
-        method: 'gift_card',
-        status: 'completed',
-        appointmentId: appointmentId
-      });
-
-      // Trigger automatic payroll sync for staff member
-      if (appointment.staffId) {
-        payrollAutoSync.triggerPayrollSync(appointment.staffId, 'appointment');
-      }
-
-      // Trigger custom automations for checkout completion
-      try {
-        await triggerCustomAutomation(appointment, storage, 'checkout completion');
-        await triggerCustomAutomation(appointment, storage, 'service checkout');
-        console.log('Checkout automation triggers executed successfully');
-      } catch (error) {
-        console.error('Failed to trigger checkout automations:', error);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Gift card payment processed successfully",
-        remainingBalance: newBalance,
-        appointment 
-      });
-    } catch (error: any) {
-      console.error('Gift card payment confirmation error:', error);
-      res.status(500).json({ 
-        error: "Error processing gift card payment: " + error.message 
-      });
-    }
-  });
 
   // Gift card management routes
   app.post("/api/add-gift-card", async (req, res) => {
@@ -2266,9 +2005,46 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Purchase gift certificate route
   app.post("/api/gift-certificates/purchase", async (req, res) => {
     try {
-      const { amount, recipientName, recipientEmail, purchaserName, purchaserEmail, message } = req.body;
+      console.log('🎁 BREADCRUMB 1: Gift certificate purchase request received');
+      console.log('Request body:', JSON.stringify(req.body, null, 2));
       
-      // Generate unique gift certificate code
+      const { amount, recipientName, recipientEmail, purchaserName, purchaserEmail, message, paymentId } = req.body;
+      
+      // STEP 1: Verify payment was successful
+      if (!paymentId) {
+        console.error('❌ BREADCRUMB ERROR: Gift certificate purchase attempted without payment ID');
+        return res.status(400).json({ 
+          error: "Payment verification required. Please complete payment first." 
+        });
+      }
+
+      console.log('🎁 BREADCRUMB 2: Payment ID received:', paymentId);
+
+      // Check if payment exists and was successful
+      const payment = await storage.getPayment(paymentId);
+      if (!payment) {
+        console.error('❌ BREADCRUMB ERROR: Payment not found for gift certificate purchase:', paymentId);
+        return res.status(400).json({ 
+          error: "Payment not found. Please complete payment first." 
+        });
+      }
+
+      console.log('🎁 BREADCRUMB 3: Payment found:', {
+        paymentId,
+        status: payment.status,
+        amount: payment.totalAmount
+      });
+
+      if (payment.status !== 'completed') {
+        console.error('❌ BREADCRUMB ERROR: Payment not completed for gift certificate purchase:', paymentId, payment.status);
+        return res.status(400).json({ 
+          error: `Payment not completed. Status: ${payment.status}` 
+        });
+      }
+
+      console.log('✅ BREADCRUMB 4: Payment verified successfully for gift certificate purchase');
+
+      // STEP 2: Generate unique gift certificate code
       const generateCode = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let code = '';
@@ -2287,11 +2063,13 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         existingCard = await storage.getGiftCardByCode(giftCardCode);
       }
 
+      console.log('🎁 BREADCRUMB 5: Generated unique gift card code:', giftCardCode);
+
       // Set expiry date to 1 year from now
       const expiryDate = new Date();
       expiryDate.setFullYear(expiryDate.getFullYear() + 1);
 
-      // Create gift card in database
+      // STEP 3: Create gift card in database
       const giftCard = await storage.createGiftCard({
         code: giftCardCode,
         initialAmount: amount,
@@ -2302,7 +2080,15 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         expiryDate: expiryDate
       });
 
-      // Create gift card transaction record
+      console.log('✅ BREADCRUMB 6: Gift card created in database:', {
+        giftCardId: giftCard.id,
+        code: giftCard.code,
+        amount: giftCard.initialAmount,
+        recipientEmail: giftCard.issuedToEmail,
+        recipientName: giftCard.issuedToName
+      });
+
+      // STEP 4: Create gift card transaction record
       await storage.createGiftCardTransaction({
         giftCardId: giftCard.id,
         transactionType: 'purchase',
@@ -2310,6 +2096,107 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         balanceAfter: amount,
         notes: `Purchased by ${purchaserName} (${purchaserEmail})${message ? ` - Message: ${message}` : ''}`
       });
+
+      console.log('✅ BREADCRUMB 7: Gift card transaction record created');
+
+      // STEP 5: Prepare email data
+      console.log('🎁 BREADCRUMB 8: Preparing email data for gift certificate confirmation');
+      
+      const emailData = {
+        recipientEmail: recipientEmail,
+        recipientName: recipientName,
+        purchaserName: purchaserName,
+        purchaserEmail: purchaserEmail,
+        giftCardCode: giftCardCode,
+        amount: amount,
+        message: message,
+        expiryDate: expiryDate
+      };
+
+      console.log('🎁 BREADCRUMB 9: Email data prepared:', JSON.stringify(emailData, null, 2));
+
+      // STEP 6: Send gift certificate confirmation email
+      console.log('🎁 BREADCRUMB 10: About to call sendEmail function for gift certificate confirmation');
+      
+      try {
+        const emailResult = await sendEmail({
+          to: recipientEmail,
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+          subject: 'Your Gift Certificate from Glo Head Spa',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #9532b8;">Glo Head Spa</h1>
+                <h2 style="color: #333;">Gift Certificate</h2>
+              </div>
+              
+              <p>Dear ${recipientName},</p>
+              
+              <p>You have received a gift certificate from <strong>${purchaserName}</strong>!</p>
+              
+              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #9532b8; margin-top: 0;">Gift Certificate Details</h3>
+                <p><strong>Amount:</strong> $${amount.toFixed(2)}</p>
+                <p><strong>Code:</strong> <span style="font-family: monospace; background-color: #e9ecef; padding: 4px 8px; border-radius: 4px;">${giftCardCode}</span></p>
+                <p><strong>Expires:</strong> ${expiryDate.toLocaleDateString()}</p>
+                ${message ? `<p><strong>Message:</strong> "${message}"</p>` : ''}
+              </div>
+              
+              <p>To use your gift certificate:</p>
+              <ol>
+                <li>Book an appointment online at <a href="https://gloupheadspa.app">gloupheadspa.app</a></li>
+                <li>During checkout, enter your gift certificate code: <strong>${giftCardCode}</strong></li>
+                <li>Your gift certificate will be applied to your appointment</li>
+              </ol>
+              
+              <p>If you have any questions, please contact us.</p>
+              
+              <p>Thank you for choosing Glo Head Spa!</p>
+              
+              <hr style="border: 1px solid #eee; margin: 30px 0;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                This gift certificate was purchased by ${purchaserName} (${purchaserEmail})
+              </p>
+            </div>
+          `,
+          text: `
+Gift Certificate from Glo Head Spa
+
+Dear ${recipientName},
+
+You have received a gift certificate from ${purchaserName}!
+
+Gift Certificate Details:
+- Amount: $${amount.toFixed(2)}
+- Code: ${giftCardCode}
+- Expires: ${expiryDate.toLocaleDateString()}
+${message ? `- Message: "${message}"` : ''}
+
+To use your gift certificate:
+1. Book an appointment online at gloupheadspa.app
+2. During checkout, enter your gift certificate code: ${giftCardCode}
+3. Your gift certificate will be applied to your appointment
+
+If you have any questions, please contact us.
+
+Thank you for choosing Glo Head Spa!
+
+This gift certificate was purchased by ${purchaserName} (${purchaserEmail})
+          `
+        });
+
+        console.log('✅ BREADCRUMB 11: Email function call completed successfully');
+        console.log('Email result:', emailResult);
+        
+      } catch (emailError) {
+        console.error('❌ BREADCRUMB ERROR: Email sending failed:', emailError);
+        console.error('Email error details:', JSON.stringify(emailError, null, 2));
+        
+        // Continue with the response even if email fails
+        console.log('⚠️ Continuing with gift certificate creation despite email failure');
+      }
+
+      console.log('✅ BREADCRUMB 12: Gift certificate purchase process completed successfully');
 
       res.json({
         success: true,
@@ -2326,7 +2213,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       });
 
     } catch (error: any) {
-      console.error('Gift certificate purchase error:', error);
+      console.error('❌ BREADCRUMB ERROR: Gift certificate purchase process failed:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       res.status(500).json({ 
         error: "Error purchasing gift certificate: " + error.message 
       });
@@ -2358,4471 +2246,29 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   });
 
 
-    try {
-      const { amount, tipAmount = 0, appointmentId, description, type = "appointment_payment", sourceId } = req.body;
-      
-      if (!amount || !sourceId) {
-        return res.status(400).json({ error: "Amount and payment source are required" });
-      }
 
-      const totalAmount = amount + tipAmount;
 
-      // Handle cash payments first
-      if (sourceId === "cash") {
-        const payment = {
-          id: `cash_${Date.now()}`,
-          status: 'COMPLETED',
-          amountMoney: {
-            amount: Math.round(totalAmount * 100),
-            currency: 'USD'
-          }
-        };
-        
-        // Get appointment to get client ID
-        let clientId = 1; // Default client ID
-        if (appointmentId) {
-          try {
-            const appointment = await storage.getAppointment(appointmentId);
-            if (appointment && appointment.clientId) {
-              clientId = appointment.clientId;
-            }
-          } catch (error) {
-            console.error('Error getting appointment for client ID:', error);
-          }
-        }
-        
-        // Save cash payment record to database
-        const paymentRecord = await storage.createPayment({
-          clientId: clientId,
-          amount: amount,
-          tipAmount: tipAmount,
-          totalAmount: totalAmount,
-          method: 'cash',
-          status: 'completed',
-          type: type,
-          description: description || (type === "pos_payment" ? "POS Cash Transaction" : "Cash Payment"),
-          paymentDate: new Date(),
-          appointmentId: appointmentId || null
-        });
 
-        // Create sales history record
-        if (type === "pos_payment") {
-          await createSalesHistoryRecord(paymentRecord, 'pos_sale');
-        } else if (appointmentId) {
-          await createSalesHistoryRecord(paymentRecord, 'appointment');
-        }
-        
-        console.log('Cash payment record saved to database:', paymentRecord);
-        
-        return res.json({ 
-          payment: payment,
-          paymentId: payment.id
-        });
-      }
 
-      // Use direct Square API call instead of SDK
-      const paymentData = {
-        source_id: sourceId,
-        amount_money: {
-          amount: Math.round(totalAmount * 100), // Convert to cents
-          currency: 'USD'
-        },
-        idempotency_key: `${Date.now()}-${Math.random()}`,
-        note: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
-        reference_id: appointmentId?.toString() || "",
-        location_id: process.env.SQUARE_LOCATION_ID
-      };
 
-      console.log('Making direct Square API payment request:', JSON.stringify(paymentData, null, 2));
-      
-      const squareResponse = await fetch('https://connect.squareup.com/v2/payments', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${squareAccessToken}`,
-          'Content-Type': 'application/json',
-          'Square-Version': '2023-10-18'
-        },
-        body: JSON.stringify(paymentData)
-      });
 
-      const responseData = await squareResponse.json();
-      console.log('Square API response:', JSON.stringify(responseData, null, 2));
-      
-      if (!squareResponse.ok || responseData.payment?.status === 'FAILED') {
-        console.log('Square payment failed:', responseData);
-        
-        // Extract meaningful error message for common decline reasons
-        let errorMessage = 'Payment declined';
-        if (responseData.payment?.card_details?.errors?.length > 0) {
-          const cardError = responseData.payment.card_details.errors[0];
-          switch(cardError.code) {
-            case 'GENERIC_DECLINE':
-              errorMessage = 'Card declined by issuing bank. Please try a different card or payment method.';
-              break;
-            case 'INSUFFICIENT_FUNDS':
-              errorMessage = 'Insufficient funds. Please try a different card.';
-              break;
-            case 'CVV_FAILURE':
-              errorMessage = 'CVV verification failed. Please check your security code.';
-              break;
-            case 'INVALID_CARD':
-              errorMessage = 'Invalid card information. Please check your card details.';
-              break;
-            case 'CARD_EXPIRED':
-              errorMessage = 'Card has expired. Please use a different card.';
-              break;
-            default:
-              errorMessage = cardError.detail || 'Payment declined. Please try a different card.';
-          }
-        } else if (responseData.errors?.length > 0) {
-          errorMessage = responseData.errors[0].detail || 'Payment processing failed';
-        }
-        
-        throw new Error(errorMessage);
-      }
 
-      const response = { payment: responseData.payment };
 
-      // Save payment record to database if Square payment was successful
-      if (response.payment && response.payment.status === 'COMPLETED') {
-        const paymentRecord = await storage.createPayment({
-          clientId: 1, // Default client for POS sales, could be made dynamic
-          amount: amount,
-          tipAmount: tipAmount,
-          totalAmount: totalAmount,
-          method: 'card',
-          status: 'completed',
-          type: type,
-          description: description || (type === "pos_payment" ? "POS Transaction" : "Appointment Payment"),
-          squarePaymentId: response.payment.id,
-          paymentDate: new Date(),
-          appointmentId: appointmentId || null
-        });
-        
-        console.log('Payment record saved to database:', paymentRecord);
-      }
+  
 
-      res.json({ 
-        payment: response.payment,
-        paymentId: response.payment?.id
-      });
-    } catch (error: any) {
-      console.error('Square payment creation error:', error);
-      res.status(500).json({ 
-        error: "Error creating payment: " + error.message 
-      });
-    }
-  });
-
-  // Square Terminal integration for in-person payments
-  app.post("/api/square-terminal/payment", async (req, res) => {
-    try {
-      const { 
-        amount, 
-        tipAmount = 0, 
-        appointmentId, 
-        description, 
-        type = "terminal_payment",
-        clientId 
-      } = req.body;
-      
-      if (!amount) {
-        return res.status(400).json({ error: "Amount is required" });
-      }
-
-      const totalAmount = amount + tipAmount;
-
-      // Create payment request for Square Terminal
-      const terminalPaymentData = {
-        amount_money: {
-          amount: Math.round(totalAmount * 100), // Convert to cents
-          currency: 'USD'
-        },
-        idempotency_key: `${Date.now()}-${Math.random()}`,
-        note: description || (type === "terminal_payment" ? "Terminal Transaction" : "Appointment Payment"),
-        reference_id: appointmentId?.toString() || "",
-        location_id: process.env.SQUARE_LOCATION_ID,
-        source_id: "terminal", // Indicates this is a terminal payment
-        tip_money: tipAmount > 0 ? {
-          amount: Math.round(tipAmount * 100),
-          currency: 'USD'
-        } : undefined
-      };
-
-      console.log('Creating Square Terminal payment request:', JSON.stringify(terminalPaymentData, null, 2));
-      
-      // Send payment request to Square Terminal
-      const terminalResponse = await fetch('https://connect.squareup.com/v2/payments', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${squareAccessToken}`,
-          'Content-Type': 'application/json',
-          'Square-Version': '2023-10-18'
-        },
-        body: JSON.stringify(terminalPaymentData)
-      });
-
-      const responseData = await terminalResponse.json();
-      console.log('Square Terminal response:', JSON.stringify(responseData, null, 2));
-      
-      if (!terminalResponse.ok || responseData.payment?.status === 'FAILED') {
-        console.log('Square Terminal payment failed:', responseData);
-        
-        let errorMessage = 'Terminal payment declined';
-        if (responseData.payment?.card_details?.errors?.length > 0) {
-          const cardError = responseData.payment.card_details.errors[0];
-          switch(cardError.code) {
-            case 'GENERIC_DECLINE':
-              errorMessage = 'Card declined by issuing bank. Please try a different card or payment method.';
-              break;
-            case 'INSUFFICIENT_FUNDS':
-              errorMessage = 'Insufficient funds. Please try a different card.';
-              break;
-            case 'CVV_FAILURE':
-              errorMessage = 'CVV verification failed. Please check your security code.';
-              break;
-            case 'INVALID_CARD':
-              errorMessage = 'Invalid card information. Please check your card details.';
-              break;
-            case 'CARD_EXPIRED':
-              errorMessage = 'Card has expired. Please use a different card.';
-              break;
-            default:
-              errorMessage = cardError.detail || 'Terminal payment declined. Please try a different card.';
-          }
-        } else if (responseData.errors?.length > 0) {
-          errorMessage = responseData.errors[0].detail || 'Terminal payment processing failed';
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const response = { payment: responseData.payment };
-
-      // Save payment record to database if Square Terminal payment was successful
-      if (response.payment && response.payment.status === 'COMPLETED') {
-        const paymentRecord = await storage.createPayment({
-          clientId: clientId || 1, // Default client for terminal sales
-          amount: amount,
-          tipAmount: tipAmount,
-          totalAmount: totalAmount,
-          method: 'terminal',
-          status: 'completed',
-          type: type,
-          description: description || (type === "terminal_payment" ? "Terminal Transaction" : "Appointment Payment"),
-          squarePaymentId: response.payment.id,
-          paymentDate: new Date(),
-          appointmentId: appointmentId || null
-        });
-        
-        console.log('Terminal payment record saved to database:', paymentRecord);
-
-        // Create sales history record
-        if (type === "terminal_payment") {
-          await createSalesHistoryRecord(paymentRecord, 'terminal_sale');
-        } else if (appointmentId) {
-          await createSalesHistoryRecord(paymentRecord, 'appointment');
-        }
-      }
-
-      res.json({ 
-        payment: response.payment,
-        paymentId: response.payment?.id,
-        success: true
-      });
-    } catch (error: any) {
-      console.error('Square Terminal payment error:', error);
-      res.status(500).json({ 
-        error: "Error processing terminal payment: " + error.message 
-      });
-    }
-  });
-
-  // Get Square Terminal status
-  app.get("/api/square-terminal/status", async (req, res) => {
-    try {
-      // Check if Square Terminal is connected and available
-      const terminalStatus = {
-        connected: true, // This would be checked via Square Terminal API
-        locationId: process.env.SQUARE_LOCATION_ID,
-        environment: squareEnvironment === SquareEnvironment.Production ? 'Production' : 'Sandbox',
-        lastSync: new Date().toISOString()
-      };
-
-      res.json(terminalStatus);
-    } catch (error: any) {
-      console.error('Square Terminal status check error:', error);
-      res.status(500).json({ 
-        error: "Error checking terminal status: " + error.message 
-      });
-    }
-  });
-
-  // Create Square Terminal checkout session
-  app.post("/api/square-terminal/checkout", async (req, res) => {
-    try {
-      const { 
-        amount, 
-        tipAmount = 0, 
-        appointmentId, 
-        description, 
-        clientId,
-        items = [] 
-      } = req.body;
-      
-      if (!amount) {
-        return res.status(400).json({ error: "Amount is required" });
-      }
-
-      const totalAmount = amount + tipAmount;
-
-      // Create checkout session for Square Terminal
-      const checkoutData = {
-        checkout: {
-          amount_money: {
-            amount: Math.round(totalAmount * 100),
-            currency: 'USD'
-          },
-          tip_money: tipAmount > 0 ? {
-            amount: Math.round(tipAmount * 100),
-            currency: 'USD'
-          } : undefined,
-          note: description || "Terminal Checkout",
-          reference_id: appointmentId?.toString() || "",
-          location_id: process.env.SQUARE_LOCATION_ID,
-          additional_recipients: items.length > 0 ? items.map((item: any) => ({
-            amount_money: {
-              amount: Math.round(item.price * 100),
-              currency: 'USD'
-            },
-            description: item.name
-          })) : undefined
-        }
-      };
-
-      console.log('Creating Square Terminal checkout session:', JSON.stringify(checkoutData, null, 2));
-      
-      // Create checkout session
-      const checkoutResponse = await fetch('https://connect.squareup.com/v2/checkouts', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${squareAccessToken}`,
-          'Content-Type': 'application/json',
-          'Square-Version': '2023-10-18'
-        },
-        body: JSON.stringify(checkoutData)
-      });
-
-      const responseData = await checkoutResponse.json();
-      console.log('Square Terminal checkout response:', JSON.stringify(responseData, null, 2));
-      
-      if (!checkoutResponse.ok) {
-        throw new Error(responseData.errors?.[0]?.detail || 'Failed to create checkout session');
-      }
-
-      res.json({ 
-        checkout: responseData.checkout,
-        checkoutId: responseData.checkout?.id,
-        success: true
-      });
-    } catch (error: any) {
-      console.error('Square Terminal checkout error:', error);
-      res.status(500).json({ 
-        error: "Error creating terminal checkout: " + error.message 
-      });
-    }
-  });
-
-  // Test Square connection
-  app.get("/api/test-square-connection", async (req, res) => {
-    try {
-      // Test Square payments API connection
-      
-      res.json({
-        status: "connected",
-        environment: squareEnvironment,
-        applicationId: squareApplicationId,
-        hasAccessToken: !!squareAccessToken
-      });
-    } catch (error: any) {
-      console.error('Square connection test error:', error);
-      res.status(500).json({ 
-        status: "error",
-        error: error.message 
-      });
-    }
-  });
 
 
 
   // Helper function to calculate staff earnings based on custom rates or defaults
   const calculateStaffEarnings = async (appointment: any, service: any) => {
     try {
-      // Get staff member
-      const staff = await storage.getStaff(appointment.staffId);
-      if (!staff) return null;
-
-      // Get staff service assignment to check for custom rates
-      const staffServices = await storage.getStaffServicesByService(service.id);
-      const staffService = staffServices.find((ss: any) => ss.staffId === appointment.staffId);
-
-      const servicePrice = service.price || 0;
-      let staffEarnings = 0;
-
-      if (staff.commissionType === 'commission') {
-        // Use custom commission rate if available, otherwise use default
-        const commissionRate = staffService?.customCommissionRate ?? staff.commissionRate ?? 0;
-        staffEarnings = servicePrice * (commissionRate / 100);
-      } else if (staff.commissionType === 'hourly') {
-        // Use custom hourly rate if available, otherwise use default
-        const hourlyRate = staffService?.customRate ?? staff.hourlyRate ?? 0;
-        const serviceDuration = service.duration || 60; // Duration in minutes
-        const hours = serviceDuration / 60;
-        staffEarnings = hourlyRate * hours;
-      } else if (staff.commissionType === 'fixed') {
-        // Use custom fixed rate if available, otherwise use default
-        staffEarnings = staffService?.customRate ?? staff.fixedRate ?? 0;
-      }
-
-      console.log('Staff earnings calculation:', {
-        staffId: appointment.staffId,
-        servicePrice,
-        commissionType: staff.commissionType,
-        customRate: staffService?.customRate,
-        customCommissionRate: staffService?.customCommissionRate,
-        defaultRate: staff.hourlyRate || staff.fixedRate || staff.commissionRate,
-        calculatedEarnings: staffEarnings
-      });
-
-      return {
-        staffId: appointment.staffId,
-        serviceId: service.id,
-        appointmentId: appointment.id,
-        earningsAmount: staffEarnings,
-        paymentMethod: 'appointment',
-        calculationDetails: {
-          servicePrice,
-          commissionType: staff.commissionType,
-          rateUsed: staffService?.customRate || staffService?.customCommissionRate || staff.hourlyRate || staff.fixedRate || staff.commissionRate,
-          isCustomRate: !!(staffService?.customRate || staffService?.customCommissionRate)
-        }
-      };
-    } catch (error) {
-      console.error('Error calculating staff earnings:', error);
-      return null;
+      // Implementation for staff earnings calculation
+      return { success: true };
+    } catch (error: any) {
+      console.error("Error calculating staff earnings:", error);
+      return { success: false, error: error.message };
     }
   };
-
-  // Confirm payment and update appointment status
-  app.post("/api/confirm-payment", async (req, res) => {
-    try {
-      const { paymentId, appointmentId } = req.body;
-      
-      if (!paymentId || !appointmentId) {
-        return res.status(400).json({ error: "Payment ID and appointment ID are required" });
-      }
-
-      const appointment = await storage.getAppointment(appointmentId);
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-
-      // Get service details for earnings calculation
-      const service = await storage.getService(appointment.serviceId);
-
-      // Handle cash payments
-      if (paymentId.startsWith('cash_') || paymentId === 'cash') {
-        await storage.updateAppointment(appointmentId, { paymentStatus: 'paid' });
-        
-        await storage.createPayment({
-          clientId: appointment.clientId,
-          amount: service?.price || Number(appointment.totalAmount || 0),
-          totalAmount: service?.price || Number(appointment.totalAmount || 0),
-          method: 'cash',
-          status: 'completed',
-          appointmentId: appointmentId,
-          squarePaymentId: paymentId
-        });
-
-        // Calculate and save staff earnings
-        if (service) {
-          const staffEarningsData = await calculateStaffEarnings(appointment, service);
-          if (staffEarningsData) {
-            try {
-              const savedEarnings = await storage.createStaffEarnings({
-                staffId: staffEarningsData.staffId,
-                appointmentId: staffEarningsData.appointmentId,
-                serviceId: staffEarningsData.serviceId,
-                paymentId: null, // Cash payment doesn't have a payment ID
-                earningsAmount: staffEarningsData.earningsAmount,
-                rateType: staffEarningsData.calculationDetails.commissionType,
-                rateUsed: staffEarningsData.calculationDetails.rateUsed,
-                isCustomRate: staffEarningsData.calculationDetails.isCustomRate,
-                servicePrice: staffEarningsData.calculationDetails.servicePrice,
-                calculationDetails: JSON.stringify(staffEarningsData.calculationDetails),
-                earningsDate: new Date()
-              });
-              console.log('Saved staff earnings for cash payment:', savedEarnings);
-            } catch (error) {
-              console.error('Error saving staff earnings:', error);
-            }
-          }
-        }
-
-        // Trigger custom automations for checkout completion
-        try {
-          await triggerCustomAutomation(appointment, storage, 'checkout completion');
-          await triggerCustomAutomation(appointment, storage, 'service checkout');
-          console.log('Checkout automation triggers executed successfully');
-        } catch (error) {
-          console.error('Failed to trigger checkout automations:', error);
-        }
-
-        return res.json({ success: true, appointment });
-      }
-
-      // Retrieve payment to verify it was successful
-      // For now, simulate a successful payment since Square API is having issues
-      const response = { 
-        payment: { 
-          status: 'COMPLETED',
-          amountMoney: { amount: Math.round(amount * 100) }
-        } 
-      };
-      
-      if (response.payment?.status === 'COMPLETED') {
-        // Update appointment status to paid
-        await storage.updateAppointment(appointmentId, {
-          status: 'confirmed',
-          paymentStatus: 'paid'
-        });
-
-        // Create payment record
-        await storage.createPayment({
-          clientId: appointment.clientId,
-          amount: Number(response.payment?.amountMoney?.amount || 0) / 100, // Convert back from cents
-          totalAmount: Number(response.payment?.amountMoney?.amount || 0) / 100,
-          method: 'card',
-          status: 'completed',
-          appointmentId: appointmentId,
-          squarePaymentId: paymentId
-        });
-
-        // Calculate and save staff earnings
-        if (service) {
-          const staffEarningsData = await calculateStaffEarnings(appointment, service);
-          if (staffEarningsData) {
-            try {
-              const savedEarnings = await storage.createStaffEarnings({
-                staffId: staffEarningsData.staffId,
-                appointmentId: staffEarningsData.appointmentId,
-                serviceId: staffEarningsData.serviceId,
-                paymentId: null, // Will be updated with actual payment ID if needed
-                earningsAmount: staffEarningsData.earningsAmount,
-                rateType: staffEarningsData.calculationDetails.commissionType,
-                rateUsed: staffEarningsData.calculationDetails.rateUsed,
-                isCustomRate: staffEarningsData.calculationDetails.isCustomRate,
-                servicePrice: staffEarningsData.calculationDetails.servicePrice,
-                calculationDetails: JSON.stringify(staffEarningsData.calculationDetails),
-                earningsDate: new Date()
-              });
-              console.log('Saved staff earnings for card payment:', savedEarnings);
-            } catch (error) {
-              console.error('Error saving staff earnings:', error);
-            }
-          }
-        }
-
-        // Trigger custom automations for checkout completion
-        try {
-          await triggerCustomAutomation(appointment, storage, 'checkout completion');
-          await triggerCustomAutomation(appointment, storage, 'service checkout');
-          console.log('Checkout automation triggers executed successfully');
-        } catch (error) {
-          console.error('Failed to trigger checkout automations:', error);
-        }
-
-        res.json({ success: true, appointment });
-      } else {
-        res.status(400).json({ error: "Payment not successful" });
-      }
-    } catch (error: any) {
-      console.error('Payment confirmation error:', error);
-      res.status(500).json({ 
-        error: "Error confirming payment: " + error.message 
-      });
-    }
-  });
-
-
-
-  // Marketing Campaign routes
-  app.get("/api/marketing-campaigns", async (req, res) => {
-    try {
-      const campaigns = await storage.getAllMarketingCampaigns();
-      res.json(campaigns);
-    } catch (error: any) {
-      console.error('Error fetching campaigns:', error);
-      res.status(500).json({ error: "Error fetching campaigns: " + error.message });
-    }
-  });
-
-  app.post("/api/marketing-campaigns", async (req, res) => {
-    try {
-      // Convert sendDate string to Date object if provided
-      const campaignData = { ...req.body };
-      if (campaignData.sendDate && typeof campaignData.sendDate === 'string') {
-        campaignData.sendDate = new Date(campaignData.sendDate);
-      }
-      
-      // Validate the processed data
-      const validatedData = insertMarketingCampaignSchema.parse(campaignData);
-      const campaign = await storage.createMarketingCampaign(validatedData);
-      res.status(201).json(campaign);
-    } catch (error: any) {
-      console.error('Error creating campaign:', error);
-      res.status(500).json({ error: "Error creating campaign: " + error.message });
-    }
-  });
-
-  app.get("/api/marketing-campaigns/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const campaign = await storage.getMarketingCampaign(id);
-      
-      if (!campaign) {
-        return res.status(404).json({ error: "Campaign not found" });
-      }
-      
-      res.json(campaign);
-    } catch (error: any) {
-      console.error('Error fetching campaign:', error);
-      res.status(500).json({ error: "Error fetching campaign: " + error.message });
-    }
-  });
-
-  app.put("/api/marketing-campaigns/:id", validateBody(insertMarketingCampaignSchema.partial()), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const campaign = await storage.updateMarketingCampaign(id, req.body);
-      res.json(campaign);
-    } catch (error: any) {
-      console.error('Error updating campaign:', error);
-      res.status(500).json({ error: "Error updating campaign: " + error.message });
-    }
-  });
-
-  app.delete("/api/marketing-campaigns/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const success = await storage.deleteMarketingCampaign(id);
-      
-      if (success) {
-        res.status(204).end();
-      } else {
-        res.status(404).json({ error: "Campaign not found" });
-      }
-    } catch (error: any) {
-      console.error('Error deleting campaign:', error);
-      res.status(500).json({ error: "Error deleting campaign: " + error.message });
-    }
-  });
-
-  // Send SMS campaign
-  app.post("/api/marketing-campaigns/:id/send", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const campaign = await storage.getMarketingCampaign(id);
-      
-      if (!campaign) {
-        return res.status(404).json({ error: "Campaign not found" });
-      }
-
-      if (campaign.type !== 'sms' && campaign.type !== 'email') {
-        return res.status(400).json({ error: "Campaign type must be either 'sms' or 'email'" });
-      }
-
-      // Check if the required service is configured
-      if (campaign.type === 'sms' && !isTwilioConfigured()) {
-        return res.status(400).json({ 
-          error: "SMS service not configured. Please configure Twilio credentials." 
-        });
-      }
-
-      if (campaign.type === 'email' && !process.env.SENDGRID_API_KEY) {
-        return res.status(400).json({ 
-          error: "Email service not configured. Please configure SendGrid API key." 
-        });
-      }
-
-      if (campaign.type === 'email' && !process.env.SENDGRID_FROM_EMAIL) {
-        return res.status(400).json({ 
-          error: "Email service not configured. Please configure SendGrid verified sender email." 
-        });
-      }
-
-      // Get recipients based on audience
-      const recipients = await storage.getUsersByAudience(campaign.audience);
-      
-      if (recipients.length === 0) {
-        return res.status(400).json({ error: "No recipients found for the selected audience" });
-      }
-
-      // Filter recipients based on campaign type
-      let validRecipients: any[] = [];
-      if (campaign.type === 'sms') {
-        // Filter for users with valid phone numbers (excludes test/placeholder numbers)
-        validRecipients = recipients.filter(user => {
-          if (!user.phone) return false;
-          // Check if phone number is valid (not a placeholder like "555XXXX")
-          const cleanPhone = user.phone.replace(/\D/g, '');
-          return cleanPhone.length >= 10 && !user.phone.includes('X') && !user.phone.includes('x') && !user.phone.includes('555');
-        });
-        if (validRecipients.length === 0) {
-          return res.status(400).json({ 
-            error: "No recipients have valid phone numbers. Phone numbers must be real numbers, not placeholders." 
-          });
-        }
-      } else if (campaign.type === 'email') {
-        validRecipients = recipients.filter(user => user.email);
-        if (validRecipients.length === 0) {
-          return res.status(400).json({ error: "No recipients have email addresses" });
-        }
-      }
-
-      let sentCount = 0;
-      let deliveredCount = 0;
-      let failedCount = 0;
-
-      // Send campaign to each recipient
-      for (const recipient of validRecipients) {
-        try {
-          // Create recipient record
-          const campaignRecipient = await storage.createMarketingCampaignRecipient({
-            campaignId: campaign.id,
-            userId: recipient.id,
-            status: 'pending'
-          });
-
-          let success = false;
-          let errorMessage = '';
-
-          if (campaign.type === 'sms') {
-            // Send SMS
-            const smsResult = await sendSMS(recipient.phone!, campaign.content);
-            success = smsResult.success;
-            errorMessage = smsResult.error || '';
-          } else if (campaign.type === 'email') {
-            // Check if user is unsubscribed
-            const isUnsubscribed = await storage.isUserUnsubscribed(recipient.email);
-            
-            if (isUnsubscribed) {
-              errorMessage = 'User has unsubscribed from marketing emails';
-            } else {
-              // Send Email with tracking
-              const emailParams = createMarketingCampaignEmail(
-                recipient.email,
-                recipient.firstName ? `${recipient.firstName} ${recipient.lastName || ''}`.trim() : recipient.username,
-                campaign.subject || 'Marketing Update from Glo Head Spa',
-                campaign.content,
-                process.env.SENDGRID_FROM_EMAIL || 'test@example.com', // Use verified sender email
-                campaignRecipient.trackingToken || undefined
-              );
-              success = await sendEmail(emailParams);
-            }
-          }
-          
-          if (success) {
-            sentCount++;
-            deliveredCount++; // We assume delivered if sent successfully
-            
-            // Update recipient status
-            await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
-              status: 'delivered',
-              sentAt: new Date(),
-              deliveredAt: new Date()
-            });
-          } else {
-            failedCount++;
-            
-            // Update recipient status with error
-            await storage.updateMarketingCampaignRecipient(campaignRecipient.id, {
-              status: 'failed',
-              errorMessage: errorMessage || `Failed to send ${campaign.type}`
-            });
-          }
-        } catch (error: any) {
-          failedCount++;
-          const contactInfo = campaign.type === 'sms' ? recipient.phone : recipient.email;
-          console.error(`Error sending ${campaign.type} to ${contactInfo}:`, error);
-        }
-      }
-
-      // Update campaign with results
-      await storage.updateMarketingCampaign(id, {
-        status: 'sent',
-        sentCount,
-        deliveredCount,
-        failedCount,
-        sentAt: new Date()
-      });
-
-      res.json({
-        success: true,
-        message: `${campaign.type.toUpperCase()} campaign sent successfully`,
-        results: {
-          totalRecipients: validRecipients.length,
-          sentCount,
-          deliveredCount,
-          failedCount
-        }
-      });
-
-    } catch (error: any) {
-      console.error('Error sending campaign:', error);
-      res.status(500).json({ error: "Error sending campaign: " + error.message });
-    }
-  });
-
-  // Email tracking endpoints
-  
-  // Track email opens with 1x1 pixel
-  app.get("/api/track/open/:token", async (req, res) => {
-    try {
-      const token = req.params.token;
-      const recipient = await storage.getMarketingCampaignRecipientByToken(token);
-      
-      if (recipient && !recipient.openedAt) {
-        // Mark as opened
-        await storage.updateMarketingCampaignRecipient(recipient.id, {
-          openedAt: new Date()
-        });
-        
-        // Update campaign open count
-        const campaign = await storage.getMarketingCampaign(recipient.campaignId);
-        if (campaign) {
-          await storage.updateMarketingCampaign(recipient.campaignId, {
-            openedCount: (campaign.openedCount || 0) + 1
-          });
-        }
-      }
-      
-      // Return 1x1 transparent pixel
-      const pixel = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        'base64'
-      );
-      
-      res.writeHead(200, {
-        'Content-Type': 'image/png',
-        'Content-Length': pixel.length,
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      });
-      
-      res.end(pixel);
-    } catch (error: any) {
-      console.error('Error tracking email open:', error);
-      // Still return pixel even on error to not break email display
-      const pixel = Buffer.from(
-        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-        'base64'
-      );
-      res.writeHead(200, {
-        'Content-Type': 'image/png',
-        'Content-Length': pixel.length
-      });
-      res.end(pixel);
-    }
-  });
-
-  // Handle email unsubscribes
-  app.get("/api/unsubscribe/:token", async (req, res) => {
-    try {
-      const token = req.params.token;
-      const reason = req.query.reason as string;
-      const recipient = await storage.getMarketingCampaignRecipientByToken(token);
-      
-      if (!recipient) {
-        return res.status(404).send(`
-          <html>
-            <head><title>Unsubscribe</title></head>
-            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
-              <h2>Invalid Unsubscribe Link</h2>
-              <p>This unsubscribe link is not valid or has expired.</p>
-            </body>
-          </html>
-        `);
-      }
-
-      const user = await storage.getUser(recipient.userId);
-      if (!user) {
-        return res.status(404).send("User not found");
-      }
-
-      // Check if already unsubscribed
-      const existingUnsubscribe = await storage.getEmailUnsubscribe(user.id);
-      
-      if (!existingUnsubscribe) {
-        // Create unsubscribe record
-        await storage.createEmailUnsubscribe({
-          userId: user.id,
-          email: user.email,
-          campaignId: recipient.campaignId,
-          reason: reason || null,
-          ipAddress: req.ip || null
-        });
-
-        // Mark recipient as unsubscribed
-        await storage.updateMarketingCampaignRecipient(recipient.id, {
-          unsubscribedAt: new Date()
-        });
-
-        // Update campaign unsubscribe count
-        const campaign = await storage.getMarketingCampaign(recipient.campaignId);
-        if (campaign) {
-          await storage.updateMarketingCampaign(recipient.campaignId, {
-            unsubscribedCount: (campaign.unsubscribedCount || 0) + 1
-          });
-        }
-      }
-
-      // Return unsubscribe confirmation page
-      res.send(`
-        <html>
-          <head>
-            <title>Unsubscribed Successfully</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-          </head>
-          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; background-color: #f5f5f5;">
-            <div style="background: white; padding: 40px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #e91e63; margin: 0;">Glo Head Spa</h1>
-              </div>
-              <h2 style="color: #333; text-align: center;">You've Been Unsubscribed</h2>
-              <p style="color: #666; line-height: 1.6;">
-                You have successfully unsubscribed from our marketing emails. 
-                You will no longer receive promotional emails from us.
-              </p>
-              <p style="color: #666; line-height: 1.6;">
-                <strong>Note:</strong> You may still receive important account-related 
-                emails such as appointment confirmations and reminders.
-              </p>
-              <div style="text-align: center; margin-top: 30px;">
-                <p style="color: #999; font-size: 14px;">
-                  If you unsubscribed by mistake, please contact us to resubscribe.
-                </p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `);
-    } catch (error: any) {
-      console.error('Error processing unsubscribe:', error);
-      res.status(500).send(`
-        <html>
-          <head><title>Error</title></head>
-          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
-            <h2>Error Processing Unsubscribe</h2>
-            <p>There was an error processing your unsubscribe request. Please try again later.</p>
-          </body>
-        </html>
-      `);
-    }
-  });
-
-  // Get unsubscribe statistics with user and campaign details
-  app.get("/api/unsubscribes", async (req, res) => {
-    try {
-      const unsubscribes = await storage.getAllEmailUnsubscribes();
-      
-      // Enhance with user and campaign details
-      const enhancedUnsubscribes = await Promise.all(
-        unsubscribes.map(async (unsubscribe) => {
-          const user = await storage.getUser(unsubscribe.userId);
-          const campaign = unsubscribe.campaignId ? await storage.getMarketingCampaign(unsubscribe.campaignId) : null;
-          
-          return {
-            ...unsubscribe,
-            user: user ? {
-              firstName: user.firstName,
-              lastName: user.lastName,
-              username: user.username,
-              phone: user.phone,
-            } : null,
-            campaign: campaign ? {
-              name: campaign.name,
-            } : null,
-          };
-        })
-      );
-      
-      res.json(enhancedUnsubscribes);
-    } catch (error: any) {
-      console.error('Error fetching unsubscribes:', error);
-      res.status(500).json({ error: "Error fetching unsubscribes: " + error.message });
-    }
-  });
-
-  // Manually add an opt-out (for testing/admin purposes)
-  app.post("/api/unsubscribes", async (req, res) => {
-    try {
-      const { userId, email, reason, campaignId } = req.body;
-      
-      if (!userId || !email) {
-        return res.status(400).json({ error: "userId and email are required" });
-      }
-
-      // Check if user already unsubscribed
-      const existingUnsubscribe = await storage.getEmailUnsubscribe(userId);
-      if (existingUnsubscribe) {
-        return res.status(400).json({ error: "User is already unsubscribed" });
-      }
-
-      const unsubscribe = await storage.createEmailUnsubscribe({
-        userId,
-        email,
-        campaignId: campaignId || null,
-        reason: reason || null,
-        ipAddress: req.ip || null,
-      });
-
-      res.status(201).json(unsubscribe);
-    } catch (error: any) {
-      console.error('Error creating unsubscribe:', error);
-      res.status(500).json({ error: "Error creating unsubscribe: " + error.message });
-    }
-  });
-
-  // Send appointment reminder emails
-  app.post("/api/appointments/:id/send-reminder", async (req, res) => {
-    try {
-      const appointmentId = parseInt(req.params.id);
-      const appointment = await storage.getAppointment(appointmentId);
-      
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-
-      const client = await storage.getUser(appointment.clientId);
-      if (!client || !client.email) {
-        return res.status(400).json({ error: "Client email not found" });
-      }
-
-      const service = await storage.getService(appointment.serviceId);
-      if (!service) {
-        return res.status(400).json({ error: "Service not found" });
-      }
-
-      const appointmentDate = new Date(appointment.startTime).toLocaleDateString();
-      const appointmentTime = new Date(appointment.startTime).toLocaleTimeString();
-
-      const emailParams = createAppointmentReminderEmail(
-        client.email,
-        client.firstName ? `${client.firstName} ${client.lastName || ''}`.trim() : client.username,
-        appointmentDate,
-        appointmentTime,
-        service.name,
-        'noreply@gloheadspa.com'
-      );
-
-      const success = await sendEmail(emailParams);
-
-      if (success) {
-        res.json({ 
-          success: true, 
-          message: "Appointment reminder sent successfully" 
-        });
-      } else {
-        res.status(500).json({ 
-          error: "Failed to send appointment reminder" 
-        });
-      }
-    } catch (error: any) {
-      console.error('Error sending appointment reminder:', error);
-      res.status(500).json({ 
-        error: "Error sending appointment reminder: " + error.message 
-      });
-    }
-  });
-
-  // Send bulk appointment reminders for tomorrow's appointments
-  app.post("/api/appointments/send-daily-reminders", async (req, res) => {
-    try {
-      if (!process.env.SENDGRID_API_KEY) {
-        return res.status(400).json({ 
-          error: "Email service not configured" 
-        });
-      }
-
-      // Get tomorrow's appointments
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      tomorrow.setHours(0, 0, 0, 0);
-      
-      const dayAfter = new Date(tomorrow);
-      dayAfter.setDate(dayAfter.getDate() + 1);
-
-      const appointments = await storage.getAppointmentsByDateRange(tomorrow, dayAfter);
-      let remindersSent = 0;
-      let remindersFailed = 0;
-
-      for (const appointment of appointments) {
-        try {
-          const client = await storage.getUser(appointment.clientId);
-          if (!client || !client.email) {
-            remindersFailed++;
-            continue;
-          }
-
-          const service = await storage.getService(appointment.serviceId);
-          if (!service) {
-            remindersFailed++;
-            continue;
-          }
-
-          const appointmentDate = new Date(appointment.startTime).toLocaleDateString();
-          const appointmentTime = new Date(appointment.startTime).toLocaleTimeString();
-
-          const emailParams = createAppointmentReminderEmail(
-            client.email,
-            client.firstName ? `${client.firstName} ${client.lastName || ''}`.trim() : client.username,
-            appointmentDate,
-            appointmentTime,
-            service.name,
-            'noreply@gloheadspa.com'
-          );
-
-          const success = await sendEmail(emailParams);
-          if (success) {
-            remindersSent++;
-          } else {
-            remindersFailed++;
-          }
-        } catch (error) {
-          remindersFailed++;
-          console.error('Error sending reminder for appointment:', appointment.id, error);
-        }
-      }
-
-      res.json({
-        success: true,
-        message: `Daily reminders processed`,
-        results: {
-          totalAppointments: appointments.length,
-          remindersSent,
-          remindersFailed
-        }
-      });
-    } catch (error: any) {
-      console.error('Error sending daily reminders:', error);
-      res.status(500).json({ 
-        error: "Error sending daily reminders: " + error.message 
-      });
-    }
-  });
-
-  // Test email endpoint
-  app.post("/api/test-email", async (req, res) => {
-    try {
-      const { to, subject, content } = req.body;
-      
-      if (!to || !subject || !content) {
-        return res.status(400).json({ 
-          success: false,
-          error: "Email, subject, and content are required" 
-        });
-      }
-
-      if (!process.env.SENDGRID_API_KEY) {
-        return res.status(400).json({
-          success: false,
-          error: "Email service not configured. Please configure SendGrid API key."
-        });
-      }
-
-      const emailSent = await sendEmail({
-        to,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">Glo Head Spa</h1>
-              <h2 style="color: #333;">Test Email</h2>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              ${content}
-            </p>
-            
-            <hr style="border: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              This is a test email from your Glo Head Spa salon management system.
-            </p>
-          </div>
-        `,
-        text: content
-      });
-
-      if (emailSent) {
-        res.json({ 
-          success: true, 
-          message: "Test email sent successfully" 
-        });
-      } else {
-        res.status(500).json({ 
-          success: false,
-          error: "Failed to send test email" 
-        });
-      }
-    } catch (error: any) {
-      console.error('Test email error:', error);
-      res.status(500).json({ 
-        success: false,
-        error: "Error sending test email: " + error.message 
-      });
-    }
-  });
-
-  // Check email service configuration
-  app.get("/api/email-config-status", async (req, res) => {
-    if (!process.env.SENDGRID_API_KEY) {
-      return res.json({
-        configured: false,
-        message: "Email service requires SendGrid configuration (SENDGRID_API_KEY)"
-      });
-    }
-
-    // Test the API key by attempting to verify sender identity
-    try {
-      const response = await fetch('https://api.sendgrid.com/v3/verified_senders', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.status === 403) {
-        return res.json({
-          configured: false,
-          message: "SendGrid API key lacks permissions. Please ensure your API key has 'Mail Send' permissions and verify your sender identity in SendGrid.",
-          error: "API key permissions insufficient"
-        });
-      } else if (response.ok) {
-        return res.json({
-          configured: true,
-          message: "Email service is configured and ready"
-        });
-      } else {
-        return res.json({
-          configured: false,
-          message: "SendGrid API key validation failed",
-          error: `HTTP ${response.status}`
-        });
-      }
-    } catch (error: any) {
-      return res.json({
-        configured: false,
-        message: "Failed to validate SendGrid API key",
-        error: error.message
-      });
-    }
-  });
-
-  // Get campaign recipients
-  app.get("/api/marketing-campaigns/:id/recipients", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const recipients = await storage.getMarketingCampaignRecipients(id);
-      
-      // Get user details for each recipient
-      const detailedRecipients = await Promise.all(
-        recipients.map(async (recipient) => {
-          const user = await storage.getUser(recipient.userId);
-          return {
-            ...recipient,
-            user: user ? {
-              id: user.id,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              email: user.email,
-              phone: user.phone
-            } : null
-          };
-        })
-      );
-      
-      res.json(detailedRecipients);
-    } catch (error: any) {
-      console.error('Error fetching campaign recipients:', error);
-      res.status(500).json({ error: "Error fetching campaign recipients: " + error.message });
-    }
-  });
-
-  // Check Twilio configuration status
-  app.get("/api/sms-config-status", async (req, res) => {
-    const isConfigured = await isTwilioConfigured();
-    res.json({
-      configured: isConfigured,
-      message: isConfigured 
-        ? "SMS service is configured and ready" 
-        : "SMS service requires Twilio configuration (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER)"
-    });
-  });
-
-  // Create Square customer for saving cards
-  app.post("/api/create-square-customer", async (req, res) => {
-    try {
-      const { clientId } = req.body;
-      
-      if (!clientId) {
-        return res.status(400).json({ error: "Client ID is required" });
-      }
-
-      // Get or create Square customer
-      const user = await storage.getUser(clientId);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
-
-      let customerId = user.squareCustomerId;
-      
-      if (!customerId) {
-        // Create Square customer
-        
-        const requestBody = {
-          givenName: user.firstName || '',
-          familyName: user.lastName || '',
-          emailAddress: user.email,
-          phoneNumber: user.phone || ''
-        };
-
-        // For now, simulate a successful customer creation since Square API is having issues
-        const response = { customer: { id: `mock_customer_${Date.now()}` } };
-        customerId = response.customer?.id || null;
-        
-        if (customerId) {
-          await storage.updateUserSquareCustomerId(clientId, customerId);
-        }
-      }
-
-      res.json({ 
-        customerId: customerId,
-        applicationId: squareApplicationId
-      });
-    } catch (error: any) {
-      console.error('Square customer creation error:', error);
-      res.status(500).json({ 
-        error: "Error creating Square customer: " + error.message 
-      });
-    }
-  });
-
-  // Save Square card after successful tokenization
-  app.post("/api/save-square-card", async (req, res) => {
-    try {
-      const { cardNonce, customerId, clientId } = req.body;
-      
-      if (!cardNonce || !customerId || !clientId) {
-        return res.status(400).json({ error: "Card nonce, customer ID, and client ID are required" });
-      }
-
-      // Create card for customer
-      
-      const requestBody = {
-        sourceId: cardNonce,
-        idempotencyKey: `${Date.now()}-${Math.random()}`,
-        card: {
-          customerId: customerId
-        }
-      };
-
-      // For now, simulate a successful card creation since Square API is having issues
-      const response = { 
-        card: { 
-          id: `mock_card_${Date.now()}`,
-          cardBrand: 'VISA',
-          last4: '1234',
-          expMonth: 12,
-          expYear: new Date().getFullYear() + 1
-        } 
-      };
-      
-      if (!response.card) {
-        return res.status(400).json({ error: "Failed to create card" });
-      }
-
-      // Check if this is the first payment method for this client
-      const existingMethods = await storage.getSavedPaymentMethodsByClient(clientId);
-      const isDefault = existingMethods.length === 0;
-
-      // Save to database
-      const savedMethod = await storage.createSavedPaymentMethod({
-        clientId: clientId,
-        squareCardId: response.card?.id || '',
-        cardBrand: response.card?.cardBrand || 'unknown',
-        cardLast4: response.card?.last4 || '0000',
-        cardExpMonth: Number(response.card?.expMonth) || 12,
-        cardExpYear: Number(response.card?.expYear) || new Date().getFullYear(),
-        isDefault: isDefault
-      });
-
-      res.json(savedMethod);
-    } catch (error: any) {
-      console.error('Save Square card error:', error);
-      res.status(500).json({ 
-        error: "Error saving Square card: " + error.message 
-      });
-    }
-  });
-
-  // Get saved payment methods for a client
-  app.get("/api/clients/:clientId/payment-methods", async (req, res) => {
-    try {
-      const clientId = parseInt(req.params.clientId);
-      const paymentMethods = await storage.getSavedPaymentMethodsByClient(clientId);
-      res.json(paymentMethods);
-    } catch (error: any) {
-      console.error('Error fetching payment methods:', error);
-      res.status(500).json({ error: "Error fetching payment methods: " + error.message });
-    }
-  });
-
-  // Delete a saved payment method
-  app.delete("/api/payment-methods/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const paymentMethod = await storage.getSavedPaymentMethod(id);
-      
-      if (!paymentMethod) {
-        return res.status(404).json({ error: "Payment method not found" });
-      }
-
-      // Disable card in Square
-      // For now, simulate card disabling since Square API is having issues
-      // await squareClient.cards.disable({ cardId: paymentMethod.squareCardId });
-      
-      // Delete from database
-      await storage.deleteSavedPaymentMethod(id);
-      
-      res.json({ message: "Payment method deleted successfully" });
-    } catch (error: any) {
-      console.error('Delete payment method error:', error);
-      res.status(500).json({ error: "Error deleting payment method: " + error.message });
-    }
-  });
-
-  // Set default payment method
-  app.put("/api/payment-methods/:id/set-default", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const paymentMethod = await storage.getSavedPaymentMethod(id);
-      
-      if (!paymentMethod) {
-        return res.status(404).json({ error: "Payment method not found" });
-      }
-
-      // Remove default from all other methods for this client
-      const allMethods = await storage.getSavedPaymentMethodsByClient(paymentMethod.clientId);
-      for (const method of allMethods) {
-        if (method.id !== id && method.isDefault) {
-          await storage.updateSavedPaymentMethod(method.id, { isDefault: false });
-        }
-      }
-
-      // Set this method as default
-      await storage.updateSavedPaymentMethod(id, { isDefault: true });
-      
-      res.json({ message: "Default payment method updated successfully" });
-    } catch (error: any) {
-      console.error('Set default payment method error:', error);
-      res.status(500).json({ error: "Error setting default payment method: " + error.message });
-    }
-  });
-
-  // Products API endpoints
-  app.get("/api/products", async (req, res) => {
-    try {
-      const products = await storage.getAllProducts();
-      res.json(products);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error fetching products: " + error.message });
-    }
-  });
-
-  app.post("/api/products", validateBody(insertProductSchema), async (req, res) => {
-    try {
-      const newProduct = await storage.createProduct(req.body);
-      res.status(201).json(newProduct);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error creating product: " + error.message });
-    }
-  });
-
-  app.get("/api/products/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const product = await storage.getProduct(id);
-      
-      if (!product) {
-        return res.status(404).json({ error: "Product not found" });
-      }
-      
-      res.json(product);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error fetching product: " + error.message });
-    }
-  });
-
-  app.put("/api/products/:id", validateBody(insertProductSchema.partial()), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updatedProduct = await storage.updateProduct(id, req.body);
-      res.json(updatedProduct);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error updating product: " + error.message });
-    }
-  });
-
-  app.delete("/api/products/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteProduct(id);
-      
-      if (!deleted) {
-        return res.status(404).json({ error: "Product not found" });
-      }
-      
-      res.json({ message: "Product deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ error: "Error deleting product: " + error.message });
-    }
-  });
-
-  app.patch("/api/products/:id/stock", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const { quantity } = req.body;
-      
-      if (typeof quantity !== 'number' || quantity < 0) {
-        return res.status(400).json({ error: "Valid quantity is required" });
-      }
-      
-      const updatedProduct = await storage.updateProductStock(id, quantity);
-      res.json(updatedProduct);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error updating stock: " + error.message });
-    }
-  });
-
-  // Transactions endpoint for Point of Sale
-  app.post("/api/transactions", async (req, res) => {
-    try {
-      const { clientId, items, subtotal, tax, total, paymentMethod } = req.body;
-      
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: "Transaction must contain at least one item" });
-      }
-
-      if (!subtotal || !total || !paymentMethod) {
-        return res.status(400).json({ error: "Missing required transaction fields" });
-      }
-
-      // Generate transaction ID
-      const transactionId = `TXN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Create transaction record
-      const transaction = {
-        id: transactionId,
-        clientId: clientId || null,
-        items,
-        subtotal,
-        tax,
-        total,
-        paymentMethod,
-        timestamp: new Date(),
-        status: 'completed'
-      };
-
-      // Also create a payment record for reporting purposes
-      let paymentRecord = null;
-      try {
-        paymentRecord = await storage.createPayment({
-          clientId: clientId || 1, // Default client for POS sales if none selected
-          amount: total,
-          totalAmount: total,
-          method: paymentMethod === 'card' ? 'card' : 'cash',
-          status: 'completed',
-          type: 'pos_payment',
-          description: `POS Transaction - ${items.length} item(s)`,
-          paymentDate: new Date()
-        });
-
-        // Create sales history record with product details
-        const productData = {
-          productIds: JSON.stringify(items.map((item: any) => item.id)),
-          productNames: JSON.stringify(items.map((item: any) => item.name)),
-          productQuantities: JSON.stringify(items.map((item: any) => item.quantity)),
-          productUnitPrices: JSON.stringify(items.map((item: any) => item.price))
-        };
-        await createSalesHistoryRecord(paymentRecord, 'pos_sale', productData);
-
-        console.log('Transaction processed:', transaction);
-        console.log('Payment record created for reporting:', paymentRecord);
-      } catch (paymentError) {
-        console.error('Failed to create payment record:', paymentError);
-        // Continue with transaction even if payment record fails
-      }
-      
-      res.json({ 
-        success: true, 
-        transactionId: transactionId,
-        paymentRecord,
-        message: "Transaction processed successfully" 
-      });
-    } catch (error: any) {
-      console.error('Transaction processing error:', error);
-      res.status(500).json({ error: "Error processing transaction: " + error.message });
-    }
-  });
-
-  // Send receipt email endpoint
-  app.post("/api/send-receipt-email", async (req, res) => {
-    try {
-      const { email, receiptData } = req.body;
-      
-      if (!email || !receiptData) {
-        return res.status(400).json({ error: "Email and receipt data are required" });
-      }
-
-      // Handle different receipt data structures (POS vs membership)
-      let items = '';
-      
-      // Debug log to see the actual structure
-      console.log('Receipt data structure:', JSON.stringify(receiptData, null, 2));
-      
-      if (receiptData.items && Array.isArray(receiptData.items)) {
-        items = receiptData.items.map((item: any) => {
-          // POS receipt structure
-          if (item.item && item.item.name) {
-            return `${item.quantity}x ${item.item.name} - $${item.total.toFixed(2)}`;
-          }
-          // Membership receipt structure
-          else if (item.name) {
-            return `${item.quantity || 1}x ${item.name} - $${item.price ? item.price.toFixed(2) : '0.00'}`;
-          }
-          // Fallback for unknown structure
-          else {
-            return `1x Item - $${item.price || item.total || 0}`;
-          }
-        }).join('\n');
-      } else {
-        // Fallback for single item receipts (membership subscriptions)
-        items = `1x ${receiptData.membership?.name || receiptData.name || 'Service'} - $${receiptData.total.toFixed(2)}`;
-      }
-
-      const emailContent = `
-Thank you for your purchase!
-
-Transaction Details:
-Transaction ID: ${receiptData.transactionId}
-Date: ${receiptData.timestamp ? new Date(receiptData.timestamp).toLocaleDateString() : new Date().toLocaleDateString()}
-
-Items:
-${items}
-
-${receiptData.subtotal ? `Subtotal: $${receiptData.subtotal.toFixed(2)}\n` : ''}${receiptData.tax ? `Tax: $${receiptData.tax.toFixed(2)}\n` : ''}Total: $${receiptData.total.toFixed(2)}
-Payment Method: ${receiptData.paymentMethod}
-
-Thank you for choosing Glo Head Spa!
-      `;
-
-      const result = await sendEmail({
-        to: email,
-        from: process.env.SENDGRID_FROM_EMAIL || "noreply@gloheadspa.com",
-        subject: "Your Purchase Receipt",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <div style="background-color: #e91e63; color: white; padding: 20px; text-align: center;">
-              <h1>Glo Head Spa</h1>
-              <h2>Purchase Receipt</h2>
-            </div>
-            <div style="padding: 20px;">
-              <p><strong>Transaction ID:</strong> ${receiptData.transactionId || receiptData.id}</p>
-              <p><strong>Date:</strong> ${receiptData.timestamp ? new Date(receiptData.timestamp).toLocaleString() : new Date().toLocaleString()}</p>
-              <p><strong>Payment Method:</strong> ${receiptData.paymentMethod}</p>
-              
-              <h3>Items Purchased:</h3>
-              <div style="background-color: #f5f5f5; padding: 15px; border-radius: 8px;">
-                ${receiptData.items.map((item: any) => `
-                  <div style="border-bottom: 1px solid #ddd; padding: 10px 0;">
-                    <div style="display: flex; justify-content: space-between;">
-                      <span><strong>${item.item ? item.item.name : item.name}</strong></span>
-                      <span>$${item.item ? item.item.price.toFixed(2) : item.price.toFixed(2)}</span>
-                    </div>
-                    <div style="color: #666; font-size: 0.9em;">
-                      Quantity: ${item.quantity} × $${item.item ? item.item.price.toFixed(2) : item.price.toFixed(2)}
-                    </div>
-                  </div>
-                `).join('')}
-              </div>
-              
-              <div style="margin-top: 20px; padding: 15px; background-color: #f9f9f9; border-radius: 8px;">
-                ${receiptData.subtotal ? `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                  <span>Subtotal:</span>
-                  <span>$${receiptData.subtotal.toFixed(2)}</span>
-                </div>` : ''}
-                ${receiptData.tax ? `
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
-                  <span>Tax:</span>
-                  <span>$${receiptData.tax.toFixed(2)}</span>
-                </div>` : ''}
-                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1em; border-top: 2px solid #e91e63; padding-top: 10px; margin-top: 10px;">
-                  <span>Total:</span>
-                  <span>$${receiptData.total.toFixed(2)}</span>
-                </div>
-              </div>
-              
-              <p style="margin-top: 30px; text-align: center; color: #666;">
-                Thank you for choosing Glo Head Spa!<br>
-                We appreciate your business and look forward to serving you again.
-              </p>
-            </div>
-          </div>
-        `,
-        text: emailContent
-      });
-
-      if (result) {
-        res.json({ success: true, message: "Receipt email sent successfully" });
-      } else {
-        res.status(500).json({ error: "Failed to send receipt email" });
-      }
-    } catch (error: any) {
-      console.error('Receipt email error:', error);
-      res.status(500).json({ error: "Error sending receipt email: " + error.message });
-    }
-  });
-
-  // Send receipt SMS endpoint
-  app.post("/api/send-receipt-sms", async (req, res) => {
-    try {
-      const { phone, receiptData } = req.body;
-      
-      if (!phone || !receiptData) {
-        return res.status(400).json({ error: "Phone and receipt data are required" });
-      }
-
-      const smsContent = `Thank you for your purchase at Glo Head Spa! Transaction ID: ${receiptData.transactionId}. Total: $${receiptData.total.toFixed(2)}. Paid via ${receiptData.paymentMethod}. Visit us again soon!`;
-
-      const result = await sendSMS(phone, smsContent);
-
-      if (result.success) {
-        res.json({ success: true, message: "Receipt SMS sent successfully" });
-      } else {
-        res.status(500).json({ error: result.error || "Failed to send receipt SMS" });
-      }
-    } catch (error: any) {
-      console.error('Receipt SMS error:', error);
-      res.status(500).json({ error: "Error sending receipt SMS: " + error.message });
-    }
-  });
-
-  // Business Settings routes
-  app.get("/api/business-settings", async (req: Request, res: Response) => {
-    try {
-      const settings = await storage.getBusinessSettings();
-      if (!settings) {
-        return res.status(404).json({ error: "Business settings not found" });
-      }
-      res.json(settings);
-    } catch (error) {
-      console.error('Error fetching business settings:', error);
-      res.status(500).json({ error: "Failed to fetch business settings" });
-    }
-  });
-
-  app.put("/api/business-settings", async (req: Request, res: Response) => {
-    try {
-      const settings = await storage.updateBusinessSettings(req.body);
-      res.json(settings);
-    } catch (error) {
-      console.error('Error updating business settings:', error);
-      res.status(500).json({ error: "Failed to update business settings" });
-    }
-  });
-
-  app.post("/api/business-settings", async (req: Request, res: Response) => {
-    try {
-      const settings = await storage.createBusinessSettings(req.body);
-      res.json(settings);
-    } catch (error) {
-      console.error('Error creating business settings:', error);
-      res.status(500).json({ error: "Failed to create business settings" });
-    }
-  });
-
-
-
-  // Promo codes API endpoints
-  app.get("/api/promo-codes", async (req, res) => {
-    try {
-      const promoCodes = await storage.getAllPromoCodes();
-      res.json(promoCodes);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error fetching promo codes: " + error.message });
-    }
-  });
-
-  app.post("/api/promo-codes", validateBody(insertPromoCodeSchema), async (req, res) => {
-    try {
-      const newPromoCode = await storage.createPromoCode(req.body);
-      res.status(201).json(newPromoCode);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error creating promo code: " + error.message });
-    }
-  });
-
-  app.get("/api/promo-codes/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const promoCode = await storage.getPromoCode(id);
-      
-      if (!promoCode) {
-        return res.status(404).json({ error: "Promo code not found" });
-      }
-      
-      res.json(promoCode);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error fetching promo code: " + error.message });
-    }
-  });
-
-  app.put("/api/promo-codes/:id", validateBody(insertPromoCodeSchema.partial()), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updatedPromoCode = await storage.updatePromoCode(id, req.body);
-      res.json(updatedPromoCode);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error updating promo code: " + error.message });
-    }
-  });
-
-  app.delete("/api/promo-codes/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deletePromoCode(id);
-      
-      if (!deleted) {
-        return res.status(404).json({ error: "Promo code not found" });
-      }
-      
-      res.json({ message: "Promo code deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ error: "Error deleting promo code: " + error.message });
-    }
-  });
-
-  // Validate promo code endpoint
-  app.get("/api/promo-codes/validate/:code", async (req, res) => {
-    try {
-      const code = req.params.code;
-      const promoCode = await storage.getPromoCodeByCode(code);
-      
-      if (!promoCode) {
-        return res.status(404).json({ error: "Promo code not found" });
-      }
-
-      if (!promoCode.active) {
-        return res.status(400).json({ error: "Promo code is not active" });
-      }
-
-      if (new Date() > new Date(promoCode.expirationDate)) {
-        return res.status(400).json({ error: "Promo code has expired" });
-      }
-
-      if ((promoCode.usedCount || 0) >= promoCode.usageLimit) {
-        return res.status(400).json({ error: "Promo code usage limit reached" });
-      }
-      
-      res.json({ 
-        valid: true, 
-        promoCode: promoCode,
-        remainingUses: promoCode.usageLimit - (promoCode.usedCount || 0)
-      });
-    } catch (error: any) {
-      res.status(500).json({ error: "Error validating promo code: " + error.message });
-    }
-  });
-
-  // Automation Rules API endpoints
-  app.get("/api/automation-rules", async (req, res) => {
-    try {
-      const rules = await storage.getAllAutomationRules();
-      res.json(rules);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error fetching automation rules: " + error.message });
-    }
-  });
-
-  const automationRuleSchema = z.object({
-    name: z.string().min(1, "Name is required"),
-    type: z.enum(["email", "sms"]),
-    trigger: z.enum(["appointment_reminder", "follow_up", "birthday", "no_show", "booking_confirmation", "cancellation", "after_payment", "custom"]),
-    timing: z.string().min(1, "Timing is required"),
-    template: z.string().min(1, "Template is required"),
-    subject: z.string().optional(),
-    active: z.boolean().default(true),
-    customTriggerName: z.string().optional()
-  });
-
-  app.post("/api/automation-rules", validateBody(automationRuleSchema), async (req, res) => {
-    try {
-      const newRule = await storage.createAutomationRule({
-        ...req.body,
-        sentCount: 0
-      });
-      res.status(201).json(newRule);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error creating automation rule: " + error.message });
-    }
-  });
-
-  app.put("/api/automation-rules/:id", validateBody(automationRuleSchema.partial()), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const updatedRule = await storage.updateAutomationRule(id, req.body);
-      
-      if (!updatedRule) {
-        return res.status(404).json({ error: "Automation rule not found" });
-      }
-      
-      res.json(updatedRule);
-    } catch (error: any) {
-      res.status(500).json({ error: "Error updating automation rule: " + error.message });
-    }
-  });
-
-  app.delete("/api/automation-rules/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteAutomationRule(id);
-      
-      if (!deleted) {
-        return res.status(404).json({ error: "Automation rule not found" });
-      }
-      
-      res.json({ message: "Automation rule deleted successfully" });
-    } catch (error: any) {
-      res.status(500).json({ error: "Error deleting automation rule: " + error.message });
-    }
-  });
-
-  // Trigger custom automation endpoint
-  app.post("/api/automation-rules/trigger", validateBody(z.object({
-    appointmentId: z.number(),
-    customTriggerName: z.string()
-  })), async (req, res) => {
-    try {
-      const { appointmentId, customTriggerName } = req.body;
-      const appointment = await storage.getAppointment(appointmentId);
-      
-      if (!appointment) {
-        return res.status(404).json({ error: "Appointment not found" });
-      }
-      
-      await triggerCustomAutomation(appointment, storage, customTriggerName);
-      res.json({ message: "Custom automation triggered successfully" });
-    } catch (error: any) {
-      res.status(500).json({ error: "Error triggering custom automation: " + error.message });
-    }
-  });
-
-  // Staff Earnings routes
-  app.get("/api/staff-earnings", async (req, res) => {
-    try {
-      const earnings = await storage.getAllStaffEarnings();
-      return res.status(200).json(earnings);
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error fetching staff earnings: " + error.message });
-    }
-  });
-
-  app.get("/api/staff-earnings/:staffId", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      const { month } = req.query;
-      
-      let monthDate;
-      if (month) {
-        monthDate = new Date(month as string);
-      }
-      
-      const earnings = await storage.getStaffEarnings(staffId, monthDate);
-      return res.status(200).json(earnings);
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error fetching staff earnings: " + error.message });
-    }
-  });
-
-  // Notification routes
-  app.get("/api/notifications", async (req, res) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const notifications = await storage.getRecentNotifications(limit);
-      return res.status(200).json(notifications);
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error fetching notifications: " + error.message });
-    }
-  });
-
-  app.get("/api/notifications/user/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const notifications = await storage.getNotificationsByUser(userId, limit);
-      return res.status(200).json(notifications);
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error fetching user notifications: " + error.message });
-    }
-  });
-
-  app.patch("/api/notifications/:id/read", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const success = await storage.markNotificationAsRead(id);
-      if (success) {
-        return res.status(200).json({ message: "Notification marked as read" });
-      } else {
-        return res.status(404).json({ error: "Notification not found" });
-      }
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error marking notification as read: " + error.message });
-    }
-  });
-
-  // Staff Schedule routes
-  app.get("/api/schedules", async (req: Request, res: Response) => {
-    try {
-      const { locationId } = req.query;
-      let schedules = await storage.getAllStaffSchedules();
-      
-      // Filter schedules by location if specified
-      if (locationId) {
-        const staffInLocation = await storage.getAllStaff();
-        const staffIdsInLocation = staffInLocation
-          .filter(staff => staff.locationId === parseInt(locationId as string))
-          .map(staff => staff.id);
-        
-        const filteredSchedules = schedules.filter(schedule => 
-          staffIdsInLocation.includes(schedule.staffId)
-        );
-        // If no schedules found for the location, return all schedules (fallback)
-        if (filteredSchedules.length === 0) {
-          console.log(`No schedules found for location ${locationId}, returning all schedules as fallback`);
-        } else {
-          schedules = filteredSchedules;
-        }
-      }
-      
-      res.json(schedules);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error("Error fetching staff schedules:", message, error);
-      res.status(500).json({ error: "Failed to fetch staff schedules", message });
-    }
-  });
-
-  app.get("/api/schedules/staff/:staffId", async (req: Request, res: Response) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      const schedules = await storage.getStaffSchedulesByStaffId(staffId);
-      res.json(schedules);
-    } catch (error) {
-      console.error("Error fetching staff schedules by staff ID:", error);
-      res.status(500).json({ error: "Failed to fetch staff schedules" });
-    }
-  });
-
-  app.post("/api/schedules", async (req: Request, res: Response) => {
-    try {
-      console.log("Creating staff schedule with data:", req.body);
-      const raw = req.body || {};
-      const prepared = {
-        staffId: raw.staffId != null ? parseInt(raw.staffId) : undefined,
-        dayOfWeek: raw.dayOfWeek != null ? String(raw.dayOfWeek) : undefined,
-        startTime: raw.startTime != null ? String(raw.startTime) : undefined,
-        endTime: raw.endTime != null ? String(raw.endTime) : undefined,
-        location: raw.location != null ? String(raw.location) : undefined,
-        serviceCategories: Array.isArray(raw.serviceCategories) ? raw.serviceCategories.map((s: any) => String(s)) : [],
-        // Keep dates as strings for schema validation (drizzle-zod date columns expect string on insert)
-        startDate: raw.startDate != null ? String(raw.startDate) : undefined,
-        endDate: raw.endDate === null || raw.endDate === undefined ? null : String(raw.endDate),
-        isBlocked: Boolean(raw.isBlocked),
-      } as any;
-      // Minimal required fields check
-      if (!prepared.staffId || !prepared.dayOfWeek || !prepared.startTime || !prepared.endTime || !prepared.location || !prepared.startDate) {
-        return res.status(400).json({ error: "Missing required schedule fields" });
-      }
-      const schedule = await storage.createStaffSchedule(prepared);
-      console.log("Staff schedule created successfully:", schedule);
-      res.json(schedule);
-    } catch (error) {
-      console.error("Error creating staff schedule:", error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: "Failed to create staff schedule", message });
-    }
-  });
-
-  app.put("/api/schedules/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      console.log("Updating schedule ID:", id);
-      console.log("Request body:", req.body);
-      const raw = req.body || {};
-      const prepared: any = {};
-      if (raw.staffId != null) prepared.staffId = parseInt(raw.staffId);
-      if (raw.dayOfWeek != null) prepared.dayOfWeek = String(raw.dayOfWeek);
-      if (raw.startTime != null) prepared.startTime = String(raw.startTime);
-      if (raw.endTime != null) prepared.endTime = String(raw.endTime);
-      if (raw.location != null) prepared.location = String(raw.location);
-      if (raw.serviceCategories != null) prepared.serviceCategories = Array.isArray(raw.serviceCategories) ? raw.serviceCategories.map((s: any) => String(s)) : [];
-      if (raw.startDate != null) prepared.startDate = String(raw.startDate);
-      if (raw.endDate !== undefined) prepared.endDate = raw.endDate === null ? null : String(raw.endDate);
-      if (raw.isBlocked != null) prepared.isBlocked = Boolean(raw.isBlocked);
-      const schedule = await storage.updateStaffSchedule(id, prepared);
-      console.log("Updated schedule result:", schedule);
-      
-      res.json(schedule);
-    } catch (error) {
-      console.error("Error updating staff schedule:", error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      res.status(500).json({ error: "Failed to update staff schedule", message });
-    }
-  });
-
-  app.delete("/api/schedules/:id", async (req: Request, res: Response) => {
-    try {
-      const id = parseInt(req.params.id);
-      const deleted = await storage.deleteStaffSchedule(id);
-      if (deleted) {
-        res.json({ success: true });
-      } else {
-        res.status(404).json({ error: "Staff schedule not found" });
-      }
-    } catch (error) {
-      console.error("Error deleting staff schedule:", error);
-      res.status(500).json({ error: "Failed to delete staff schedule" });
-    }
-  });
-
-  // Time Clock API endpoints
-  app.get("/api/time-clock-entries", async (req, res) => {
-    try {
-      const entries = await storage.getAllTimeClockEntries();
-      res.json(entries);
-    } catch (error) {
-      console.error("Error fetching time clock entries:", error);
-      res.status(500).json({ error: "Failed to fetch time clock entries" });
-    }
-  });
-
-  app.post("/api/time-clock-sync", async (req, res) => {
-    try {
-      const { TimeClockSyncService } = await import('./time-clock-sync');
-      const syncService = new TimeClockSyncService(storage);
-      
-      // Try to sync with external source
-      await syncService.syncTimeClockData();
-      
-      // If no data was synced, generate sample data for demonstration
-      const entries = await storage.getAllTimeClockEntries();
-      if (entries.length === 0) {
-        console.log("No external data found, generating mock data for demonstration");
-        await syncService.generateMockTimeClockData();
-      }
-      
-      const updatedEntries = await storage.getAllTimeClockEntries();
-      res.json({ 
-        message: "Time clock sync completed", 
-        entriesCount: updatedEntries.length,
-        entries: updatedEntries
-      });
-    } catch (error) {
-      console.error("Error syncing time clock data:", error);
-      res.status(500).json({ error: "Failed to sync time clock data" });
-    }
-  });
-
-  // Payroll Data Sync endpoint - sends payroll data to external front-end
-  // Test automatic payroll sync trigger
-  app.post("/api/test-auto-sync/:staffId", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      console.log(`[TEST] Manual trigger for automatic payroll sync - Staff ID: ${staffId}`);
-      
-      // Trigger the automatic sync
-      await payrollAutoSync.triggerPayrollSync(staffId, 'manual');
-      
-      res.json({
-        success: true,
-        message: `Automatic payroll sync triggered for staff ${staffId}`,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error: any) {
-      console.error('[TEST] Auto-sync trigger error:', error);
-      res.status(500).json({ error: "Error triggering automatic sync: " + error.message });
-    }
-  });
-
-  app.post("/api/payroll-sync", async (req, res) => {
-    try {
-      const { staffId, month } = req.body;
-      
-      if (!staffId) {
-        return res.status(400).json({ error: "Staff ID is required" });
-      }
-
-      // Get staff member details
-      const staff = await storage.getStaff(staffId);
-      if (!staff) {
-        return res.status(404).json({ error: "Staff member not found" });
-      }
-
-      // Get user details for staff member
-      const user = await storage.getUser(staff.userId);
-      if (!user) {
-        return res.status(404).json({ error: "User details not found for staff member" });
-      }
-
-      // Parse month parameter or use current month
-      const targetMonth = month ? new Date(month) : new Date();
-      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
-
-      // Get staff earnings for the specified month
-      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
-      
-      // Get time clock entries for the staff member in the month
-      const timeEntries = await storage.getAllTimeClockEntries();
-      const staffTimeEntries = timeEntries.filter((entry: any) => {
-        const entryDate = new Date(entry.clockInTime);
-        return entry.staffId === staffId && 
-               entryDate >= monthStart && 
-               entryDate <= monthEnd;
-      });
-
-      // Calculate total hours worked
-      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
-        if (entry.clockOutTime) {
-          const clockIn = new Date(entry.clockInTime);
-          const clockOut = new Date(entry.clockOutTime);
-          const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-          return sum + hours;
-        }
-        return sum;
-      }, 0);
-
-      // Calculate payroll summary
-      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
-      const totalServices = staffEarnings.length;
-      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
-
-      // Prepare payroll data for external system
-      const payrollData = {
-        staffId: staff.id,
-        userId: user.id,
-        staffName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        title: staff.title,
-        commissionType: staff.commissionType,
-        baseCommissionRate: staff.commissionRate || 0,
-        hourlyRate: staff.hourlyRate || 0,
-        fixedRate: staff.fixedRate || 0,
-        month: targetMonth.toISOString().substring(0, 7), // YYYY-MM format
-        monthStart: monthStart.toISOString(),
-        monthEnd: monthEnd.toISOString(),
-        totalHours: Math.round(totalHours * 100) / 100, // Round to 2 decimal places
-        totalServices,
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        totalEarnings: Math.round(totalEarnings * 100) / 100,
-        earnings: staffEarnings.map((earning: any) => ({
-          id: earning.id,
-          appointmentId: earning.appointmentId,
-          serviceId: earning.serviceId,
-          earningsAmount: earning.earningsAmount,
-          rateType: earning.rateType,
-          rateUsed: earning.rateUsed,
-          servicePrice: earning.servicePrice,
-          earningsDate: earning.earningsDate,
-          calculationDetails: earning.calculationDetails
-        })),
-        timeEntries: staffTimeEntries.map((entry: any) => ({
-          id: entry.id,
-          clockInTime: entry.clockInTime,
-          clockOutTime: entry.clockOutTime,
-          totalHours: entry.clockOutTime ? 
-            Math.round(((new Date(entry.clockOutTime).getTime() - new Date(entry.clockInTime).getTime()) / (1000 * 60 * 60)) * 100) / 100 : 0,
-          status: entry.status,
-          location: entry.location,
-          notes: entry.notes
-        })),
-        syncedAt: new Date().toISOString()
-      };
-
-      // Send data to external front-end system
-      console.log('Preparing to sync payroll data for staff:', staffId);
-      console.log('Payroll data summary:', {
-        staffName: payrollData.staffName,
-        month: payrollData.month,
-        totalEarnings: payrollData.totalEarnings,
-        totalHours: payrollData.totalHours,
-        totalServices: payrollData.totalServices
-      });
-
-      // Try multiple potential URLs for your SalonStaffDashboard
-      const possibleUrls = [
-        'https://salonstaffdashboard.candraczapansky.repl.co/api/payroll-data',
-        'https://salon-staff-dashboard.candraczapansky.repl.co/api/payroll-data',
-        'https://salonstaffdashboard--candraczapansky.repl.co/api/payroll-data',
-        'https://salon-staff-dashboard--candraczapansky.repl.co/api/payroll-data'
-      ];
-
-      let syncSuccess = false;
-      let lastError = null;
-
-      for (const url of possibleUrls) {
-        try {
-          console.log(`Attempting to sync with: ${url}`);
-          
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
-          const externalResponse = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'User-Agent': 'GloHeadSpa-PayrollSync/1.0'
-            },
-            body: JSON.stringify(payrollData),
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-
-          if (externalResponse.ok) {
-            const result = await externalResponse.json();
-            console.log(`Successfully sent payroll data to external system at ${url}:`, result);
-            
-            syncSuccess = true;
-            res.json({
-              message: "Payroll data synchronized successfully",
-              staffId,
-              month: payrollData.month,
-              totalEarnings: payrollData.totalEarnings,
-              totalHours: payrollData.totalHours,
-              externalSyncStatus: "success",
-              syncedToUrl: url,
-              data: payrollData
-            });
-            break;
-          } else {
-            console.log(`Failed to sync with ${url}: ${externalResponse.status} ${externalResponse.statusText}`);
-            lastError = `${externalResponse.status} ${externalResponse.statusText}`;
-          }
-        } catch (error) {
-          console.log(`Error connecting to ${url}:`, (error as Error).message);
-          lastError = (error as Error).message;
-        }
-      }
-
-      if (!syncSuccess) {
-        console.error('Failed to sync with all attempted URLs. Last error:', lastError);
-        
-        // Still return the payroll data even if external sync fails
-        res.json({
-          message: "Payroll data prepared but could not reach external dashboard",
-          staffId,
-          month: payrollData.month,
-          totalEarnings: payrollData.totalEarnings,
-          totalHours: payrollData.totalHours,
-          externalSyncStatus: "failed",
-          externalError: lastError,
-          attemptedUrls: possibleUrls,
-          data: payrollData,
-          note: "Please verify your SalonStaffDashboard is running and accessible"
-        });
-      }
-
-    } catch (error) {
-      console.error("Error processing payroll sync:", error);
-      res.status(500).json({ error: "Failed to process payroll sync" });
-    }
-  });
-
-  // Test endpoint to check payroll data preparation (without external sync)
-  app.get("/api/payroll-test/:staffId", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      const month = req.query.month ? new Date(req.query.month as string) : new Date();
-      
-      if (!staffId) {
-        return res.status(400).json({ error: "Valid staff ID is required" });
-      }
-
-      // Get staff member details
-      const staff = await storage.getStaff(staffId);
-      if (!staff) {
-        return res.status(404).json({ error: "Staff member not found" });
-      }
-
-      // Get user details
-      const user = await storage.getUser(staff.userId);
-      if (!user) {
-        return res.status(404).json({ error: "User details not found" });
-      }
-
-      const targetMonth = new Date(month.getFullYear(), month.getMonth(), 1);
-      const monthStart = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), 1);
-      const monthEnd = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0);
-
-      // Get staff earnings for the month
-      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
-      
-      // Get time clock entries
-      const allTimeEntries = await storage.getTimeClockEntriesByStaffId(staffId);
-      const staffTimeEntries = allTimeEntries.filter((entry: any) => {
-        if (!entry.clockInTime) return false;
-        const entryDate = new Date(entry.clockInTime);
-        return entryDate >= monthStart && entryDate <= monthEnd;
-      });
-
-      // Calculate totals
-      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
-      const totalServices = staffEarnings.length;
-      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
-      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
-        if (entry.clockInTime && entry.clockOutTime) {
-          const clockIn = new Date(entry.clockInTime);
-          const clockOut = new Date(entry.clockOutTime);
-          return sum + (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-        }
-        return sum;
-      }, 0);
-
-      const testData = {
-        staffId: staff.id,
-        userId: user.id,
-        staffName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        title: staff.title,
-        commissionType: staff.commissionType,
-        month: targetMonth.toISOString().substring(0, 7),
-        totalHours: Math.round(totalHours * 100) / 100,
-        totalServices,
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        totalEarnings: Math.round(totalEarnings * 100) / 100,
-        earningsCount: staffEarnings.length,
-        timeEntriesCount: staffTimeEntries.length
-      };
-
-      res.json({
-        message: "Payroll data test - ready for sync",
-        data: testData
-      });
-
-    } catch (error) {
-      console.error("Error testing payroll data:", error);
-      res.status(500).json({ error: "Failed to test payroll data" });
-    }
-  });
-
-  // Get detailed payroll breakdown for a specific staff member with individual appointments
-  app.get("/api/payroll/:staffId/detailed", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      const month = req.query.month ? new Date(req.query.month as string) : new Date();
-      
-      if (!staffId) {
-        return res.status(400).json({ error: "Valid staff ID is required" });
-      }
-
-      // Get staff member details
-      const staff = await storage.getStaff(staffId);
-      if (!staff) {
-        return res.status(404).json({ error: "Staff member not found" });
-      }
-
-      // Get user details
-      const user = await storage.getUser(staff.userId);
-      if (!user) {
-        return res.status(404).json({ error: "User details not found" });
-      }
-
-      const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-      const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-
-      // Get all paid appointments for this staff member in the time period
-      const allAppointments = await storage.getAllAppointments();
-      const staffAppointments = allAppointments.filter(appointment => 
-        appointment.staffId === staffId && 
-        appointment.paymentStatus === 'paid' &&
-        new Date(appointment.startTime) >= monthStart &&
-        new Date(appointment.startTime) <= monthEnd
-      );
-
-      // Get services and clients data for mapping
-      const allServices = await storage.getAllServices();
-      const allUsers = await storage.getAllUsers();
-      
-      // Build detailed appointment breakdown
-      const appointmentDetails = await Promise.all(
-        staffAppointments.map(async (appointment) => {
-          const service = allServices.find(s => s.id === appointment.serviceId);
-          const client = allUsers.find(u => u.id === appointment.clientId);
-          
-          // Calculate commission for this appointment
-          let commissionAmount = 0;
-          if (staff.commissionType === 'commission' && service) {
-            commissionAmount = (service.price || 0) * (staff.commissionRate || 0);
-          } else if (staff.commissionType === 'fixed') {
-            commissionAmount = staff.fixedRate || 0;
-          }
-
-          return {
-            appointmentId: appointment.id,
-            date: appointment.startTime,
-            clientName: client ? `${client.firstName} ${client.lastName}` : 'Unknown Client',
-            serviceName: service?.name || 'Unknown Service',
-            servicePrice: service?.price || 0,
-            commissionRate: staff.commissionRate || 0,
-            commissionAmount: commissionAmount,
-            commissionType: staff.commissionType,
-            duration: service?.duration || 0,
-            status: appointment.status,
-            paymentStatus: appointment.paymentStatus
-          };
-        })
-      );
-
-      // Calculate totals
-      const totalRevenue = appointmentDetails.reduce((sum, detail) => sum + detail.servicePrice, 0);
-      const totalCommission = appointmentDetails.reduce((sum, detail) => sum + detail.commissionAmount, 0);
-      const totalAppointments = appointmentDetails.length;
-
-      res.json({
-        staffId: staff.id,
-        staffName: `${user.firstName} ${user.lastName}`,
-        title: staff.title,
-        commissionType: staff.commissionType,
-        baseCommissionRate: staff.commissionRate || 0,
-        hourlyRate: staff.hourlyRate || 0,
-        month: month.toISOString().substring(0, 7),
-        summary: {
-          totalAppointments,
-          totalRevenue: Math.round(totalRevenue * 100) / 100,
-          totalCommission: Math.round(totalCommission * 100) / 100,
-          averageCommissionPerService: totalAppointments > 0 ? Math.round((totalCommission / totalAppointments) * 100) / 100 : 0
-        },
-        appointments: appointmentDetails.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      });
-
-    } catch (error) {
-      console.error("Error fetching detailed payroll data:", error);
-      res.status(500).json({ error: "Failed to fetch detailed payroll data" });
-    }
-  });
-
-  // Get payroll data for a specific staff member (for local use)
-  app.get("/api/payroll/:staffId", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      const month = req.query.month ? new Date(req.query.month as string) : new Date();
-      
-      if (!staffId) {
-        return res.status(400).json({ error: "Valid staff ID is required" });
-      }
-
-      // Get staff member details
-      const staff = await storage.getStaff(staffId);
-      if (!staff) {
-        return res.status(404).json({ error: "Staff member not found" });
-      }
-
-      // Get user details
-      const user = await storage.getUser(staff.userId);
-      if (!user) {
-        return res.status(404).json({ error: "User details not found" });
-      }
-
-      const monthStart = new Date(month.getFullYear(), month.getMonth(), 1);
-      const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
-
-      // Get staff earnings for the month
-      const staffEarnings = await storage.getStaffEarnings(staffId, monthStart);
-      
-      // Get time clock entries
-      const timeEntries = await storage.getAllTimeClockEntries();
-      const staffTimeEntries = timeEntries.filter((entry: any) => {
-        const entryDate = new Date(entry.clockInTime);
-        return entry.staffId === staffId && 
-               entryDate >= monthStart && 
-               entryDate <= monthEnd;
-      });
-
-      // Calculate totals
-      const totalHours = staffTimeEntries.reduce((sum: number, entry: any) => {
-        if (entry.clockOutTime) {
-          const clockIn = new Date(entry.clockInTime);
-          const clockOut = new Date(entry.clockOutTime);
-          const hours = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
-          return sum + hours;
-        }
-        return sum;
-      }, 0);
-
-      const totalEarnings = staffEarnings.reduce((sum: number, earning: any) => sum + earning.earningsAmount, 0);
-      const totalServices = staffEarnings.length;
-      const totalRevenue = staffEarnings.reduce((sum: number, earning: any) => sum + earning.servicePrice, 0);
-
-      res.json({
-        staffId: staff.id,
-        staffName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        title: staff.title,
-        commissionType: staff.commissionType,
-        month: month.toISOString().substring(0, 7),
-        totalHours: Math.round(totalHours * 100) / 100,
-        totalServices,
-        totalRevenue: Math.round(totalRevenue * 100) / 100,
-        totalEarnings: Math.round(totalEarnings * 100) / 100,
-        earnings: staffEarnings,
-        timeEntries: staffTimeEntries
-      });
-
-    } catch (error) {
-      console.error("Error fetching payroll data:", error);
-      res.status(500).json({ error: "Failed to fetch payroll data" });
-    }
-  });
-
-  // Payroll History Routes
-
-  // Create/Save payroll history
-  app.post("/api/payroll-history", async (req, res) => {
-    try {
-      const payrollHistoryData = req.body;
-      const newPayrollHistory = await storage.createPayrollHistory(payrollHistoryData);
-      res.json(newPayrollHistory);
-    } catch (error) {
-      console.error("Error creating payroll history:", error);
-      res.status(500).json({ error: "Failed to create payroll history" });
-    }
-  });
-
-  // Get all payroll history
-  app.get("/api/payroll-history", async (req, res) => {
-    try {
-      const payrollHistory = await storage.getAllPayrollHistory();
-      res.json(payrollHistory);
-    } catch (error) {
-      console.error("Error fetching payroll history:", error);
-      res.status(500).json({ error: "Failed to fetch payroll history" });
-    }
-  });
-
-  // Get payroll history for specific staff member
-  app.get("/api/payroll-history/staff/:staffId", async (req, res) => {
-    try {
-      const staffId = parseInt(req.params.staffId);
-      if (!staffId) {
-        return res.status(400).json({ error: "Valid staff ID is required" });
-      }
-      
-      const payrollHistory = await storage.getPayrollHistoryByStaff(staffId);
-      res.json(payrollHistory);
-    } catch (error) {
-      console.error("Error fetching payroll history for staff:", error);
-      res.status(500).json({ error: "Failed to fetch payroll history for staff" });
-    }
-  });
-
-  // Get specific payroll history record
-  app.get("/api/payroll-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid payroll history ID is required" });
-      }
-      
-      const payrollHistory = await storage.getPayrollHistory(id);
-      if (!payrollHistory) {
-        return res.status(404).json({ error: "Payroll history not found" });
-      }
-      
-      res.json(payrollHistory);
-    } catch (error) {
-      console.error("Error fetching payroll history:", error);
-      res.status(500).json({ error: "Failed to fetch payroll history" });
-    }
-  });
-
-  // Update payroll history record
-  app.put("/api/payroll-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid payroll history ID is required" });
-      }
-      
-      const updateData = req.body;
-      const updatedPayrollHistory = await storage.updatePayrollHistory(id, updateData);
-      res.json(updatedPayrollHistory);
-    } catch (error) {
-      console.error("Error updating payroll history:", error);
-      res.status(500).json({ error: "Failed to update payroll history" });
-    }
-  });
-
-  // Delete payroll history record
-  app.delete("/api/payroll-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid payroll history ID is required" });
-      }
-      
-      const deleted = await storage.deletePayrollHistory(id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Payroll history not found" });
-      }
-      
-      res.json({ message: "Payroll history deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting payroll history:", error);
-      res.status(500).json({ error: "Failed to delete payroll history" });
-    }
-  });
-
-  // Public API endpoint for external payroll data access
-  app.get("/api/payroll-data", async (req, res) => {
-    try {
-      const { staffId, month, year } = req.query;
-      
-      // Default to current month if not specified
-      const targetDate = year && month 
-        ? new Date(parseInt(year as string), parseInt(month as string) - 1, 1)
-        : new Date();
-      
-      const monthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-      const monthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
-      
-      let allStaffPayroll = [];
-      
-      if (staffId) {
-        // Get specific staff member payroll
-        const staffIdNum = parseInt(staffId as string);
-        if (!staffIdNum) {
-          return res.status(400).json({ error: "Valid staff ID is required" });
-        }
-        
-        const staff = await storage.getStaff(staffIdNum);
-        if (!staff) {
-          return res.status(404).json({ error: "Staff member not found" });
-        }
-        
-        const user = await storage.getUser(staff.userId);
-        if (!user) {
-          return res.status(404).json({ error: "User details not found" });
-        }
-        
-        const payrollData = await calculatePayrollForStaff(staff, user, monthStart, monthEnd);
-        allStaffPayroll.push(payrollData);
-        
-      } else {
-        // Get all staff payroll data
-        const allStaff = await storage.getAllStaff();
-        
-        for (const staff of allStaff) {
-          const user = await storage.getUser(staff.userId);
-          if (user) {
-            const payrollData = await calculatePayrollForStaff(staff, user, monthStart, monthEnd);
-            allStaffPayroll.push(payrollData);
-          }
-        }
-      }
-      
-      res.json({
-        success: true,
-        period: {
-          month: targetDate.getMonth() + 1,
-          year: targetDate.getFullYear(),
-          startDate: monthStart.toISOString(),
-          endDate: monthEnd.toISOString()
-        },
-        staffCount: allStaffPayroll.length,
-        totalPayroll: allStaffPayroll.reduce((sum, staff) => sum + staff.totalEarnings, 0),
-        data: allStaffPayroll
-      });
-      
-    } catch (error) {
-      console.error("Error fetching payroll data:", error);
-      res.status(500).json({ error: "Failed to fetch payroll data" });
-    }
-  });
-
-  // Helper function to calculate payroll for a specific staff member
-  async function calculatePayrollForStaff(staff: any, user: any, monthStart: Date, monthEnd: Date) {
-    const appointments = await storage.getAppointmentsByStaffAndDateRange(staff.id, monthStart, monthEnd);
-    const paidAppointments = appointments.filter((apt: any) => apt.paymentStatus === 'paid');
-    
-    let totalEarnings = 0;
-    let totalHours = 0;
-    const appointmentDetails = [];
-    
-    for (const appointment of paidAppointments) {
-      const service = await storage.getService(appointment.serviceId);
-      const client = appointment.clientId ? await storage.getUser(appointment.clientId) : null;
-      
-      // Skip if service not found
-      if (!service) {
-        console.log(`Service ${appointment.serviceId} not found for appointment ${appointment.id}`);
-        continue;
-      }
-      
-      let earnings = 0;
-      const servicePrice = appointment.totalAmount || service.price;
-      const serviceDuration = service.duration / 60; // Convert to hours
-      
-      // Calculate earnings based on commission type
-      switch (staff.commissionType) {
-        case 'commission':
-          earnings = servicePrice * (staff.commissionRate / 100);
-          break;
-        case 'hourly':
-          earnings = serviceDuration * staff.hourlyRate;
-          break;
-        case 'fixed':
-          earnings = staff.fixedRate;
-          break;
-        case 'hourly_plus_commission':
-          const hourlyPay = serviceDuration * staff.hourlyRate;
-          const commissionPay = servicePrice * (staff.commissionRate / 100);
-          earnings = hourlyPay + commissionPay;
-          break;
-        default:
-          earnings = 0;
-      }
-      
-      totalEarnings += earnings;
-      totalHours += serviceDuration;
-      
-      appointmentDetails.push({
-        appointmentId: appointment.id,
-        date: appointment.startTime,
-        serviceName: service.name,
-        servicePrice: servicePrice,
-        serviceDuration: serviceDuration,
-        clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() : 'Walk-in',
-        earnings: earnings
-      });
-    }
-    
-    return {
-      staffId: staff.id,
-      staffName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
-      staffEmail: user.email,
-      commissionType: staff.commissionType,
-      commissionRate: staff.commissionRate,
-      hourlyRate: staff.hourlyRate,
-      fixedRate: staff.fixedRate,
-      totalEarnings: Math.round(totalEarnings * 100) / 100,
-      totalHours: Math.round(totalHours * 100) / 100,
-      appointmentCount: paidAppointments.length,
-      appointments: appointmentDetails
-    };
-  }
-
-  // Helper function to create sales history record
-  async function createSalesHistoryRecord(paymentData: any, transactionType: string, additionalData?: any) {
-    try {
-      console.log('createSalesHistoryRecord called with:', { paymentData, transactionType, additionalData });
-      
-      const transactionDate = new Date();
-      const businessDate = transactionDate.toISOString().split('T')[0];
-      const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][transactionDate.getDay()];
-      const monthYear = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
-      const quarter = `${transactionDate.getFullYear()}-Q${Math.ceil((transactionDate.getMonth() + 1) / 3)}`;
-
-      let clientInfo = null;
-      let staffInfo = null;
-      let appointmentInfo = null;
-      let serviceInfo = null;
-
-      // Get client information if clientId exists
-      if (paymentData.clientId) {
-        clientInfo = await storage.getUser(paymentData.clientId);
-        console.log('Client info:', clientInfo);
-      }
-
-      // Get appointment and service information for appointment payments
-      if (paymentData.appointmentId && transactionType === 'appointment') {
-        appointmentInfo = await storage.getAppointment(paymentData.appointmentId);
-        console.log('Appointment info:', appointmentInfo);
-        if (appointmentInfo) {
-          serviceInfo = await storage.getService(appointmentInfo.serviceId);
-          console.log('Service info:', serviceInfo);
-          if (appointmentInfo.staffId) {
-            const staffData = await storage.getStaff(appointmentInfo.staffId);
-            if (staffData) {
-              const staffUser = await storage.getUser(staffData.userId);
-              staffInfo = { ...staffData, user: staffUser };
-              console.log('Staff info:', staffInfo);
-            }
-          }
-        }
-      }
-
-      const salesHistoryData = {
-        transactionType,
-        transactionDate,
-        paymentId: paymentData.id,
-        totalAmount: paymentData.totalAmount || paymentData.amount,
-        paymentMethod: paymentData.method,
-        paymentStatus: paymentData.status,
-        
-        // Client information
-        clientId: clientInfo?.id || null,
-        clientName: clientInfo ? `${clientInfo.firstName || ''} ${clientInfo.lastName || ''}`.trim() : null,
-        clientEmail: clientInfo?.email || null,
-        clientPhone: clientInfo?.phone || null,
-        
-        // Staff information
-        staffId: staffInfo?.id || null,
-        staffName: staffInfo?.user ? `${staffInfo.user.firstName || ''} ${staffInfo.user.lastName || ''}`.trim() : null,
-        
-        // Appointment and service information
-        appointmentId: appointmentInfo?.id || null,
-        serviceIds: serviceInfo ? JSON.stringify([serviceInfo.id]) : null,
-        serviceNames: serviceInfo ? JSON.stringify([serviceInfo.name]) : null,
-        serviceTotalAmount: transactionType === 'appointment' ? (paymentData.totalAmount || paymentData.amount) : null,
-        
-        // POS information
-        productIds: additionalData?.productIds || null,
-        productNames: additionalData?.productNames || null,
-        productQuantities: additionalData?.productQuantities || null,
-        productUnitPrices: additionalData?.productUnitPrices || null,
-        productTotalAmount: transactionType === 'pos_sale' ? (paymentData.totalAmount || paymentData.amount) : null,
-        
-        // Membership information
-        membershipId: additionalData?.membershipId || null,
-        membershipName: additionalData?.membershipName || null,
-        membershipDuration: additionalData?.membershipDuration || null,
-        
-        // Business insights
-        businessDate,
-        dayOfWeek,
-        monthYear,
-        quarter,
-        
-        // External tracking
-        squarePaymentId: paymentData.squarePaymentId || null,
-        
-        // Audit
-        createdBy: null, // Could be set to current user ID if available
-        notes: paymentData.description || null
-      };
-
-      const salesHistory = await storage.createSalesHistory(salesHistoryData);
-      console.log('Sales history record created:', salesHistory.id);
-      return salesHistory;
-    } catch (error) {
-      console.error('Error creating sales history record:', error);
-      // Don't throw error to prevent breaking payment flow
-    }
-  }
-
-  // Sales History Routes
-
-  // Create sales history record
-  app.post("/api/sales-history", async (req, res) => {
-    try {
-      const salesHistoryData = req.body;
-      const newSalesHistory = await storage.createSalesHistory(salesHistoryData);
-      res.json(newSalesHistory);
-    } catch (error) {
-      console.error("Error creating sales history:", error);
-      res.status(500).json({ error: "Failed to create sales history" });
-    }
-  });
-
-  // Get all sales history
-  app.get("/api/sales-history", async (req, res) => {
-    try {
-      const { startDate, endDate, transactionType, clientId, staffId, monthYear } = req.query;
-      
-      let salesHistory;
-      
-      if (startDate && endDate) {
-        salesHistory = await storage.getSalesHistoryByDateRange(new Date(startDate as string), new Date(endDate as string));
-      } else if (transactionType) {
-        salesHistory = await storage.getSalesHistoryByTransactionType(transactionType as string);
-      } else if (clientId) {
-        salesHistory = await storage.getSalesHistoryByClient(parseInt(clientId as string));
-      } else if (staffId) {
-        salesHistory = await storage.getSalesHistoryByStaff(parseInt(staffId as string));
-      } else if (monthYear) {
-        salesHistory = await storage.getSalesHistoryByMonth(monthYear as string);
-      } else {
-        salesHistory = await storage.getAllSalesHistory();
-      }
-      
-      res.json(salesHistory);
-    } catch (error) {
-      console.error("Error fetching sales history:", error);
-      res.status(500).json({ error: "Failed to fetch sales history" });
-    }
-  });
-
-  // Get sales history by ID
-  app.get("/api/sales-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid sales history ID is required" });
-      }
-      
-      const salesHistory = await storage.getSalesHistory(id);
-      if (!salesHistory) {
-        return res.status(404).json({ error: "Sales history not found" });
-      }
-      
-      res.json(salesHistory);
-    } catch (error) {
-      console.error("Error fetching sales history:", error);
-      res.status(500).json({ error: "Failed to fetch sales history" });
-    }
-  });
-
-  // Update sales history record
-  app.put("/api/sales-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid sales history ID is required" });
-      }
-      
-      const updateData = req.body;
-      const updatedSalesHistory = await storage.updateSalesHistory(id, updateData);
-      res.json(updatedSalesHistory);
-    } catch (error) {
-      console.error("Error updating sales history:", error);
-      res.status(500).json({ error: "Failed to update sales history" });
-    }
-  });
-
-  // Delete sales history record
-  app.delete("/api/sales-history/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      if (!id) {
-        return res.status(400).json({ error: "Valid sales history ID is required" });
-      }
-      
-      const deleted = await storage.deleteSalesHistory(id);
-      if (!deleted) {
-        return res.status(404).json({ error: "Sales history not found" });
-      }
-      
-      res.json({ message: "Sales history deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting sales history:", error);
-      res.status(500).json({ error: "Failed to delete sales history" });
-    }
-  });
-
-  // Phone Service API Routes
-  
-  // Twilio webhook for incoming calls
-  app.post("/api/phone/incoming", async (req, res) => {
-    try {
-      const { CallSid, From, To } = req.body;
-      const result = await PhoneService.handleIncomingCall(CallSid, From, To);
-      
-      res.set('Content-Type', 'text/xml');
-      res.send(result.twiml);
-    } catch (error) {
-      console.error("Error handling incoming call:", error);
-      res.status(500).send('<Response><Say>Sorry, we are experiencing technical difficulties.</Say></Response>');
-    }
-  });
-
-  // Twilio webhook for call status updates
-  app.post("/api/phone/call-status", async (req, res) => {
-    try {
-      const { CallSid, CallStatus, CallDuration } = req.body;
-      await PhoneService.updateCallStatus(CallSid, CallStatus, CallDuration ? parseInt(CallDuration) : undefined);
-      res.sendStatus(200);
-    } catch (error) {
-      console.error("Error updating call status:", error);
-      res.sendStatus(500);
-    }
-  });
-
-  // Twilio webhook for recording status
-  app.post("/api/phone/recording-status", async (req, res) => {
-    try {
-      const { CallSid, RecordingSid, RecordingUrl, RecordingDuration } = req.body;
-      await PhoneService.saveCallRecording(
-        CallSid, 
-        RecordingSid, 
-        RecordingUrl, 
-        RecordingDuration ? parseInt(RecordingDuration) : undefined
-      );
-      res.sendStatus(200);
-    } catch (error) {
-      console.error("Error saving call recording:", error);
-      res.sendStatus(500);
-    }
-  });
-
-  // Make outbound call
-  app.post("/api/phone/outbound", async (req, res) => {
-    try {
-      const { toNumber, staffId, userId, appointmentId, purpose } = req.body;
-      
-      if (!toNumber || !staffId) {
-        return res.status(400).json({ error: "Phone number and staff ID are required" });
-      }
-
-      const call = await PhoneService.makeOutboundCall(toNumber, staffId, userId, appointmentId, purpose);
-      res.json(call);
-    } catch (error) {
-      console.error("Error making outbound call:", error);
-      res.status(500).json({ error: "Failed to make outbound call" });
-    }
-  });
-
-  // Get call history for user
-  app.get("/api/phone/history/:userId", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.userId);
-      if (!userId) {
-        return res.status(400).json({ error: "Valid user ID is required" });
-      }
-
-      const callHistory = await PhoneService.getCallHistoryForUser(userId);
-      res.json(callHistory);
-    } catch (error) {
-      console.error("Error fetching call history:", error);
-      res.status(500).json({ error: "Failed to fetch call history" });
-    }
-  });
-
-  // Get recent calls for dashboard
-  app.get("/api/phone/recent", async (req, res) => {
-    try {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const recentCalls = await PhoneService.getRecentCalls(limit);
-      res.json(recentCalls);
-    } catch (error) {
-      console.error("Error fetching recent calls:", error);
-      res.status(500).json({ error: "Failed to fetch recent calls" });
-    }
-  });
-
-  // Add notes to call
-  app.put("/api/phone/notes/:callId", async (req, res) => {
-    try {
-      const callId = parseInt(req.params.callId);
-      const { notes, staffId } = req.body;
-      
-      if (!callId || !notes || !staffId) {
-        return res.status(400).json({ error: "Call ID, notes, and staff ID are required" });
-      }
-
-      await PhoneService.addCallNotes(callId, notes, staffId);
-      res.json({ message: "Notes added successfully" });
-    } catch (error) {
-      console.error("Error adding call notes:", error);
-      res.status(500).json({ error: "Failed to add call notes" });
-    }
-  });
-
-  // Update call user association
-  app.put("/api/phone/call/:callId/user", async (req, res) => {
-    try {
-      const callId = parseInt(req.params.callId);
-      const { userId } = req.body;
-      
-      if (!callId) {
-        return res.status(400).json({ error: "Call ID is required" });
-      }
-
-      await PhoneService.updateCallUserAssociation(callId, userId || null);
-      res.json({ message: "Call user association updated successfully" });
-    } catch (error) {
-      console.error("Error updating call user association:", error);
-      res.status(500).json({ error: "Failed to update call user association" });
-    }
-  });
-
-  // Find user by phone number
-  app.get("/api/phone/find-user/:phoneNumber", async (req, res) => {
-    try {
-      const { phoneNumber } = req.params;
-      
-      if (!phoneNumber) {
-        return res.status(400).json({ error: "Phone number is required" });
-      }
-
-      const user = await PhoneService.findUserByPhone(phoneNumber);
-      res.json({ user });
-    } catch (error) {
-      console.error("Error finding user by phone:", error);
-      res.status(500).json({ error: "Failed to find user by phone" });
-    }
-  });
-
-  // Get call analytics
-  app.get("/api/phone/analytics", async (req, res) => {
-    try {
-      const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
-      const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
-      
-      const analytics = await PhoneService.getCallAnalytics(startDate, endDate);
-      res.json(analytics);
-    } catch (error) {
-      console.error("Error generating call analytics:", error);
-      res.status(500).json({ error: "Failed to generate call analytics" });
-    }
-  });
-
-  // Download call recording
-  app.get("/api/phone/recording/:recordingSid", async (req, res) => {
-    try {
-      const { recordingSid } = req.params;
-      const downloadUrl = await PhoneService.getRecordingDownloadUrl(recordingSid);
-      res.redirect(downloadUrl);
-    } catch (error) {
-      console.error("Error downloading recording:", error);
-      res.status(500).json({ error: "Failed to download recording" });
-    }
-  });
-
-  // Register external API routes
-  registerExternalRoutes(app, storage);
-
-  // Initialize Jotform integration
-  const jotformIntegration = new JotformIntegration(storage, {
-    // Map Jotform question IDs to field names
-    // You'll need to update these based on your actual Jotform field IDs
-    '1': 'clientFirstName',      // Example: Question ID 1 = First Name
-    '2': 'clientLastName',       // Example: Question ID 2 = Last Name
-    '3': 'clientEmail',          // Example: Question ID 3 = Email
-    '4': 'clientPhone',          // Example: Question ID 4 = Phone
-    '5': 'serviceName',          // Example: Question ID 5 = Service
-    '6': 'appointmentDate',      // Example: Question ID 6 = Date
-    '7': 'appointmentTime',      // Example: Question ID 7 = Time
-    '8': 'appointmentNotes',     // Example: Question ID 8 = Notes
-    '9': 'staffName',            // Example: Question ID 9 = Staff Member
-  });
-
-  // Jotform webhook endpoint
-  app.post("/api/jotform/webhook", async (req, res) => {
-    try {
-      console.log('Jotform webhook received:', req.body);
-      
-      const result = await jotformIntegration.processSubmission(req.body);
-      
-      if (result.success) {
-        console.log('Successfully processed Jotform submission:', result.appointment);
-        res.status(200).json({
-          success: true,
-          message: 'Submission processed successfully',
-          appointment: result.appointment
-        });
-      } else {
-        console.error('Failed to process Jotform submission:', result.error);
-        res.status(400).json({
-          success: false,
-          error: result.error
-        });
-      }
-    } catch (error) {
-      console.error('Error in Jotform webhook:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error'
-      });
-    }
-  });
-
-  // Jotform webhook status endpoint
-  app.get("/api/jotform/webhook", async (req, res) => {
-    res.json({
-      status: "Jotform webhook endpoint is active",
-      endpoint: "/api/jotform/webhook",
-      method: "POST",
-      description: "Receives form submissions from Jotform and creates appointments",
-      features: [
-        "Processes Jotform submissions",
-        "Creates appointments automatically",
-        "Creates clients, services, and staff if needed",
-        "Deletes submissions from Jotform after processing",
-        "Field mapping support"
-      ],
-      setup: {
-        webhookUrl: `${process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || process.env.REPLIT_DOMAINS || 'http://localhost:5000'}/api/jotform/webhook`,
-        requiredFields: ["Client information", "Service information", "Appointment date/time"],
-        fieldMapping: "Configure field mappings in the JotformIntegration constructor"
-      }
-    });
-  });
-
-  // --- 2FA ROUTES ---
-
-  // 1. Setup 2FA: generate secret and QR (for authenticator app)
-  app.post("/api/2fa/setup", async (req, res) => {
-    const { userId, method = "authenticator" } = req.body;
-    if (!userId) return res.status(400).json({ error: "User ID required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (method === "email") {
-      // Email-based 2FA setup
-      if (!user.email) {
-        return res.status(400).json({ error: "Email address required for email-based 2FA" });
-      }
-
-      // Generate 6-digit code
-      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Save code temporarily
-      await storage.updateUser(userId, { 
-        twoFactorEmailCode: emailCode,
-        twoFactorEmailCodeExpiry: codeExpiry,
-        twoFactorMethod: "email"
-      });
-
-      // Send email with code
-      const emailSent = await sendEmail({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject: "Your Two-Factor Authentication Code",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">Glo Head Spa</h1>
-              <h2 style="color: #333;">Two-Factor Authentication Setup</h2>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Hello ${user.firstName || user.username},
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              You're setting up two-factor authentication for your Glo Head Spa account. 
-              Use the code below to complete the setup:
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
-                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
-              </div>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              This code will expire in 10 minutes for security reasons.
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              If you didn't request this setup, please ignore this email and contact support immediately.
-            </p>
-            
-            <hr style="border: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              This email was sent from your Glo Head Spa salon management system.
-            </p>
-          </div>
-        `,
-        text: `
-Hello ${user.firstName || user.username},
-
-You're setting up two-factor authentication for your Glo Head Spa account.
-
-Your verification code is: ${emailCode}
-
-This code will expire in 10 minutes for security reasons.
-
-If you didn't request this setup, please ignore this email and contact support immediately.
-
-- Glo Head Spa Team
-        `
-      });
-
-      if (emailSent) {
-        res.json({ 
-          method: "email", 
-          message: "Verification code sent to your email",
-          email: user.email 
-        });
-      } else {
-        res.status(500).json({ error: "Failed to send verification email" });
-      }
-    } else {
-      // Authenticator app setup (existing logic)
-      const secret = speakeasy.generateSecret({ name: `Glo Head Spa (${user.email})` });
-      await storage.updateUser(userId, { 
-        twoFactorSecret: secret.base32,
-        twoFactorMethod: "authenticator"
-      });
-      res.json({ 
-        method: "authenticator",
-        secret: secret.base32, 
-        qrCodeUrl: secret.otpauth_url 
-      });
-    }
-  });
-
-  // 2. Verify 2FA: verify code and enable 2FA
-  app.post("/api/2fa/verify", async (req, res) => {
-    const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (user.twoFactorMethod === "email") {
-      // Email-based verification
-      if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
-        return res.status(404).json({ error: "Email verification code not found or expired" });
-      }
-
-      // Check if code is expired
-      if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
-        return res.status(401).json({ error: "Verification code has expired" });
-      }
-
-      // Verify email code
-      if (user.twoFactorEmailCode !== token) {
-        return res.status(401).json({ error: "Invalid verification code" });
-      }
-
-      // Enable 2FA and clear temporary code
-      await storage.updateUser(userId, { 
-        twoFactorEnabled: true,
-        twoFactorEmailCode: null,
-        twoFactorEmailCodeExpiry: null
-      });
-      res.json({ success: true });
-    } else {
-      // Authenticator app verification (existing logic)
-      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
-      
-      const verified = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
-        encoding: "base32",
-        token,
-        window: 1
-      });
-      if (!verified) return res.status(401).json({ error: "Invalid token" });
-      await storage.updateUser(userId, { twoFactorEnabled: true });
-      res.json({ success: true });
-    }
-  });
-
-  // 3. Disable 2FA: verify code and disable
-  app.post("/api/2fa/disable", async (req, res) => {
-    const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (user.twoFactorMethod === "email") {
-      // For email 2FA, we need to send a new code for disabling
-      if (!user.email) {
-        return res.status(400).json({ error: "Email address required for email-based 2FA" });
-      }
-
-      // Generate 6-digit code for disabling
-      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Save code temporarily
-      await storage.updateUser(userId, { 
-        twoFactorEmailCode: emailCode,
-        twoFactorEmailCodeExpiry: codeExpiry
-      });
-
-      // Send email with code
-      const emailSent = await sendEmail({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject: "Disable Two-Factor Authentication",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">Glo Head Spa</h1>
-              <h2 style="color: #333;">Disable Two-Factor Authentication</h2>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Hello ${user.firstName || user.username},
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              You're attempting to disable two-factor authentication for your Glo Head Spa account. 
-              Use the code below to complete this action:
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
-                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
-              </div>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              This code will expire in 10 minutes for security reasons.
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              If you didn't request to disable 2FA, please ignore this email and contact support immediately.
-            </p>
-            
-            <hr style="border: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              This email was sent from your Glo Head Spa salon management system.
-            </p>
-          </div>
-        `,
-        text: `
-Hello ${user.firstName || user.username},
-
-You're attempting to disable two-factor authentication for your Glo Head Spa account.
-
-Your verification code is: ${emailCode}
-
-This code will expire in 10 minutes for security reasons.
-
-If you didn't request to disable 2FA, please ignore this email and contact support immediately.
-
-- Glo Head Spa Team
-        `
-      });
-
-      if (emailSent) {
-        res.json({ 
-          method: "email", 
-          message: "Verification code sent to your email",
-          email: user.email 
-        });
-      } else {
-        res.status(500).json({ error: "Failed to send verification email" });
-      }
-    } else {
-      // Authenticator app verification (existing logic)
-      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
-      
-      const verified = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
-        encoding: "base32",
-        token,
-        window: 1
-      });
-      if (!verified) return res.status(401).json({ error: "Invalid token" });
-      await storage.updateUser(userId, { 
-        twoFactorEnabled: false,
-        twoFactorSecret: null,
-        twoFactorMethod: null
-      });
-      res.json({ success: true });
-    }
-  });
-
-  // 4. Verify email 2FA disable
-  app.post("/api/2fa/disable-email", async (req, res) => {
-    const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (user.twoFactorMethod !== "email") {
-      return res.status(400).json({ error: "User is not using email-based 2FA" });
-    }
-
-    // Check if code is expired
-    if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
-      return res.status(404).json({ error: "Email verification code not found or expired" });
-    }
-
-    if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
-      return res.status(401).json({ error: "Verification code has expired" });
-    }
-
-    // Verify email code
-    if (user.twoFactorEmailCode !== token) {
-      return res.status(401).json({ error: "Invalid verification code" });
-    }
-
-    // Disable 2FA and clear all 2FA data
-    await storage.updateUser(userId, { 
-      twoFactorEnabled: false,
-      twoFactorEmailCode: null,
-      twoFactorEmailCodeExpiry: null,
-      twoFactorMethod: null
-    });
-    res.json({ success: true });
-  });
-
-  // 5. Serve QR code image
-  app.get("/api/2fa/qr-code", async (req, res) => {
-    const { qrCodeUrl } = req.query;
-    if (!qrCodeUrl) return res.status(400).json({ error: "qrCodeUrl required" });
-    try {
-      const qr = await QRCode.toDataURL(qrCodeUrl as string);
-      const img = Buffer.from(qr.split(",")[1], "base64");
-      res.writeHead(200, { "Content-Type": "image/png" });
-      res.end(img);
-    } catch (e) {
-      res.status(500).json({ error: "Failed to generate QR code" });
-    }
-  });
-
-  // 6. Login 2FA: verify code at login
-  app.post("/api/login/2fa", async (req, res) => {
-    const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user || !user.twoFactorEnabled) return res.status(404).json({ error: "2FA not enabled" });
-
-    if (user.twoFactorMethod === "email") {
-      // For email 2FA login, we need to send a new code
-      if (!user.email) {
-        return res.status(400).json({ error: "Email address required for email-based 2FA" });
-      }
-
-      // Generate 6-digit code for login
-      const emailCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const codeExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-      // Save code temporarily
-      await storage.updateUser(userId, { 
-        twoFactorEmailCode: emailCode,
-        twoFactorEmailCodeExpiry: codeExpiry
-      });
-
-      // Send email with code
-      const emailSent = await sendEmail({
-        to: user.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject: "Your Login Verification Code",
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #9532b8;">Glo Head Spa</h1>
-              <h2 style="color: #333;">Login Verification</h2>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              Hello ${user.firstName || user.username},
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              You're logging into your Glo Head Spa account. Use the code below to complete your login:
-            </p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; display: inline-block;">
-                <h3 style="margin: 0; color: #333; font-size: 24px; letter-spacing: 4px;">${emailCode}</h3>
-              </div>
-            </div>
-            
-            <p style="color: #666; line-height: 1.6;">
-              This code will expire in 10 minutes for security reasons.
-            </p>
-            
-            <p style="color: #666; line-height: 1.6;">
-              If you didn't attempt to log in, please ignore this email and contact support immediately.
-            </p>
-            
-            <hr style="border: 1px solid #eee; margin: 30px 0;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              This email was sent from your Glo Head Spa salon management system.
-            </p>
-          </div>
-        `,
-        text: `
-Hello ${user.firstName || user.username},
-
-You're logging into your Glo Head Spa account.
-
-Your verification code is: ${emailCode}
-
-This code will expire in 10 minutes for security reasons.
-
-If you didn't attempt to log in, please ignore this email and contact support immediately.
-
-- Glo Head Spa Team
-        `
-      });
-
-      if (emailSent) {
-        res.json({ 
-          method: "email", 
-          message: "Verification code sent to your email",
-          email: user.email 
-        });
-      } else {
-        res.status(500).json({ error: "Failed to send verification email" });
-      }
-    } else {
-      // Authenticator app verification (existing logic)
-      if (!user.twoFactorSecret) return res.status(404).json({ error: "2FA not set up" });
-      
-      const verified = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
-        encoding: "base32",
-        token,
-        window: 1
-      });
-      if (!verified) return res.status(401).json({ error: "Invalid token" });
-      // Remove sensitive fields
-      const { password, twoFactorSecret, ...userSafe } = user;
-      res.json(userSafe);
-    }
-  });
-
-  // 7. Verify email 2FA login
-  app.post("/api/login/2fa-email", async (req, res) => {
-    const { userId, token } = req.body;
-    if (!userId || !token) return res.status(400).json({ error: "User ID and token required" });
-    
-    const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ error: "User not found" });
-
-    if (user.twoFactorMethod !== "email") {
-      return res.status(400).json({ error: "User is not using email-based 2FA" });
-    }
-
-    // Check if code is expired
-    if (!user.twoFactorEmailCode || !user.twoFactorEmailCodeExpiry) {
-      return res.status(404).json({ error: "Email verification code not found or expired" });
-    }
-
-    if (new Date() > new Date(user.twoFactorEmailCodeExpiry)) {
-      return res.status(401).json({ error: "Verification code has expired" });
-    }
-
-    // Verify email code
-    if (user.twoFactorEmailCode !== token) {
-      return res.status(401).json({ error: "Invalid verification code" });
-    }
-
-    // Clear temporary code and return user data
-    await storage.updateUser(userId, { 
-      twoFactorEmailCode: null,
-      twoFactorEmailCodeExpiry: null
-    });
-    
-    // Remove sensitive fields
-    const { password, twoFactorSecret, twoFactorEmailCode, twoFactorEmailCodeExpiry, ...userSafe } = user;
-    res.json(userSafe);
-  });
-
-
-
-  // Get all forms
-  app.get("/api/forms", async (req, res) => {
-    try {
-      const forms = await storage.getAllForms();
-      res.json(forms);
-    } catch (error: any) {
-      console.error("Error fetching forms:", error);
-      console.error("Error stack:", error.stack);
-      res.status(500).json({ 
-        error: "Failed to fetch forms", 
-        details: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
-    }
-  });
-
-  // Get form submissions (MUST come before /api/forms/:id to avoid route conflicts)
-  app.get("/api/forms/:id/submissions", async (req, res) => {
-    try {
-      const formId = parseInt(req.params.id);
-
-      // Get the form
-      const form = await storage.getForm(formId);
-      if (!form) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-
-      // Get submissions for this form
-      const submissions = await storage.getFormSubmissions(formId);
-      
-      res.json(submissions);
-    } catch (error: any) {
-      console.error("Error fetching form submissions:", error);
-      res.status(500).json({ error: "Failed to fetch form submissions: " + error.message });
-    }
-  });
-
-  // Get a single form by ID
-  app.get("/api/forms/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const form = await storage.getForm(id);
-      
-      if (!form) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-      
-      res.json(form);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch form" });
-    }
-  });
-
-  // Create new form
-  app.post("/api/forms", validateBody(insertFormSchema), async (req, res) => {
-    try {
-      const newForm = await storage.createForm(req.body);
-      res.status(201).json(newForm);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to create form" });
-    }
-  });
-
-  // Update existing form
-  app.put("/api/forms/:id", validateBody(insertFormSchema), async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const existingForm = await storage.getForm(id);
-      if (!existingForm) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-      
-      const updatedForm = await storage.updateForm(id, req.body);
-      res.json(updatedForm);
-    } catch (error: any) {
-      console.error("Error updating form:", error);
-      res.status(500).json({ error: "Failed to update form: " + error.message });
-    }
-  });
-
-  // Delete form
-  app.delete("/api/forms/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      
-      if (!id) {
-        return res.status(400).json({ error: "Form ID is required" });
-      }
-      
-      // Check if form exists before deletion
-      const existingForm = await storage.getForm(id);
-      if (!existingForm) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-      
-      // Delete the form
-      const deleted = await storage.deleteForm(id);
-      
-      if (!deleted) {
-        return res.status(500).json({ error: "Failed to delete form" });
-      }
-      
-      res.status(200).json({ success: true, message: "Form deleted successfully" });
-    } catch (error: any) {
-      console.error("Error deleting form:", error);
-      res.status(500).json({ error: "Failed to delete form: " + error.message });
-    }
-  });
-
-  // Send form to client via SMS
-  app.post("/api/forms/:id/send-sms", async (req, res) => {
-    try {
-      const formId = parseInt(req.params.id);
-      const { clientId, phone, customMessage } = req.body;
-
-      // Validate required fields
-      if (!clientId && !phone) {
-        return res.status(400).json({ error: "Either clientId or phone is required" });
-      }
-
-      // Get the form
-      const form = await storage.getForm(formId);
-      if (!form) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-
-      let targetPhone = phone;
-      let clientName = "";
-
-      // If clientId is provided, get client details
-      if (clientId) {
-        const client = await storage.getUser(clientId);
-        if (!client) {
-          return res.status(404).json({ error: "Client not found" });
-        }
-        if (!client.phone) {
-          return res.status(400).json({ error: "Client does not have a phone number" });
-        }
-        targetPhone = client.phone;
-        clientName = `${client.firstName || ""} ${client.lastName || ""}`.trim();
-      }
-
-      // Check if SMS is configured
-      if (!isTwilioConfigured()) {
-        return res.status(400).json({ 
-          error: "SMS service not configured. Please configure Twilio credentials." 
-        });
-      }
-
-      // Create the SMS messages
-      // Use custom domain if available, otherwise use Replit domain, fall back to localhost for development
-      const customDomain = process.env.CUSTOM_DOMAIN || process.env.VITE_API_BASE_URL;
-      const replitDomain = process.env.REPLIT_DOMAINS;
-      const baseUrl = customDomain || (replitDomain ? `https://${replitDomain}` : 'http://localhost:5002');
-      // Include clientId in form URL if sending to a specific client
-      const formUrl = clientId ? `${baseUrl}/forms/${formId}?clientId=${clientId}` : `${baseUrl}/forms/${formId}`;
-      
-      console.log(`[SMS DEBUG] Using domain: ${baseUrl}`);
-      
-      // First message: Custom message or default message with call-to-action
-      let firstMessage = customMessage || `Hi${clientName ? ` ${clientName}` : ""}! You have a new form from Glo Head Spa: ${form.title}`;
-      
-      if (form.description && !customMessage) {
-        firstMessage += `\n\n${form.description}`;
-      }
-      
-      // Add call-to-action to first message
-      firstMessage += `\n\nComplete your form here:`;
-      
-      // Second message: Form link only
-      const secondMessage = formUrl;
-      
-      // Check if this is a test number (for development)
-      const isTestNumber = targetPhone.includes('555') || targetPhone.includes('test');
-      
-      console.log(`[SMS DEBUG] Phone: ${targetPhone}, isTestNumber: ${isTestNumber}`);
-      console.log(`[SMS DEBUG] First message: ${firstMessage}`);
-      console.log(`[SMS DEBUG] Second message: ${secondMessage}`);
-      
-      if (isTestNumber) {
-        // Simulate successful SMS for test numbers
-        console.log(`[TEST MODE] Would send first SMS to ${targetPhone}: ${firstMessage}`);
-        console.log(`[TEST MODE] Would send second SMS to ${targetPhone}: ${secondMessage}`);
-        
-        // Update form submission count
-        await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
-
-        return res.json({
-          success: true,
-          message: "Form sent successfully via SMS (test mode)",
-          messageId: "test-message-id",
-          testMode: true
-        });
-      }
-
-      // Send the first SMS (custom message)
-      console.log(`[SMS DEBUG] Sending first SMS to ${targetPhone}`);
-      const firstSmsResult = await sendSMS(targetPhone, firstMessage);
-      console.log(`[SMS DEBUG] First SMS result:`, firstSmsResult);
-      
-      if (!firstSmsResult.success) {
-        return res.status(500).json({
-          success: false,
-          error: firstSmsResult.error || "Failed to send first SMS"
-        });
-      }
-      
-      // Send the second SMS (form link)
-      console.log(`[SMS DEBUG] Sending second SMS to ${targetPhone}`);
-      const secondSmsResult = await sendSMS(targetPhone, secondMessage);
-      console.log(`[SMS DEBUG] Second SMS result:`, secondSmsResult);
-      
-      if (secondSmsResult.success) {
-        // Update form submission count
-        await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
-
-        res.json({
-          success: true,
-          message: "Form sent successfully via SMS",
-          messageId: `${firstSmsResult.messageId}, ${secondSmsResult.messageId}`
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: secondSmsResult.error || "Failed to send second SMS"
-        });
-      }
-    } catch (error: any) {
-      console.error("Error sending form via SMS:", error);
-      res.status(500).json({ error: "Failed to send form via SMS: " + error.message });
-    }
-  });
-
-  // Get client form submissions
-  app.get("/api/clients/:id/form-submissions", async (req, res) => {
-    try {
-      const clientId = parseInt(req.params.id);
-
-      // Verify the client exists
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Get form submissions for this client
-      const submissions = await storage.getClientFormSubmissions(clientId);
-      
-      res.json(submissions);
-    } catch (error: any) {
-      console.error("Error fetching client form submissions:", error);
-      res.status(500).json({ error: "Failed to fetch client form submissions: " + error.message });
-    }
-  });
-
-  // Get client analytics
-  app.get("/api/clients/:id/analytics", async (req, res) => {
-    try {
-      const clientId = parseInt(req.params.id);
-
-      // Verify the client exists
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Get client appointments
-      const appointments = await storage.getAppointmentsByClient(clientId);
-      
-      // Calculate analytics
-      const totalAppointments = appointments.length;
-      const completedAppointments = appointments.filter((a: any) => a.status === 'completed').length;
-      const cancelledAppointments = appointments.filter((a: any) => a.status === 'cancelled').length;
-      
-      // Calculate total spent (assuming appointments have a totalAmount field)
-      const totalSpent = appointments
-        .filter((a: any) => a.status === 'completed' && a.totalAmount)
-        .reduce((sum: number, a: any) => sum + (a.totalAmount || 0), 0);
-      
-      const averageAppointmentValue = completedAppointments > 0 
-        ? totalSpent / completedAppointments 
-        : 0;
-      
-      // Get last and next appointments
-      const sortedAppointments = appointments.sort((a: any, b: any) => 
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-      );
-      
-      const lastAppointment = sortedAppointments
-        .filter((a: any) => a.status === 'completed')
-        .pop()?.startTime || null;
-      
-      const nextAppointment = sortedAppointments
-        .filter((a: any) => a.status === 'confirmed' && new Date(a.startTime) > new Date())
-        .shift()?.startTime || null;
-      
-      // Get favorite service (most booked service)
-      const serviceCounts: { [key: string]: number } = {};
-      appointments.forEach((appointment: any) => {
-        if (appointment.serviceName) {
-          serviceCounts[appointment.serviceName] = (serviceCounts[appointment.serviceName] || 0) + 1;
-        }
-      });
-      
-      const favoriteService = Object.keys(serviceCounts).length > 0
-        ? Object.entries(serviceCounts).sort(([,a], [,b]) => b - a)[0][0]
-        : null;
-      
-      // Get client communication preferences
-      const communicationPreferences = {
-        emailAccountManagement: client?.emailAccountManagement || false,
-        emailAppointmentReminders: client?.emailAppointmentReminders || false,
-        emailPromotions: client?.emailPromotions || false,
-        smsAccountManagement: client?.smsAccountManagement || false,
-        smsAppointmentReminders: client?.smsAppointmentReminders || false,
-        smsPromotions: client?.smsPromotions || false,
-      };
-      
-      res.json({
-        totalAppointments,
-        completedAppointments,
-        cancelledAppointments,
-        totalSpent,
-        averageAppointmentValue,
-        lastAppointment,
-        nextAppointment,
-        favoriteService,
-        communicationPreferences,
-      });
-    } catch (error: any) {
-      console.error("Error fetching client analytics:", error);
-      res.status(500).json({ error: "Failed to fetch client analytics: " + error.message });
-    }
-  });
-
-  // Send communication to client
-  app.post("/api/communications/send", async (req, res) => {
-    try {
-      const { clientId, subject, message, type } = req.body;
-
-      // Verify the client exists
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Send communication based on type
-      if (type === 'email') {
-        // Send email using existing email service
-        await emailService.sendEmail({
-          to: client.email,
-          subject: subject,
-          html: message.replace(/\n/g, '<br>'),
-        });
-      } else if (type === 'sms' && client.phone) {
-        // Send SMS using existing SMS service
-        await smsService.sendSMS({
-          to: client.phone!,
-          body: message,
-        });
-      } else {
-        return res.status(400).json({ error: "Invalid communication type or missing phone number" });
-      }
-
-      res.json({ success: true, message: "Communication sent successfully" });
-    } catch (error: any) {
-      console.error("Error sending communication:", error);
-      res.status(500).json({ error: "Failed to send communication: " + error.message });
-    }
-  });
-
-  // Send appointment reminder
-  app.post("/api/communications/reminder", async (req, res) => {
-    try {
-      const { clientId } = req.body;
-
-      // Verify the client exists
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      // Get upcoming appointments for this client
-      const appointments = await storage.getAppointmentsByClient(clientId);
-      const upcomingAppointments = appointments.filter((a: any) => 
-        a.status === 'confirmed' && new Date(a.startTime) > new Date()
-      );
-
-      if (upcomingAppointments.length === 0) {
-        return res.status(404).json({ error: "No upcoming appointments found" });
-      }
-
-      // Send reminder for the next appointment
-      const nextAppointment = upcomingAppointments.sort((a: any, b: any) => 
-        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-      )[0];
-
-      const reminderMessage = `Hi ${client.firstName || client.username}, this is a reminder for your appointment on ${new Date(nextAppointment.startTime).toLocaleDateString()} at ${new Date(nextAppointment.startTime).toLocaleTimeString()}. Please call us if you need to reschedule.`;
-
-      if (client.phone) {
-        await smsService.sendSMS({
-          to: client.phone!,
-          body: reminderMessage,
-        });
-      } else if (client.email) {
-        await emailService.sendEmail({
-          to: client.email,
-          subject: "Appointment Reminder",
-          html: reminderMessage.replace(/\n/g, '<br>'),
-        });
-      } else {
-        return res.status(400).json({ error: "No contact information available for reminder" });
-      }
-
-      res.json({ success: true, message: "Reminder sent successfully" });
-    } catch (error: any) {
-      console.error("Error sending reminder:", error);
-      res.status(500).json({ error: "Failed to send reminder: " + error.message });
-    }
-  });
-
-  // Submit form data
-  app.post("/api/forms/:id/submit", async (req, res) => {
-    try {
-      const formId = parseInt(req.params.id);
-      const { formData, submittedAt, clientId } = req.body;
-
-      // Get the form
-      const form = await storage.getForm(formId);
-      if (!form) {
-        return res.status(404).json({ error: "Form not found" });
-      }
-
-      // Validate form data
-      if (!formData || typeof formData !== 'object') {
-        return res.status(400).json({ error: "Invalid form data" });
-      }
-
-      // Try to identify client from form data if clientId not provided
-      let identifiedClientId = clientId;
-      if (!identifiedClientId) {
-        // Look for email in form data to match with existing client
-        const email = formData.email || formData.Email || formData.clientEmail;
-        if (email) {
-          const users = await storage.getAllUsers();
-          const matchingClient = users.find(user => 
-            user.role === 'client' && 
-            user.email.toLowerCase() === email.toLowerCase()
-          );
-          if (matchingClient) {
-            identifiedClientId = matchingClient.id;
-          }
-        }
-      }
-
-      // Store form submission
-      const submission = {
-        formId,
-        clientId: identifiedClientId,
-        formData,
-        submittedAt: submittedAt || new Date().toISOString(),
-        ipAddress: req.ip || req.connection.remoteAddress,
-        userAgent: req.get('User-Agent'),
-      };
-
-      // Save submission to storage
-      await storage.saveFormSubmission(submission);
-
-      // Update form submission count
-      await storage.updateFormSubmissions(formId, (form.submissions || 0) + 1, new Date());
-
-      res.json({
-        success: true,
-        message: "Form submitted successfully",
-        submissionId: submission.submittedAt, // Using timestamp as ID for now
-        clientId: identifiedClientId
-      });
-    } catch (error: any) {
-      console.error("Error submitting form:", error);
-      res.status(500).json({ error: "Failed to submit form: " + error.message });
-    }
-  });
-
-  // Initialize Auto-Respond Services
-  const autoRespondService = new AutoRespondService(storage);
-  const smsAutoRespondService = SMSAutoRespondService.getInstance(storage);
-
-  // LLM Messaging API Routes
-  // Generate AI response for client message
-  app.post("/api/llm/generate-response", async (req, res) => {
-    try {
-      const { clientMessage, clientId, channel = 'email' } = req.body;
-
-
-
-      if (!clientMessage) {
-        return res.status(400).json({ error: "Client message is required" });
-      }
-
-      // Get client information
-      let client = null;
-      if (clientId) {
-        client = await storage.getUser(clientId);
-      }
-
-      // Get business settings
-      const businessSettings = await storage.getBusinessSettings();
-
-      // Get available services
-      const services = await storage.getAllServices();
-
-      // Get available staff
-      const staff = await storage.getAllStaff();
-      const staffUsers = await Promise.all(
-        staff.map(async (s) => {
-          const user = await storage.getUser(s.userId);
-          return {
-            name: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username : 'Unknown',
-            title: s.title,
-            bio: s.bio || undefined
-          };
-        })
-      );
-
-      // Get business knowledge for context
-      const businessKnowledge = await storage.getBusinessKnowledge();
-
-
-      // Build context for LLM
-      const context = {
-        clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username : undefined,
-        clientEmail: client?.email,
-        clientPhone: client?.phone || undefined,
-        businessName: businessSettings?.businessName || 'Glo Head Spa',
-        businessType: 'salon and spa',
-        clientPreferences: client ? {
-          emailAccountManagement: client.emailAccountManagement || undefined,
-          emailAppointmentReminders: client.emailAppointmentReminders || undefined,
-          emailPromotions: client.emailPromotions || undefined,
-          smsAccountManagement: client.smsAccountManagement || undefined,
-          smsAppointmentReminders: client.smsAppointmentReminders || undefined,
-          smsPromotions: client.smsPromotions || undefined,
-        } : undefined,
-        availableServices: services.map(s => ({
-          name: s.name,
-          description: s.description || undefined,
-          price: s.price,
-          duration: s.duration
-        })),
-        availableStaff: staffUsers,
-        businessKnowledge: businessKnowledge
-      };
-
-      // Generate response using LLM
-      const llmResponse = await llmService.generateResponse(clientMessage, context, channel);
-
-      if (!llmResponse.success) {
-        return res.status(500).json({ error: llmResponse.error });
-      }
-
-      // Save conversation if client exists
-      if (client) {
-        await llmService.saveConversation(
-          client.id,
-          clientMessage,
-          llmResponse.message || '',
-          channel,
-          {
-            suggestedActions: llmResponse.suggestedActions,
-            confidence: llmResponse.confidence
-          }
-        );
-      }
-
-
-      
-      res.json({
-        success: true,
-        response: llmResponse.message,
-        suggestedActions: llmResponse.suggestedActions,
-        confidence: llmResponse.confidence
-      });
-
-    } catch (error: any) {
-      console.error("Error generating LLM response:", error);
-      res.status(500).json({ error: "Failed to generate response: " + error.message });
-    }
-  });
-
-  // Send AI-generated response via email
-  app.post("/api/llm/send-email", async (req, res) => {
-    try {
-      const { clientId, clientMessage, aiResponse, subject } = req.body;
-
-      if (!clientId || !clientMessage || !aiResponse) {
-        return res.status(400).json({ error: "Client ID, message, and AI response are required" });
-      }
-
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      if (!client.email) {
-        return res.status(400).json({ error: "Client does not have an email address" });
-      }
-
-      // Send email with AI response
-      const emailSent = await sendEmail({
-        to: client.email,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
-        subject: subject || 'Response from Glo Head Spa',
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #333;">Response from Glo Head Spa</h2>
-            <p><strong>Your message:</strong></p>
-            <p style="background-color: #f5f5f5; padding: 10px; border-left: 4px solid #ddd;">${clientMessage}</p>
-            <p><strong>Our response:</strong></p>
-            <p style="background-color: #e8f5e8; padding: 10px; border-left: 4px solid #4CAF50;">${aiResponse.replace(/\n/g, '<br>')}</p>
-            <p style="margin-top: 20px; font-size: 12px; color: #666;">
-              This response was generated by our AI assistant. If you need further assistance, please don't hesitate to contact us directly.
-            </p>
-          </div>
-        `
-      });
-
-      if (emailSent) {
-        res.json({
-          success: true,
-          message: "Email sent successfully"
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: "Failed to send email"
-        });
-      }
-
-    } catch (error: any) {
-      console.error("Error sending AI email:", error);
-      res.status(500).json({ error: "Failed to send email: " + error.message });
-    }
-  });
-
-  // Send AI-generated response via SMS
-  app.post("/api/llm/send-sms", async (req, res) => {
-    try {
-      const { clientId, clientMessage, aiResponse } = req.body;
-
-      if (!clientId || !clientMessage || !aiResponse) {
-        return res.status(400).json({ error: "Client ID, message, and AI response are required" });
-      }
-
-      const client = await storage.getUser(clientId);
-      if (!client || client.role !== 'client') {
-        return res.status(404).json({ error: "Client not found" });
-      }
-
-      if (!client.phone) {
-        return res.status(400).json({ error: "Client does not have a phone number" });
-      }
-
-      // Send SMS with AI response
-      const smsResult = await sendSMS(client.phone, aiResponse);
-
-      if (smsResult.success) {
-        res.json({
-          success: true,
-          message: "SMS sent successfully",
-          messageId: smsResult.messageId
-        });
-      } else {
-        res.status(500).json({
-          success: false,
-          error: smsResult.error || "Failed to send SMS"
-        });
-      }
-
-    } catch (error: any) {
-      console.error("Error sending AI SMS:", error);
-      res.status(500).json({ error: "Failed to send SMS: " + error.message });
-    }
-  });
 
   // Get all conversations for the conversations tab
   app.get("/api/llm/conversations", async (req, res) => {
@@ -6896,7 +2342,7 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
       const result = await autoRespondService.processIncomingEmail({
         from,
-        to: to || process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        to: to || process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
         subject,
         body,
         timestamp: timestamp || new Date().toISOString(),
@@ -7198,6 +2644,35 @@ If you didn't attempt to log in, please ignore this email and contact support im
     }
   });
 
+  // Test SMS auto-responder
+  app.post("/api/sms-auto-respond/test", async (req, res) => {
+    try {
+      const { from, to, body } = req.body;
+
+      if (!from || !body) {
+        return res.status(400).json({ error: "From and body are required" });
+      }
+
+      // Process test SMS
+      const result = await smsAutoRespondService.processIncomingSMS({
+        from,
+        to: to || process.env.TWILIO_PHONE_NUMBER || '+1234567890',
+        body,
+        timestamp: new Date().toISOString(),
+        messageId: `test_${Date.now()}`
+      });
+
+      res.json({
+        success: true,
+        result,
+        message: "Test SMS processed successfully"
+      });
+    } catch (error: any) {
+      console.error("Error testing SMS auto-responder:", error);
+      res.status(500).json({ error: "Failed to test SMS auto-responder: " + error.message });
+    }
+  });
+
   // SMS webhook for incoming messages (Twilio)
   app.post("/api/webhook/incoming-sms", async (req, res) => {
     try {
@@ -7220,25 +2695,60 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
       console.log('SMS auto-respond result:', result);
 
-      // Return TwiML response for Twilio with the actual AI response
-      let twiml = '';
-      if (result.responseSent && result.response) {
-        twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>${result.response}</Message>
-</Response>`;
-      } else {
-        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // Return TwiML response for Twilio
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <!-- Auto-response handled by system -->
 </Response>`;
-      }
 
       res.set('Content-Type', 'text/xml');
       res.send(twiml);
 
     } catch (error: any) {
       console.error("Error processing incoming SMS webhook:", error);
+      // Return empty TwiML response
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+</Response>`;
+
+      res.set('Content-Type', 'text/xml');
+      res.status(500).send(twiml);
+    }
+  });
+
+  // Structured SMS Assistant webhook for appointment booking
+  app.post("/api/webhook/structured-sms", async (req, res) => {
+    try {
+      console.log('Structured SMS webhook received:', {
+        headers: req.headers,
+        body: req.body
+      });
+
+      // Handle Twilio webhook format
+      const smsData = {
+        from: req.body.From,
+        to: req.body.To,
+        body: req.body.Body || '',
+        timestamp: req.body.Timestamp || new Date().toISOString(),
+        messageId: req.body.MessageSid || `webhook_${Date.now()}`
+      };
+
+      // Process with structured assistant
+      const result = await smsStructuredAssistant.processMessage(smsData);
+
+      console.log('Structured SMS result:', result);
+
+      // Return TwiML response for Twilio
+      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <!-- Structured response handled by system -->
+</Response>`;
+
+      res.set('Content-Type', 'text/xml');
+      res.send(twiml);
+
+    } catch (error: any) {
+      console.error("Error processing structured SMS webhook:", error);
       // Return empty TwiML response
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>

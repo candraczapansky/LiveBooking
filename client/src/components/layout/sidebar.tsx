@@ -2,6 +2,7 @@ import { useContext, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { BusinessBrand } from "@/components/BusinessBrand";
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -14,7 +15,6 @@ import {
   Megaphone, 
   Settings, 
   LogOut, 
-  X, 
   Menu,
   MapPin,
   Monitor,
@@ -25,9 +25,9 @@ import {
   Phone,
   FileText,
   Bot,
-  Receipt,
   StickyNote,
-  Building2
+  Building2,
+  Shield
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -47,73 +47,36 @@ const SidebarItem = ({ icon, label, href, isActive, isCollapsed }: SidebarItemPr
       href={href} 
       className={`sidebar-item ${isActive ? 'active' : ''} ${isCollapsed ? 'collapsed' : ''}`} 
       style={{ color: 'hsl(0 0% 0%)' }}
-      title={isCollapsed ? label : undefined}
     >
-      <span className={`w-5 h-5 text-primary ${isCollapsed ? 'mx-auto' : 'mr-3'}`} style={{ color: 'hsl(330 81% 60%)' }}>
-        {icon}
-      </span>
-      {!isCollapsed && <span style={{ color: 'hsl(0 0% 0%)' }}>{label}</span>}
+      <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-start'} p-3 rounded-lg transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800`}>
+        <div className="flex-shrink-0">
+          {icon}
+        </div>
+        {!isCollapsed && (
+          <span className="ml-3 text-sm font-medium">{label}</span>
+        )}
+      </div>
     </Link>
   );
 };
 
 const Sidebar = () => {
   const { isOpen, isMobile, closeSidebar, toggleSidebar } = useSidebar();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const { user, logout } = useContext(AuthContext);
   const [primaryColor, setPrimaryColor] = useState('#d38301');
   const hamburgerRef = useRef<SVGSVGElement>(null);
-  const [localUser, setLocalUser] = useState<any>(null);
 
-  // Use context user or fallback to localStorage user
-  const currentUser = user || localUser;
-
+  // Load user color preferences
   useEffect(() => {
-    // Load user from localStorage if context isn't ready
-    if (!user) {
-      const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        try {
-          const userData = JSON.parse(storedUser);
-          setLocalUser(userData);
-        } catch (e) {
-          console.error('Error parsing stored user data:', e);
-        }
-      }
-    } else {
-      setLocalUser(user);
-    }
-
-    // Listen for user data updates (includes profile picture updates)
-    const handleUserDataUpdate = (event: CustomEvent) => {
-      setLocalUser(event.detail);
-    };
-
-    window.addEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
-    
-    return () => {
-      window.removeEventListener('userDataUpdated', handleUserDataUpdate as EventListener);
-    };
-  }, [user]);
-
-  useEffect(() => {
-    // Load user's color preferences
-    const loadUserColor = async () => {
+    const loadColorPreferences = async () => {
       if (user?.id) {
         try {
           const response = await fetch(`/api/users/${user.id}/color-preferences`);
           if (response.ok) {
-            const colorPrefs = await response.json();
-            if (colorPrefs && colorPrefs.primaryColor) {
-              setPrimaryColor(colorPrefs.primaryColor);
-              
-              // Force color update via DOM manipulation
-              if (hamburgerRef.current) {
-                hamburgerRef.current.style.color = colorPrefs.primaryColor;
-                hamburgerRef.current.style.fill = colorPrefs.primaryColor;
-                hamburgerRef.current.style.setProperty('color', colorPrefs.primaryColor, 'important');
-                hamburgerRef.current.style.setProperty('fill', colorPrefs.primaryColor, 'important');
-              }
+            const prefs = await response.json();
+            if (prefs.primaryColor) {
+              setPrimaryColor(prefs.primaryColor);
             }
           }
         } catch (error) {
@@ -122,146 +85,169 @@ const Sidebar = () => {
       }
     };
     
-    loadUserColor();
-    
-    // Listen for color preference updates
-    const handleColorUpdate = () => {
-      loadUserColor();
-    };
-    
-    window.addEventListener('colorPreferencesUpdated', handleColorUpdate);
-    
-    return () => {
-      window.removeEventListener('colorPreferencesUpdated', handleColorUpdate);
-    };
+    loadColorPreferences();
   }, [user?.id]);
 
-  // Also update color when primaryColor state changes
+  // Global click handler to close sidebar when clicking outside
   useEffect(() => {
-    if (hamburgerRef.current && primaryColor) {
-      hamburgerRef.current.style.color = primaryColor;
-      hamburgerRef.current.style.fill = primaryColor;
-      hamburgerRef.current.style.setProperty('color', primaryColor, 'important');
-      hamburgerRef.current.style.setProperty('fill', primaryColor, 'important');
+    const handleGlobalClick = (event: MouseEvent) => {
+      // Don't handle if mobile (PersistentMobileMenu handles mobile)
+      if (isMobile) return;
+      
+      // Don't close if clicking on the hamburger button itself
+      const target = event.target as Element;
+      if (target?.closest('[data-hamburger="true"]')) {
+        return;
+      }
+      
+      // Don't close if clicking inside the sidebar
+      if (target?.closest('.sidebar')) {
+        return;
+      }
+      
+      // Don't close if clicking on the overlay itself (let overlay handle it)
+      if (target?.closest('[data-sidebar-overlay="true"]')) {
+        return;
+      }
+      
+      // Close sidebar
+      closeSidebar();
+    };
+
+    if (isOpen && !isMobile) {
+      // Use capture phase to ensure we get the click before other handlers
+      document.addEventListener('click', handleGlobalClick, true);
+      return () => document.removeEventListener('click', handleGlobalClick, true);
     }
-  }, [primaryColor]);
+  }, [isOpen, isMobile, closeSidebar]);
 
   // Don't render original sidebar on mobile - SimpleMobileMenu handles mobile navigation
   if (isMobile) {
     return null;
   }
 
-  // For both mobile and desktop, show collapsed or expanded based on isOpen state
-  const sidebarClass = `sidebar fixed inset-y-0 left-0 z-50 bg-white dark:bg-gray-800 shadow-xl transition-all duration-300 ${
-    isOpen ? "w-64" : "w-16"
-  }`;
-
-  const navigationItems = [
-    { icon: <LayoutDashboard />, label: "Dashboard", href: "/dashboard" },
-    { icon: <Calendar />, label: "Client Appointments", href: "/appointments" },
-    { icon: <CalendarDays />, label: "Staff Working Hours", href: "/staff-schedule" },
-    { icon: <Users />, label: "Clients", href: "/clients" },
-    { icon: <UserCircle />, label: "Staff", href: "/staff" },
-    { icon: <Scissors />, label: "Services", href: "/services" },
-    { icon: <Package />, label: "Products", href: "/products" },
-    { icon: <DollarSign />, label: "Point of Sale", href: "/pos" },
-    { icon: <Gift />, label: "Gift Certificates", href: "/gift-certificates" },
-    { icon: <Building2 />, label: "Locations", href: "/locations" },
-    { icon: <MapPin />, label: "Rooms", href: "/rooms" },
-    { icon: <Monitor />, label: "Devices", href: "/devices" },
-    { icon: <CreditCard />, label: "Memberships", href: "/memberships" },
-    { icon: <Receipt />, label: "Payroll", href: "/payroll" },
-    { icon: <BarChart3 />, label: "Reports", href: "/reports" },
-    { icon: <Megaphone />, label: "Marketing", href: "/marketing" },
-    { icon: <Zap />, label: "Automations", href: "/automations" },
-    { icon: <FileText />, label: "Forms", href: "/forms" },
-    { icon: <Phone />, label: "Phone", href: "/phone" },
-    { icon: <Bot />, label: "AI Messaging", href: "/ai-messaging" },
-    { icon: <StickyNote />, label: "Note Templates", href: "/note-templates" },
-    { icon: <Settings />, label: "Settings", href: "/settings" },
+  const menuItems = [
+    { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
+    { icon: <Calendar size={20} />, label: "Appointments", href: "/appointments" },
+    { icon: <CalendarDays size={20} />, label: "Schedule", href: "/schedule" },
+    { icon: <Users size={20} />, label: "Clients", href: "/clients" },
+    { icon: <UserCircle size={20} />, label: "Staff", href: "/staff" },
+    { icon: <Scissors size={20} />, label: "Services", href: "/services" },
+    { icon: <Package size={20} />, label: "Products", href: "/products" },
+    { icon: <CreditCard size={20} />, label: "POS", href: "/pos" },
+    { icon: <DollarSign size={20} />, label: "Payroll", href: "/payroll" },
+    { icon: <MapPin size={20} />, label: "Locations", href: "/locations" },
+    { icon: <Monitor size={20} />, label: "Devices", href: "/devices" },
+    { icon: <BarChart3 size={20} />, label: "Reports", href: "/reports" },
+    { icon: <Zap size={20} />, label: "Automations", href: "/automations" },
+    { icon: <Megaphone size={20} />, label: "Marketing", href: "/marketing" },
+    { icon: <Gift size={20} />, label: "Gift Certificates", href: "/gift-certificates" },
+    { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
+    { icon: <FileText size={20} />, label: "Forms", href: "/forms" },
+    { icon: <StickyNote size={20} />, label: "Note Templates", href: "/note-templates" },
+    { icon: <Bot size={20} />, label: "AI Messaging", href: "/ai-messaging" },
+    { icon: <Building2 size={20} />, label: "Memberships", href: "/memberships" },
+    { icon: <Shield size={20} />, label: "Permissions", href: "/permissions" },
+    { icon: <Settings size={20} />, label: "Settings", href: "/settings" },
   ];
 
-
-
   return (
-    <div 
-      className={sidebarClass}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <div className="flex flex-col h-full">
-        <div className="p-1 border-b border-sidebar-border">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className={`h-10 w-10 ${isOpen ? 'mr-3' : 'mx-auto'}`}
-                onClick={toggleSidebar}
-              >
-                <Menu 
-                  ref={hamburgerRef}
-                  data-hamburger="true"
-                  className="h-10 w-10" 
-                  style={{ color: primaryColor }}
-                />
-              </Button>
+    <>
+      {/* Overlay for when sidebar is expanded - Desktop only */}
+      {isOpen && !isMobile && (
+        <div
+          className="fixed inset-0 z-40 transition-opacity duration-300 hidden lg:block"
+          style={{
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backdropFilter: 'blur(4px)'
+          }}
+          data-sidebar-overlay="true"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            closeSidebar();
+          }}
+        />
+      )}
+
+      {/* Main Sidebar */}
+      <div className={`sidebar fixed left-0 top-0 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 z-50 flex flex-col ${isOpen ? 'w-64' : 'w-16'}`}>
+        
+        {/* Header Section */}
+        <div className={`flex items-center p-4 border-b border-gray-200 dark:border-gray-700 ${isOpen ? 'justify-between' : 'justify-center'}`}>
+          {isOpen && (
+            <div className="flex items-center space-x-3">
+              <BusinessBrand 
+                showLogo={true}
+                showName={true}
+                size="md"
+                className="text-lg font-bold"
+              />
             </div>
-            {isMobile && (
-              <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">
-                <X className="h-5 w-5" />
-              </Button>
+          )}
+          
+          {/* Hamburger Menu Button */}
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-10 w-10 ${isOpen ? 'mr-3' : 'mx-auto'}`}
+              onClick={toggleSidebar}
+            >
+              <Menu 
+                ref={hamburgerRef}
+                data-hamburger="true"
+                className="h-10 w-10" 
+                style={{ color: primaryColor }}
+              />
+            </Button>
+            {isOpen && (
+              <div className="flex items-center space-x-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.profilePicture || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {user ? getInitials(getFullName(user.firstName, user.lastName)) : 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {user ? getFullName(user.firstName, user.lastName) : 'User'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {user?.email || 'user@example.com'}
+                  </p>
+                </div>
+              </div>
             )}
           </div>
         </div>
-        
-        <nav className="flex-1 px-2 py-4 overflow-y-auto">
-          <div className="space-y-1">
-            {navigationItems.map((item) => (
-              <SidebarItem
-                key={item.href}
-                icon={item.icon}
-                label={item.label}
-                href={item.href}
-                isActive={location === item.href || (item.href === "/dashboard" && location === "/")}
-                isCollapsed={!isOpen}
-              />
-            ))}
-          </div>
+
+        {/* Navigation Items */}
+        <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+          {menuItems.map((item) => (
+            <SidebarItem
+              key={item.href}
+              icon={item.icon}
+              label={item.label}
+              href={item.href}
+              isActive={location === item.href}
+              isCollapsed={!isOpen}
+            />
+          ))}
         </nav>
-        {/* User info and sign out */}
-        <div className="p-4 border-t border-sidebar-border">
-          {/* User avatar and name */}
-          <div className="flex items-center mb-4">
-            <Avatar className="h-9 w-9 mr-3">
-              <AvatarImage 
-                src={currentUser?.profilePicture || "/placeholder-avatar.svg"} 
-                alt="User profile"
-              />
-              <AvatarFallback>
-                {getInitials(currentUser?.firstName, currentUser?.lastName) || (currentUser?.username ? currentUser.username[0].toUpperCase() : '?')}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col">
-              <span className="font-medium text-gray-900 dark:text-gray-100 text-base truncate">
-                {getFullName(currentUser?.firstName, currentUser?.lastName) || currentUser?.username || 'User'}
-              </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {currentUser?.email || ''}
-              </span>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            className="w-full mt-4 border border-red-500 bg-transparent text-red-600 dark:text-red-400 text-sm font-medium rounded-lg cursor-pointer transition-colors hover:border-2 hover:border-red-600 hover:text-red-700 focus:border-2 focus:border-red-600 focus:text-red-700"
-            style={{ color: 'hsl(0 84% 60%)', background: 'transparent' }}
+
+        {/* Logout Section */}
+        <div className="p-2 border-t border-gray-200 dark:border-gray-700">
+          <button
             onClick={logout}
+            className={`w-full flex items-center ${!isOpen ? 'justify-center' : 'justify-start'} p-3 rounded-lg transition-colors duration-200 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20`}
           >
-            <LogOut className="h-5 w-5 mr-2" style={{ color: 'hsl(0 84% 60%)' }} />
-            <span style={{ color: 'hsl(0 84% 60%)' }}>Sign Out</span>
-          </Button>
+            <LogOut size={20} />
+            {isOpen && <span className="ml-3 text-sm font-medium">Logout</span>}
+          </button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

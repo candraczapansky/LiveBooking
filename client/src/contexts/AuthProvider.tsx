@@ -35,7 +35,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (userData: User) => void;
+  login: (userData: User, token?: string) => void;
   logout: () => void;
   updateUser: (updatedUserData: Partial<User>) => void;
   loading: boolean;
@@ -336,11 +336,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user, colorPreferencesApplied]);
 
-  const login = (userData: User) => {
+  const login = (userData: User, token?: string) => {
     setUser(userData);
     setIsAuthenticated(true);
     setColorPreferencesApplied(false);
     localStorage.setItem('user', JSON.stringify(userData));
+    
+    // Store JWT token if provided
+    if (token) {
+      localStorage.setItem('token', token);
+    }
     
     // Also update profilePicture in localStorage for backward compatibility
     if (userData.profilePicture) {
@@ -359,6 +364,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
     setColorPreferencesApplied(false);
     localStorage.removeItem('user');
+    localStorage.removeItem('token');
     localStorage.removeItem('profilePicture');
     
     // Clear color preferences from the DOM

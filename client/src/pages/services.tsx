@@ -11,10 +11,14 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const ServicesPage = () => {
   useDocumentTitle("Services | Glo Head Spa");
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null); // Start with all services
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const handleCategorySelect = (categoryId: number | null) => {
+    setSelectedCategoryId(categoryId);
+  };
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -38,18 +42,13 @@ const ServicesPage = () => {
     }
   });
 
-  // Select the first category if none is selected yet or if selected category doesn't exist
-  if ((!selectedCategoryId || selectedCategoryId === 0) && categories && categories.length > 0) {
-    setSelectedCategoryId(categories[0].id);
-  }
+  // No need to auto-select a category anymore - start with "All Categories" (null)
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
@@ -87,22 +86,14 @@ const ServicesPage = () => {
                 {/* Categories Sidebar */}
                 <div className="lg:col-span-1">
                   <CategoryList 
-                    selectedCategoryId={selectedCategoryId || 0} 
-                    onCategorySelect={setSelectedCategoryId} 
+                    selectedCategoryId={selectedCategoryId} 
+                    onCategorySelect={handleCategorySelect} 
                   />
                 </div>
                 
                 {/* Services List */}
                 <div className="lg:col-span-3">
-                  {selectedCategoryId && selectedCategoryId > 0 ? (
-                    <ServiceList categoryId={selectedCategoryId} />
-                  ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
-                      <p className="text-gray-600 dark:text-gray-400">
-                        Please select a category or create one to manage services.
-                      </p>
-                    </div>
-                  )}
+                  <ServiceList categoryId={selectedCategoryId} />
                 </div>
               </div>
             )}

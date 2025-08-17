@@ -869,6 +869,36 @@ body {
     font-size: 16px !important;
     -webkit-appearance: none !important;
     border-radius: 0.375rem !important;
+    min-height: 48px !important;
+    padding: 0.75rem 1rem !important;
+    line-height: 1.5 !important;
+  }
+  
+  /* Improve form label readability */
+  label {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    margin-bottom: 0.5rem !important;
+    display: block !important;
+  }
+  
+  /* Better form error messages */
+  .form-error, [role="alert"] {
+    font-size: 0.875rem !important;
+    color: rgb(239 68 68) !important;
+    margin-top: 0.25rem !important;
+  }
+  
+  /* Optimize form field groups */
+  .form-field, .field-group {
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Mobile-friendly checkboxes and radio buttons */
+  input[type="checkbox"], input[type="radio"] {
+    min-height: 20px !important;
+    min-width: 20px !important;
+    margin: 0 0.5rem 0 0 !important;
   }
   
   /* Touch targets meet accessibility standards */
@@ -893,12 +923,51 @@ body {
     overflow-x: auto !important;
     white-space: nowrap !important;
     width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: thin !important;
+  }
+  
+  /* Improve table scrollbar appearance on mobile */
+  table::-webkit-scrollbar {
+    height: 6px !important;
+  }
+  
+  table::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 3px !important;
+  }
+  
+  table::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.3) !important;
+    border-radius: 3px !important;
+  }
+  
+  table::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5) !important;
   }
   
   /* Modal and overlay constraints */
   [role="dialog"], .fixed[class*="z-"] {
     max-width: calc(100vw - 1rem) !important;
     max-height: calc(100vh - 1rem) !important;
+    margin: 0.5rem !important;
+  }
+  
+  /* Improve dialog content on mobile */
+  [data-radix-dialog-content] {
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    margin: 1rem !important;
+    max-height: calc(100vh - 2rem) !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Alert dialog mobile optimization */
+  [data-radix-alert-dialog-content] {
+    width: calc(100vw - 2rem) !important;
+    max-width: calc(100vw - 2rem) !important;
+    margin: 1rem !important;
   }
   
   /* Typography responsive scaling */
@@ -913,6 +982,52 @@ body {
     border-radius: 0.5rem !important;
     margin: 0 !important;
     width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Improve card spacing and readability on mobile */
+  .card .p-4, .card .p-6 {
+    padding: 1rem !important;
+  }
+  
+  .card .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+  
+  /* Better mobile form field spacing */
+  .space-y-6 .grid {
+    gap: 0.75rem !important;
+  }
+  
+  /* Improve select dropdowns on mobile */
+  [role="combobox"], .select-trigger {
+    min-height: 48px !important;
+    font-size: 16px !important;
+    padding: 0.75rem 1rem !important;
+  }
+  
+  /* Better mobile date and time pickers */
+  input[type="date"], input[type="time"], input[type="datetime-local"] {
+    min-height: 48px !important;
+    padding: 0.75rem 1rem !important;
+    font-size: 16px !important;
+  }
+  
+  /* Improve mobile search inputs */
+  input[type="search"] {
+    -webkit-appearance: none !important;
+    border-radius: 0.375rem !important;
+  }
+  
+  /* Better mobile number inputs */
+  input[type="number"] {
+    -moz-appearance: textfield !important;
+  }
+  
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
   }
 
   /* Point of Sale specific mobile fixes */
@@ -930,6 +1045,68 @@ body {
   main {
     min-height: calc(100vh - 4rem) !important;
     overflow-y: auto !important;
+  }
+  
+  /* Enhanced touch and swipe support */
+  * {
+    -webkit-tap-highlight-color: transparent !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    user-select: none !important;
+  }
+  
+  /* Allow text selection in content areas */
+  p, span, div[class*="text"], [role="textbox"], input, textarea {
+    -webkit-user-select: text !important;
+    user-select: text !important;
+  }
+  
+  /* Improve drawer/sheet mobile behavior */
+  [data-vaul-drawer] {
+    touch-action: none !important;
+  }
+  
+  [data-vaul-drawer-visible="true"] {
+    transform: translate3d(0, 0, 0) !important;
+  }
+  
+  /* Fix mobile menu scrolling */
+  .mobile-menu-scroll-container {
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+    overscroll-behavior: contain !important;
+    overflow: auto !important;
+    position: relative !important;
+    height: 100% !important;
+    width: 100% !important;
+  }
+  
+  /* Prevent conflicts with mobile menu panel */
+  .mobile-menu-panel {
+    touch-action: none !important;
+    overflow: hidden !important;
+  }
+  
+  .mobile-menu-panel .mobile-menu-scroll-container {
+    touch-action: pan-y !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  
+  /* Better mobile sidebar animations */
+  .sidebar-mobile {
+    transform: translateX(-100%) !important;
+    transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1) !important;
+  }
+  
+  .sidebar-mobile.open {
+    transform: translateX(0) !important;
+  }
+  
+  /* Improve mobile menu backdrop */
+  .mobile-menu-backdrop {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
   }
 }
 
@@ -1474,8 +1651,17 @@ button svg:not(.bg-secondary svg) {
 
 /* Custom styles for active sidebar item */
 .sidebar-item.active {
-  @apply border-l-4 border-primary text-primary;
-  background-color: hsl(var(--primary) / 0.1) !important;
+  @apply border border-primary text-primary;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Force outline style for active sidebar items with higher specificity */
+.sidebar .sidebar-item.active,
+.sidebar-item.active[href] {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
 }
 
 .sidebar-item {
@@ -1494,8 +1680,17 @@ button svg:not(.bg-secondary svg) {
 }
 
 .sidebar-item.collapsed.active {
-  @apply border-l-0 border-b-4 border-primary;
-  background-color: hsl(var(--primary) / 0.1) !important;
+  @apply border border-primary;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Force outline style for collapsed active sidebar items */
+.sidebar .sidebar-item.collapsed.active,
+.sidebar-item.collapsed.active[href] {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: 1px solid hsl(var(--primary)) !important;
 }
 
 /* Mobile sidebar toggle */
@@ -1662,107 +1857,10 @@ button {
   background-color: rgb(219 39 119) !important;
 }
 
-/* Hide any persistent white rectangle at the bottom of the page */
-div[style*="background: white" i],
-div[style*="background-color: white" i],
-div[style*="background: #fff" i],
-div[style*="background-color: #fff" i],
-div[style*="background: #ffffff" i],
-div[style*="background-color: #ffffff" i],
-div[style*="box-shadow" i][style*="fixed" i],
-div[style*="box-shadow" i][style*="bottom" i],
-div[style*="fixed" i][style*="bottom" i][style*="white" i],
-div[style*="absolute" i][style*="bottom" i][style*="white" i] {
+/* Hide unwanted calendar overlays */
+.rbc-calendar div[style*="background: white"],
+.rbc-calendar div[style*="background-color: white"] {
   display: none !important;
-}
-
-/* Ultra-aggressive: Hide ANY element at the bottom of the viewport */
-*[style*="bottom: 0" i],
-*[style*="bottom:0" i],
-*[style*="bottom: 0px" i],
-*[style*="bottom:0px" i],
-*[style*="bottom: 1px" i],
-*[style*="bottom:1px" i],
-*[style*="bottom: 2px" i],
-*[style*="bottom:2px" i],
-*[style*="bottom: 3px" i],
-*[style*="bottom:3px" i],
-*[style*="bottom: 4px" i],
-*[style*="bottom:4px" i],
-*[style*="bottom: 5px" i],
-*[style*="bottom:5px" i],
-*[style*="bottom: 10px" i],
-*[style*="bottom:10px" i],
-*[style*="bottom: 20px" i],
-*[style*="bottom:20px" i],
-*[style*="bottom: 50px" i],
-*[style*="bottom:50px" i],
-*[style*="bottom: 100px" i],
-*[style*="bottom:100px" i],
-*[style*="position: fixed" i][style*="bottom" i],
-*[style*="position:absolute" i][style*="bottom" i],
-*[style*="position: fixed" i][style*="bottom" i],
-*[style*="position:absolute" i][style*="bottom" i],
-div[style*="position: fixed" i][style*="bottom" i],
-div[style*="position: absolute" i][style*="bottom" i],
-div[style*="position:fixed" i][style*="bottom" i],
-div[style*="position:absolute" i][style*="bottom" i],
-.fixed[style*="bottom" i],
-.absolute[style*="bottom" i],
-[class*="fixed"][style*="bottom" i],
-[class*="absolute"][style*="bottom" i],
-[class*="fixed"][class*="bottom" i],
-[class*="absolute"][class*="bottom" i] {
-  display: none !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  position: static !important;
-  bottom: auto !important;
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  z-index: -9999 !important;
-}
-
-/* Also hide any pseudo-elements at the bottom */
-*::before[style*="bottom" i],
-*::after[style*="bottom" i],
-*::before[class*="bottom" i],
-*::after[class*="bottom" i] {
-  display: none !important;
-  content: none !important;
-}
-
-/* Nuclear option: Hide any fixed/absolute element at the bottom with a white background */
-.fixed[style*="bottom" i][style*="white" i],
-.absolute[style*="bottom" i][style*="white" i],
-div[style*="position: fixed" i][style*="bottom" i][style*="white" i],
-div[style*="position: absolute" i][style*="bottom" i][style*="white" i],
-div[style*="background: white" i],
-div[style*="background-color: white" i],
-div[style*="background: #fff" i],
-div[style*="background-color: #fff" i],
-div[style*="background: #ffffff" i],
-div[style*="background-color: #ffffff" i],
-div[style*="box-shadow" i][style*="fixed" i],
-div[style*="box-shadow" i][style*="bottom" i],
-div[style*="fixed" i][style*="bottom" i][style*="white" i],
-div[style*="absolute" i][style*="bottom" i][style*="white" i] {
-  display: none !important;
-  pointer-events: none !important;
-  opacity: 0 !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  max-height: 0 !important;
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
 }
 
 /* Remove react-big-calendar current date highlight */

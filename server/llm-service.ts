@@ -136,13 +136,13 @@ export class LLMService {
   ): Promise<LLMResponse> {
     try {
       const systemPrompt = this.buildStructuredBookingPrompt(context, conversationState);
-      const userPrompt = this.buildUserPrompt(clientMessage, context, 'sms');
+      const userPrompt = this.buildStructuredUserPrompt(clientMessage, conversationState);
 
       // Define the book_appointment function schema
       const functions = [
         {
-          name: 'book_appointment',
-          description: 'Book an appointment when all required parameters (service, date, time) are collected',
+          name: 'check_availability',
+          description: 'Check if a specific time slot is available for booking',
           parameters: {
             type: 'object',
             properties: {
@@ -162,33 +162,108 @@ export class LLMService {
             },
             required: ['service', 'date', 'time']
           }
+        },
+        {
+          name: 'book_appointment',
+          description: 'Book an appointment when all required parameters (service, date, time) are collected and availability is confirmed',
+          parameters: {
+            type: 'object',
+            properties: {
+              service: {
+                type: 'string',
+                description: 'The service name (e.g., "Signature Head Spa", "Deluxe Head Spa", "Platinum Head Spa")',
+                enum: ['Signature Head Spa', 'Deluxe Head Spa', 'Platinum Head Spa']
+              },
+              date: {
+                type: 'string',
+                description: 'The appointment date in YYYY-MM-DD format (e.g., "2024-08-01")'
+              },
+              time: {
+                type: 'string',
+                description: 'The appointment time in HH:MM AM/PM format (e.g., "10:30 AM", "2:00 PM")'
+              }
+            },
+            required: ['service', 'date', 'time']
+          }
+        },
+        {
+          name: 'cancel_appointment',
+          description: 'Cancel an existing appointment',
+          parameters: {
+            type: 'object',
+            properties: {
+              appointment_id: {
+                type: 'string',
+                description: 'The unique appointment ID to cancel'
+              },
+              client_phone: {
+                type: 'string',
+                description: 'The phone number associated with the appointment'
+              }
+            },
+            required: ['appointment_id', 'client_phone']
+          }
+        },
+        {
+          name: 'reschedule_appointment',
+          description: 'Reschedule an existing appointment to a new date and time',
+          parameters: {
+            type: 'object',
+            properties: {
+              appointment_id: {
+                type: 'string',
+                description: 'The unique appointment ID to reschedule'
+              },
+              client_phone: {
+                type: 'string',
+                description: 'The phone number associated with the appointment'
+              },
+              new_date: {
+                type: 'string',
+                description: 'The new appointment date in YYYY-MM-DD format'
+              },
+              new_time: {
+                type: 'string',
+                description: 'The new appointment time in HH:MM AM/PM format'
+              }
+            },
+            required: ['appointment_id', 'client_phone', 'new_date', 'new_time']
+          }
         }
       ];
 
+      console.log('🔍 Structured Booking - System Prompt Preview:', systemPrompt.substring(0, 200) + '...');
+      console.log('🔍 Structured Booking - User Prompt:', userPrompt);
+      
       const response = await this.callOpenAI(systemPrompt, userPrompt, functions);
       
       if (!response.success) {
         return response;
       }
 
+      console.log('🔍 Structured Booking - LLM Response:', response.message);
+      console.log('🔍 Structured Booking - Function Call:', response.functionCall);
+
       // If function call is detected, return it directly
-      if (response.functionCall && response.functionCall.name === 'book_appointment') {
-        return {
-          success: true,
-          message: 'Function call detected - booking appointment',
-          functionCall: response.functionCall,
-          confidence: 1.0
-        };
+      if (response.functionCall) {
+        console.log('✅ Function call detected:', response.functionCall.name);
+        
+        // Handle both check_availability and book_appointment function calls
+        if (response.functionCall.name === 'check_availability' || response.functionCall.name === 'book_appointment') {
+          return {
+            success: true,
+            message: 'Function call detected - proceeding with booking process',
+            functionCall: response.functionCall,
+            confidence: 1.0
+          };
+        }
       }
 
-      // Parse the response for structured booking
-      const parsedResponse = this.parseStructuredBookingResponse(response.message || '');
-      
+      // Return conversational response
       return {
         success: true,
-        message: parsedResponse.message,
-        suggestedActions: parsedResponse.actions,
-        confidence: parsedResponse.confidence
+        message: response.message || 'I didn\'t understand that. Could you please clarify?',
+        confidence: 0.8
       };
 
     } catch (error: any) {
@@ -363,42 +438,150 @@ Example actions:
 CRITICAL BOOKING FLOW RULES:
 1. You are in a structured booking conversation
 2. You must collect: service, date, and time
-3. Once ALL THREE are collected, you MUST call the book_appointment function
-4. Do NOT continue asking questions once all parameters are collected
-5. Be friendly and enthusiastic throughout the process
+3. Once ALL THREE are collected, you MUST call check_availability first
+4. Only if check_availability returns true, then call book_appointment
+5. If check_availability returns false, suggest alternative times
+6. Be friendly and enthusiastic throughout the process
 
 Current Conversation State:
 - Service: ${conversationState?.selectedService || 'Not selected'}
 - Date: ${conversationState?.selectedDate || 'Not selected'}
 - Time: ${conversationState?.selectedTime || 'Not selected'}
+- Conversation Step: ${conversationState?.conversationStep || 'initial'}
 
 Available Services:
 - Signature Head Spa ($99)
 - Deluxe Head Spa ($160)
 - Platinum Head Spa ($220)
 
-Booking Flow Steps:
-1. If no service selected: Ask "What service would you like? We offer Signature Head Spa ($99), Deluxe Head Spa ($160), or Platinum Head Spa ($220)."
-2. If service selected but no date: Ask "Great! What date would you like to come in? You can say 'tomorrow', 'Monday', or a specific date."
-3. If service and date selected but no time: Ask "Perfect! What time works for you? We have availability at 9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, and 5:00 PM."
-4. If ALL THREE are collected: Call the book_appointment function with the collected information
+BOOKING FLOW DECISION TREE:
+1. If conversationStep is 'initial' OR no service selected:
+   → Ask: "What service would you like? We offer Signature Head Spa ($99), Deluxe Head Spa ($160), or Platinum Head Spa ($220)."
+
+2. If conversationStep is 'date_requested' OR service selected but no date:
+   → Ask: "Great! What date would you like to come in? You can say 'tomorrow', 'Monday', or a specific date."
+
+3. If conversationStep is 'time_selected' OR service and date selected but no time:
+   → Ask: "Perfect! What time works for you? We have availability at 9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, and 5:00 PM."
+
+4. If ALL THREE are collected (service, date, time):
+   → Call check_availability function with the collected information
+   → If available: Call book_appointment function
+   → If not available: Suggest alternative times and ask for a new time
+
+CANCELLATION AND RESCHEDULING:
+- If user mentions "cancel" or "cancel appointment": Ask for appointment ID and call cancel_appointment
+- If user mentions "reschedule" or "change appointment": Ask for appointment ID and new date/time, then call reschedule_appointment
+- If appointment ID is not provided: Ask user to provide it or call us directly
 
 IMPORTANT FUNCTION CALLING RULES:
-- When ALL THREE parameters (service, date, time) are collected, you MUST call the book_appointment function
-- The function requires: service (string), date (YYYY-MM-DD format), time (HH:MM AM/PM format)
+- When ALL THREE parameters (service, date, time) are collected, you MUST call check_availability first
+- Only call book_appointment if check_availability returns true
+- The functions require: service (string), date (YYYY-MM-DD format), time (HH:MM AM/PM format)
 - Do NOT ask for more information once all three are collected
-- Call the function immediately when all parameters are available
-- The function will handle the actual booking process
+- Call the functions immediately when all parameters are available
+- The functions will handle the actual booking process
 
-Example function call when all parameters are collected:
-- Service: "Signature Head Spa"
-- Date: "2024-08-01" (tomorrow)
-- Time: "10:30 AM"
-- Result: Call book_appointment function with these exact parameters
+ERROR HANDLING:
+- If check_availability returns false: Suggest alternative times like "9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, or 5:00 PM"
+- If book_appointment fails: Apologize and suggest calling us directly
+- If cancel_appointment fails: Ask user to verify appointment ID or call us
+- If reschedule_appointment fails: Ask user to verify details or call us
 
-Do NOT continue the conversation after calling the function. The function will handle the booking confirmation.`;
+CURRENT STATE ANALYSIS:
+- Service: ${conversationState?.selectedService || 'Not selected'}
+- Date: ${conversationState?.selectedDate || 'Not selected'}
+- Time: ${conversationState?.selectedTime || 'Not selected'}
+- Step: ${conversationState?.conversationStep || 'initial'}
+
+Based on the current state, you should: ${this.getNextStepInstruction(conversationState)}
+
+CRITICAL: You are in a structured booking conversation. Do NOT give generic greetings like "Hello! How can I assist you today?" - follow the booking flow exactly as instructed above.
+
+MOST IMPORTANT: When ALL THREE parameters (service, date, time) are collected, you MUST call the check_availability function immediately. Do not ask for more information. Do not give a conversational response. Call the function.
+
+CRITICAL FUNCTION CALLING RULES:
+- When service, date, and time are ALL provided in the user's message, call check_availability immediately
+- Do NOT ask for more information if all three are present
+- Do NOT give a conversational response if all three are present
+- The check_availability function MUST be called first before book_appointment
+- Only call book_appointment if check_availability returns true
+- If the user provides a time and you have service and date, call check_availability IMMEDIATELY
+- Do NOT ask for confirmation or more details - just call the function`;
 
     return prompt;
+  }
+
+  /**
+   * Build user prompt specifically for structured booking
+   */
+  private buildStructuredUserPrompt(clientMessage: string, conversationState: any): string {
+    let prompt = `Client Message: "${clientMessage}"`;
+
+    // Add conversation state context
+    if (conversationState) {
+      prompt += `\n\nCurrent Conversation State:`;
+      prompt += `\n- Service: ${conversationState.selectedService || 'Not selected'}`;
+      prompt += `\n- Date: ${conversationState.selectedDate || 'Not selected'}`;
+      prompt += `\n- Time: ${conversationState.selectedTime || 'Not selected'}`;
+      prompt += `\n- Step: ${conversationState.conversationStep || 'initial'}`;
+      
+      // Check if all parameters are collected
+      const hasService = conversationState.selectedService;
+      const hasDate = conversationState.selectedDate;
+      const hasTime = conversationState.selectedTime;
+      
+      if (hasService && hasDate && hasTime) {
+        prompt += `\n\n🚨 ALL PARAMETERS COLLECTED: Service, Date, and Time are all available. You MUST call check_availability function immediately. DO NOT give a conversational response. CALL THE FUNCTION NOW.`;
+      } else if (hasService && hasDate && !hasTime) {
+        prompt += `\n\n📝 PARTIAL: Service and Date collected, need Time. Ask for time selection.`;
+      } else if (hasService && !hasDate && !hasTime) {
+        prompt += `\n\n📝 PARTIAL: Service collected, need Date and Time. Ask for date selection.`;
+      } else {
+        prompt += `\n\n📝 INCOMPLETE: Need Service, Date, and Time. Ask for service selection.`;
+      }
+    }
+
+    // Check if this looks like a continuing conversation
+    const continuingConversationKeywords = [
+      'book', 'appointment', 'schedule', 'service', 'price', 'cost', 'hours', 
+      'when', 'what', 'how much', 'available', 'time', 'date', 'reservation',
+      'signature', 'deluxe', 'platinum', 'head spa'
+    ];
+    
+    const isContinuingConversation = continuingConversationKeywords.some(keyword => 
+      clientMessage.toLowerCase().includes(keyword)
+    );
+
+    if (isContinuingConversation) {
+      prompt += `\n\n🚨 CRITICAL INSTRUCTION: This is a continuing conversation. DO NOT start your response with ANY greeting like "Hey there!", "Hi!", "Hello!", or "Hey [name]!". Start directly with your answer or next step. NO GREETINGS ALLOWED.`;
+    } else {
+      prompt += `\n\nThis is a new conversation. You can use a friendly greeting.`;
+    }
+
+    prompt += `\nPlease provide a helpful response to the client's message.`;
+
+    return prompt;
+  }
+
+  /**
+   * Get the next step instruction based on conversation state
+   */
+  private getNextStepInstruction(conversationState: any): string {
+    const hasService = conversationState?.selectedService;
+    const hasDate = conversationState?.selectedDate;
+    const hasTime = conversationState?.selectedTime;
+    const step = conversationState?.conversationStep;
+
+    if (!hasService || step === 'initial') {
+      return "Ask for service selection: 'What service would you like? We offer Signature Head Spa ($99), Deluxe Head Spa ($160), or Platinum Head Spa ($220).'";
+    } else if (!hasDate || step === 'date_requested') {
+      return "Ask for date selection: 'Great! What date would you like to come in? You can say \"tomorrow\", \"Monday\", or a specific date.'";
+    } else if (!hasTime || step === 'time_selected') {
+      return "Ask for time selection: 'Perfect! What time works for you? We have availability at 9:00 AM, 11:00 AM, 1:00 PM, 3:00 PM, and 5:00 PM.'";
+    } else {
+      return "Call the book_appointment function with all collected parameters.";
+    }
   }
 
   private buildUserPrompt(clientMessage: string, context: MessageContext, channel: 'email' | 'sms'): string {
@@ -412,7 +595,8 @@ Do NOT continue the conversation after calling the function. The function will h
     // Check if this looks like a continuing conversation based on message content
     const continuingConversationKeywords = [
       'book', 'appointment', 'schedule', 'service', 'price', 'cost', 'hours', 
-      'when', 'what', 'how much', 'available', 'time', 'date', 'reservation'
+      'when', 'what', 'how much', 'available', 'time', 'date', 'reservation',
+      'signature', 'deluxe', 'platinum', 'head spa'
     ];
     
     const isContinuingConversation = continuingConversationKeywords.some(keyword => 

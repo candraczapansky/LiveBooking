@@ -40,7 +40,7 @@ const formSchema = z.object({
   daysOfWeek: z.array(z.string()).min(1, "At least one day must be selected"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  location: z.string().min(1, "Location is required"),
+  locationId: z.string().min(1, "Location is required"),
   serviceCategories: z.array(z.string()).optional(),
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().optional(),
@@ -70,7 +70,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
     queryKey: ['/api/service-categories'],
   });
 
-  // Fetch business locations for location options
+  // Fetch locations for location options
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ['/api/locations'],
   });
@@ -82,7 +82,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       daysOfWeek: schedule?.dayOfWeek ? [schedule.dayOfWeek] : [],
       startTime: schedule?.startTime || "09:00",
       endTime: schedule?.endTime || "17:00",
-      location: schedule?.location || "All Locations",
+      locationId: schedule?.locationId?.toString() || "",
       serviceCategories: schedule?.serviceCategories || [],
       startDate: schedule?.startDate || format(new Date(), 'yyyy-MM-dd'),
       endDate: schedule?.endDate || "",
@@ -133,6 +133,14 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       // Additional cache clearing for any potential related queries
       queryClient.removeQueries({ queryKey: ['/api/schedules'] });
       
+      // Invalidate all location-specific schedule queries
+      queryClient.invalidateQueries({ 
+        predicate: (query) => query.queryKey[0] === '/api/schedules'
+      });
+      
+      // Dispatch custom event to notify other components
+      window.dispatchEvent(new CustomEvent('schedule-updated'));
+      
       // Call parent callback for additional refresh
       onSuccess?.();
       
@@ -160,6 +168,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
         ...data,
         dayOfWeek: schedule.dayOfWeek, // Keep the original day when editing
         staffId: parseInt(data.staffId),
+        locationId: parseInt(data.locationId),
         serviceCategories: data.serviceCategories || [],
         endDate: data.endDate || null,
         isBlocked: data.isBlocked || false,
@@ -173,7 +182,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
           staffId: parseInt(data.staffId),
           startTime: data.startTime,
           endTime: data.endTime,
-          location: data.location,
+          locationId: parseInt(data.locationId),
           serviceCategories: data.serviceCategories || [],
           startDate: data.startDate,
           endDate: data.endDate || null,
@@ -191,6 +200,25 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
         // Close dialog and show success message after all schedules are created
         queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        // Also invalidate location-specific schedule queries
+        queryClient.invalidateQueries({ 
+          predicate: (query) => query.queryKey[0] === '/api/schedules'
+        });
+        
+        // Force immediate refetch to update UI
+        queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+        
+        // Additional cache clearing for any potential related queries
+        queryClient.removeQueries({ queryKey: ['/api/schedules'] });
+        
+        // Dispatch custom event to notify other components
+        window.dispatchEvent(new CustomEvent('schedule-updated'));
+        
+        // Call the onSuccess callback if provided
+        if (onSuccess) {
+          onSuccess();
+        }
+        
         toast({
           title: "Success",
           description: `${data.daysOfWeek.length} schedule(s) created successfully.`,
@@ -201,7 +229,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
           daysOfWeek: [],
           startTime: "09:00",
           endTime: "17:00",
-          location: "All Locations",
+          locationId: locations.length > 0 ? locations[0].id.toString() : "",
           serviceCategories: [],
           startDate: format(new Date(), 'yyyy-MM-dd'),
           endDate: "",
@@ -357,7 +385,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
             <FormField
               control={form.control}
-              name="location"
+              name="locationId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Location</FormLabel>
@@ -368,14 +396,11 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="All Locations">All Locations</SelectItem>
-                      {(locations as any[])
-                        .filter((loc: any) => loc.isActive)
-                        .map((loc: any) => (
-                          <SelectItem key={loc.id} value={loc.name}>
-                            {loc.name}
-                          </SelectItem>
-                        ))}
+                      {(locations as any[]).map((location: any) => (
+                        <SelectItem key={location.id} value={location.id.toString()}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />

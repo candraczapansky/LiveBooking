@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
+import { useAuth } from "@/contexts/AuthProvider";
 import Header from "@/components/layout/header";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
@@ -54,6 +55,7 @@ const StaffPage = () => {
   useDocumentTitle("Staff | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   
@@ -142,18 +144,17 @@ const StaffPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
+      <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className={`min-h-screen flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
+      <div className="min-h-screen lg:h-screen flex flex-col transition-all duration-300">
         <Header />
         
-        <main className="p-3 lg:p-6">
-          <div className="w-full space-y-4 lg:space-y-6">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-auto lg:overflow-auto">
+          <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
+            <div className="space-y-4 lg:space-y-6">
             {/* Page Header */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
               <div className="space-y-3">
@@ -193,29 +194,31 @@ const StaffPage = () => {
                       Manage your salon staff - PAGE UPDATED
                     </p>
                   </div>
-                  <button
-                    onClick={() => {
-                      console.log("Add Staff button clicked");
-                      toast({
-                        title: "Add Staff Clicked!",
-                        description: "Original button works",
-                      });
-                      setSelectedStaffId(null);
-                      setIsFormOpen(true);
-                    }}
-                    className="relative z-50 inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 border-0"
-                    style={{
-                      minHeight: '44px',
-                      minWidth: '120px',
-                      WebkitTapHighlightColor: 'rgba(0,0,0,0)',
-                      userSelect: 'none',
-                      touchAction: 'manipulation'
-                    }}
-                    type="button"
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    <span className="ml-1">Add Staff</span>
-                  </button>
+                  {user && user.role === 'admin' && (
+                    <button
+                      onClick={() => {
+                        console.log("Add Staff button clicked");
+                        toast({
+                          title: "Add Staff Clicked!",
+                          description: "Original button works",
+                        });
+                        setSelectedStaffId(null);
+                        setIsFormOpen(true);
+                      }}
+                      className="relative z-50 inline-flex items-center justify-center px-4 py-3 text-sm font-medium text-white bg-orange-500 rounded-md hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 border-0"
+                      style={{
+                        minHeight: '44px',
+                        minWidth: '120px',
+                        WebkitTapHighlightColor: 'rgba(0,0,0,0)',
+                        userSelect: 'none',
+                        touchAction: 'manipulation'
+                      }}
+                      type="button"
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      <span className="ml-1">Add Staff</span>
+                    </button>
+                  )}
                 </div>
                 
                 <div className="w-full">
@@ -324,17 +327,11 @@ const StaffPage = () => {
                 ))}
               </div>
             )}
+            </div>
           </div>
         </main>
       </div>
-      
-      {/* Staff Form Dialog */}
-      <StaffForm
-        open={Boolean(isFormOpen)}
-        onOpenChange={setIsFormOpen}
-        staffId={selectedStaffId || undefined}
-      />
-      
+
       {/* Delete Staff Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

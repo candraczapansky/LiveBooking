@@ -40,7 +40,7 @@ class VoiceService:
             self.openai_client = openai.OpenAI(api_key=self.openai_api_key)
         else:
             self.openai_client = None
-            logger.warning("OpenAI API key not configured")
+            logger.warning("OpenAI API key not configured - using fallback responses")
         
         # Conversation history storage (in production, use Redis or database)
         self.conversation_history: Dict[str, List[Dict]] = {}
@@ -109,10 +109,20 @@ class VoiceService:
                 language='en-US'
             )
             
+            # Get webhook base URL from environment or use relative paths
+            webhook_base = os.getenv('WEBHOOK_BASE_URL', '')
+            if webhook_base:
+                process_url = f"{webhook_base}/webhook/voice/process?call_sid={call_sid}"
+                redirect_url = f"{webhook_base}/webhook/voice?call_sid={call_sid}"
+            else:
+                # Use relative paths - Twilio will use the same domain
+                process_url = f"/webhook/voice/process?call_sid={call_sid}"
+                redirect_url = f"/webhook/voice?call_sid={call_sid}"
+            
             # Configure speech recognition
             gather = response.gather(
                 input='speech',
-                action=f'/webhook/voice/process?call_sid={call_sid}',
+                action=process_url,
                 method='POST',
                 speech_timeout='auto',
                 speech_model='phone_call',
@@ -133,12 +143,14 @@ class VoiceService:
                 voice='alice',
                 language='en-US'
             )
-            response.redirect('/webhook/voice?call_sid=' + call_sid)
+            response.redirect(redirect_url)
             
             return str(response)
             
         except Exception as e:
             logger.error(f"Error creating initial response: {e}")
+            import traceback
+            logger.error(f"TRACEBACK: {traceback.format_exc()}")
             # Fallback response
             response = VoiceResponse()
             response.say(
@@ -173,9 +185,17 @@ class VoiceService:
             )
             
             # Continue listening for more input
+            # Get webhook base URL from environment or use relative paths
+            webhook_base = os.getenv('WEBHOOK_BASE_URL', '')
+            if webhook_base:
+                process_url = f"{webhook_base}/webhook/voice/process?call_sid={call_sid}"
+            else:
+                # Use relative paths - Twilio will use the same domain
+                process_url = f"/webhook/voice/process?call_sid={call_sid}"
+            
             gather = response.gather(
                 input='speech',
-                action=f'/webhook/voice/process?call_sid={call_sid}',
+                action=process_url,
                 method='POST',
                 speech_timeout='auto',
                 speech_model='phone_call',
@@ -213,12 +233,9 @@ class VoiceService:
     
     def _generate_ai_response(self, call_sid: str, user_speech: str) -> str:
         """
-        Generate AI response using OpenAI
+        Generate AI response using OpenAI or fallback responses
         """
         try:
-            if not self.openai_client:
-                return "I'm sorry, I'm not able to process your request right now. Please call back later."
-            
             # Get conversation history for this call
             if call_sid not in self.conversation_history:
                 self.conversation_history[call_sid] = []
@@ -229,40 +246,80 @@ class VoiceService:
                 "content": user_speech
             })
             
-            # Prepare messages for OpenAI
-            messages = [
-                {"role": "system", "content": self.salon_context}
-            ]
+            # Try OpenAI first
+            if self.openai_client:
+                try:
+                    # Prepare messages for OpenAI
+                    messages = [
+                        {"role": "system", "content": self.salon_context}
+                    ]
+                    
+                    # Add conversation history (keep last 10 messages to avoid token limits)
+                    history = self.conversation_history[call_sid][-10:]
+                    messages.extend(history)
+                    
+                    # Generate response
+                    completion = self.openai_client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=messages,
+                        max_tokens=150,
+                        temperature=0.7
+                    )
+                    
+                    ai_response = completion.choices[0].message.content.strip()
+                    
+                    # Add AI response to history
+                    self.conversation_history[call_sid].append({
+                        "role": "assistant",
+                        "content": ai_response
+                    })
+                    
+                    # Clean up old conversations (keep only last 20 messages)
+                    if len(self.conversation_history[call_sid]) > 20:
+                        self.conversation_history[call_sid] = self.conversation_history[call_sid][-20:]
+                    
+                    return ai_response
+                    
+                except Exception as e:
+                    logger.error(f"OpenAI error: {e}")
+                    import traceback
+                    logger.error(f"OpenAI TRACEBACK: {traceback.format_exc()}")
+                    # Fall through to fallback responses
             
-            # Add conversation history (keep last 10 messages to avoid token limits)
-            history = self.conversation_history[call_sid][-10:]
-            messages.extend(history)
+            # Fallback responses when OpenAI is not available
+            user_speech_lower = user_speech.lower()
             
-            # Generate response
-            completion = self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=150,
-                temperature=0.7
-            )
+            if any(word in user_speech_lower for word in ['appointment', 'book', 'schedule', 'reserve']):
+                response = "I'd be happy to help you book an appointment! We're open Monday through Saturday 9AM to 7PM, and Sundays 10AM to 5PM. What day and time would work best for you?"
             
-            ai_response = completion.choices[0].message.content.strip()
+            elif any(word in user_speech_lower for word in ['price', 'cost', 'how much', 'fee']):
+                response = "Our services range from $25 for basic cuts to $150+ for complex services. Haircuts start at $25, styling is $35, and coloring starts at $75. Would you like to know more about a specific service?"
             
-            # Add AI response to history
+            elif any(word in user_speech_lower for word in ['hour', 'open', 'time', 'when']):
+                response = "We're open Monday through Saturday from 9AM to 7PM, and Sundays from 10AM to 5PM. We accept walk-ins but recommend appointments for the best experience."
+            
+            elif any(word in user_speech_lower for word in ['cancel', 'reschedule', 'change']):
+                response = "I can help you reschedule or cancel your appointment. We require 24-hour notice for cancellations. What's your name and when is your current appointment?"
+            
+            elif any(word in user_speech_lower for word in ['service', 'what do you', 'offer']):
+                response = "We offer a full range of salon services including haircuts, styling, coloring, highlights, treatments, and more. Our stylists are experienced in all types of hair and styles. What service are you interested in?"
+            
+            else:
+                response = "Thank you for your inquiry. I'm here to help with appointments, pricing, hours, and any other questions about our salon. How can I assist you today?"
+            
+            # Add fallback response to history
             self.conversation_history[call_sid].append({
                 "role": "assistant",
-                "content": ai_response
+                "content": response
             })
             
-            # Clean up old conversations (keep only last 20 messages)
-            if len(self.conversation_history[call_sid]) > 20:
-                self.conversation_history[call_sid] = self.conversation_history[call_sid][-20:]
-            
-            return ai_response
+            return response
             
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
-            return "I'm sorry, I'm having trouble understanding. Could you please repeat your request?"
+            import traceback
+            logger.error(f"AI Response TRACEBACK: {traceback.format_exc()}")
+            return "I'm sorry, I'm having trouble processing your request. Please try again or speak to our staff."
     
     def cleanup_conversation(self, call_sid: str):
         """
@@ -295,4 +352,4 @@ class VoiceService:
                 "conversation_messages": len(self.conversation_history.get(call_sid, []))
             }
         except Exception as e:
-            return {"error": str(e)} 
+            return {"error": str(e)}

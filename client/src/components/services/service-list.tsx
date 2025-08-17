@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -41,10 +41,15 @@ type Service = {
   price: number;
   categoryId: number;
   color: string;
+  category?: {
+    id: number;
+    name: string;
+    description?: string;
+  };
 };
 
 type ServiceListProps = {
-  categoryId: number;
+  categoryId: number | null; // Allow null for "all categories"
 };
 
 const ServiceList = ({ categoryId }: ServiceListProps) => {
@@ -59,7 +64,9 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
   const { data: services, isLoading } = useQuery({
     queryKey: ['/api/services', categoryId],
     queryFn: async () => {
-      const response = await fetch(`/api/services?categoryId=${categoryId}`);
+      // If categoryId is null, fetch all services; otherwise filter by category
+      const url = categoryId ? `/api/services?categoryId=${categoryId}` : '/api/services';
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     }
@@ -72,7 +79,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
       if (!response.ok) throw new Error('Failed to fetch category');
       return response.json();
     },
-    enabled: !!categoryId
+    enabled: !!categoryId // Only fetch category details when a specific category is selected
   });
 
   const { data: allStaff } = useQuery({
@@ -92,10 +99,14 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
       // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
+      // Specifically invalidate this component's query with categoryId
+      queryClient.invalidateQueries({ queryKey: ['/api/services', categoryId] });
       // Also invalidate queries with any additional parameters
       queryClient.invalidateQueries({ predicate: query => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === '/api/services' ||
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/services"
+        Array.isArray(query.queryKey) && (
+          query.queryKey[0] === '/api/services' ||
+          query.queryKey[0] === "/api/services"
+        )
       });
       toast({
         title: "Success",
@@ -143,7 +154,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b">
-          <CardTitle className="text-lg font-medium">{category?.name || 'Services'}</CardTitle>
+          <CardTitle className="text-lg font-medium">{categoryId ? (category?.name || 'Services') : 'All Services'}</CardTitle>
           <div className="relative">
             <Input
               placeholder="Search services..."
@@ -159,6 +170,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
             <TableHeader>
               <TableRow>
                 <TableHead>Service</TableHead>
+                {!categoryId && <TableHead>Category</TableHead>}
                 <TableHead>Duration</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Staff</TableHead>
@@ -169,13 +181,13 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
+                  <TableCell colSpan={categoryId ? 6 : 7} className="text-center py-4">
                     Loading services...
                   </TableCell>
                 </TableRow>
               ) : filteredServices?.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-4">
+                  <TableCell colSpan={categoryId ? 6 : 7} className="text-center py-4">
                     No services found. {searchQuery ? 'Try a different search term.' : ''}
                   </TableCell>
                 </TableRow>
@@ -186,6 +198,13 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                       <div className="font-medium">{service.name}</div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">{service.description}</div>
                     </TableCell>
+                    {!categoryId && (
+                      <TableCell>
+                        <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
+                          {service.category?.name || 'Uncategorized'}
+                        </span>
+                      </TableCell>
+                    )}
                     <TableCell>{formatDuration(service.duration)}</TableCell>
                     <TableCell>{formatPrice(service.price)}</TableCell>
                     <TableCell>{getStaffForService(service.id)}</TableCell>

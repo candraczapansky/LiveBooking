@@ -1,203 +1,126 @@
-# 🔧 Helcim Webhook Configuration Guide
+# 🔧 Helcim Webhook & Configuration Setup Guide
 
-## Overview
+## 🚨 **Current Issue**
+You're getting payment processing errors because Helcim needs webhook configurations to notify your application about payment status changes.
 
-This guide will help you configure Helcim to send webhooks to your new clean payment processing system.
+## 📋 **Required Webhook URLs**
 
-## 📋 **Step 1: Get Your Webhook URLs**
+Based on your Replit domain, you need to configure these webhook URLs in your Helcim account:
 
-Your webhook endpoints are now available at:
-
-- **Primary Webhook**: `https://yourdomain.com/webhooks/helcim`
-- **Legacy Webhook**: `https://yourdomain.com/webhook/helcim` (for backward compatibility)
-- **Test Webhook**: `https://yourdomain.com/webhooks/helcim/test` (no signature required, for testing)
-
-## 🌐 **Step 2: Configure Helcim Dashboard**
-
-### 2.1 Log into Helcim Dashboard
-1. Go to [Helcim Dashboard](https://dashboard.helcim.com)
-2. Navigate to **Settings** → **Webhooks** or **API Configuration**
-
-### 2.2 Add New Webhook
-1. Click **"Add Webhook"** or **"Create Webhook"**
-2. Set the following configuration:
-
+### **1. Payment Success Webhook**
 ```
-Webhook URL: https://yourdomain.com/webhooks/helcim
-Method: POST
-Events: 
-  - cardTransaction.completed
-  - cardTransaction.declined
-  - cardTransaction.failed
-  - terminal.payment.completed
-  - terminal.payment.declined
+https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/payment-success
 ```
 
-### 2.3 Webhook Headers
-Add these custom headers:
+### **2. Payment Failed Webhook**
 ```
-Content-Type: application/json
-webhook-signature: [Helcim will generate this automatically]
+https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/payment-failed
 ```
 
-### 2.4 Webhook Secret
-- **Generate a strong secret** (32+ characters, mix of letters, numbers, symbols)
-- **Save this secret** - you'll need it for the `HELICM_WEBHOOK_SECRET` environment variable
-- **Never share this secret** publicly
+### **3. Customer Created Webhook**
+```
+https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/customer-created
+```
 
-## 🔑 **Step 3: Set Environment Variables**
+## 🔧 **Setup Steps**
 
-### 3.1 Edit payment.env File
+### **Step 1: Configure Webhooks in Helcim**
+
+1. **Go to your Helcim admin panel** (as shown in your screenshot)
+2. **Navigate to:** `glo-head-spa.myhelcim.com/admin/helcim-js-configs`
+3. **Click on "Webhooks" tab**
+4. **Add the following webhook configurations:**
+
+#### **Payment Success Webhook:**
+- **Event Type:** `payment.success`
+- **URL:** `https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/payment-success`
+- **Method:** `POST`
+- **Active:** `Yes`
+
+#### **Payment Failed Webhook:**
+- **Event Type:** `payment.failed`
+- **URL:** `https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/payment-failed`
+- **Method:** `POST`
+- **Active:** `Yes`
+
+#### **Customer Created Webhook:**
+- **Event Type:** `customer.created`
+- **URL:** `https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/customer-created`
+- **Method:** `POST`
+- **Active:** `Yes`
+
+### **Step 2: Test Webhook Endpoints**
+
+Run this command to test if your webhook endpoints are accessible:
+
 ```bash
-# Edit the payment.env file with your actual values
-nano payment.env
+curl -X GET "https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/health"
 ```
 
-Update these lines:
-```bash
-HELICM_API_TOKEN=your_actual_helcim_api_token_here
-HELICM_WEBHOOK_SECRET=your_webhook_secret_here
-```
+### **Step 3: Verify Helcim.js Configuration**
 
-### 3.2 Load Environment Variables
-```bash
-# Load the environment variables
-source payment.env
+In your Helcim admin panel:
 
-# Verify they're set
-echo $HELICM_API_TOKEN
-echo $HELICM_WEBHOOK_SECRET
-```
+1. **Go to "Helcim.js Configurations"**
+2. **Create a new configuration or edit existing one:**
+   - **Configuration Name:** `Glo Head Spa Production`
+   - **Environment:** `Production`
+   - **API Token:** `aLWelMKkFYVQd%h9zDbS%N84EtS@Qj!Vjhn_5VlqkzFaKiH7d3Zb.v@BG3RXEkhb`
+   - **Webhook URLs:** (as listed above)
 
-### 3.3 Alternative: Set System Environment Variables
-```bash
-export HELICM_API_TOKEN="your_actual_token"
-export HELICM_WEBHOOK_SECRET="your_webhook_secret"
-```
+## 🔍 **Troubleshooting**
 
-## 🧪 **Step 4: Test the Configuration**
+### **If Webhooks Don't Work:**
 
-### 4.1 Test Webhook Health Check
-```bash
-curl -X GET https://yourdomain.com/webhooks/helcim
-```
+1. **Check Replit Domain:**
+   - Your current domain: `47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev`
+   - Make sure this is accessible from external services
 
-Expected response:
-```json
-{
-  "status": "active",
-  "endpoint": "/webhooks/helcim",
-  "legacy_endpoint": "/webhook/helcim",
-  "message": "Helcim webhook endpoint is ready"
-}
-```
+2. **Test Webhook URLs:**
+   ```bash
+   curl -X POST "https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev/api/helcim/webhook/payment-success" \
+        -H "Content-Type: application/json" \
+        -d '{"test": "webhook"}'
+   ```
 
-### 4.2 Test Webhook (No Signature Required)
-```bash
-curl -X POST https://yourdomain.com/webhooks/helcim/test \
-  -H "Content-Type: application/json" \
-  -d '{"transactionId": "TEST123", "status": "APPROVED"}'
-```
+3. **Check Server Logs:**
+   - Look for webhook requests in your server logs
+   - Verify the webhook endpoints are being called
 
-Expected response:
-```json
-{
-  "status": "test_received",
-  "transaction_id": "TEST123",
-  "status": "APPROVED"
-}
-```
+### **Alternative: Use Local Development**
 
-### 4.3 Test Real Webhook (Requires Signature)
-```bash
-# This will fail without proper signature, which is expected
-curl -X POST https://yourdomain.com/webhooks/helcim \
-  -H "Content-Type: application/json" \
-  -d '{"transactionId": "REAL123", "status": "APPROVED"}'
-```
+If webhooks don't work with Replit, you can:
 
-Expected response (without signature):
-```json
-{
-  "detail": "Webhook signature header missing"
-}
-```
+1. **Use ngrok for local development:**
+   ```bash
+   ngrok http 5000
+   ```
 
-## 🔍 **Step 5: Monitor Webhook Activity**
+2. **Use the ngrok URL for webhooks:**
+   ```
+   https://your-ngrok-url.ngrok.io/api/helcim/webhook/payment-success
+   ```
 
-### 5.1 Check Server Logs
-When webhooks are received, you'll see detailed logs:
-```
-INFO:payments:Received Helcim webhook.
-INFO:payments:Webhook headers: {...}
-INFO:payments:Webhook body: {...}
-INFO:payments:Signature header: abc123...
-INFO:payments:Expected signature: xyz789...
-INFO:payments:Webhook signature verified successfully.
-INFO:payments:Event data: {...}
-INFO:payments:Transaction TEST123 status updated to COMPLETED.
-```
+## ✅ **Expected Results**
 
-### 5.2 Webhook Status in Helcim Dashboard
-- Check **Webhook History** or **Delivery Status**
-- Look for successful deliveries (200 status codes)
-- Check for any failed deliveries and error messages
+After setting up webhooks correctly:
 
-## 🚨 **Troubleshooting**
+1. **Payment processing should work without errors**
+2. **You should see webhook logs in your server console**
+3. **Payment status updates should be received automatically**
+4. **Customer creation should trigger webhook notifications**
 
-### Common Issues:
+## 🆘 **If Still Having Issues**
 
-#### 1. **"Webhook secret not configured"**
-- Make sure `HELICM_WEBHOOK_SECRET` is set in your environment
-- Restart the server after setting environment variables
+1. **Check Helcim API documentation** for the latest webhook requirements
+2. **Verify your API token has webhook permissions**
+3. **Test with Helcim's webhook testing tools**
+4. **Contact Helcim support** if webhook configuration issues persist
 
-#### 2. **"Invalid signature"**
-- Verify the webhook secret in Helcim matches your `HELICM_WEBHOOK_SECRET`
-- Check that Helcim is sending the `webhook-signature` header
+## 📞 **Next Steps**
 
-#### 3. **"Webhook signature header missing"**
-- Ensure Helcim is configured to send the signature header
-- Check webhook configuration in Helcim dashboard
-
-#### 4. **Webhook not reaching your server**
-- Verify the webhook URL is correct
-- Check your server is accessible from the internet
-- Ensure firewall/security groups allow incoming webhooks
-
-### Debug Steps:
-1. **Check server logs** for webhook receipt
-2. **Verify environment variables** are loaded
-3. **Test webhook endpoints** manually
-4. **Check Helcim webhook configuration**
-5. **Verify network connectivity**
-
-## ✅ **Success Indicators**
-
-When everything is working correctly, you should see:
-
-1. **Server startup** shows both tokens as configured
-2. **Health check endpoints** return 200 OK
-3. **Test webhook** processes successfully
-4. **Real webhooks** from Helcim are received and processed
-5. **Server logs** show successful webhook processing
-6. **Database** shows transaction status updates
-
-## 🔄 **Next Steps**
-
-After webhooks are working:
-
-1. **Test complete payment flow** from frontend
-2. **Monitor webhook reliability** in production
-3. **Set up webhook retry logic** if needed
-4. **Implement webhook monitoring** and alerting
-5. **Add webhook analytics** and reporting
-
-## 📞 **Support**
-
-If you continue to have issues:
-
-1. **Check server logs** for detailed error messages
-2. **Verify Helcim configuration** matches this guide
-3. **Test webhook endpoints** manually
-4. **Check network connectivity** and firewall settings
-5. **Contact Helcim support** if webhook configuration issues persist
+1. Configure the webhooks in your Helcim admin panel
+2. Test the webhook endpoints
+3. Try processing a test payment
+4. Check server logs for webhook activity
+5. Verify payment status updates are working 

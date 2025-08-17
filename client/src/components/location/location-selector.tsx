@@ -76,7 +76,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           setSelectedLocation(location || null);
         }}
       >
-        <SelectTrigger className={`${variant === 'compact' ? 'h-8 text-sm' : 'h-9'}`}>
+        <SelectTrigger className={`${variant === 'compact' ? 'h-8 text-sm min-w-[120px]' : 'h-9 min-w-[140px]'}`}>
           <SelectValue placeholder="Select location" />
         </SelectTrigger>
         <SelectContent>

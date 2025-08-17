@@ -325,7 +325,7 @@ export default function Products() {
     <div className="flex min-h-screen lg:h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
       <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden ml-0 lg:ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">

@@ -68,7 +68,10 @@ import {
   Users,
   UserX,
   Clock,
-  MailX
+  MailX,
+  Check,
+  X,
+  Upload
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -82,6 +85,7 @@ type Campaign = {
   audience: string;
   subject?: string;
   content: string;
+  photoUrl?: string; // Add photo support
   sendDate?: string;
   sentCount?: number;
   deliveredCount?: number;
@@ -121,12 +125,22 @@ type OptOut = {
   };
 };
 
+type Client = {
+  id: number;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phone?: string;
+  role: string;
+};
+
 const campaignFormSchema = z.object({
   name: z.string().min(1, "Campaign name is required"),
   type: z.enum(['email', 'sms']),
   audience: z.string().min(1, "Audience is required"),
   subject: z.string().optional(),
   content: z.string().min(1, "Content is required"),
+  photoUrl: z.string().optional(), // Add photo support
   sendDate: z.string().optional(),
   sendTime: z.string().optional(),
   sendNow: z.boolean().default(false),
@@ -138,6 +152,14 @@ const campaignFormSchema = z.object({
 }, {
   message: "Subject is required for email campaigns",
   path: ["subject"],
+}).refine((data) => {
+  if (data.type === 'sms' && data.content.length > 160) {
+    return false;
+  }
+  return true;
+}, {
+  message: "SMS messages cannot exceed 160 characters",
+  path: ["content"],
 });
 
 const promoFormSchema = z.object({
@@ -172,6 +194,9 @@ const MarketingPage = () => {
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const emailEditorRef = useRef<EmailTemplateEditorRef>(null);
   const [optOutSearchQuery, setOptOutSearchQuery] = useState("");
+  const [selectedClients, setSelectedClients] = useState<Client[]>([]);
+  const [clientSearchQuery, setClientSearchQuery] = useState("");
+  const [showClientSelector, setShowClientSelector] = useState(false);
 
 
 
@@ -197,6 +222,15 @@ const MarketingPage = () => {
     }
   }, [location]);
 
+  // Fetch clients for selection
+  const { data: allClients = [] } = useQuery<Client[]>({
+    queryKey: ["/api/users?role=client"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users?role=client");
+      return response.json();
+    },
+  });
+
   // Campaign form
   const campaignForm = useForm<CampaignFormValues>({
     resolver: zodResolver(campaignFormSchema),
@@ -211,6 +245,14 @@ const MarketingPage = () => {
       sendNow: false,
     },
   });
+
+  // Reset selected clients when audience changes
+  useEffect(() => {
+    const currentAudience = campaignForm.watch("audience");
+    if (currentAudience !== "Specific Clients") {
+      setSelectedClients([]);
+    }
+  }, [campaignForm.watch("audience")]);
 
   // Promo form
   const promoForm = useForm<PromoFormValues>({
@@ -263,7 +305,11 @@ const MarketingPage = () => {
         subject: campaignData.type === 'email' ? campaignData.subject : undefined,
         content: campaignData.content,
         sendDate: sendDate,
-        status: sendDate ? 'scheduled' : 'draft'
+        status: sendDate ? 'scheduled' : 'draft',
+        // Include selected client IDs for specific clients audience
+        ...(campaignData.audience === 'Specific Clients' && selectedClients.length > 0 && {
+          targetClientIds: selectedClients.map(client => client.id)
+        })
       };
       
       const response = await fetch('/api/marketing-campaigns', {
@@ -285,6 +331,7 @@ const MarketingPage = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
       setIsCampaignFormOpen(false);
       campaignForm.reset();
+      setSelectedClients([]); // Reset selected clients
       
       // If "Send Now" was selected, immediately send the campaign
       if (variables.sendNow) {
@@ -406,6 +453,26 @@ const MarketingPage = () => {
       return; // Prevent duplicate submissions
     }
     
+    // Validate that specific clients are selected when audience is "Specific Clients"
+    if (data.audience === "Specific Clients" && selectedClients.length === 0) {
+      toast({
+        title: "No clients selected",
+        description: "Please select at least one client for the Specific Clients audience.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Validate SMS character limit
+    if (data.type === 'sms' && data.content.length > 160) {
+      toast({
+        title: "Message too long",
+        description: "SMS messages cannot exceed 160 characters. Please shorten your message.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (data.type === 'sms' && !(smsConfig as any)?.configured) {
       toast({
         title: "SMS not configured",
@@ -426,6 +493,19 @@ const MarketingPage = () => {
         variant: "destructive",
       });
       return;
+    }
+    
+    // Find the campaign to validate SMS length
+    if (campaignType === 'sms') {
+      const campaign = campaigns.find((c: any) => c.id === campaignId);
+      if (campaign && campaign.content.length > 160) {
+        toast({
+          title: "Cannot send campaign",
+          description: "SMS message exceeds 160 character limit. Please edit the campaign first.",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
     sendCampaignMutation.mutate(campaignId);
@@ -590,15 +670,15 @@ const MarketingPage = () => {
                     {filteredCampaigns.map((campaign) => (
                       <Card key={campaign.id} className="overflow-hidden">
                         <CardHeader className="pb-4">
-                          <div className="flex justify-between items-start">
-                            <div>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
                               <Badge 
                                 variant="outline"
-                                className={`mb-2 ${
+                                className={`${
                                   campaign.status === "sent" 
                                     ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" 
                                     : campaign.status === "scheduled" 
-                                    ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100"
+                                    ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-green-100"
                                     : ""
                                 }`}
                               >
@@ -609,6 +689,11 @@ const MarketingPage = () => {
                                   : "Draft"}
                               </Badge>
                               <CardTitle className="text-lg">{campaign.name}</CardTitle>
+                              {campaign.type === "sms" && campaign.photoUrl && (
+                                <Badge variant="secondary" className="text-xs">
+                                  📷 Photo
+                                </Badge>
+                              )}
                             </div>
                             <Badge variant={campaign.type === "email" ? "default" : "secondary"}>
                               {campaign.type === "email" ? "Email" : "SMS"}
@@ -676,6 +761,7 @@ const MarketingPage = () => {
                                       audience: campaign.audience,
                                       content: campaign.content,
                                       subject: campaign.subject || '',
+                                      photoUrl: campaign.photoUrl || '',
                                     });
                                   }}
                                   className="flex-1 sm:flex-initial"
@@ -1003,6 +1089,7 @@ const MarketingPage = () => {
                           <SelectItem value="New Clients">New Clients</SelectItem>
                           <SelectItem value="Inactive Clients">Inactive Clients</SelectItem>
                           <SelectItem value="Upcoming Appointments">Upcoming Appointments</SelectItem>
+                          <SelectItem value="Specific Clients">Specific Clients</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -1010,6 +1097,96 @@ const MarketingPage = () => {
                   )}
                 />
               </div>
+              
+              {/* Client Selection for Specific Clients */}
+              {campaignForm.watch("audience") === "Specific Clients" && (
+                <div className="space-y-4">
+                  <FormItem>
+                    <FormLabel>Select Specific Clients</FormLabel>
+                    <div className="space-y-3">
+                      {/* Selected Clients Display */}
+                      {selectedClients.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedClients.map((client) => (
+                            <div
+                              key={client.id}
+                              className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm"
+                            >
+                              <span>
+                                {client.firstName} {client.lastName} ({client.email})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedClients(prev => prev.filter(c => c.id !== client.id))}
+                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-100"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Client Search and Selection */}
+                      <div className="relative">
+                        <Input
+                          placeholder="Search clients by name or email..."
+                          value={clientSearchQuery}
+                          onChange={(e) => setClientSearchQuery(e.target.value)}
+                          className="pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowClientSelector(!showClientSelector)}
+                          className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        >
+                          <Users size={16} />
+                        </button>
+                      </div>
+                      
+                      {/* Client List */}
+                      {showClientSelector && (
+                        <div className="border rounded-lg max-h-60 overflow-y-auto bg-white dark:bg-gray-800">
+                          {allClients
+                            .filter((client) => {
+                              const searchTerm = clientSearchQuery.toLowerCase();
+                              const fullName = `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase();
+                              const email = client.email.toLowerCase();
+                              return fullName.includes(searchTerm) || email.includes(searchTerm);
+                            })
+                            .filter((client) => !selectedClients.some(selected => selected.id === client.id))
+                            .map((client) => (
+                              <div
+                                key={client.id}
+                                className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0"
+                                onClick={() => {
+                                  setSelectedClients(prev => [...prev, client]);
+                                  setClientSearchQuery("");
+                                }}
+                              >
+                                <div>
+                                  <div className="font-medium">
+                                    {client.firstName} {client.lastName}
+                                  </div>
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {client.email}
+                                  </div>
+                                </div>
+                                <Check size={16} className="text-gray-400" />
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                      
+                      {selectedClients.length === 0 && (
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          No clients selected. Click the search icon to browse and select clients.
+                        </p>
+                      )}
+                    </div>
+                  </FormItem>
+                </div>
+              )}
               
               {campaignForm.watch("type") === "email" && (
                 <FormField
@@ -1058,26 +1235,202 @@ const MarketingPage = () => {
                   />
                 </div>
               ) : (
-                <FormField
-                  control={campaignForm.control}
-                  name="content"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Message Content</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Write your SMS message here..." 
-                          rows={5}
-                          {...field} 
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        SMS messages are limited to 160 characters.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-4">
+                  {/* SMS Campaign Info */}
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-start gap-3">
+                      <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                      <div className="text-sm">
+                        <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                          SMS Campaign with Photo Support
+                        </h4>
+                        <p className="text-blue-700 dark:text-blue-300 mb-2">
+                          Create engaging SMS campaigns with optional photos. Photos will be sent as MMS messages.
+                        </p>
+                        <ul className="text-blue-600 dark:text-blue-400 space-y-1 text-xs">
+                          <li>• SMS messages limited to 160 characters</li>
+                          <li>• Photos stored as base64 data</li>
+                          <li>• MMS sending requires Twilio MMS configuration</li>
+                          <li>• Additional carrier charges may apply for MMS</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <FormField
+                    control={campaignForm.control}
+                    name="content"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Message Content</FormLabel>
+                        <FormControl>
+                          <div className="space-y-2">
+                            <Textarea 
+                              placeholder="Write your SMS message here..." 
+                              rows={5}
+                              {...field} 
+                            />
+                            <div className="flex justify-between text-xs text-gray-500">
+                              <span>
+                                {field.value.length} / 160 characters
+                              </span>
+                              {field.value.length > 160 && (
+                                <span className="text-red-500">
+                                  Message exceeds SMS limit
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          SMS messages are limited to 160 characters.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  <FormField
+                    control={campaignForm.control}
+                    name="photoUrl"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center justify-between">
+                          <FormLabel>Photo (Optional)</FormLabel>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (field.value) {
+                                field.onChange("");
+                              } else {
+                                // Show photo upload section
+                                document.getElementById('sms-photo-upload')?.click();
+                              }
+                            }}
+                            className="text-xs"
+                          >
+                            {field.value ? "Remove Photo" : "Add Photo"}
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <div className="space-y-3">
+                            {field.value ? (
+                              <div className="relative">
+                                <img
+                                  src={field.value}
+                                  alt="Campaign photo"
+                                  className="w-full h-32 object-cover rounded-md border"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  className="absolute top-2 right-2"
+                                  onClick={() => field.onChange("")}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
+                                <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => document.getElementById('sms-photo-upload')?.click()}
+                                >
+                                  Choose Photo
+                                </Button>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  JPEG, PNG, GIF up to 5MB
+                                </p>
+                              </div>
+                            )}
+                            <input
+                              id="sms-photo-upload"
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  // Validate file type
+                                  if (!file.type.startsWith('image/')) {
+                                    toast({
+                                      title: "Invalid file type",
+                                      description: "Please select an image file (JPEG, PNG, GIF, etc.)",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  
+                                  // Validate file size (max 5MB)
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    toast({
+                                      title: "File too large",
+                                      description: "Please select an image smaller than 5MB",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+                                  
+                                  // Convert to base64
+                                  const reader = new FileReader();
+                                  reader.onload = (e) => {
+                                    const dataUrl = e.target?.result as string;
+                                    field.onChange(dataUrl);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Add a photo to your SMS campaign. The photo will be sent as an MMS message.
+                          <br />
+                          <span className="text-amber-600 dark:text-amber-400">
+                            Note: MMS messages may incur additional charges from your carrier.
+                          </span>
+                          <br />
+                          <span className="text-blue-600 dark:text-blue-400">
+                            Current implementation: Photos are stored and displayed, but actual MMS sending requires Twilio MMS configuration.
+                          </span>
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {/* SMS Preview */}
+                  {(campaignForm.watch("content") || campaignForm.watch("photoUrl")) && (
+                    <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                      <h4 className="text-sm font-medium mb-3">Message Preview</h4>
+                      <div className="space-y-3">
+                        {campaignForm.watch("photoUrl") && (
+                          <div className="text-center">
+                            <img
+                              src={campaignForm.watch("photoUrl")}
+                              alt="Preview"
+                              className="w-32 h-32 object-cover rounded-md border mx-auto"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Photo will be sent as MMS</p>
+                          </div>
+                        )}
+                        {campaignForm.watch("content") && (
+                          <div className="bg-white dark:bg-gray-700 p-3 rounded border">
+                            <p className="text-sm whitespace-pre-wrap">{campaignForm.watch("content")}</p>
+                            <div className="text-xs text-gray-500 mt-2 text-right">
+                              {campaignForm.watch("content").length} / 160 characters
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
-                />
+                </div>
               )}
               
               <div className="space-y-4">
@@ -1182,7 +1535,7 @@ const MarketingPage = () => {
                             viewCampaign.status === "sent" 
                               ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" 
                               : viewCampaign.status === "scheduled" 
-                              ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100"
+                              ? "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-green-100"
                               : ""
                           }`}
                         >
@@ -1239,6 +1592,15 @@ const MarketingPage = () => {
                 <div>
                   <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Content</label>
                   <div className="mt-2 p-4 bg-muted rounded-lg">
+                    {viewCampaign.type === "sms" && viewCampaign.photoUrl && (
+                      <div className="mb-4">
+                        <img
+                          src={viewCampaign.photoUrl}
+                          alt="Campaign photo"
+                          className="w-full max-w-md h-auto rounded-md border"
+                        />
+                      </div>
+                    )}
                     <p className="whitespace-pre-wrap">{viewCampaign.content}</p>
                   </div>
                 </div>
@@ -1341,6 +1703,7 @@ const MarketingPage = () => {
                         audience: viewCampaign.audience,
                         content: viewCampaign.content,
                         subject: viewCampaign.subject || '',
+                        photoUrl: viewCampaign.photoUrl || '',
                       });
                     }}
                   >

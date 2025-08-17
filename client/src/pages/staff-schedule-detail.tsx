@@ -4,12 +4,13 @@ import { useParams, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, MapPin, Plus, Edit, Trash2, ArrowLeft, User } from "lucide-react";
+import { Calendar, Clock, MapPin, Plus, Edit, Trash2, ArrowLeft, User, Building2, CalendarDays } from "lucide-react";
 import { AddEditScheduleDialog } from "@/components/staff/add-edit-schedule-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function StaffScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,6 +28,11 @@ export default function StaffScheduleDetailPage() {
     queryKey: ['/api/staff'],
   });
 
+  // Fetch locations for display
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ['/api/locations'],
+  });
+
   const staffMember = staff.find((s: any) => s.id === staffId);
 
   // Fetch schedules for this staff member
@@ -38,6 +44,30 @@ export default function StaffScheduleDetailPage() {
 
   const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
 
+  // Group schedules by location for better organization
+  const schedulesByLocation = staffSchedules.reduce((acc: any, schedule: any) => {
+    const location = locations.find((loc: any) => loc.id === schedule.locationId);
+    const locationName = location?.name || 'Unknown Location';
+    
+    if (!acc[locationName]) {
+      acc[locationName] = [];
+    }
+    acc[locationName].push({ ...schedule, locationName });
+    return acc;
+  }, {});
+
+  // Group schedules by day for weekly view
+  const schedulesByDay = staffSchedules.reduce((acc: any, schedule: any) => {
+    const dayName = schedule.dayOfWeek;
+    if (!acc[dayName]) {
+      acc[dayName] = [];
+    }
+    acc[dayName].push(schedule);
+    return acc;
+  }, {});
+
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
   // Delete schedule mutation
   const deleteScheduleMutation = useMutation({
     mutationFn: async (scheduleId: number) => {
@@ -48,6 +78,8 @@ export default function StaffScheduleDetailPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // Dispatch custom event to notify calendar
+      window.dispatchEvent(new CustomEvent('schedule-updated'));
       toast({
         title: "Success",
         description: "Schedule deleted successfully.",
@@ -79,6 +111,11 @@ export default function StaffScheduleDetailPage() {
       return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
     }
     return 'Unknown Staff';
+  };
+
+  const getLocationName = (locationId: number) => {
+    const location = locations.find((loc: any) => loc.id === locationId);
+    return location?.name || 'Unknown Location';
   };
 
   if (!staffMember) {
@@ -129,87 +166,264 @@ export default function StaffScheduleDetailPage() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-center py-8">Loading schedules...</div>
-      ) : staffSchedules.length === 0 ? (
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <Card>
-          <CardContent className="text-center py-8">
-            <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No schedules found</h3>
-            <p className="text-muted-foreground mb-4">
-              Create the first schedule for {getStaffName()}.
-            </p>
-            <Button 
-              onClick={() => {
-                setEditingSchedule(null);
-                setIsDialogOpen(true);
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Schedule
-            </Button>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Schedules</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{staffSchedules.length}</div>
+            <p className="text-xs text-muted-foreground">Active schedules</p>
           </CardContent>
         </Card>
-      ) : (
-        <div className="grid gap-4">
-          {staffSchedules.map((schedule: any) => (
-            <Card key={schedule.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-xl">{schedule.dayOfWeek}</CardTitle>
-                    <CardDescription>
-                      {schedule.startTime} - {schedule.endTime}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(schedule)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(schedule.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    Duration: {schedule.startTime} - {schedule.endTime}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    Location: {schedule.location}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    From: {format(new Date(schedule.startDate), 'MMM dd, yyyy')}
-                    {schedule.endDate && ` - ${format(new Date(schedule.endDate), 'MMM dd, yyyy')}`}
-                  </div>
-                </div>
-                {schedule.serviceCategories && schedule.serviceCategories.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {schedule.serviceCategories.map((category: string, index: number) => (
-                      <Badge key={index} variant="secondary">
-                        {category}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Locations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{Object.keys(schedulesByLocation).length}</div>
+            <p className="text-xs text-muted-foreground">Different locations</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Working Days</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{Object.keys(schedulesByDay).length}</div>
+            <p className="text-xs text-muted-foreground">Days with schedules</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Tabs for different views */}
+      <Tabs defaultValue="locations" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="locations" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            By Location
+          </TabsTrigger>
+          <TabsTrigger value="weekly" className="flex items-center gap-2">
+            <CalendarDays className="h-4 w-4" />
+            Weekly View
+          </TabsTrigger>
+          <TabsTrigger value="all" className="flex items-center gap-2">
+            <Calendar className="h-4 w-4" />
+            All Schedules
+          </TabsTrigger>
+        </TabsList>
+
+        {/* By Location View */}
+        <TabsContent value="locations" className="mt-6">
+          {Object.keys(schedulesByLocation).length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Building2 className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No schedules by location</h3>
+                <p className="text-muted-foreground">Add schedules to see them organized by location.</p>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="grid gap-6">
+              {Object.entries(schedulesByLocation).map(([locationName, schedules]) => (
+                <Card key={locationName}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      {locationName}
+                    </CardTitle>
+                    <CardDescription>
+                      {(schedules as any[]).length} schedule{(schedules as any[]).length !== 1 ? 's' : ''} at this location
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-3">
+                      {(schedules as any[]).map((schedule: any) => (
+                        <div key={schedule.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <Badge variant="outline">{schedule.dayOfWeek}</Badge>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              {schedule.startTime} - {schedule.endTime}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              {format(new Date(schedule.startDate), 'MMM dd, yyyy')}
+                              {schedule.endDate && ` - ${format(new Date(schedule.endDate), 'MMM dd, yyyy')}`}
+                            </div>
+                            {schedule.isBlocked && (
+                              <Badge variant="destructive">Blocked</Badge>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(schedule)}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDelete(schedule.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Weekly View */}
+        <TabsContent value="weekly" className="mt-6">
+          <div className="grid gap-4">
+            {daysOfWeek.map((day) => {
+              const daySchedules = schedulesByDay[day] || [];
+              return (
+                <Card key={day}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>{day}</span>
+                      <Badge variant={daySchedules.length > 0 ? "default" : "secondary"}>
+                        {daySchedules.length} schedule{daySchedules.length !== 1 ? 's' : ''}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {daySchedules.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">No schedules for this day</p>
+                    ) : (
+                      <div className="grid gap-3">
+                        {daySchedules.map((schedule: any) => (
+                          <div key={schedule.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-4">
+                              <div className="flex items-center gap-2 text-sm">
+                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                {schedule.startTime} - {schedule.endTime}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <MapPin className="h-4 w-4 text-muted-foreground" />
+                                {getLocationName(schedule.locationId)}
+                              </div>
+                              <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                {format(new Date(schedule.startDate), 'MMM dd, yyyy')}
+                                {schedule.endDate && ` - ${format(new Date(schedule.endDate), 'MMM dd, yyyy')}`}
+                              </div>
+                              {schedule.isBlocked && (
+                                <Badge variant="destructive">Blocked</Badge>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(schedule)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(schedule.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        {/* All Schedules View */}
+        <TabsContent value="all" className="mt-6">
+          {staffSchedules.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No schedules found</h3>
+                <p className="text-muted-foreground">Add schedules to manage staff availability.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {staffSchedules.map((schedule: any) => (
+                <Card key={schedule.id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl">{schedule.dayOfWeek}</CardTitle>
+                        <CardDescription>
+                          {schedule.startTime} - {schedule.endTime}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(schedule)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(schedule.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        Duration: {schedule.startTime} - {schedule.endTime}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-4 w-4" />
+                        Location: {getLocationName(schedule.locationId)}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        From: {format(new Date(schedule.startDate), 'MMM dd, yyyy')}
+                        {schedule.endDate && ` - ${format(new Date(schedule.endDate), 'MMM dd, yyyy')}`}
+                      </div>
+                    </div>
+                    {schedule.serviceCategories && schedule.serviceCategories.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {schedule.serviceCategories.map((category: string, index: number) => (
+                          <Badge key={index} variant="secondary">
+                            {category}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {schedule.isBlocked && (
+                      <Badge variant="destructive" className="mt-2">Blocked</Badge>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       <AddEditScheduleDialog
         open={isDialogOpen}
@@ -222,6 +436,8 @@ export default function StaffScheduleDetailPage() {
           setTimeout(() => {
             queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
             queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+            // Dispatch custom event to notify calendar
+            window.dispatchEvent(new CustomEvent('schedule-updated'));
             console.log("Schedule data refresh triggered from parent");
           }, 100);
         }}

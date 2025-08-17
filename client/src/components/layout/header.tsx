@@ -96,15 +96,15 @@ const Header = () => {
     <header className="bg-white dark:bg-gray-800 shadow-sm z-10 sticky top-0">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-14 sm:h-16">
-          <div className="flex items-center min-w-0">
+          <div className="flex items-center min-w-0 flex-shrink-0">
             <div className="lg:hidden ml-2 sm:ml-3 truncate">
               <Link href="/dashboard" className="truncate hover:opacity-80 transition-opacity cursor-pointer">
                 <BusinessBrand size="md" className="text-primary" showName={false} />
               </Link>
             </div>
           </div>
-          <div className="flex items-center space-x-1 sm:space-x-2">
-            <div className="hidden md:block mr-4">
+          <div className="flex items-center space-x-1 sm:space-x-2 min-w-0">
+            <div className="mr-1 sm:mr-2 flex-shrink-0">
               <LocationSelector variant="compact" showLabel={false} />
             </div>
             <DropdownMenu>

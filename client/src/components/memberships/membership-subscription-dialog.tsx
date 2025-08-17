@@ -24,9 +24,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search, Users, UserPlus, CreditCard, Receipt, Check, X, Mail, Phone, DollarSign } from "lucide-react";
 
-// Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
-const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
+// Helcim payment configuration
+const HELCIM_ENABLED = true;
 
 // Square Payment Form Component (based on working POS implementation)
 interface PaymentFormProps {
@@ -42,49 +41,18 @@ const PaymentForm = ({ total, onSuccess, onError }: PaymentFormProps) => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    initializeSquarePayment();
+    initializePayment();
   }, []);
 
-  const initializeSquarePayment = async () => {
+  const initializePayment = async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      if (!SQUARE_APP_ID) {
-        throw new Error('Square Application ID not configured');
-      }
-
-      // Load Square Web SDK dynamically
-      if (!window.Square) {
-        const script = document.createElement('script');
-        script.src = 'https://web.squarecdn.com/v1/square.js';
-        
-        await new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = () => reject(new Error('Failed to load Square SDK'));
-          document.head.appendChild(script);
-        });
-      }
-
-      const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
-      const card = await payments.card({
-        style: {
-          input: {
-            fontSize: '16px',
-            fontFamily: '"Helvetica Neue", Arial, sans-serif'
-          },
-          '.input-container': {
-            borderColor: '#E5E7EB',
-            borderRadius: '6px'
-          }
-        }
-      });
-      await card.attach('#membership-square-card-element');
-      
-      setCardElement(card);
+      // Payment form is now handled by Helcim
       setIsLoading(false);
     } catch (err: any) {
-      console.error('Square payment form initialization error:', err);
+      console.error('Payment form initialization error:', err);
       setError('Failed to load payment form. Please try again.');
       setIsLoading(false);
     }
@@ -428,6 +396,7 @@ export default function MembershipSubscriptionDialog({
           clientId: selectedClient.id,
           clientMembershipId: membershipSubscription.id,
           amount: membership.price,
+          totalAmount: membership.price,
           method: "card",
           status: "completed",
           type: "membership",

@@ -1,6 +1,6 @@
 import express from 'express';
 import { db } from '../db';
-import { locations, insertLocationSchema, updateLocationSchema } from '../../shared/schema';
+import { locations, appointments, insertLocationSchema, updateLocationSchema } from '../../shared/schema';
 import { eq, and, desc, count } from 'drizzle-orm';
 import { requireAuth } from '../middleware/error-handler';
 
@@ -116,7 +116,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Check if this is the default location
+    // Check if location exists
     const location = await db
       .select()
       .from(locations)
@@ -127,39 +127,13 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Location not found' });
     }
 
-    if (location[0].isDefault) {
-      return res.status(400).json({ error: 'Cannot delete the default location' });
-    }
-
-    // Check if there are any appointments, services, staff, or rooms associated with this location
-    const { appointments, services, staff, rooms } = await import('../../shared/schema');
-    
-    const [appointmentCount] = await db
-      .select({ count: count() })
-      .from(appointments)
+    // First, set location_id to NULL for all appointments that reference this location
+    await db
+      .update(appointments)
+      .set({ locationId: null })
       .where(eq(appointments.locationId, parseInt(id)));
 
-    const [serviceCount] = await db
-      .select({ count: count() })
-      .from(services)
-      .where(eq(services.locationId, parseInt(id)));
-
-    const [staffCount] = await db
-      .select({ count: count() })
-      .from(staff)
-      .where(eq(staff.locationId, parseInt(id)));
-
-    const [roomCount] = await db
-      .select({ count: count() })
-      .from(rooms)
-      .where(eq(rooms.locationId, parseInt(id)));
-
-    if (appointmentCount.count > 0 || serviceCount.count > 0 || staffCount.count > 0 || roomCount.count > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete location that has associated appointments, services, staff, or rooms' 
-      });
-    }
-
+    // Then delete the location
     await db.delete(locations).where(eq(locations.id, parseInt(id)));
     res.json({ message: 'Location deleted successfully' });
   } catch (error) {

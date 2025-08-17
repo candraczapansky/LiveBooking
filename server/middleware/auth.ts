@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 
 // Simple API key validation middleware
 export function validateApiKey(req: Request, res: Response, next: NextFunction) {
@@ -35,5 +36,54 @@ export function optionalApiKey(req: Request, res: Response, next: NextFunction) 
   
   // Add auth status to request for logging
   (req as any).authenticated = !!apiKey;
+  next();
+}
+
+// JWT Authentication middleware
+export function authenticateToken(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (!token) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Access token required',
+      code: 'MISSING_TOKEN'
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+    (req as any).user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or expired token',
+      code: 'INVALID_TOKEN'
+    });
+  }
+}
+
+// Admin role verification middleware
+export function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  const user = (req as any).user;
+  
+  if (!user) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Authentication required',
+      code: 'NOT_AUTHENTICATED'
+    });
+  }
+
+  if (user.role !== 'admin') {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Admin privileges required',
+      code: 'INSUFFICIENT_PERMISSIONS'
+    });
+  }
+
   next();
 } 

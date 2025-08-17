@@ -34,7 +34,9 @@ import { Input } from "@/components/ui/input";
 import { AntiAutofillInput } from "@/components/ui/anti-autofill-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Upload, X } from "lucide-react";
+import { Upload, X, Shield, CheckCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 // Staff form schema
 const staffFormSchema = z.object({
@@ -49,6 +51,7 @@ const staffFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   phone: z.string().optional(),
+  permissionGroups: z.array(z.number()).default([]),
 });
 
 type StaffFormValues = z.infer<typeof staffFormSchema>;
@@ -68,12 +71,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Fetch locations to allow assigning staff to a business location
-  const { data: locations = [] } = useQuery<any[]>({
-    queryKey: ['/api/locations'],
-    enabled: open,
-  });
-
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
     defaultValues: {
@@ -88,6 +85,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       firstName: "",
       lastName: "",
       phone: "",
+      permissionGroups: [],
+    },
+  });
+
+  // Fetch permission groups
+  const { data: permissionGroups, isLoading: permissionGroupsLoading } = useQuery({
+    queryKey: ['permission-groups'],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/permission-groups");
+      return response.json();
     },
   });
 
@@ -106,23 +113,59 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       // staffQueryData comes back as an array, so we need to get the first element
       const staffData = Array.isArray(staffQueryData) ? staffQueryData[0] : staffQueryData;
       setStaffData(staffData);
-      const formData = {
-        title: staffData?.title || "",
-        bio: staffData?.bio || "",
-        commissionRate: staffData?.commissionType === 'commission' 
-          ? (staffData?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
-          : 0,
-        hourlyRate: staffData?.hourlyRate || 0,
-        fixedSalary: staffData?.fixedRate || 0,
-        commissionType: staffData?.commissionType || "commission",
-        firstName: staffData?.user?.firstName || "",
-        lastName: staffData?.user?.lastName || "",
-        email: staffData?.user?.email || "",
-        phone: staffData?.user?.phone || "",
-        photo: staffData?.photoUrl || "",
+      
+      // Load user's permission groups
+      const loadUserPermissions = async () => {
+        try {
+          const userId = staffData?.userId;
+          if (userId) {
+            const response = await apiRequest("GET", `/api/user-permission-groups/${userId}`);
+            const userGroups = await response.json();
+            const groupIds = userGroups.data?.map((group: any) => group.groupId) || [];
+            
+            const formData = {
+              title: staffData?.title || "",
+              bio: staffData?.bio || "",
+              commissionRate: staffData?.commissionType === 'commission' 
+                ? (staffData?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
+                : 0,
+              hourlyRate: staffData?.hourlyRate || 0,
+              fixedSalary: staffData?.fixedRate || 0,
+              commissionType: staffData?.commissionType || "commission",
+              firstName: staffData?.user?.firstName || "",
+              lastName: staffData?.user?.lastName || "",
+              email: staffData?.user?.email || "",
+              phone: staffData?.user?.phone || "",
+              photo: staffData?.photoUrl || "",
+              permissionGroups: groupIds,
+            };
+            console.log("Form data being set:", formData);
+            form.reset(formData);
+          }
+        } catch (error) {
+          console.error("Failed to load user permission groups:", error);
+          // Set form data without permission groups if loading fails
+          const formData = {
+            title: staffData?.title || "",
+            bio: staffData?.bio || "",
+            commissionRate: staffData?.commissionType === 'commission' 
+              ? (staffData?.commissionRate || 0) * 100
+              : 0,
+            hourlyRate: staffData?.hourlyRate || 0,
+            fixedSalary: staffData?.fixedRate || 0,
+            commissionType: staffData?.commissionType || "commission",
+            firstName: staffData?.user?.firstName || "",
+            lastName: staffData?.user?.lastName || "",
+            email: staffData?.user?.email || "",
+            phone: staffData?.user?.phone || "",
+            photo: staffData?.photoUrl || "",
+            permissionGroups: [],
+          };
+          form.reset(formData);
+        }
       };
-      console.log("Form data being set:", formData);
-      form.reset(formData);
+      
+      loadUserPermissions();
     } else if (open && !staffId) {
       // Reset form for new staff member
       form.reset({
@@ -137,6 +180,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         lastName: "",
         phone: "",
         photo: "",
+        permissionGroups: [],
       });
     }
   }, [staffQueryData, open, staffId, form]);
@@ -212,8 +256,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
         hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
-        // Default new staff to default location if it exists
-        locationId: Array.isArray(locations) && locations.find((l: any) => l.isDefault)?.id || undefined,
       };
 
       console.log("Sending staff data to /api/staff:", staffData);
@@ -230,6 +272,24 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
         const staff = await staffResponse.json();
         console.log("Staff creation successful:", staff);
+
+        // Assign permission groups if any are selected
+        if (data.permissionGroups && data.permissionGroups.length > 0) {
+          console.log("Assigning permission groups:", data.permissionGroups);
+          for (const groupId of data.permissionGroups) {
+            try {
+              await apiRequest("POST", "/api/user-permission-groups", {
+                userId: userId,
+                groupId: groupId
+              });
+              console.log(`Assigned permission group ${groupId} to user ${userId}`);
+            } catch (error) {
+              console.error(`Failed to assign permission group ${groupId}:`, error);
+              // Continue with other groups even if one fails
+            }
+          }
+        }
+
         return staff;
       } catch (error) {
         console.error("Staff creation error:", error);
@@ -292,7 +352,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
         photoUrl: data.photo || null,
-        // Keep existing staff location as-is; no change here unless a dedicated control is added
       };
 
       console.log("Sending PATCH request to:", `/api/staff/${staffId}`, "with data:", staffUpdateData);
@@ -307,6 +366,48 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
 
       const updatedStaff = await staffResponse.json();
       console.log("Staff update successful, returned data:", updatedStaff);
+
+      // Update permission groups
+      if (data.permissionGroups !== undefined) {
+        console.log("Updating permission groups for user:", userId);
+        
+        // First, get current permission groups
+        try {
+          const currentGroupsResponse = await apiRequest("GET", `/api/user-permission-groups/${userId}`);
+          const currentGroups = await currentGroupsResponse.json();
+          const currentGroupIds = currentGroups.data?.map((group: any) => group.groupId) || [];
+          
+          // Remove groups that are no longer selected
+          for (const groupId of currentGroupIds) {
+            if (!data.permissionGroups.includes(groupId)) {
+              try {
+                await apiRequest("DELETE", `/api/user-permission-groups/${userId}/${groupId}`);
+                console.log(`Removed permission group ${groupId} from user ${userId}`);
+              } catch (error) {
+                console.error(`Failed to remove permission group ${groupId}:`, error);
+              }
+            }
+          }
+          
+          // Add new groups that are selected
+          for (const groupId of data.permissionGroups) {
+            if (!currentGroupIds.includes(groupId)) {
+              try {
+                await apiRequest("POST", "/api/user-permission-groups", {
+                  userId: userId,
+                  groupId: groupId
+                });
+                console.log(`Added permission group ${groupId} to user ${userId}`);
+              } catch (error) {
+                console.error(`Failed to add permission group ${groupId}:`, error);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Failed to update permission groups:", error);
+        }
+      }
+
       return updatedStaff;
     },
     onSuccess: () => {
@@ -573,41 +674,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               )}
             />
 
-            {/* Staff Location (assign to business location) */}
-            {Array.isArray(locations) && locations.length > 0 && (
-              <div>
-                <FormLabel>Assigned Location</FormLabel>
-                <Select
-                  onValueChange={async (value) => {
-                    if (!staffId) {
-                      // For new staff, selection will be applied on create via defaulting above
-                      return;
-                    }
-                    const idNum = parseInt(value);
-                    try {
-                      await apiRequest("PATCH", `/api/staff/${staffId}`, { locationId: idNum });
-                      queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
-                      queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId] });
-                    } catch (e) {
-                      console.error('Failed to update staff location', e);
-                    }
-                  }}
-                  value={(staffData?.locationId || locations.find((l: any) => l.isDefault)?.id || '').toString()}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select business location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.filter((l: any) => l.isActive).map((l: any) => (
-                      <SelectItem key={l.id} value={l.id.toString()}>
-                        {l.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
             <FormField
               control={form.control}
               name="bio"
@@ -809,7 +875,66 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
               )}
             </div>
 
-
+            {/* Permissions Section */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Shield className="h-5 w-5 text-gray-600" />
+                <h3 className="text-lg font-semibold">Access Permissions</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Select permission groups to control what this staff member can access
+              </p>
+              
+              {permissionGroupsLoading ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">Loading permission groups...</p>
+                </div>
+              ) : (
+                <div className="grid gap-3">
+                  {permissionGroups?.data?.map((group: any) => (
+                    <div
+                      key={group.id}
+                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        form.watch('permissionGroups')?.includes(group.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => {
+                        const currentGroups = form.watch('permissionGroups') || [];
+                        if (currentGroups.includes(group.id)) {
+                          form.setValue('permissionGroups', currentGroups.filter(id => id !== group.id));
+                        } else {
+                          form.setValue('permissionGroups', [...currentGroups, group.id]);
+                        }
+                      }}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <Checkbox
+                          checked={form.watch('permissionGroups')?.includes(group.id) || false}
+                          onChange={() => {
+                            const currentGroups = form.watch('permissionGroups') || [];
+                            if (currentGroups.includes(group.id)) {
+                              form.setValue('permissionGroups', currentGroups.filter(id => id !== group.id));
+                            } else {
+                              form.setValue('permissionGroups', [...currentGroups, group.id]);
+                            }
+                          }}
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h4 className="font-medium">{group.name}</h4>
+                            {group.isSystem && (
+                              <Badge variant="secondary" className="text-xs">System</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{group.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

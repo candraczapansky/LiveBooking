@@ -56,7 +56,9 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
   
   switch (rule.trigger) {
     case 'booking_confirmation':
-      return client.smsAppointmentReminders === true;
+      // Skip SMS automation for booking confirmations to prevent duplicates
+      // SMS confirmations are already sent directly in the appointment creation route
+      return false;
     case 'appointment_reminder':
       return client.smsAppointmentReminders === true;
     case 'cancellation':

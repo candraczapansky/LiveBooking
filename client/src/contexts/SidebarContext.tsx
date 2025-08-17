@@ -25,7 +25,10 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isOpen, setIsOpen] = useState(!isMobile);
 
-
+  // Initialize global state
+  useEffect(() => {
+    (window as any).sidebarIsOpen = isOpen;
+  }, [isOpen]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -33,8 +36,10 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
       setIsMobile(mobile);
       if (mobile) {
         setIsOpen(false);
+        (window as any).sidebarIsOpen = false;
       } else {
         setIsOpen(true);
+        (window as any).sidebarIsOpen = true;
       }
     };
 
@@ -45,6 +50,19 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Listen for global state changes (for compatibility with other pages)
+  useEffect(() => {
+    const checkGlobalState = () => {
+      const globalSidebarState = (window as any).sidebarIsOpen;
+      if (globalSidebarState !== undefined && globalSidebarState !== isOpen) {
+        setIsOpen(globalSidebarState);
+      }
+    };
+
+    const interval = setInterval(checkGlobalState, 100);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
   const [isToggling, setIsToggling] = useState(false);
 
   const toggleSidebar = () => {
@@ -54,7 +72,11 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
     }
     
     setIsToggling(true);
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    setIsOpen(newState);
+    
+    // Update global state for compatibility with other pages
+    (window as any).sidebarIsOpen = newState;
     
     // Reset toggle flag after a short delay
     setTimeout(() => {
@@ -64,6 +86,8 @@ export const SidebarProvider = ({ children }: SidebarProviderProps) => {
 
   const closeSidebar = () => {
     setIsOpen(false);
+    // Update global state for compatibility with other pages
+    (window as any).sidebarIsOpen = false;
   };
 
   return (

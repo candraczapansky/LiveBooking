@@ -87,9 +87,9 @@ const Login = () => {
       const userData = await response.json();
       
       // Use the auth context login function which will handle color preferences
-      // The backend returns { success: true, user: {...} } so we need to extract the user object
+      // The backend returns { success: true, user: {...}, token: "..." } so we need to extract the user object and token
       if (userData.success && userData.user) {
-        authContext.login(userData.user as any);
+        authContext.login(userData.user as any, userData.token);
       } else {
         throw new Error("Invalid response format from server");
       }

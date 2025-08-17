@@ -36,21 +36,26 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 const serviceFormSchema = z.object({
+  // Required fields only
   name: z.string().min(1, "Service name is required"),
-  description: z.string().optional(),
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
   categoryId: z.coerce.number().min(1, "Category is required"),
-  roomId: z.coerce.number().optional(),
-  bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
-  bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").default(0),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code"),
+  
+  // Optional fields - explicitly marked as optional
+  description: z.string().optional(),
+  roomId: z.coerce.number().optional().nullable(),
+  bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").optional(),
+  bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").optional(),
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code").optional(),
+  
+  // These are handled separately and not sent to the service creation endpoint
   assignedStaff: z.array(z.object({
     staffId: z.number(),
     customRate: z.union([z.coerce.number().min(0, "Rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
     customCommissionRate: z.union([z.coerce.number().min(0, "Commission rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
-  })).default([]),
-  requiredDevices: z.array(z.number()).optional(),
+  })).optional().default([]),
+  requiredDevices: z.array(z.number()).optional().default([]),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -110,8 +115,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       description: "",
       duration: 30,
       price: 0,
-      categoryId: undefined,
-      roomId: undefined,
+      categoryId: undefined, // Will be set by user selection
+      roomId: null,
       bufferTimeBefore: 0,
       bufferTimeAfter: 0,
       color: "#3B82F6",
@@ -173,7 +178,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         duration: 30,
         price: 0,
         categoryId: undefined,
-        roomId: undefined,
+        roomId: null,
         bufferTimeBefore: 0,
         bufferTimeAfter: 0,
         color: "#3B82F6",
@@ -185,32 +190,83 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
-      const { assignedStaff, ...serviceData } = data;
-      const response = await apiRequest("POST", "/api/services", serviceData);
-      const service = await response.json();
+      const { assignedStaff, requiredDevices } = data;
       
-      // Assign staff to the service with custom rates
-      if (assignedStaff && assignedStaff.length > 0) {
-        for (const assignment of assignedStaff) {
-          await apiRequest("POST", "/api/staff-services", {
-            staffId: assignment.staffId,
-            serviceId: service.id,
-            customRate: assignment.customRate || null,
-            customCommissionRate: assignment.customCommissionRate || null,
-          });
-        }
+      // Validate required fields
+      if (!data.name || !data.duration || data.price === undefined || !data.categoryId) {
+        throw new Error('Missing required fields: name, duration, price, and category are required');
       }
       
-      return service;
+      // Start with ONLY the absolutely required fields
+      const cleanServiceData = {
+        name: data.name.trim(),
+        duration: Number(data.duration),
+        price: Number(data.price),
+        categoryId: Number(data.categoryId),
+      };
+      
+      // Only add optional fields if they are meaningful
+      if (data.description && data.description.trim() !== "") {
+        cleanServiceData.description = data.description.trim();
+      }
+      
+      if (data.roomId && Number(data.roomId) > 0) {
+        cleanServiceData.roomId = Number(data.roomId);
+      }
+      
+      if (typeof data.bufferTimeBefore === 'number' && data.bufferTimeBefore >= 0) {
+        cleanServiceData.bufferTimeBefore = Number(data.bufferTimeBefore);
+      }
+      
+      if (typeof data.bufferTimeAfter === 'number' && data.bufferTimeAfter >= 0) {
+        cleanServiceData.bufferTimeAfter = Number(data.bufferTimeAfter);
+      }
+      
+      if (data.color && data.color.match(/^#[0-9A-F]{6}$/i)) {
+        cleanServiceData.color = data.color;
+      }
+      
+      console.log('🔍 Creating service with cleaned data:', cleanServiceData);
+      console.log('🔍 Original form data:', data);
+      console.log('🔍 API URL will be:', '/api/services');
+      console.log('🔍 cleanServiceData type check:', typeof cleanServiceData);
+      console.log('🔍 cleanServiceData keys:', Object.keys(cleanServiceData));
+      console.log('🔍 cleanServiceData values:', Object.values(cleanServiceData));
+      
+      try {
+        const response = await apiRequest("POST", "/api/services", cleanServiceData);
+        const service = await response.json();
+        
+        console.log('🔍 Service created successfully:', service);
+        
+        // Assign staff to the service with custom rates
+        if (assignedStaff && assignedStaff.length > 0) {
+          for (const assignment of assignedStaff) {
+            await apiRequest("POST", "/api/staff-services", {
+              staffId: assignment.staffId,
+              serviceId: service.id,
+              customRate: assignment.customRate || null,
+              customCommissionRate: assignment.customCommissionRate || null,
+            });
+          }
+        }
+        
+        return service;
+      } catch (error) {
+        console.error('🔍 Service creation error details:', error);
+        throw error;
+      }
     },
     onSuccess: (service) => {
       // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
-      // Also invalidate queries with any additional parameters
+      // Invalidate all category-specific service queries
       queryClient.invalidateQueries({ predicate: query => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === '/api/services' ||
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/services"
+        Array.isArray(query.queryKey) && (
+          query.queryKey[0] === '/api/services' ||
+          query.queryKey[0] === "/api/services"
+        )
       });
       toast({
         title: "Success",
@@ -224,6 +280,12 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       onOpenChange(false);
     },
     onError: (error) => {
+      console.error('❌ Service creation failed:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       toast({
         title: "Error",
         description: `Failed to create service: ${error.message}`,
@@ -236,9 +298,19 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     mutationFn: async (data: ServiceFormValues) => {
       const { assignedStaff, ...serviceData } = data;
       
+      // Filter out undefined values and empty strings to prevent validation errors
+      const filteredServiceData = Object.fromEntries(
+        Object.entries(serviceData).filter(([_, value]) => value !== undefined && value !== null && value !== "")
+      );
+      
+      // Ensure roomId is not included if it's undefined/null
+      if (filteredServiceData.roomId === undefined || filteredServiceData.roomId === null) {
+        delete filteredServiceData.roomId;
+      }
+      
       // Send the service data along with assigned staff to the backend
       const fullServiceData = {
-        ...serviceData,
+        ...filteredServiceData,
         assignedStaff: assignedStaff
       };
       
@@ -255,10 +327,12 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       // Invalidate all service-related queries to sync across all pages
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
-      // Also invalidate queries with any additional parameters
+      // Invalidate all category-specific service queries (service might have moved categories)
       queryClient.invalidateQueries({ predicate: query => 
-        Array.isArray(query.queryKey) && query.queryKey[0] === '/api/services' ||
-        Array.isArray(query.queryKey) && query.queryKey[0] === "/api/services"
+        Array.isArray(query.queryKey) && (
+          query.queryKey[0] === '/api/services' ||
+          query.queryKey[0] === "/api/services"
+        )
       });
       toast({
         title: "Success",
@@ -276,7 +350,67 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     }
   });
 
-  const onSubmit = (values: ServiceFormValues) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check if categories are available
+    if (!serviceCategories || serviceCategories.length === 0) {
+      toast({
+        title: "No Categories Available",
+        description: "Please create at least one service category before creating a service.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Manually trigger validation
+    const isValid = await form.trigger();
+    
+    if (!isValid) {
+      // Get the first error
+      const errors = form.formState.errors;
+      const errorFields = Object.keys(errors);
+      const firstErrorField = errorFields[0];
+      const errorMessage = errors[firstErrorField as keyof typeof errors]?.message;
+      
+      console.log("Form validation failed:", errors);
+      console.log("First error field:", firstErrorField);
+      console.log("Error message:", errorMessage);
+      
+      // Create a more user-friendly error message
+      let userFriendlyMessage = errorMessage;
+      if (firstErrorField === 'categoryId' && errorMessage?.includes('nan')) {
+        userFriendlyMessage = "Please select a category";
+      } else if (firstErrorField === 'name' && !form.getValues('name')?.trim()) {
+        userFriendlyMessage = "Service name is required";
+      } else if (firstErrorField === 'duration' && (!form.getValues('duration') || form.getValues('duration') < 1)) {
+        userFriendlyMessage = "Duration must be at least 1 minute";
+      } else if (firstErrorField === 'price' && (!form.getValues('price') || form.getValues('price') < 0)) {
+        userFriendlyMessage = "Price must be a positive number";
+      } else if (firstErrorField === 'color' && !form.getValues('color')?.match(/^#[0-9A-F]{6}$/i)) {
+        userFriendlyMessage = "Please enter a valid hex color code";
+      }
+      
+      console.log("About to call toast...");
+      console.log("User friendly message:", userFriendlyMessage);
+      try {
+        const toastResult = toast({
+          title: "Required Field Missing",
+          description: userFriendlyMessage || `Please fill in the required field: ${firstErrorField}`,
+          variant: "destructive",
+        });
+        console.log("Toast called successfully, result:", toastResult);
+        console.log("Current toast state:", form.formState);
+      } catch (error) {
+        console.error("Toast error:", error);
+        // Fallback to alert if toast fails
+        alert(`Required Field Missing: ${userFriendlyMessage || firstErrorField}`);
+      }
+      return;
+    }
+    
+    // If valid, proceed with submission
+    const values = form.getValues();
     if (serviceId) {
       updateServiceMutation.mutate(values);
     } else {
@@ -297,7 +431,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -399,8 +533,12 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString() || ""}
+                      onValueChange={(value) => {
+                        if (value && value !== "") {
+                          field.onChange(parseInt(value));
+                        }
+                      }}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -408,11 +546,17 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {serviceCategories?.map((category: any) => (
-                          <SelectItem key={category.id} value={category.id.toString()}>
-                            {category.name}
+                        {!serviceCategories || serviceCategories.length === 0 ? (
+                          <SelectItem value="" disabled>
+                            No categories available
                           </SelectItem>
-                        ))}
+                        ) : (
+                          serviceCategories.map((category: any) => (
+                            <SelectItem key={category.id} value={category.id.toString()}>
+                              {category.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -428,7 +572,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                     <FormLabel>Room (Optional)</FormLabel>
                     <Select
                       value={field.value?.toString() || "none"}
-                      onValueChange={(value) => field.onChange(value === "none" ? undefined : parseInt(value))}
+                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -623,6 +767,20 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
+              </Button>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  console.log("Test toast button clicked");
+                  toast({
+                    title: "Test Toast",
+                    description: "This is a test toast to verify the system is working",
+                    variant: "default",
+                  });
+                }}
+              >
+                Test Toast
               </Button>
               <Button 
                 type="submit" 

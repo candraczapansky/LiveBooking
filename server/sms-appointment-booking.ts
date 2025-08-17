@@ -1253,4 +1253,186 @@ export class SMSAppointmentBookingService {
     // This would typically clear the conversation state
     console.log('📱 Clearing conversation state for', phoneNumber);
   }
+
+  /**
+   * Check availability for a specific time slot
+   */
+  async checkAvailability(request: StructuredBookingRequest): Promise<{ available: boolean; message: string; alternativeTimes?: string[] }> {
+    try {
+      console.log('🔍 Checking availability for:', request);
+      
+      // Parse the date and time
+      const parsedDate = this.parseDate(request.date);
+      const parsedTime = this.parseTime(request.time);
+      
+      if (!parsedDate || !parsedTime) {
+        return {
+          available: false,
+          message: 'I need a valid date and time to check availability. Please provide both clearly.'
+        };
+      }
+
+      // Create appointment request
+      const appointmentRequest: AppointmentBookingRequest = {
+        serviceName: request.service,
+        date: request.date,
+        time: request.time,
+        clientPhone: request.clientPhone,
+        clientName: request.clientName
+      };
+
+      // Find available slots
+      const availableSlots = await this.findAvailableSlots(appointmentRequest);
+      
+      if (availableSlots.length === 0) {
+        // Get suggested times for the same date
+        const suggestedTimes = await this.getSuggestedTimes(appointmentRequest);
+        
+        return {
+          available: false,
+          message: 'That time is not available. Here are some alternative times: ' + suggestedTimes.join(', '),
+          alternativeTimes: suggestedTimes
+        };
+      }
+
+      // Check if the requested time is available
+      const targetDateTime = new Date(parsedDate);
+      targetDateTime.setHours(parsedTime.hours, parsedTime.minutes, 0, 0);
+      
+      const isAvailable = availableSlots.some(slot => {
+        const slotTime = new Date(slot.startTime);
+        return Math.abs(slotTime.getTime() - targetDateTime.getTime()) < 30 * 60 * 1000; // Within 30 minutes
+      });
+
+      if (isAvailable) {
+        return {
+          available: true,
+          message: 'Great! That time is available. I\'ll proceed with booking your appointment.'
+        };
+      } else {
+        // Get suggested times
+        const suggestedTimes = await this.getSuggestedTimes(appointmentRequest);
+        
+        return {
+          available: false,
+          message: 'That specific time is not available. Here are some alternative times: ' + suggestedTimes.join(', '),
+          alternativeTimes: suggestedTimes
+        };
+      }
+
+    } catch (error: any) {
+      console.error('Error checking availability:', error);
+      return {
+        available: false,
+        message: 'I encountered an issue checking availability. Please call us directly or try again later.'
+      };
+    }
+  }
+
+  /**
+   * Cancel an existing appointment
+   */
+  async cancelAppointment(appointmentId: string, clientPhone: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('📞 Cancelling appointment:', appointmentId, 'for phone:', clientPhone);
+      
+      // Find the appointment
+      const appointment = await this.storage.getAppointmentById(appointmentId);
+      
+      if (!appointment) {
+        return {
+          success: false,
+          message: 'I couldn\'t find an appointment with that ID. Please check the appointment ID or call us directly.'
+        };
+      }
+
+      // Verify the appointment belongs to this phone number
+      if (appointment.clientPhone !== clientPhone) {
+        return {
+          success: false,
+          message: 'This appointment doesn\'t match your phone number. Please verify the appointment ID or call us directly.'
+        };
+      }
+
+      // Cancel the appointment
+      await this.storage.cancelAppointment(appointmentId);
+      
+      return {
+        success: true,
+        message: `Your appointment for ${appointment.serviceName} on ${appointment.date} at ${appointment.time} has been cancelled successfully.`
+      };
+
+    } catch (error: any) {
+      console.error('Error cancelling appointment:', error);
+      return {
+        success: false,
+        message: 'I encountered an issue cancelling your appointment. Please call us directly.'
+      };
+    }
+  }
+
+  /**
+   * Reschedule an existing appointment
+   */
+  async rescheduleAppointment(
+    appointmentId: string, 
+    clientPhone: string, 
+    newDate: string, 
+    newTime: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('📞 Rescheduling appointment:', appointmentId, 'to', newDate, newTime);
+      
+      // Find the appointment
+      const appointment = await this.storage.getAppointmentById(appointmentId);
+      
+      if (!appointment) {
+        return {
+          success: false,
+          message: 'I couldn\'t find an appointment with that ID. Please check the appointment ID or call us directly.'
+        };
+      }
+
+      // Verify the appointment belongs to this phone number
+      if (appointment.clientPhone !== clientPhone) {
+        return {
+          success: false,
+          message: 'This appointment doesn\'t match your phone number. Please verify the appointment ID or call us directly.'
+        };
+      }
+
+      // Check availability for the new time
+      const availabilityCheck = await this.checkAvailability({
+        service: appointment.serviceName,
+        date: newDate,
+        time: newTime,
+        clientPhone: clientPhone
+      });
+
+      if (!availabilityCheck.available) {
+        return {
+          success: false,
+          message: `The new time you requested is not available. ${availabilityCheck.message}`
+        };
+      }
+
+      // Reschedule the appointment
+      await this.storage.updateAppointment(appointmentId, {
+        date: newDate,
+        time: newTime
+      });
+      
+      return {
+        success: true,
+        message: `Your appointment has been rescheduled to ${newDate} at ${newTime}.`
+      };
+
+    } catch (error: any) {
+      console.error('Error rescheduling appointment:', error);
+      return {
+        success: false,
+        message: 'I encountered an issue rescheduling your appointment. Please call us directly.'
+      };
+    }
+  }
 } 

@@ -17,9 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Users, UserPlus, CreditCard, Receipt, Check, X, Mail, Phone, DollarSign, Calendar, RefreshCw } from "lucide-react";
 
-// Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
-const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
+// Helcim payment configuration
+const HELCIM_ENABLED = true;
 
 // Square Payment Form Component (based on working POS implementation)
 interface PaymentFormProps {
@@ -339,6 +338,7 @@ export default function MembershipSubscriptionDialog({
         clientId: selectedClient?.id,
         clientMembershipId: membershipData.id,
         amount: membership?.price,
+        totalAmount: membership?.price,
         method: "card",
         status: "completed",
         type: "membership",

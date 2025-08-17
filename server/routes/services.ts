@@ -16,13 +16,25 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
   // Get all services
   app.get("/api/services", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { category, active, staffId } = req.query;
+    const { category, categoryId, active, staffId } = req.query;
 
-    LoggerService.debug("Fetching services", { ...context, filters: { category, active, staffId } });
+    LoggerService.debug("Fetching services", { ...context, filters: { category, categoryId, active, staffId } });
 
     let services;
-    if (category) {
-      services = await storage.getServicesByCategory(category as string);
+    // Support both 'category' and 'categoryId' parameters for backwards compatibility
+    const filterCategoryId = categoryId || category;
+    if (filterCategoryId) {
+      const categoryServices = await storage.getServicesByCategory(parseInt(filterCategoryId as string));
+      // Add category information for consistency
+      const categoryInfo = await storage.getServiceCategory(parseInt(filterCategoryId as string));
+      services = categoryServices.map(service => ({
+        ...service,
+        category: categoryInfo ? {
+          id: categoryInfo.id,
+          name: categoryInfo.name,
+          description: categoryInfo.description
+        } : null
+      }));
     } else if (active !== undefined) {
       services = await storage.getServicesByStatus(active === 'true');
     } else if (staffId) {
@@ -41,7 +53,21 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
         })
       );
     } else {
-      services = await storage.getAllServices();
+      // Fetch all services with category information
+      const allServices = await storage.getAllServices();
+      services = await Promise.all(
+        allServices.map(async (service) => {
+          const category = await storage.getServiceCategory(service.categoryId);
+          return {
+            ...service,
+            category: category ? {
+              id: category.id,
+              name: category.name,
+              description: category.description
+            } : null
+          };
+        })
+      );
     }
 
     LoggerService.info("Services fetched", { ...context, count: services.length });
@@ -64,16 +90,58 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
   }));
 
   // Create new service
-  app.post("/api/services", validateRequest(insertServiceSchema), asyncHandler(async (req: Request, res: Response) => {
+  app.post("/api/services", asyncHandler(async (req: Request, res: Response) => {
+    console.log("🔍 DEBUG: Service creation endpoint hit!");
+    console.log("🔍 DEBUG: Raw request body:", JSON.stringify(req.body, null, 2));
+    console.log("🔍 DEBUG: Request headers:", JSON.stringify(req.headers, null, 2));
+    
+    // Manual validation with detailed error reporting
+    try {
+      const validationResult = insertServiceSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        console.log("🔍 DEBUG: Validation failed!");
+        console.log("🔍 DEBUG: Validation errors:", JSON.stringify(validationResult.error.errors, null, 2));
+        return res.status(400).json({
+          error: "ValidationError",
+          message: "Request validation failed",
+          details: validationResult.error.errors,
+        });
+      }
+      console.log("🔍 DEBUG: Validation passed!");
+      req.body = validationResult.data;
+    } catch (validationError) {
+      console.log("🔍 DEBUG: Validation exception:", validationError);
+      return res.status(400).json({
+        error: "ValidationError", 
+        message: "Validation exception occurred",
+        details: validationError
+      });
+    }
+    
     const context = getLogContext(req);
     const serviceData = req.body;
 
+    console.log("🔍 DEBUG: Service creation validated data:", JSON.stringify(serviceData, null, 2));
     LoggerService.info("Creating new service", { ...context, serviceData });
 
     // Check if service with same name already exists
     const existingService = await storage.getServiceByName(serviceData.name);
     if (existingService) {
       throw new ConflictError("Service with this name already exists");
+    }
+
+    // Set default location if not provided
+    if (!serviceData.locationId) {
+      // Import db and locations table for direct access
+      const { db } = await import("../db");
+      const { locations } = await import("@shared/schema");
+      
+      const allLocations = await db.select().from(locations);
+      const defaultLocation = allLocations.find((loc: any) => loc.isDefault) || allLocations[0];
+      if (defaultLocation) {
+        serviceData.locationId = defaultLocation.id;
+        console.log("🔍 DEBUG: Set default locationId:", defaultLocation.id);
+      }
     }
 
     const newService = await storage.createService(serviceData);

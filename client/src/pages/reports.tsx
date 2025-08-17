@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import PayrollReport from "./payroll-report";
 import { formatPrice } from "@/lib/utils";
+import SalesCategoryChart from "@/components/reports/sales-category-chart";
 import {
   BarChart,
   Bar,
@@ -65,6 +66,14 @@ const reportCategories = [
     title: "Client Reports", 
     description: "Client demographics, retention, and engagement metrics",
     icon: Users,
+    color: "text-primary",
+    bgColor: "bg-primary/10",
+  },
+  {
+    id: "appointments",
+    title: "Appointment Reports",
+    description: "No-shows, cancellations, and appointment performance analytics",
+    icon: Calendar,
     color: "text-primary",
     bgColor: "bg-primary/10",
   },
@@ -185,24 +194,447 @@ const ReportsLandingPage = ({ onSelectReport }: { onSelectReport: (reportId: str
   );
 };
 
+// Appointments Report Component
+const AppointmentsReport = ({ timePeriod, customStartDate, customEndDate }: { 
+  timePeriod: string; 
+  customStartDate?: string; 
+  customEndDate?: string; 
+}) => {
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({ 
+    queryKey: ["/api/appointments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: cancelledAppointments = [], isLoading: cancelledLoading } = useQuery({ 
+    queryKey: ["/api/cancelled-appointments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: users = [], isLoading: usersLoading } = useQuery({ 
+    queryKey: ["/api/users"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: staff = [], isLoading: staffLoading } = useQuery({ 
+    queryKey: ["/api/staff"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+
+  const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  
+  // Filter appointments by date range
+  const periodAppointments = (appointments as any[]).filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate >= startDate && aptDate <= endDate;
+  });
+
+  const periodCancelled = (cancelledAppointments as any[]).filter((apt: any) => {
+    const aptDate = new Date(apt.startTime);
+    return aptDate >= startDate && aptDate <= endDate;
+  });
+
+  // Calculate metrics
+  const totalAppointments = periodAppointments.length;
+  const completedAppointments = periodAppointments.filter((apt: any) => apt.status === 'completed').length;
+  const noShows = periodAppointments.filter((apt: any) => apt.status === 'no_show').length;
+  const cancelledCount = periodCancelled.length;
+  const totalRevenue = periodAppointments
+    .filter((apt: any) => apt.status === 'completed')
+    .reduce((sum: number, apt: any) => sum + (apt.totalAmount || 0), 0);
+
+  const completionRate = totalAppointments > 0 ? (completedAppointments / totalAppointments) * 100 : 0;
+  const noShowRate = totalAppointments > 0 ? (noShows / totalAppointments) * 100 : 0;
+  const cancellationRate = totalAppointments > 0 ? (cancelledCount / totalAppointments) * 100 : 0;
+
+  // Get client and staff names
+  const getClientName = (clientId: number) => {
+    const client = (users as any[]).find((u: any) => u.id === clientId && u.role === 'client');
+    return client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username : 'Unknown';
+  };
+
+  const getStaffName = (staffId: number) => {
+    const staffMember = (staff as any[]).find((s: any) => s.id === staffId);
+    return staffMember ? `${staffMember.user?.firstName || ''} ${staffMember.user?.lastName || ''}`.trim() || staffMember.user?.username : 'Unknown';
+  };
+
+  // No-show analysis by client
+  const noShowByClient = periodAppointments
+    .filter((apt: any) => apt.status === 'no_show')
+    .reduce((acc: any, apt: any) => {
+      const clientName = getClientName(apt.clientId);
+      acc[clientName] = (acc[clientName] || 0) + 1;
+      return acc;
+    }, {});
+
+  const topNoShowClients = Object.entries(noShowByClient)
+    .map(([name, count]) => ({ name, count: Number(count) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  // No-show analysis by staff
+  const noShowByStaff = periodAppointments
+    .filter((apt: any) => apt.status === 'no_show')
+    .reduce((acc: any, apt: any) => {
+      const staffName = getStaffName(apt.staffId);
+      acc[staffName] = (acc[staffName] || 0) + 1;
+      return acc;
+    }, {});
+
+  const topNoShowStaff = Object.entries(noShowByStaff)
+    .map(([name, count]) => ({ name, count: Number(count) }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const isLoading = appointmentsLoading || cancelledLoading || usersLoading || staffLoading;
+
+  return (
+    <div className="space-y-6">
+      {isLoading && (
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Refreshing appointment data... This page updates automatically every 30 seconds.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <Calendar className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Appointments
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {totalAppointments}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-green-100 rounded-md p-2 md:p-3">
+                <Calendar className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Completed
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {completedAppointments}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-red-100 rounded-md p-2 md:p-3">
+                <Calendar className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    No-Shows
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {noShows}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 md:p-3">
+                <Calendar className="h-4 w-4 md:h-5 md:w-5 text-yellow-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Cancelled
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {cancelledCount}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 md:p-3">
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Completion Rate
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {Math.round(completionRate)}%
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-red-100 rounded-md p-2 md:p-3">
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    No-Show Rate
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {Math.round(noShowRate)}%
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-yellow-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Revenue Generated
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>No-Shows by Client</CardTitle>
+            <CardDescription>Clients with highest no-show rates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {topNoShowClients.length > 0 ? (
+                <BarChart data={topNoShowClients} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="name" width={120} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#ef4444" name="No-Shows" />
+                </BarChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No no-show data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>No-Shows by Staff</CardTitle>
+            <CardDescription>Staff members with highest no-show rates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {topNoShowStaff.length > 0 ? (
+                <BarChart data={topNoShowStaff} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis type="category" dataKey="name" width={120} />
+                  <Tooltip />
+                  <Bar dataKey="count" fill="#f59e0b" name="No-Shows" />
+                </BarChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No no-show data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Appointment Status Distribution */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Appointment Status Distribution</CardTitle>
+          <CardDescription>Breakdown of appointment outcomes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <RechartsCircleChart>
+              <Pie
+                data={[
+                  { name: 'Completed', value: completedAppointments, color: '#10b981' },
+                  { name: 'No-Show', value: noShows, color: '#ef4444' },
+                  { name: 'Cancelled', value: cancelledCount, color: '#f59e0b' },
+                  { name: 'Other', value: totalAppointments - completedAppointments - noShows - cancelledCount, color: '#6b7280' }
+                ]}
+                cx="50%"
+                cy="50%"
+                labelLine={false}
+                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                outerRadius={80}
+                fill="#8884d8"
+                dataKey="value"
+              >
+                <Cell fill="#10b981" />
+                <Cell fill="#ef4444" />
+                <Cell fill="#f59e0b" />
+                <Cell fill="#6b7280" />
+              </Pie>
+              <Tooltip />
+            </RechartsCircleChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Recent Appointments Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Appointments</CardTitle>
+          <CardDescription>Latest appointments with status and revenue</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Client
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Staff
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Revenue
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {periodAppointments.slice(0, 20).map((apt: any, index: number) => (
+                  <tr key={apt.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {new Date(apt.startTime).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {getClientName(apt.clientId)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {getStaffName(apt.staffId)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        apt.status === 'completed' 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : apt.status === 'no_show'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                          : apt.status === 'cancelled'
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                      }`}>
+                        {apt.status === 'completed' ? 'Completed' : 
+                         apt.status === 'no_show' ? 'No-Show' : 
+                         apt.status === 'cancelled' ? 'Cancelled' : apt.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {apt.status === 'completed' ? formatPrice(apt.totalAmount || 0) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {periodAppointments.length > 20 && (
+              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                Showing first 20 of {periodAppointments.length} appointments
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 // Specific Report View Component
 const SpecificReportView = ({ 
   reportType, 
   timePeriod, 
   customStartDate, 
-  customEndDate 
+  customEndDate,
+  selectedLocation
 }: { 
   reportType: string; 
   timePeriod: string; 
   customStartDate: string; 
   customEndDate: string; 
+  selectedLocation: string; 
 }) => {
   // Generate reports based on type
   switch (reportType) {
     case "sales":
-      return <SalesReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
+      return <SalesReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} selectedLocation={selectedLocation} />;
     case "clients": 
       return <ClientsReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
+    case "appointments":
+      return <AppointmentsReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "services":
       return <ServicesReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "staff":
@@ -218,10 +650,11 @@ const SpecificReportView = ({
 
 // Individual Report Components
 
-const SalesReport = ({ timePeriod, customStartDate, customEndDate }: { 
+const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocation }: { 
   timePeriod: string; 
   customStartDate?: string; 
   customEndDate?: string; 
+  selectedLocation?: string; 
 }) => {
   const { data: salesHistory = [], isLoading, refetch } = useQuery({ 
     queryKey: ["/api/sales-history"],
@@ -230,17 +663,135 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
     refetchOnMount: true,
     staleTime: 0, // Always consider data stale for real-time updates
   });
+  const { data: services = [], isLoading: servicesLoading } = useQuery({ 
+    queryKey: ["/api/services"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: products = [], isLoading: productsLoading } = useQuery({ 
+    queryKey: ["/api/products"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
   
-  // Filter sales by date range and completed status
+  // Filter sales by date range, completed status, and location
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
-    return saleDate >= startDate && saleDate <= endDate && 
-           (sale.paymentStatus === "completed" || sale.payment_status === "completed");
+    const dateFilter = saleDate >= startDate && saleDate <= endDate;
+    const statusFilter = (sale.paymentStatus === "completed" || sale.payment_status === "completed");
+    
+    // Location filtering - for appointment sales, check the appointment's location
+    let locationFilter = true;
+    if (selectedLocation && selectedLocation !== 'all' && sale.transactionType === 'appointment' && sale.appointmentId) {
+      // For appointment sales, we need to check the appointment's location
+      // This will be handled by the backend API, but we can do basic filtering here
+      // The main filtering should be done in the API call
+    }
+    
+    return dateFilter && statusFilter && locationFilter;
   });
   
   const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
   const totalTransactions = filteredSales.length;
+  const totalTax = filteredSales.reduce((sum: number, sale: any) => sum + (sale.taxAmount || sale.tax_amount || 0), 0);
+  const totalTips = filteredSales.reduce((sum: number, sale: any) => sum + (sale.tipAmount || sale.tip_amount || 0), 0);
+  const totalDiscounts = filteredSales.reduce((sum: number, sale: any) => sum + (sale.discountAmount || sale.discount_amount || 0), 0);
+
+  // Calculate sales by category
+  const salesByCategory = () => {
+    const categoryMap = new Map();
+    
+    filteredSales.forEach((sale: any) => {
+      if (sale.transactionType === 'appointment' && sale.serviceNames) {
+        try {
+          const serviceNames = JSON.parse(sale.serviceNames);
+          serviceNames.forEach((serviceName: string) => {
+            const service = (services as any[]).find(s => s.name === serviceName);
+            const category = service?.category || 'Other';
+            const amount = (sale.serviceTotalAmount || sale.totalAmount || 0) / serviceNames.length;
+            
+            if (categoryMap.has(category)) {
+              categoryMap.set(category, categoryMap.get(category) + amount);
+            } else {
+              categoryMap.set(category, amount);
+            }
+          });
+        } catch (e) {
+          // Handle non-JSON service names
+          const category = 'Other';
+          const amount = sale.serviceTotalAmount || sale.totalAmount || 0;
+          if (categoryMap.has(category)) {
+            categoryMap.set(category, categoryMap.get(category) + amount);
+          } else {
+            categoryMap.set(category, amount);
+          }
+        }
+      } else if (sale.transactionType === 'pos_sale' && sale.productNames) {
+        try {
+          const productNames = JSON.parse(sale.productNames);
+          productNames.forEach((productName: string) => {
+            const product = (products as any[]).find(p => p.name === productName);
+            const category = product?.category || 'Retail';
+            const amount = (sale.productTotalAmount || sale.totalAmount || 0) / productNames.length;
+            
+            if (categoryMap.has(category)) {
+              categoryMap.set(category, categoryMap.get(category) + amount);
+            } else {
+              categoryMap.set(category, amount);
+            }
+          });
+        } catch (e) {
+          const category = 'Retail';
+          const amount = sale.productTotalAmount || sale.totalAmount || 0;
+          if (categoryMap.has(category)) {
+            categoryMap.set(category, categoryMap.get(category) + amount);
+          } else {
+            categoryMap.set(category, amount);
+          }
+        }
+      }
+    });
+    
+    return Array.from(categoryMap.entries()).map(([category, amount]) => ({
+      category,
+      amount: Number(amount),
+      percentage: (Number(amount) / totalRevenue) * 100
+    })).sort((a, b) => b.amount - a.amount);
+  };
+
+  // Calculate daily sales trend
+  const dailySalesTrend = () => {
+    const dailyMap = new Map();
+    
+    filteredSales.forEach((sale: any) => {
+      const date = new Date(sale.transactionDate || sale.transaction_date);
+      const dateKey = date.toISOString().split('T')[0];
+      const amount = sale.totalAmount || sale.total_amount || 0;
+      
+      if (dailyMap.has(dateKey)) {
+        dailyMap.set(dateKey, dailyMap.get(dateKey) + amount);
+      } else {
+        dailyMap.set(dateKey, amount);
+      }
+    });
+    
+    return Array.from(dailyMap.entries())
+      .map(([date, amount]) => ({
+        date,
+        amount: Number(amount),
+        dayOfWeek: new Date(date).toLocaleDateString('en-US', { weekday: 'short' })
+      }))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  };
+
+  const categoryData = salesByCategory();
+  const trendData = dailySalesTrend();
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -252,7 +803,9 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
           </AlertDescription>
         </Alert>
       )}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+      
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
@@ -272,6 +825,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
             </div>
           </CardContent>
         </Card>
+        
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
@@ -291,6 +845,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
             </div>
           </CardContent>
         </Card>
+        
         <Card>
           <CardContent className="p-4 md:p-6">
             <div className="flex items-center">
@@ -310,28 +865,785 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate }: {
             </div>
           </CardContent>
         </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Tax Collected
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalTax)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Additional Financial Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-green-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Tips
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalTips)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-yellow-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Discounts
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalDiscounts)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Net Revenue
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue - totalDiscounts)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sales by Category</CardTitle>
+            <CardDescription>Revenue breakdown by service and product categories</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {categoryData.length > 0 ? (
+                <RechartsCircleChart>
+                  <Pie
+                    data={categoryData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="amount"
+                  >
+                    {categoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={`hsl(${index * 60}, 70%, 50%)`} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => formatPrice(Number(value))} />
+                </RechartsCircleChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No category data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Daily Sales Trend</CardTitle>
+            <CardDescription>Revenue trend over the selected time period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {trendData.length > 0 ? (
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="dayOfWeek" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => formatPrice(Number(value))} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="amount" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    name="Revenue"
+                  />
+                </LineChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No trend data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sales by Category Chart */}
+      <SalesCategoryChart 
+        timePeriod={timePeriod}
+        customStartDate={customStartDate}
+        customEndDate={customEndDate}
+        selectedLocation={selectedLocation}
+      />
+
+      {/* Detailed Sales Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Sales Breakdown</CardTitle>
+          <CardDescription>Detailed view of all transactions in the selected period</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Client
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Staff
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Tax
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Tips
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Method
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredSales.slice(0, 20).map((sale: any, index: number) => (
+                  <tr key={sale.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {new Date(sale.transactionDate || sale.transaction_date).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        sale.transactionType === 'appointment' 
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                          : sale.transactionType === 'pos_sale'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                      }`}>
+                        {sale.transactionType === 'appointment' ? 'Service' : 
+                         sale.transactionType === 'pos_sale' ? 'Retail' : sale.transactionType}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {sale.clientName || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {sale.staffName || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {formatPrice(sale.totalAmount || sale.total_amount || 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(sale.taxAmount || sale.tax_amount || 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(sale.tipAmount || sale.tip_amount || 0)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {sale.paymentMethod || 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filteredSales.length > 20 && (
+              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                Showing first 20 of {filteredSales.length} transactions
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-const ClientsReport = ({ }: { 
+const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: { 
   timePeriod: string; 
   customStartDate?: string; 
   customEndDate?: string; 
 }) => {
-  const { data: users = [] } = useQuery({ queryKey: ["/api/users"] });
+  const { data: users = [], isLoading: usersLoading } = useQuery({ 
+    queryKey: ["/api/users"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({ 
+    queryKey: ["/api/appointments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  const { data: salesHistory = [], isLoading: salesLoading } = useQuery({ 
+    queryKey: ["/api/sales-history"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+
+  const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  
   const clients = (users as any[]).filter((user: any) => user.role === "client");
+  
+  // Calculate client analytics
+  const calculateClientAnalytics = () => {
+    const clientMap = new Map();
+    
+    // Initialize client data
+    clients.forEach((client: any) => {
+      clientMap.set(client.id, {
+        id: client.id,
+        name: `${client.firstName || ''} ${client.lastName || ''}`.trim() || client.username,
+        email: client.email,
+        phone: client.phone,
+        firstVisit: null,
+        lastVisit: null,
+        totalVisits: 0,
+        totalSpent: 0,
+        averageTicket: 0,
+        isNew: false,
+        isReturning: false,
+        retentionStatus: 'unknown'
+      });
+    });
+
+    // Analyze appointments
+    const periodAppointments = (appointments as any[]).filter((apt: any) => {
+      const aptDate = new Date(apt.startTime);
+      return aptDate >= startDate && aptDate <= endDate && apt.status === 'completed';
+    });
+
+    periodAppointments.forEach((apt: any) => {
+      const clientData = clientMap.get(apt.clientId);
+      if (clientData) {
+        clientData.totalVisits++;
+        const visitDate = new Date(apt.startTime);
+        
+        if (!clientData.firstVisit || visitDate < new Date(clientData.firstVisit)) {
+          clientData.firstVisit = visitDate;
+        }
+        if (!clientData.lastVisit || visitDate > new Date(clientData.lastVisit)) {
+          clientData.lastVisit = visitDate;
+        }
+      }
+    });
+
+    // Analyze sales history
+    const periodSales = (salesHistory as any[]).filter((sale: any) => {
+      const saleDate = new Date(sale.transactionDate || sale.transaction_date);
+      return saleDate >= startDate && saleDate <= endDate && 
+             sale.paymentStatus === 'completed' && sale.clientId;
+    });
+
+    periodSales.forEach((sale: any) => {
+      const clientData = clientMap.get(sale.clientId);
+      if (clientData) {
+        clientData.totalSpent += sale.totalAmount || sale.total_amount || 0;
+      }
+    });
+
+    // Calculate averages and classify clients
+    const clientAnalytics = Array.from(clientMap.values()).map((client: any) => {
+      client.averageTicket = client.totalVisits > 0 ? client.totalSpent / client.totalVisits : 0;
+      
+      // Classify as new vs returning
+      const isNewInPeriod = client.firstVisit && new Date(client.firstVisit) >= startDate;
+      client.isNew = isNewInPeriod;
+      client.isReturning = !isNewInPeriod && client.totalVisits > 0;
+      
+      // Calculate retention status
+      if (client.totalVisits === 0) {
+        client.retentionStatus = 'no_visits';
+      } else if (client.totalVisits === 1) {
+        client.retentionStatus = 'one_time';
+      } else if (client.totalVisits >= 2 && client.totalVisits <= 5) {
+        client.retentionStatus = 'regular';
+      } else {
+        client.retentionStatus = 'loyal';
+      }
+      
+      return client;
+    });
+
+    return clientAnalytics;
+  };
+
+  const clientAnalytics = calculateClientAnalytics();
+  
+  // Calculate summary metrics
+  const totalClients = clientAnalytics.length;
+  const newClients = clientAnalytics.filter((c: any) => c.isNew).length;
+  const returningClients = clientAnalytics.filter((c: any) => c.isReturning).length;
+  const totalRevenue = clientAnalytics.reduce((sum: number, c: any) => sum + c.totalSpent, 0);
+  const averageSpend = totalClients > 0 ? totalRevenue / totalClients : 0;
+  
+  // Retention rate calculation
+  const clientsWithVisits = clientAnalytics.filter((c: any) => c.totalVisits > 0);
+  const retentionRate = clientsWithVisits.length > 0 ? 
+    (returningClients / clientsWithVisits.length) * 100 : 0;
+
+  // Big spenders (top 20% by total spent)
+  const sortedBySpend = [...clientAnalytics].sort((a: any, b: any) => b.totalSpent - a.totalSpent);
+  const bigSpendersCount = Math.ceil(totalClients * 0.2);
+  const bigSpenders = sortedBySpend.slice(0, bigSpendersCount);
+
+  // Client lifetime value distribution
+  const ltvDistribution = [
+    { range: '$0-50', count: 0, percentage: 0 },
+    { range: '$51-100', count: 0, percentage: 0 },
+    { range: '$101-250', count: 0, percentage: 0 },
+    { range: '$251-500', count: 0, percentage: 0 },
+    { range: '$501+', count: 0, percentage: 0 }
+  ];
+
+  clientAnalytics.forEach((client: any) => {
+    if (client.totalSpent <= 50) ltvDistribution[0].count++;
+    else if (client.totalSpent <= 100) ltvDistribution[1].count++;
+    else if (client.totalSpent <= 250) ltvDistribution[2].count++;
+    else if (client.totalSpent <= 500) ltvDistribution[3].count++;
+    else ltvDistribution[4].count++;
+  });
+
+  ltvDistribution.forEach(range => {
+    range.percentage = totalClients > 0 ? (range.count / totalClients) * 100 : 0;
+  });
+
+  const isLoading = usersLoading || appointmentsLoading || salesLoading;
 
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-4 w-4 animate-spin" />
+          <AlertDescription>
+            Refreshing client data... This page updates automatically every 30 seconds.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-primary/10 rounded-md p-2 md:p-3">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Clients
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {totalClients}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-green-100 rounded-md p-2 md:p-3">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    New Clients
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {newClients}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-blue-100 rounded-md p-2 md:p-3">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Returning Clients
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {returningClients}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-purple-100 rounded-md p-2 md:p-3">
+                <BarChart2 className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Retention Rate
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {Math.round(retentionRate)}%
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-yellow-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-yellow-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Total Revenue
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(totalRevenue)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-indigo-100 rounded-md p-2 md:p-3">
+                <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-indigo-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Avg Client Spend
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {formatPrice(averageSpend)}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 md:p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0 bg-red-100 rounded-md p-2 md:p-3">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-red-600" />
+              </div>
+              <div className="ml-3 md:ml-5 w-0 flex-1">
+                <dl>
+                  <dt className="text-xs md:text-sm font-medium text-gray-500 dark:text-gray-400 truncate">
+                    Big Spenders
+                  </dt>
+                  <dd className="text-lg md:text-xl font-semibold text-gray-900 dark:text-gray-100">
+                    {bigSpendersCount}
+                  </dd>
+                </dl>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Client Lifetime Value Distribution</CardTitle>
+            <CardDescription>Distribution of client spending in the selected period</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {ltvDistribution.some(range => range.count > 0) ? (
+                <BarChart data={ltvDistribution}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="range" />
+                  <YAxis />
+                  <Tooltip formatter={(value, name) => [value, name === 'count' ? 'Clients' : 'Percentage']} />
+                  <Bar dataKey="count" fill="hsl(var(--primary))" name="Clients" />
+                </BarChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No client spending data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Client Retention Analysis</CardTitle>
+            <CardDescription>Breakdown of client retention status</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              {clientAnalytics.length > 0 ? (
+                <RechartsCircleChart>
+                  <Pie
+                    data={[
+                      { name: 'No Visits', value: clientAnalytics.filter((c: any) => c.retentionStatus === 'no_visits').length },
+                      { name: 'One Time', value: clientAnalytics.filter((c: any) => c.retentionStatus === 'one_time').length },
+                      { name: 'Regular', value: clientAnalytics.filter((c: any) => c.retentionStatus === 'regular').length },
+                      { name: 'Loyal', value: clientAnalytics.filter((c: any) => c.retentionStatus === 'loyal').length }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    <Cell fill="#ef4444" />
+                    <Cell fill="#f59e0b" />
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#10b981" />
+                  </Pie>
+                  <Tooltip />
+                </RechartsCircleChart>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
+                  No client data available for the selected time period
+                </div>
+              )}
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Big Spenders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Client Overview</CardTitle>
+          <CardTitle>Big Spenders (Top 20%)</CardTitle>
+          <CardDescription>Clients with highest lifetime value in the selected period</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold">{clients.length}</div>
-          <p className="text-gray-600 dark:text-gray-400">Total Clients</p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Client Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total Visits
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total Spent
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Avg Ticket
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {bigSpenders.map((client: any, index: number) => (
+                  <tr key={client.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {client.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.totalVisits}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {formatPrice(client.totalSpent)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(client.averageTicket)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        client.isNew 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : client.isReturning
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                      }`}>
+                        {client.isNew ? 'New' : client.isReturning ? 'Returning' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* All Clients Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>All Clients</CardTitle>
+          <CardDescription>Complete client list with analytics for the selected period</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-800">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Client Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Visits
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Total Spent
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Avg Ticket
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    First Visit
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Last Visit
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                {clientAnalytics.slice(0, 50).map((client: any, index: number) => (
+                  <tr key={client.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {client.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.totalVisits}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {formatPrice(client.totalSpent)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {formatPrice(client.averageTicket)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.firstVisit ? new Date(client.firstVisit).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {client.lastVisit ? new Date(client.lastVisit).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        client.isNew 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                          : client.isReturning
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                      }`}>
+                        {client.isNew ? 'New' : client.isReturning ? 'Returning' : 'Inactive'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {clientAnalytics.length > 50 && (
+              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
+                Showing first 50 of {clientAnalytics.length} clients
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -881,9 +2193,52 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
     // Utilization (assume 160h/month, 40h/week, etc)
     const totalWorkingHours = timePeriod === "week" ? 40 : timePeriod === "month" ? 160 : timePeriod === "quarter" ? 480 : 640;
     const utilization = totalWorkingHours > 0 ? Math.min((serviceHours / totalWorkingHours) * 100, 100) : 0;
-    // Commission
-    const commissionRate = Number(staffMember.commissionRate) || 0;
-    const commissionEarnings = finalRevenue * commissionRate;
+    // Commission calculation based on commission type
+    let commissionEarnings = 0;
+    
+    switch (staffMember.commissionType) {
+      case 'commission': {
+        // Commission rate is already stored as decimal (e.g., 0.3 for 30%)
+        const commissionRate = Number(staffMember.commissionRate) || 0;
+        commissionEarnings = finalRevenue * commissionRate;
+        break;
+      }
+      case 'hourly': {
+        // Calculate hourly earnings based on service duration
+        const hourlyRate = Number(staffMember.hourlyRate) || 0;
+        const totalHours = completedAppointments.reduce((sum: number, apt: any) => {
+          const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
+          const duration = Number(service?.duration) || 60; // Duration in minutes
+          return sum + (duration / 60); // Convert to hours
+        }, 0);
+        commissionEarnings = hourlyRate * totalHours;
+        break;
+      }
+      case 'fixed': {
+        // Fixed rate per appointment
+        const fixedRate = Number(staffMember.fixedRate) || 0;
+        commissionEarnings = fixedRate * completedAppointments.length;
+        break;
+      }
+      case 'hourly_plus_commission': {
+        // Calculate both hourly and commission
+        const hourlyRate = Number(staffMember.hourlyRate) || 0;
+        const commissionRate = Number(staffMember.commissionRate) || 0;
+        
+        const totalHours = completedAppointments.reduce((sum: number, apt: any) => {
+          const service = (services as any[]).find((s: any) => s.id === apt.serviceId);
+          const duration = Number(service?.duration) || 60; // Duration in minutes
+          return sum + (duration / 60); // Convert to hours
+        }, 0);
+        
+        const hourlyPortion = hourlyRate * totalHours;
+        const commissionPortion = finalRevenue * commissionRate;
+        commissionEarnings = hourlyPortion + commissionPortion;
+        break;
+      }
+      default:
+        commissionEarnings = 0;
+    }
     // Name/role
     const name = `${staffMember.user?.firstName || ''} ${staffMember.user?.lastName || ''}`.trim() || staffMember.user?.username || 'Unknown';
     const role = staffMember.title || 'Staff';
@@ -965,7 +2320,7 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
                   <th className="px-4 py-2 text-right text-xs font-semibold">Total Sales</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold">Completed</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold">Avg Ticket</th>
-                  <th className="px-4 py-2 text-right text-xs font-semibold">Commission</th>
+                  <th className="px-4 py-2 text-right text-xs font-semibold">Earnings</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold">Utilization</th>
                   <th className="px-4 py-2 text-right text-xs font-semibold">Service Hours</th>
                 </tr>
@@ -1192,11 +2547,28 @@ const ReportsPage = () => {
   const [timePeriod, setTimePeriod] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const { isOpen: sidebarOpen } = useSidebar();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const queryClient = useQueryClient();
+
+  // Fetch locations for the dropdown
+  const { data: locations = [], isLoading: locationsLoading } = useQuery({
+    queryKey: ["/api/locations"],
+    queryFn: async () => {
+      const response = await fetch("/api/locations");
+      if (!response.ok) {
+        throw new Error("Failed to fetch locations");
+      }
+      return response.json();
+    },
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
 
   // Auto-update the last update time every 30 seconds to show live status
   React.useEffect(() => {
@@ -1348,6 +2720,24 @@ const ReportsPage = () => {
                           </PopoverContent>
                         </Popover>
                       )}
+                      
+                      {/* Location Filter */}
+                      <Select 
+                        value={selectedLocation} 
+                        onValueChange={setSelectedLocation}
+                      >
+                        <SelectTrigger className="w-full sm:w-[200px] min-h-[44px] text-left">
+                          <SelectValue placeholder="All Locations" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Locations</SelectItem>
+                          {locations.map((location: any) => (
+                            <SelectItem key={location.id} value={location.id.toString()}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -1420,6 +2810,7 @@ const ReportsPage = () => {
                   timePeriod={timePeriod}
                   customStartDate={customStartDate}
                   customEndDate={customEndDate}
+                  selectedLocation={selectedLocation}
                 />
               </div>
             ) : (

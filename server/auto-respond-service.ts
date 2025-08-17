@@ -188,7 +188,7 @@ export class AutoRespondService {
       // Send auto-response
       const emailSent = await sendEmail({
         to: email.from,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
         subject: `Re: ${email.subject}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -468,7 +468,7 @@ The ${businessName} Team`;
       // Send fallback response
       const emailSent = await sendEmail({
         to: email.from,
-        from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+        from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
         subject: `Re: ${email.subject}`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

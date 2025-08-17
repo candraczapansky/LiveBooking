@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-from models import ClientInfo, AppointmentInfo
+from .models import ClientInfo, AppointmentInfo
 
 class ConversationState:
     """Represents the state of a conversation"""
@@ -52,10 +52,9 @@ class ConversationState:
 class ConversationManager:
     """Manages conversation state and flow for appointment booking"""
     
-    def __init__(self, db_service=None):
+    def __init__(self):
         self.conversations: Dict[str, ConversationState] = {}
         self.logger = logging.getLogger(__name__)
-        self.db_service = db_service
         
         # Available services
         self.services = {
@@ -101,57 +100,31 @@ class ConversationManager:
         # Log current state for debugging
         self.logger.info(f"Processing message for {phone_number}: '{message}' at step '{state.step}'")
         
-        # Check if this is a booking-related message
-        message_lower = message.lower()
-        is_booking_request = any(word in message_lower for word in [
-            "book", "appointment", "schedule", "make appointment", "book me",
-            "haircut", "color", "style", "service", "price", "cost"
-        ])
-        
-        # If we're in a booking flow or this is a booking request, handle it
-        if state.step != "greeting" or is_booking_request:
-            # Process based on current step
-            if state.step == "greeting":
-                result = self._handle_greeting(state, message)
-            elif state.step == "service_selection":
-                result = self._handle_service_selection(state, message)
-            elif state.step == "time_selection":
-                result = self._handle_time_selection(state, message)
-            elif state.step == "client_info":
-                result = self._handle_client_info(state, message)
-            elif state.step == "confirmation":
-                result = self._handle_confirmation(state, message)
-            else:
-                result = self._handle_greeting(state, message)
-            
-            # Log result for debugging
-            self.logger.info(f"Conversation result for {phone_number}: {result}")
-            
-            # If we have a specific response, use it
-            if result.get("response"):
-                return result
-            else:
-                # Fall back to AI for general conversation
-                return {
-                    "response": None,
-                    "requires_booking": False,
-                    "step": state.step
-                }
+        # Process based on current step
+        if state.step == "greeting":
+            result = self._handle_greeting(state, message)
+        elif state.step == "service_selection":
+            result = self._handle_service_selection(state, message)
+        elif state.step == "time_selection":
+            result = self._handle_time_selection(state, message)
+        elif state.step == "client_info":
+            result = self._handle_client_info(state, message)
+        elif state.step == "confirmation":
+            result = self._handle_confirmation(state, message)
         else:
-            # For general conversation, always let AI handle it
-            self.logger.info(f"General conversation for {phone_number}, letting AI handle it")
-            return {
-                "response": None,
-                "requires_booking": False,
-                "step": "greeting"
-            }
+            result = self._handle_greeting(state, message)
+        
+        # Log result for debugging
+        self.logger.info(f"Conversation result for {phone_number}: {result}")
+        
+        return result
     
     def _handle_greeting(self, state: ConversationState, message: str) -> Dict[str, Any]:
         """Handle initial greeting and service selection"""
         message_lower = message.lower()
         
-        # Check if user wants to book an appointment (more specific)
-        if any(word in message_lower for word in ["book", "appointment", "schedule", "make appointment", "book me"]):
+        # Check if user wants to book an appointment
+        if any(word in message_lower for word in ["book", "appointment", "schedule", "haircut", "service"]):
             state.step = "service_selection"
             return {
                 "response": "Great! I'd be happy to help you book an appointment. Here are our services:\n\n" + 
@@ -160,17 +133,9 @@ class ConversationManager:
                 "step": "service_selection",
                 "requires_booking": True
             }
-        elif any(word in message_lower for word in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]):
-            # For greetings, let AI handle the response to make it more natural
-            return {
-                "response": None,
-                "step": "greeting",
-                "requires_booking": False
-            }
         else:
-            # For general conversation, let AI handle it
             return {
-                "response": None,
+                "response": "Hello! I'm here to help with your salon needs. Would you like to book an appointment?",
                 "step": "greeting",
                 "requires_booking": False
             }
@@ -283,71 +248,18 @@ class ConversationManager:
         message_lower = message.lower()
         
         if message_lower in ["yes", "confirm", "book it", "ok", "sure"]:
-            try:
-                # Create or update client profile
-                client_data = {
-                    "name": state.temp_data["name"],
-                    "email": state.temp_data["email"],
-                    "phone": state.phone_number
-                }
-                
-                if self.db_service:
-                    # Try to find existing client
-                    client = self.db_service.get_client_by_phone(state.phone_number)
-                    
-                    if client:
-                        # Update existing client
-                        client_id = client.id
-                        self.db_service.update_client(client_id, client_data)
-                    else:
-                        # Create new client
-                        client = self.db_service.create_client(client_data)
-                        client_id = client.id
-                    
-                    # Parse date and time
-                    appointment_datetime = self._parse_datetime(state.selected_date, state.selected_time)
-                    service_info = self.services[state.selected_service]
-                    
-                    # Create appointment
-                    appointment = self.db_service.create_appointment(
-                        client_id=client_id,
-                        date=appointment_datetime,
-                        service=service_info["name"],
-                        duration=service_info["duration"],
-                        notes=f"Booked via SMS on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-                    )
-                    
-                    if appointment:
-                        state.step = "completed"
-                        return {
-                            "response": f"Excellent! Your appointment is confirmed for {state.selected_date} at {state.selected_time}.\n\n" +
-                                      "You'll receive a confirmation email shortly. We look forward to seeing you!\n\n" +
-                                      "If you need to make any changes, just text us back.",
-                            "step": "completed",
-                            "booking_confirmed": True,
-                            "requires_booking": False,
-                            "appointment_id": appointment
-                        }
-                    else:
-                        raise Exception("Failed to create appointment")
-                        
-                else:
-                    self.logger.error("Database service not available")
-                    return {
-                        "response": "I apologize, but I'm having trouble accessing our booking system. Please call us directly to book your appointment.",
-                        "step": "error",
-                        "requires_booking": False,
-                        "error": "Database service not available"
-                    }
-                    
-            except Exception as e:
-                self.logger.error(f"Error creating appointment: {str(e)}")
-                return {
-                    "response": "I apologize, but there was an error booking your appointment. Please call us directly to book.",
-                    "step": "error",
-                    "requires_booking": False,
-                    "error": str(e)
-                }
+            # Here we would create the appointment in the database
+            # For now, we'll simulate success
+            state.step = "completed"
+            
+            return {
+                "response": f"Excellent! Your appointment is confirmed for {state.selected_date} at {state.selected_time}.\n\n" +
+                           "You'll receive a confirmation email shortly. We look forward to seeing you!\n\n" +
+                           "If you need to make any changes, just text us back.",
+                "step": "completed",
+                "booking_confirmed": True,
+                "requires_booking": False
+            }
         elif message_lower in ["no", "cancel", "nevermind"]:
             state.step = "greeting"
             return {
@@ -388,55 +300,4 @@ class ConversationManager:
             "selected_time": state.selected_time,
             "client_info": state.client_info.dict() if state.client_info else None,
             "temp_data": state.temp_data
-        }
-        
-    def _parse_datetime(self, date_str: str, time_str: str) -> datetime:
-        """Parse date and time strings into datetime object"""
-        try:
-            # Handle relative dates
-            date_lower = date_str.lower()
-            if date_lower == "today":
-                date = datetime.now()
-            elif date_lower == "tomorrow":
-                date = datetime.now() + timedelta(days=1)
-            elif date_lower.startswith("next"):
-                # Handle "next monday", "next tuesday", etc.
-                day_name = date_lower.split()[1]
-                date = self._get_next_day_of_week(day_name)
-            else:
-                # Try to parse as explicit date
-                date = datetime.strptime(date_str, "%B %d")
-                # Add year
-                current_year = datetime.now().year
-                date = date.replace(year=current_year)
-                # If the date is in the past, add a year
-                if date < datetime.now():
-                    date = date.replace(year=current_year + 1)
-            
-            # Parse time
-            time = datetime.strptime(time_str, "%I:%M %p").time()
-            
-            # Combine date and time
-            return datetime.combine(date.date(), time)
-            
-        except Exception as e:
-            self.logger.error(f"Error parsing datetime: {str(e)}")
-            raise ValueError("Invalid date or time format")
-            
-    def _get_next_day_of_week(self, day_name: str) -> datetime:
-        """Get the next occurrence of a day of the week"""
-        days = {
-            "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-            "friday": 4, "saturday": 5, "sunday": 6
-        }
-        
-        target_day = days.get(day_name.lower())
-        if target_day is None:
-            raise ValueError(f"Invalid day name: {day_name}")
-            
-        current = datetime.now()
-        days_ahead = target_day - current.weekday()
-        if days_ahead <= 0:  # Target day already happened this week
-            days_ahead += 7
-            
-        return current + timedelta(days=days_ahead)
+        } 

@@ -67,9 +67,8 @@ interface SubscriberDialogProps {
   membership: Membership | null;
 }
 
-// Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
-const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
+// Helcim payment configuration
+const HELCIM_ENABLED = true;
 
 export default function SubscriberDialog({
   open,
@@ -267,6 +266,7 @@ export default function SubscriberDialog({
           clientId: selectedClient.id,
           clientMembershipId: membershipSubscription.id,
           amount: membership.price,
+          totalAmount: membership.price,
           method: "card",
           status: "completed",
           type: "membership",

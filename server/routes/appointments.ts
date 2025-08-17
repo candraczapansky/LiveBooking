@@ -51,7 +51,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       
       // Test email sending with current config
       const finalApiKey = dbApiKey || envApiKey;
-      const finalFromEmail = dbFromEmail || envFromEmail || 'noreply@gloheadspa.com';
+      const finalFromEmail = dbFromEmail || envFromEmail || 'hello@headspaglo.com';
       
       console.log("🔧 Final configuration:");
       console.log("  - API Key:", finalApiKey ? "AVAILABLE" : "MISSING");
@@ -197,6 +197,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const context = getLogContext(req);
     const appointmentData = req.body;
 
+    console.log("🎯 APPOINTMENT CREATION STARTED:", {
+      clientId: appointmentData.clientId,
+      serviceId: appointmentData.serviceId,
+      staffId: appointmentData.staffId,
+      startTime: appointmentData.startTime,
+      endTime: appointmentData.endTime
+    });
+
     LoggerService.info("Creating new appointment", { ...context, appointmentData });
 
     // Validate appointment time conflicts
@@ -285,23 +293,15 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       throw new ConflictError("Appointment time conflicts with existing appointments");
     }
 
-    // Ensure totalAmount is set based on service price if not provided
-    try {
-      if (appointmentData.totalAmount == null && appointmentData.serviceId) {
-        const service = await storage.getService(appointmentData.serviceId);
-        appointmentData.totalAmount = service?.price || 0;
-      }
-    } catch {
-      // If fetching service fails, keep default 0
-      if (appointmentData.totalAmount == null) appointmentData.totalAmount = 0;
-    }
-
     const newAppointment = await storage.createAppointment(appointmentData);
 
     LoggerService.logAppointment("created", newAppointment.id, context);
     
     // NEW AUTOMATION SERVICE - Trigger automation for booking confirmation
-    try {
+    // DISABLED: This was causing duplicate SMS confirmations since we already send SMS directly below
+    // SMS confirmations are handled directly in the appointment creation logic (lines 555-572)
+    // Email confirmations should still use automation rules if needed
+    /* try {
       console.log("🚀 NEW AUTOMATION SERVICE: Triggering booking confirmation automation");
       
       // Import and initialize the new automation service
@@ -329,7 +329,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     } catch (automationError: any) {
       console.error("❌ NEW AUTOMATION SERVICE: Error triggering automation:", automationError);
       console.error("❌ Automation error details:", automationError);
-    }
+    } */
     
     console.log("🎯 APPOINTMENT CREATED SUCCESSFULLY 🎯");
     console.log("Appointment ID:", newAppointment.id);
@@ -446,7 +446,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             ...context,
             appointmentId: newAppointment.id,
             to: client.email,
-            from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloupheadspa.app'
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com'
           });
           
           try {
@@ -550,22 +550,12 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             }
           }
           
-          // Send SMS confirmation with fallback staff name
-        if (client.smsAppointmentReminders && client.phone) {
-            try {
-          const message = `Your Glo Head Spa appointment for ${service.name} on ${new Date(newAppointment.startTime).toLocaleDateString()} at ${newAppointment.startTime} has been confirmed.`;
-              await sendSMS(client.phone, message);
-              console.log("✅ FALLBACK SMS SENT SUCCESSFULLY ✅");
-            } catch (smsError) {
-              console.log("❌ FALLBACK SMS FAILED:", smsError);
-            }
-          }
         } else {
           console.log("❌ FALLBACK FAILED: Missing essential data (client or service)");
         }
       }
 
-      // Send SMS confirmation (moved outside the main if block to handle both cases)
+      // Send SMS confirmation (single block to prevent duplicates)
       if (client && client.smsAppointmentReminders && client.phone) {
         LoggerService.info("Sending SMS confirmation", {
           ...context,
@@ -658,19 +648,6 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         });
         throw new ConflictError("Updated appointment time conflicts with existing appointments");
       }
-    }
-
-    // Ensure totalAmount is set when missing, using the (possibly updated) service
-    try {
-      if (updateData.totalAmount == null) {
-        const serviceIdToUse = updateData.serviceId || existingAppointment.serviceId;
-        if (serviceIdToUse) {
-          const service = await storage.getService(serviceIdToUse);
-          updateData.totalAmount = service?.price || 0;
-        }
-      }
-    } catch {
-      // leave as-is if service lookup fails
     }
 
     const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);
@@ -770,7 +747,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       try {
         await sendEmail({
           to: client.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloupheadspa.app',
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           subject: 'Appointment Reminder - Glo Head Spa',
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -839,7 +816,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           try {
             await sendEmail({
               to: client.email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloupheadspa.app',
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
               subject: 'Appointment Reminder - Glo Head Spa',
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -891,5 +868,203 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       errorCount, 
       totalAppointments: appointments.length 
     });
+  }));
+
+  // DEBUG ENDPOINT: Test email functionality with simulated data
+  app.post("/api/debug/test-email-functionality", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    
+    console.log("🔍 DEBUG: Testing email functionality with simulated data...");
+    
+    try {
+      // Simulate client data
+      const simulatedClient = {
+        id: 'test-client-id',
+        email: 'test@example.com',
+        firstName: 'Test',
+        lastName: 'User',
+        emailAppointmentReminders: true,
+        phone: '+1234567890',
+        smsAppointmentReminders: true
+      };
+      
+      // Simulate service data
+      const simulatedService = {
+        id: 'test-service-id',
+        name: 'Test Haircut Service',
+        duration: 60,
+        price: 50.00
+      };
+      
+      // Simulate staff data
+      const simulatedStaff = {
+        id: 'test-staff-id',
+        firstName: 'John',
+        lastName: 'Stylist',
+        email: 'john@salon.com'
+      };
+      
+      // Simulate appointment data
+      const simulatedAppointment = {
+        id: 'test-appointment-id',
+        startTime: '2024-01-15T10:00:00Z',
+        endTime: '2024-01-15T11:00:00Z',
+        clientId: simulatedClient.id,
+        serviceId: simulatedService.id,
+        staffId: simulatedStaff.id
+      };
+      
+      console.log("🔍 DEBUG: Simulated data created:");
+      console.log("  - Client:", simulatedClient);
+      console.log("  - Service:", simulatedService);
+      console.log("  - Staff:", simulatedStaff);
+      console.log("  - Appointment:", simulatedAppointment);
+      
+      // Test the email sending logic
+      console.log("🔍 DEBUG: Testing email sending logic...");
+      console.log("  - client.emailAppointmentReminders:", simulatedClient.emailAppointmentReminders);
+      console.log("  - client.email:", simulatedClient.email);
+      console.log("  - Condition result:", simulatedClient.emailAppointmentReminders && simulatedClient.email);
+      
+      if (simulatedClient.emailAppointmentReminders && simulatedClient.email) {
+        console.log("✅ DEBUG: Email conditions met, sending email...");
+        
+        try {
+          await sendEmail({
+            to: simulatedClient.email,
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            subject: 'DEBUG TEST - Appointment Confirmation - Glo Head Spa',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">DEBUG TEST - Appointment Confirmation</h2>
+                <p>Hello ${simulatedClient.firstName || simulatedClient.lastName},</p>
+                <p>This is a DEBUG TEST email to verify the email functionality:</p>
+                <ul>
+                  <li><strong>Service:</strong> ${simulatedService.name}</li>
+                  <li><strong>Date:</strong> ${new Date(simulatedAppointment.startTime).toLocaleDateString()}</li>
+                  <li><strong>Time:</strong> ${simulatedAppointment.startTime} - ${simulatedAppointment.endTime}</li>
+                  <li><strong>Staff:</strong> ${simulatedStaff.firstName} ${simulatedStaff.lastName}</li>
+                </ul>
+                <p>This is a debug test email to verify the email service is working correctly.</p>
+              </div>
+            `
+          });
+          
+          console.log("✅ DEBUG: Email sent successfully!");
+          
+          res.json({
+            success: true,
+            message: "Debug email test completed successfully",
+            emailSent: true,
+            simulatedData: {
+              client: simulatedClient,
+              service: simulatedService,
+              staff: simulatedStaff,
+              appointment: simulatedAppointment
+            }
+          });
+          
+        } catch (emailError) {
+          console.log("❌ DEBUG: Email sending failed:", emailError);
+          
+          res.status(500).json({
+            success: false,
+            error: "Email sending failed",
+            details: emailError instanceof Error ? emailError.message : String(emailError),
+            emailSent: false
+          });
+        }
+      } else {
+        console.log("❌ DEBUG: Email conditions not met:");
+        console.log("  - emailAppointmentReminders:", simulatedClient.emailAppointmentReminders);
+        console.log("  - email:", simulatedClient.email);
+        
+        res.status(400).json({
+          success: false,
+          error: "Email conditions not met",
+          conditions: {
+            emailAppointmentReminders: simulatedClient.emailAppointmentReminders,
+            email: simulatedClient.email,
+            conditionMet: simulatedClient.emailAppointmentReminders && simulatedClient.email
+          }
+        });
+      }
+      
+    } catch (error) {
+      console.log("❌ DEBUG: Test failed with error:", error);
+      
+      res.status(500).json({
+        success: false,
+        error: "Debug test failed",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }));
+
+  // DEBUG ENDPOINT: Test data retrieval
+  app.get("/api/debug/test-data-retrieval/:clientId/:staffId/:serviceId", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { clientId, staffId, serviceId } = req.params;
+    
+    console.log("🔍 DEBUG: Testing data retrieval...");
+    console.log("  - clientId:", clientId);
+    console.log("  - staffId:", staffId);
+    console.log("  - serviceId:", serviceId);
+    
+    try {
+      // Test client retrieval
+      const client = await storage.getUser(parseInt(clientId));
+      console.log("  - client found:", !!client);
+      if (client) {
+        console.log("  - client email:", client.email);
+        console.log("  - client emailAppointmentReminders:", client.emailAppointmentReminders);
+      }
+      
+      // Test staff retrieval
+      const staff = await storage.getStaff(parseInt(staffId));
+      console.log("  - staff found:", !!staff);
+      if (staff) {
+        console.log("  - staff title:", staff.title);
+        console.log("  - staff userId:", staff.userId);
+      }
+      
+      // Test service retrieval
+      const service = await storage.getService(parseInt(serviceId));
+      console.log("  - service found:", !!service);
+      if (service) {
+        console.log("  - service name:", service.name);
+      }
+      
+      res.json({
+        success: true,
+        data: {
+          client: client ? {
+            id: client.id,
+            email: client.email,
+            emailAppointmentReminders: client.emailAppointmentReminders,
+            firstName: client.firstName,
+            lastName: client.lastName
+          } : null,
+          staff: staff ? {
+            id: staff.id,
+            title: staff.title,
+            userId: staff.userId
+          } : null,
+          service: service ? {
+            id: service.id,
+            name: service.name
+          } : null
+        }
+      });
+      
+    } catch (error) {
+      console.log("❌ DEBUG: Data retrieval failed:", error);
+      
+      res.status(500).json({
+        success: false,
+        error: "Data retrieval failed",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
   }));
 } 

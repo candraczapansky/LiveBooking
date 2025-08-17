@@ -17,7 +17,8 @@ export const users = pgTable("users", {
   state: text("state"),
   zipCode: text("zip_code"),
   profilePicture: text("profile_picture"), // Base64 encoded image data
-  squareCustomerId: text("stripe_customer_id"),
+  squareCustomerId: text("square_customer_id"), // Legacy field for backward compatibility
+  helcimCustomerId: text("helcim_customer_id"),
   // Password reset fields
   resetToken: text("reset_token"),
   resetTokenExpiry: timestamp("reset_token_expiry"),
@@ -37,6 +38,70 @@ export const users = pgTable("users", {
   twoFactorEmailCodeExpiry: timestamp("two_factor_email_code_expiry"), // When email code expires
   notes: text("notes"), // Client notes for staff reference
 
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Permission Groups (like Mindbody's permission sets)
+export const permissionGroups = pgTable("permission_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  isSystem: boolean("is_system").default(false), // System-defined groups cannot be deleted
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Permissions (granular permissions)
+export const permissions = pgTable("permissions", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  category: text("category").notNull(), // clients, appointments, reports, settings, etc.
+  action: text("action").notNull(), // create, read, update, delete, view, manage
+  resource: text("resource").notNull(), // client_contact_info, calendar, reports, etc.
+  isActive: boolean("is_active").default(true),
+  isSystem: boolean("is_system").default(false), // System permissions cannot be deleted
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Permission Group Mappings (many-to-many between groups and permissions)
+export const permissionGroupMappings = pgTable("permission_group_mappings", {
+  id: serial("id").primaryKey(),
+  groupId: integer("group_id").notNull().references(() => permissionGroups.id),
+  permissionId: integer("permission_id").notNull().references(() => permissions.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User Permission Groups (many-to-many between users and permission groups)
+export const userPermissionGroups = pgTable("user_permission_groups", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  groupId: integer("group_id").notNull().references(() => permissionGroups.id),
+  assignedBy: integer("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional expiration date
+});
+
+// User Direct Permissions (for individual permission overrides)
+export const userDirectPermissions = pgTable("user_direct_permissions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  permissionId: integer("permission_id").notNull().references(() => permissions.id),
+  isGranted: boolean("is_granted").default(true), // true = granted, false = denied
+  assignedBy: integer("assigned_by").references(() => users.id),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  expiresAt: timestamp("expires_at"), // Optional expiration date
+});
+
+// Permission Categories (for organizing permissions)
+export const permissionCategories = pgTable("permission_categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  displayOrder: integer("display_order").default(0),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -333,8 +398,9 @@ export const payments = pgTable("payments", {
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   type: text("type").notNull().default("appointment"), // appointment, pos_payment, membership
   description: text("description"),
+  squarePaymentId: text("square_payment_id"), // Optional for backward compatibility
+  helcimPaymentId: text("helcim_payment_id"),
   paymentDate: timestamp("payment_date"),
-  transactionId: text("transaction_id"), // External transaction ID from payment processor
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -371,7 +437,8 @@ export const insertStaffEarningsSchema = createInsertSchema(staffEarnings).omit(
 export const savedPaymentMethods = pgTable("saved_payment_methods", {
   id: serial("id").primaryKey(),
   clientId: integer("client_id").notNull(),
-  squareCardId: text("square_card_id").notNull(),
+  squareCardId: text("square_card_id"), // Optional for backward compatibility
+  helcimCardId: text("helcim_card_id"),
   cardBrand: text("card_brand").notNull(), // visa, mastercard, amex, etc.
   cardLast4: text("card_last4").notNull(),
   cardExpMonth: integer("card_exp_month").notNull(),
@@ -518,6 +585,7 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
   audience: text("audience").notNull(), // All Clients, Regular Clients, etc.
   subject: text("subject"), // For email campaigns
   content: text("content").notNull(),
+  photoUrl: text("photo_url"), // For SMS campaigns with photos (MMS)
   htmlContent: text("html_content"), // Generated HTML from Unlayer
   templateDesign: text("template_design"), // Unlayer design JSON as text
   sendDate: timestamp("send_date"),
@@ -530,6 +598,7 @@ export const marketingCampaigns = pgTable("marketing_campaigns", {
   unsubscribedCount: integer("unsubscribed_count").default(0), // Track unsubscribes
   createdAt: timestamp("created_at").defaultNow(),
   sentAt: timestamp("sent_at"),
+  targetClientIds: text("target_client_ids"), // JSON array of specific client IDs for "Specific Clients" audience
 });
 
 export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaigns).omit({
@@ -537,6 +606,8 @@ export const insertMarketingCampaignSchema = createInsertSchema(marketingCampaig
   createdAt: true,
 }).extend({
   sendDate: z.union([z.date(), z.string(), z.null()]).optional(),
+  targetClientIds: z.union([z.array(z.number()), z.string(), z.null()]).optional(),
+  photoUrl: z.string().optional(), // Add photoUrl support
 });
 
 // Marketing campaign recipients schema (for tracking individual sends)
@@ -647,7 +718,7 @@ export const staffSchedules = pgTable("staff_schedules", {
   dayOfWeek: text("day_of_week").notNull(), // Monday, Tuesday, etc.
   startTime: text("start_time").notNull(), // HH:MM format
   endTime: text("end_time").notNull(), // HH:MM format
-  location: text("location").notNull(),
+  locationId: integer("location_id").references(() => locations.id),
   serviceCategories: text("service_categories").array().default([]), // Array of category IDs
   startDate: date("start_date").notNull(),
   endDate: date("end_date"), // Optional end date
@@ -824,6 +895,9 @@ export const salesHistory = pgTable("sales_history", {
   monthYear: text("month_year"), // Format: "2025-06" for easy monthly grouping
   quarter: text("quarter"), // Format: "2025-Q2"
   
+  // External tracking
+  helcimPaymentId: text("helcim_payment_id"),
+  
   // Audit trail
   createdBy: integer("created_by"), // User who created the record
   notes: text("notes"),
@@ -906,6 +980,37 @@ export const updateLocationSchema = createInsertSchema(locations).omit({
 export type Location = typeof locations.$inferSelect;
 export type InsertLocation = z.infer<typeof insertLocationSchema>;
 export type UpdateLocation = z.infer<typeof updateLocationSchema>;
+
+// Terminal Devices schema for location-based terminal management
+export const terminalDevices = pgTable("terminal_devices", {
+  id: serial("id").primaryKey(),
+  deviceCode: text("device_code").notNull().unique(), // Helcim device code (e.g., xog5)
+  deviceName: text("device_name").notNull(), // Friendly name (e.g., "Front Desk Terminal")
+  locationId: integer("location_id").references(() => locations.id), // Associated location
+  status: text("status").default("active").notNull(), // active, inactive, maintenance
+  deviceType: text("device_type").default("smart_terminal").notNull(), // smart_terminal, virtual_terminal
+  lastSeen: timestamp("last_seen"), // Last successful ping/communication
+  isDefault: boolean("is_default").default(false), // Whether this is the default terminal for the location
+  apiEnabled: boolean("api_enabled").default(true), // Whether API mode is enabled
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTerminalDeviceSchema = createInsertSchema(terminalDevices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updateTerminalDeviceSchema = createInsertSchema(terminalDevices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+export type TerminalDevice = typeof terminalDevices.$inferSelect;
+export type InsertTerminalDevice = z.infer<typeof insertTerminalDeviceSchema>;
+export type UpdateTerminalDevice = z.infer<typeof updateTerminalDeviceSchema>;
 
 // Automation Rules schema
 export const automationRules = pgTable("automation_rules", {
@@ -1072,7 +1177,7 @@ export type InsertSystemConfig = z.infer<typeof insertSystemConfigSchema>;
 // Check Software Integration schema
 export const checkSoftwareProviders = pgTable("check_software_providers", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull(), // "quickbooks", "adp", "gusto", "paychex", "square", "custom"
+  name: text("name").notNull(), // "quickbooks", "adp", "gusto", "paychex", "helcim", "custom"
   displayName: text("display_name").notNull(),
   apiKey: text("api_key"),
   apiSecret: text("api_secret"),
@@ -1284,3 +1389,67 @@ export const updateNoteHistorySchema = createInsertSchema(noteHistory).omit({
 export type NoteHistory = typeof noteHistory.$inferSelect;
 export type InsertNoteHistory = z.infer<typeof insertNoteHistorySchema>;
 export type UpdateNoteHistory = z.infer<typeof updateNoteHistorySchema>;
+
+// Permission schema types and validation schemas
+export const insertPermissionGroupSchema = createInsertSchema(permissionGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const updatePermissionGroupSchema = createInsertSchema(permissionGroups).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).partial();
+
+export const insertPermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const updatePermissionSchema = createInsertSchema(permissions).omit({
+  id: true,
+  createdAt: true,
+}).partial();
+
+export const insertPermissionGroupMappingSchema = createInsertSchema(permissionGroupMappings).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertUserPermissionGroupSchema = createInsertSchema(userPermissionGroups).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export const insertUserDirectPermissionSchema = createInsertSchema(userDirectPermissions).omit({
+  id: true,
+  assignedAt: true,
+});
+
+export const insertPermissionCategorySchema = createInsertSchema(permissionCategories).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Permission type exports
+export type PermissionGroup = typeof permissionGroups.$inferSelect;
+export type InsertPermissionGroup = z.infer<typeof insertPermissionGroupSchema>;
+export type UpdatePermissionGroup = z.infer<typeof updatePermissionGroupSchema>;
+
+export type Permission = typeof permissions.$inferSelect;
+export type InsertPermission = z.infer<typeof insertPermissionSchema>;
+export type UpdatePermission = z.infer<typeof updatePermissionSchema>;
+
+export type PermissionGroupMapping = typeof permissionGroupMappings.$inferSelect;
+export type InsertPermissionGroupMapping = z.infer<typeof insertPermissionGroupMappingSchema>;
+
+export type UserPermissionGroup = typeof userPermissionGroups.$inferSelect;
+export type InsertUserPermissionGroup = z.infer<typeof insertUserPermissionGroupSchema>;
+
+export type UserDirectPermission = typeof userDirectPermissions.$inferSelect;
+export type InsertUserDirectPermission = z.infer<typeof insertUserDirectPermissionSchema>;
+
+export type PermissionCategory = typeof permissionCategories.$inferSelect;
+export type InsertPermissionCategory = z.infer<typeof insertPermissionCategorySchema>;

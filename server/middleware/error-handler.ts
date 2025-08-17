@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { handleError, logError } from '../utils/errors';
 import LoggerService from '../utils/logger';
+import jwt from 'jsonwebtoken';
 
 // Global error handling middleware
 export function errorHandler(error: any, req: Request, res: Response, next: NextFunction) {
@@ -45,11 +46,15 @@ export function notFoundHandler(req: Request, res: Response) {
 // Request validation middleware
 export function validateRequest(schema: any) {
   return (req: Request, res: Response, next: NextFunction) => {
+    console.log("🔍 DEBUG: validateRequest middleware hit for path:", req.path);
+    console.log("🔍 DEBUG: Request body:", JSON.stringify(req.body, null, 2));
     try {
       const validatedData = schema.parse(req.body);
       req.body = validatedData;
+      console.log("🔍 DEBUG: Validation successful");
       next();
     } catch (error: any) {
+      console.log("🔍 DEBUG: Validation failed:", error.errors);
       LoggerService.warn('Request validation failed', {
         requestId: (req as any).requestId,
         path: req.path,
@@ -69,8 +74,36 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     // Check for user in request (from session/token system)
     let user = (req as any).user;
     
-    // If no user in request, check for user ID in headers or query params
-    // This is a temporary solution for the localStorage-based auth
+    // If no user in request, check for JWT token in Authorization header
+    if (!user) {
+      const authHeader = req.headers['authorization'];
+      const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
+          user = decoded;
+          (req as any).user = user;
+        } catch (error) {
+          LoggerService.warn('Invalid JWT token', {
+            requestId: (req as any).requestId,
+            path: req.path,
+            method: req.method,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+          
+          return res.status(401).json({
+            error: 'AuthenticationError',
+            message: 'Invalid or expired token',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+            method: req.method,
+          });
+        }
+      }
+    }
+    
+    // Fallback: check for user ID in headers or query params (for backward compatibility)
     if (!user) {
       const userId = req.headers['x-user-id'] || req.query.userId;
       
@@ -80,6 +113,24 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
         user = { id: userId };
         (req as any).user = user;
       }
+    }
+    
+    // Development mode: allow requests without authentication for testing
+    if (!user && process.env.NODE_ENV === 'development') {
+      LoggerService.warn('Development mode: Allowing unauthenticated request', {
+        requestId: (req as any).requestId,
+        path: req.path,
+        method: req.method,
+      });
+      
+      // Create a default user for development
+      user = { 
+        id: 1, 
+        username: 'admin', 
+        role: 'admin',
+        email: 'admin@admin.com'
+      };
+      (req as any).user = user;
     }
     
     if (!user) {

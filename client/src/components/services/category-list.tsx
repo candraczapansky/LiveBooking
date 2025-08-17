@@ -50,8 +50,8 @@ type ServiceCategory = {
 };
 
 type CategoryListProps = {
-  selectedCategoryId: number;
-  onCategorySelect: (categoryId: number) => void;
+  selectedCategoryId: number | null; // Allow null for "All Categories"
+  onCategorySelect: (categoryId: number | null) => void; // Allow null for "All Categories"
 };
 
 const categoryFormSchema = z.object({
@@ -155,7 +155,7 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
       
       // Clear the selected category if it was the one that was deleted
       if (selectedCategoryId === categoryToDelete) {
-        onCategorySelect(0); // Clear selection
+        onCategorySelect(null); // Clear selection to show all categories
       }
     },
     onError: (error) => {
@@ -220,44 +220,63 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
               <div className="px-4 py-3 text-center text-sm text-muted-foreground">
                 Loading categories...
               </div>
-            ) : categories?.length === 0 ? (
-              <div className="px-4 py-3 text-center text-sm text-muted-foreground">
-                No categories found. Add your first category.
-              </div>
             ) : (
-              categories?.map((category: ServiceCategory) => (
+              <>
+                {/* All Categories Option */}
                 <div 
-                  key={category.id} 
-                  className={`px-4 py-3 ${selectedCategoryId === category.id ? 'border border-primary bg-transparent rounded-md mx-2' : 'mx-2'}`}
+                  className={`px-4 py-3 ${selectedCategoryId === null ? 'border border-primary bg-transparent rounded-md mx-2' : 'mx-2'}`}
                 >
                   <div className="flex items-center justify-between">
                     <span 
-                      className={`${selectedCategoryId === category.id ? 'font-medium' : ''} cursor-pointer hover:text-primary transition-colors`}
-                      onClick={() => onCategorySelect(category.id)}
+                      className={`${selectedCategoryId === null ? 'font-medium' : ''} cursor-pointer hover:text-primary transition-colors`}
+                      onClick={() => onCategorySelect(null)}
                     >
-                      {category.name}
+                      All Categories
                     </span>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700" 
-                        onClick={() => openEditDialog(category)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 text-gray-500 hover:text-red-500" 
-                        onClick={() => openDeleteDialog(category.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
                   </div>
                 </div>
-              ))
+
+                {/* Individual Categories */}
+                {categories?.length === 0 ? (
+                  <div className="px-4 py-3 text-center text-sm text-muted-foreground">
+                    No categories found. Add your first category.
+                  </div>
+                ) : (
+                  categories?.map((category: ServiceCategory) => (
+                    <div 
+                      key={category.id} 
+                      className={`px-4 py-3 ${selectedCategoryId === category.id ? 'border border-primary bg-transparent rounded-md mx-2' : 'mx-2'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span 
+                          className={`${selectedCategoryId === category.id ? 'font-medium' : ''} cursor-pointer hover:text-primary transition-colors`}
+                          onClick={() => onCategorySelect(category.id)}
+                        >
+                          {category.name}
+                        </span>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700" 
+                            onClick={() => openEditDialog(category)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-500" 
+                            onClick={() => openDeleteDialog(category.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </>
             )}
           </div>
         </CardContent>

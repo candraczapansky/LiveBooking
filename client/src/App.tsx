@@ -9,7 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthProvider";
 import { BusinessSettingsProvider } from "@/contexts/BusinessSettingsContext";
 import { LocationProvider } from "@/contexts/LocationContext";
-import PersistentMobileMenu from "@/components/layout/persistent-mobile-menu";
+import SimpleMobileMenu from "@/components/layout/simple-mobile-menu";
 
 // Lazy load components for better performance
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -37,6 +37,7 @@ const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail"));
 const ClientBooking = lazy(() => import("@/pages/client-booking"));
 const PointOfSale = lazy(() => import("@/pages/pos"));
 const Products = lazy(() => import("@/pages/products"));
+
 const EmailTest = lazy(() => import("@/pages/email-test"));
 const GiftCertificatesPage = lazy(() => import("@/pages/gift-certificates"));
 const PhonePage = lazy(() => import("@/pages/phone"));
@@ -45,6 +46,7 @@ const FormDisplay = lazy(() => import("@/pages/form-display"));
 const AIMessagingPage = lazy(() => import("@/pages/ai-messaging"));
 const PayrollPage = lazy(() => import("@/pages/payroll"));
 const Locations = lazy(() => import("@/pages/locations"));
+const PermissionsPage = lazy(() => import("@/pages/permissions"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -102,6 +104,7 @@ function Router() {
         <Route path="/staff" component={Staff} />
         <Route path="/pos" component={PointOfSale} />
         <Route path="/products" component={Products} />
+
         <Route path="/gift-certificates" component={GiftCertificatesPage} />
         <Route path="/rooms" component={Rooms} />
         <Route path="/devices" component={Devices} />
@@ -116,6 +119,7 @@ function Router() {
         <Route path="/ai-messaging" component={AIMessagingPage} />
         <Route path="/payroll" component={PayrollPage} />
         <Route path="/locations" component={Locations} />
+        <Route path="/permissions" component={PermissionsPage} />
         <Route path="/email-test" component={EmailTest} />
         <Route path="/settings" component={Settings} />
         <Route path="/schedule" component={Schedule} />
@@ -166,7 +170,7 @@ function App() {
                 <Router />
                 <Toaster />
                 {/* Global Mobile Menu - persists across all navigation */}
-                <PersistentMobileMenu />
+                <SimpleMobileMenu />
               </LocationProvider>
             </BusinessSettingsProvider>
           </SidebarProvider>

@@ -15,19 +15,17 @@ const Dashboard = () => {
   const { isOpen: sidebarOpen } = useSidebar();
 
   
-  // Desktop layout
+  // Desktop and mobile responsive layout
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
         <SidebarController />
       </div>
       
-      <div className={`h-screen flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
+      <div className="min-h-screen lg:h-screen flex flex-col transition-all duration-300">
         <Header />
         
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-auto">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-auto lg:overflow-auto">
           <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">
             {/* Page Heading */}
             <div className="mb-4 sm:mb-6">

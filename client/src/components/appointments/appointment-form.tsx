@@ -236,13 +236,24 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     const dayName = getDayName(selectedFormDate);
     const currentDate = formatDateForComparison(selectedFormDate);
 
-    const staffSchedules = (schedules as any[]).filter((schedule: any) => 
-      schedule.staffId === parseInt(selectedStaffId) && 
-      schedule.dayOfWeek === dayName &&
-      schedule.startDate <= currentDate &&
-      (!schedule.endDate || schedule.endDate >= currentDate) &&
-      !schedule.isBlocked
-    );
+    const staffSchedules = (schedules as any[]).filter((schedule: any) => {
+      // Fix date comparison logic
+      const currentDateString = formatDateForComparison(selectedFormDate);
+      const startDateString = typeof schedule.startDate === 'string' 
+        ? schedule.startDate 
+        : new Date(schedule.startDate).toISOString().slice(0, 10);
+      const endDateString = schedule.endDate 
+        ? (typeof schedule.endDate === 'string' 
+          ? schedule.endDate 
+          : new Date(schedule.endDate).toISOString().slice(0, 10))
+        : null;
+      
+      return schedule.staffId === parseInt(selectedStaffId) && 
+        schedule.dayOfWeek === dayName &&
+        startDateString <= currentDateString &&
+        (!endDateString || endDateString >= currentDateString) &&
+        !schedule.isBlocked;
+    });
 
     if (staffSchedules.length === 0) {
       return [];
@@ -746,6 +757,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         clientId: appointment.clientId,
         appointmentId: appointmentId,
         amount: selectedService?.price || 0,
+        totalAmount: selectedService?.price || 0,
         method: "cash",
         status: "completed"
       });
@@ -1222,6 +1234,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         <AppointmentCheckout
           appointment={{
             id: appointment.id,
+            clientId: appointment.clientId,
             clientName: (() => {
               const client = clients.find((c: any) => c.id === appointment.clientId);
               return client ? `${client.firstName} ${client.lastName}` : 'Unknown Client';
@@ -1241,6 +1254,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
             startTime: new Date(appointment.startTime),
             endTime: new Date(appointment.endTime),
             amount: appointment.totalAmount || (() => {
+              const service = services.find((s: any) => s.id === appointment.serviceId);
+              return service?.price || 0;
+            })(),
+            totalAmount: appointment.totalAmount || (() => {
               const service = services.find((s: any) => s.id === appointment.serviceId);
               return service?.price || 0;
             })(),

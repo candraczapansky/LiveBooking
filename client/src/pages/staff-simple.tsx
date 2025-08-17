@@ -170,18 +170,18 @@ const StaffPageSimple = () => {
   ) : [];
 
   return (
-    <div className="h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
       {/* Desktop Sidebar */}
       <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
         <Sidebar />
       </div>
       
       {/* Main Content */}
-      <div className="lg:pl-64 h-screen flex flex-col">
+      <div className="lg:pl-64 min-h-screen lg:h-screen flex flex-col">
         <Header />
         
         {/* Content Area */}
-        <div className="flex-1 p-4 sm:p-6 overflow-auto">
+        <div className="flex-1 p-4 sm:p-6 overflow-auto lg:overflow-auto">
           {/* Header Section */}
           <Card className="mb-4 p-4 w-full">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">

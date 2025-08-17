@@ -11,7 +11,14 @@ export const config = {
   // SendGrid Configuration
   sendgrid: {
     apiKey: process.env.SENDGRID_API_KEY || '',
-    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+    fromEmail: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+  },
+  
+  // Helcim Configuration
+  helcim: {
+    apiToken: process.env.HELCIM_API_TOKEN || '',
+    apiUrl: process.env.HELCIM_API_URL || 'https://api.helcim.com/v2',
+    terminalDeviceCode: process.env.HELCIM_TERMINAL_DEVICE_CODE || 'xog5',
   },
   
   // Database Configuration
@@ -23,12 +30,7 @@ export const config = {
   server: {
     port: parseInt(process.env.PORT || '5000'),
     nodeEnv: process.env.NODE_ENV || 'development',
-  },
-  
-  // Helcim Configuration
-  HELCIM_API_TOKEN: process.env.HELCIM_API_TOKEN || '',
-  HELCIM_API_URL: process.env.HELCIM_API_URL || 'https://api.helcim.com/v2/smart-terminal',
-  HELCIM_TERMINAL_DEVICE_CODE: process.env.HELCIM_TERMINAL_DEVICE_CODE || 'UOJS'
+  }
 };
 
 // Database-backed configuration

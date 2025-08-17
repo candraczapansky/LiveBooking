@@ -101,11 +101,11 @@ const SchedulePage = () => {
                 
                 <div className="w-full">
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
                     <Input
                       type="search"
                       placeholder="Search staff by name..."
-                      className="pl-8 w-full"
+                      className="pl-10 w-full min-h-[44px]"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                     />

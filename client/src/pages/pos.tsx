@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-// Square Web SDK will be loaded via script tag
+// Helcim payment processing
 
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
@@ -20,10 +20,8 @@ import {
   Trash2,
   Receipt,
   User,
-  DollarSign,
-  Package,
   Mail,
-  MessageSquare,
+  MessageCircle,
   Check,
   X
 } from "lucide-react";
@@ -48,193 +46,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useSidebar } from "@/contexts/SidebarContext";
-import SquareTerminalIntegration from "@/components/payment/square-terminal-integration";
+import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 
-// Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
-const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID;
 
-// Square payment form component
-const PaymentForm = ({ total, tipAmount, onSuccess, onError }: { 
-  total: number; 
-  tipAmount: number;
-  onSuccess: () => void; 
-  onError: (error: string) => void; 
-}) => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [cardElement, setCardElement] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    initializeSquarePaymentForm();
-    
-    return () => {
-      // Cleanup Square elements when component unmounts
-      if (cardElement) {
-        cardElement.destroy();
-      }
-    };
-  }, []);
-
-  const initializeSquarePaymentForm = async () => {
-    try {
-      // Dynamically load Square Web SDK if not already loaded
-      if (!(window as any).Square) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://web.squarecdn.com/v1/square.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
-      const card = await payments.card({
-        style: {
-          input: {
-            fontSize: '16px',
-            fontFamily: '"Helvetica Neue", Arial, sans-serif'
-          },
-          '.input-container': {
-            borderColor: '#E5E7EB',
-            borderRadius: '6px'
-          }
-        }
-      });
-      await card.attach('#pos-square-card-element');
-      
-      setCardElement(card);
-      setIsLoading(false);
-    } catch (err: any) {
-      console.error('Square payment form initialization error:', err);
-      setError('Failed to load payment form. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!cardElement) {
-      onError('Payment form not ready. Please try again.');
-      return;
-    }
-
-    setIsProcessing(true);
-
-    try {
-      const result = await cardElement.tokenize();
-      
-      if (result.status === 'OK') {
-        const nonce = result.token;
-        
-        // Process payment with Square
-        const response = await apiRequest("POST", "/api/create-payment", {
-          amount: total - tipAmount, // Base amount without tip
-          tipAmount: tipAmount,
-          totalAmount: total,
-          sourceId: nonce,
-          type: "pos_payment",
-          description: "Point of Sale Transaction"
-        });
-
-        const paymentData = await response.json();
-        console.log('POS Payment response:', paymentData);
-        
-        if (paymentData.payment || paymentData.paymentId) {
-          onSuccess();
-        } else {
-          console.error('Unexpected payment response:', paymentData);
-          throw new Error('Payment processing failed');
-        }
-      } else {
-        const errorMessages = result.errors?.map((error: any) => error.message).join(', ') || 'Payment failed';
-        onError(errorMessages);
-      }
-    } catch (error: any) {
-      console.error('POS Payment processing error:', error);
-      
-      // Extract specific error message from server response
-      let errorMessage = 'Payment failed';
-      if (error.response?.data?.error) {
-        const serverError = error.response.data.error;
-        if (serverError.includes('GENERIC_DECLINE')) {
-          errorMessage = 'Card declined by bank. Please check card details or try a different payment method.';
-        } else if (serverError.includes('INSUFFICIENT_FUNDS')) {
-          errorMessage = 'Insufficient funds on card. Please try a different payment method.';
-        } else if (serverError.includes('CVV_FAILURE')) {
-          errorMessage = 'CVV verification failed. Please check your security code.';
-        } else if (serverError.includes('INVALID_CARD')) {
-          errorMessage = 'Invalid card information. Please check your card details.';
-        } else {
-          errorMessage = 'Payment processing failed. Please try again or use a different payment method.';
-        }
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      onError(errorMessage);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-            Payment Form Error
-          </h3>
-          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-        </div>
-        <Button onClick={initializeSquarePaymentForm} className="w-full">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div 
-        id="pos-square-card-element" 
-        className="min-h-[60px] border rounded-lg p-3 bg-white"
-        data-testid="card-element"
-        role="textbox"
-        aria-label="Credit card number"
-      >
-        {/* Square Card element will be mounted here */}
-      </div>
-      
-      {isLoading && (
-        <div className="flex items-center justify-center text-sm text-muted-foreground">
-          <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
-          Loading secure payment form...
-        </div>
-      )}
-      
-      <Button 
-        type="submit" 
-        disabled={!cardElement || isProcessing || isLoading}
-        className="w-full"
-      >
-        {isProcessing ? (
-          <div className="flex items-center gap-2">
-            <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full" />
-            Processing...
-          </div>
-        ) : (
-          `Pay $${total.toFixed(2)}`
-        )}
-      </Button>
-    </form>
-  );
-};
 
 type Service = {
   id: number;
@@ -291,7 +107,7 @@ export default function PointOfSale() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>("card");
   const [cashReceived, setCashReceived] = useState<string>("");
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
   const [activeTab, setActiveTab] = useState<'services' | 'products'>('services');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
@@ -299,6 +115,7 @@ export default function PointOfSale() {
   const [manualEmail, setManualEmail] = useState("");
   const [manualPhone, setManualPhone] = useState("");
   const [tipAmount, setTipAmount] = useState(0);
+  const [showHelcimModal, setShowHelcimModal] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -313,7 +130,6 @@ export default function PointOfSale() {
     isTaxable: true
   });
   const { toast } = useToast();
-  const { isOpen: sidebarOpen } = useSidebar();
 
   useDocumentTitle("Point of Sale");
 
@@ -377,7 +193,7 @@ export default function PointOfSale() {
   const TAX_RATE = 0.085;
 
   // Fetch services
-  const { data: services, isLoading: servicesLoading, refetch: refetchServices } = useQuery({
+  const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["/api/services"],
     staleTime: 0, // Always consider data stale
     gcTime: 0, // Don't cache data (gcTime replaces cacheTime)
@@ -497,6 +313,218 @@ export default function PointOfSale() {
       });
     },
   });
+
+  // Helcim popup payment handlers
+  const handleHelcimSuccess = async (paymentId: string) => {
+    try {
+      console.log('✅ Helcim popup payment successful:', paymentId);
+      
+      // Create transaction with card payment
+      const transaction = {
+        clientId: selectedClient?.id,
+        items: cart,
+        subtotal: getSubtotal(),
+        tax: getTax(),
+        tipAmount: tipAmount,
+        total: getGrandTotal(),
+        paymentMethod: "card",
+      };
+      
+      // Process the transaction with card payment
+      const response = await apiRequest("POST", "/api/transactions", {
+        ...transaction,
+        paymentId,
+        helcimPaymentId: paymentId
+      });
+      const result = await response.json();
+      
+      // Store transaction details for receipt
+      setLastTransaction({
+        ...result,
+        client: selectedClient,
+        items: cart,
+        subtotal: getSubtotal(),
+        tax: getTax(),
+        tipAmount: tipAmount,
+        total: getGrandTotal(),
+        paymentMethod: "card",
+        timestamp: new Date(),
+        paymentId
+      });
+      
+      toast({
+        title: "Payment Successful",
+        description: `Card payment of $${getGrandTotal().toFixed(2)} processed successfully`,
+      });
+      
+      clearCart();
+      setIsCheckoutOpen(false);
+      setShowHelcimModal(false);
+      setCashReceived("");
+      setSelectedClient(null);
+      setManualEmail("");
+      setManualPhone("");
+      setTipAmount(0);
+      setShowReceiptDialog(true);
+      
+    } catch (error: any) {
+      console.error('❌ Error processing Helcim payment:', error);
+      toast({
+        title: "Payment Error",
+        description: "Payment succeeded but transaction recording failed. Please check transactions.",
+        variant: "destructive",
+      });
+      setShowHelcimModal(false);
+    }
+  };
+
+  const handleHelcimError = (error: string) => {
+    console.error('❌ Helcim popup payment failed:', error);
+    toast({
+      title: "Payment Failed",
+      description: error,
+      variant: "destructive",
+    });
+    setShowHelcimModal(false);
+  };
+
+  // Smart Terminal payment handlers
+  const handleTerminalSuccess = async (result: any) => {
+    try {
+      console.log('✅ Smart Terminal payment successful:', result);
+      
+      // Create transaction with terminal payment
+      const transaction = {
+        clientId: selectedClient?.id,
+        items: cart,
+        subtotal: getSubtotal(),
+        tax: getTax(),
+        tipAmount: tipAmount,
+        total: getGrandTotal(),
+        paymentMethod: "terminal",
+      };
+      
+      // Use the new complete-payment endpoint to sync with calendar
+      try {
+        const completeResponse = await fetch('/api/terminal/complete-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transactionId: result.transactionId,
+            deviceCode: selectedDevice || 'HF1N', // Use selected device or default to HF1N
+            paymentId: null // No specific payment ID for POS transactions
+          }),
+        });
+
+        const completeResult = await completeResponse.json();
+        
+        if (completeResult.success) {
+          console.log('✅ Terminal payment completed and calendar synced successfully');
+          
+          // Process the transaction with terminal payment
+          const response = await apiRequest("POST", "/api/transactions", {
+            ...transaction,
+            paymentId: result.transactionId,
+            helcimTransactionId: result.transactionId,
+            cardLast4: result.cardLast4,
+            terminalPaymentMethod: result.paymentMethod
+          });
+          const transactionResult = await response.json();
+          
+          // Store transaction details for receipt
+          setLastTransaction({
+            ...transactionResult,
+            client: selectedClient,
+            items: cart,
+            subtotal: getSubtotal(),
+            tax: getTax(),
+            tipAmount: tipAmount,
+            total: getGrandTotal(),
+            paymentMethod: "terminal",
+            timestamp: new Date(),
+            paymentId: result.transactionId,
+            cardLast4: result.cardLast4
+          });
+          
+          toast({
+            title: "Payment Successful",
+            description: `Terminal payment of $${getGrandTotal().toFixed(2)} completed. Card ending in ${result.cardLast4 || '****'}`,
+          });
+          
+          clearCart();
+          setIsCheckoutOpen(false);
+          setCashReceived("");
+          setSelectedClient(null);
+          setManualEmail("");
+          setManualPhone("");
+          setTipAmount(0);
+          setShowReceiptDialog(true);
+        } else {
+          throw new Error(completeResult.error || 'Failed to sync payment with calendar');
+        }
+      } catch (error: any) {
+        console.error('Error completing terminal payment:', error);
+        
+        // Still process the transaction even if calendar sync fails
+        const response = await apiRequest("POST", "/api/transactions", {
+          ...transaction,
+          paymentId: result.transactionId,
+          helcimTransactionId: result.transactionId,
+          cardLast4: result.cardLast4,
+          terminalPaymentMethod: result.paymentMethod
+        });
+        const transactionResult = await response.json();
+        
+        // Store transaction details for receipt
+        setLastTransaction({
+          ...transactionResult,
+          client: selectedClient,
+          items: cart,
+          subtotal: getSubtotal(),
+          tax: getTax(),
+          tipAmount: tipAmount,
+          total: getGrandTotal(),
+          paymentMethod: "terminal",
+          timestamp: new Date(),
+          paymentId: result.transactionId,
+          cardLast4: result.cardLast4
+        });
+        
+        toast({
+          title: "Payment Successful",
+          description: `Terminal payment of $${getGrandTotal().toFixed(2)} completed. Card ending in ${result.cardLast4 || '****'}`,
+        });
+        
+        clearCart();
+        setIsCheckoutOpen(false);
+        setCashReceived("");
+        setSelectedClient(null);
+        setManualEmail("");
+        setManualPhone("");
+        setTipAmount(0);
+        setShowReceiptDialog(true);
+      }
+      
+    } catch (error: any) {
+      console.error('❌ Error processing terminal payment:', error);
+      toast({
+        title: "Payment Error",
+        description: "Payment succeeded but transaction recording failed. Please check transactions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleTerminalError = (error: string) => {
+    console.error('❌ Smart Terminal payment failed:', error);
+    toast({
+      title: "Terminal Payment Failed",
+      description: error,
+      variant: "destructive",
+    });
+  };
 
   const addServiceToCart = (service: Service) => {
     setCart(prev => {
@@ -624,9 +652,7 @@ export default function PointOfSale() {
         <SidebarController />
       </div>
       
-      <div className={`flex-1 flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
+      <div className="flex-1 flex flex-col transition-all duration-300">
         <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 md:p-4 lg:p-6">
@@ -1316,8 +1342,7 @@ export default function PointOfSale() {
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Credit/Debit Card</SelectItem>
-                  <SelectItem value="terminal">Square Terminal</SelectItem>
-                  <SelectItem value="helcim">Helcim Smart Terminal</SelectItem>
+                  <SelectItem value="terminal">Helcim Terminal</SelectItem>
                   <SelectItem value="gift_card">Gift Card</SelectItem>
                 </SelectContent>
               </Select>
@@ -1343,118 +1368,30 @@ export default function PointOfSale() {
 
             {paymentMethod === "card" && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Card Information</label>
-                <PaymentForm
-                  total={getGrandTotal()}
-                  tipAmount={tipAmount}
-                  onSuccess={() => {
-                    console.log('Square payment successful, processing POS transaction...');
-                    // Process transaction after successful payment
-                    const transaction = {
-                      clientId: selectedClient?.id,
-                      items: cart,
-                      subtotal: getSubtotal(),
-                      tax: getTax(),
-                      tipAmount: tipAmount,
-                      total: getGrandTotal(),
-                      paymentMethod: "card",
-                    };
-                    console.log('POS transaction data:', transaction);
-                    processTransactionMutation.mutate(transaction);
-                  }}
-                  onError={(error) => {
-                    console.error('Square payment error:', error);
-                    toast({
-                      title: "Payment Failed",
-                      description: error,
-                      variant: "destructive",
-                    });
-                  }}
-                />
+                <label className="text-sm font-medium mb-2 block">Card Payment</label>
+                <div className="space-y-4">
+                  <p className="text-muted-foreground text-sm">
+                    Process a secure card payment using Helcim's payment gateway.
+                  </p>
+                  <Button 
+                    onClick={() => setShowHelcimModal(true)}
+                    className="w-full"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Pay ${getGrandTotal().toFixed(2)} with Card
+                  </Button>
+                </div>
               </div>
             )}
 
             {paymentMethod === "terminal" && (
               <div>
-                <label className="text-sm font-medium mb-2 block">Square Terminal Payment</label>
-                <SquareTerminalIntegration
-                  amount={getSubtotal()}
-                  tipAmount={tipAmount}
-                  clientId={selectedClient?.id}
-                  description="POS Terminal Transaction"
-                  onSuccess={(paymentData) => {
-                    console.log('Terminal payment successful, processing POS transaction...');
-                    // Process transaction after successful terminal payment
-                    const transaction = {
-                      clientId: selectedClient?.id,
-                      items: cart,
-                      subtotal: getSubtotal(),
-                      tax: getTax(),
-                      tipAmount: tipAmount,
-                      total: getGrandTotal(),
-                      paymentMethod: "terminal",
-                    };
-                    console.log('POS transaction data:', transaction);
-                    processTransactionMutation.mutate(transaction);
-                  }}
-                  onError={(error) => {
-                    console.error('Terminal payment error:', error);
-                    toast({
-                      title: "Terminal Payment Failed",
-                      description: error,
-                      variant: "destructive",
-                    });
-                  }}
-                  onCancel={() => {
-                    setIsCheckoutOpen(false);
-                  }}
-                />
-              </div>
-            )}
-
-            {paymentMethod === "helcim" && (
-              <div>
-                <label className="text-sm font-medium mb-2 block">Helcim Smart Terminal Payment</label>
+                <label className="text-sm font-medium mb-2 block">Smart Terminal Payment</label>
                 <SmartTerminalPayment
-                  amount={getSubtotal() + getTax()}
-                  tipAmount={tipAmount}
-                  clientId={selectedClient?.id}
-                  description="POS Terminal Transaction"
-                  onSuccess={(paymentData) => {
-                    console.log('Helcim payment successful, processing POS transaction...');
-                    // Process transaction after successful payment
-                    const transaction = {
-                      clientId: selectedClient?.id,
-                      items: cart,
-                      subtotal: getSubtotal(),
-                      tax: getTax(),
-                      tipAmount: tipAmount,
-                      total: getGrandTotal(),
-                      paymentMethod: "helcim",
-                    };
-                    console.log('POS transaction data:', transaction);
-                    processTransactionMutation.mutate(transaction);
-                    
-                    // Clear cart and close checkout
-                    setCart([]);
-                    setIsCheckoutOpen(false);
-                    setSelectedClient(null);
-                    setTipAmount(0);
-                    setCashReceived("");
-                    
-                    toast({
-                      title: "Payment Successful",
-                      description: `Transaction completed for $${getGrandTotal().toFixed(2)}`,
-                    });
-                    
-                    // Refresh the page to update any cached data
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 1500);
-                  }}
-                  onCancel={() => {
-                    setIsCheckoutOpen(false);
-                  }}
+                  amount={getGrandTotal()}
+                  description={`POS Sale - ${cart.length} item${cart.length > 1 ? 's' : ''}`}
+                  onSuccess={handleTerminalSuccess}
+                  onError={handleTerminalError}
                 />
               </div>
             )}
@@ -1497,7 +1434,7 @@ export default function PointOfSale() {
             <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>
               Cancel
             </Button>
-            {paymentMethod !== "card" && paymentMethod !== "helcim" && (
+            {paymentMethod !== "card" && (
               <Button 
                 onClick={processTransaction}
                 disabled={processTransactionMutation.isPending}
@@ -1587,7 +1524,7 @@ export default function PointOfSale() {
                     }}
                     disabled={sendReceiptSMSMutation.isPending}
                   >
-                    <MessageSquare className="h-4 w-4 mr-2" />
+                    <MessageCircle className="h-4 w-4 mr-2" />
                     {sendReceiptSMSMutation.isPending ? "Sending..." : `SMS to ${lastTransaction.client.phone}`}
                   </Button>
                 )}
@@ -1652,7 +1589,7 @@ export default function PointOfSale() {
                         }}
                         disabled={!manualPhone.trim() || sendReceiptSMSMutation.isPending}
                       >
-                        <MessageSquare className="h-4 w-4 mr-1" />
+                        <MessageCircle className="h-4 w-4 mr-1" />
                         {sendReceiptSMSMutation.isPending ? "Sending..." : "Send"}
                       </Button>
                     </div>
@@ -1673,6 +1610,20 @@ export default function PointOfSale() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Helcim Payment Modal */}
+      <HelcimPayJsModal
+        open={showHelcimModal}
+        onOpenChange={setShowHelcimModal}
+        amount={getSubtotal() + getTax()}
+        tipAmount={tipAmount}
+        clientId={selectedClient?.id}
+        description="POS transaction payment"
+        type="pos_payment"
+        onSuccess={handleHelcimSuccess}
+        onError={handleHelcimError}
+      />
+
     </div>
   );
 }

@@ -27,6 +27,7 @@ export interface AppointmentEvent {
   end: Date;
   resourceId?: number | string;
   resource?: any;
+  type?: string;
 }
 
 export interface CalendarResource {
@@ -55,7 +56,7 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         startAccessor="start"
         endAccessor="end"
         views={[Views.DAY, Views.WEEK, Views.MONTH]}
-        defaultView={Views.WEEK}
+        defaultView={Views.DAY}
         onSelectEvent={onSelectEvent}
         onSelectSlot={onSelectSlot}
         selectable
@@ -69,28 +70,17 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         onNavigate={onNavigate}
         backgroundEvents={backgroundEvents}
         eventPropGetter={(event) => {
-          // Only style background events (unavailable times)
-          if ((event as any).type === 'unavailable') {
-            return {
-              style: (event as any).style || { backgroundColor: '#e5e7eb', opacity: 0.5 },
-              className: 'bg-gray-200',
-            };
-          }
-          
-          // For regular appointments
+          // For regular appointments, check payment status first
           const appointmentEvent = event as AppointmentEvent;
-          const isPaid = appointmentEvent.resource && (appointmentEvent.resource as any).paymentStatus === 'paid';
           
-          // If appointment is paid, use green color
-          if (isPaid) {
+          // If appointment is paid, make it green
+          if (appointmentEvent.resource && (appointmentEvent.resource as any).paymentStatus === 'paid') {
             return {
               style: { 
-                backgroundColor: '#16a34a', // Green color for paid appointments
-                color: '#ffffff',
-                border: '2px solid #15803d',
-                fontWeight: 'bold',
+                backgroundColor: '#22c55e', // Green color for paid appointments
+                color: '#ffffff', // White text for contrast
+                border: '1px solid #22c55e',
               },
-              className: 'paid-appointment',
             };
           }
           
@@ -99,12 +89,22 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
             return {
               style: { 
                 backgroundColor: (appointmentEvent.resource as any).serviceColor,
-                color: '#ffffff',
+                color: '#ffffff', // White text for contrast
                 border: `1px solid ${(appointmentEvent.resource as any).serviceColor}`,
               },
             };
           }
           
+          return {};
+        }}
+        backgroundEventPropGetter={(event) => {
+          // Handle background events (unavailable times)
+          if ((event as any).type === 'unavailable' || (event as any).isBackground) {
+            return {
+              style: (event as any).style || { backgroundColor: '#e5e7eb', opacity: 0.5 },
+              className: 'bg-gray-200',
+            };
+          }
           return {};
         }}
       />

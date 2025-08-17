@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -80,6 +80,7 @@ const PersistentMobileMenu = () => {
     { icon: Phone, label: "Phone", href: "/phone" },
     { icon: Bot, label: "AI Messaging", href: "/ai-messaging" },
     { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
+    { icon: Shield, label: "Permissions", href: "/permissions" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
 
@@ -181,7 +182,7 @@ const PersistentMobileMenu = () => {
   return (
     <>
       {/* Menu Button */}
-      <div className="fixed top-4 left-4 z-40 lg:hidden">
+      <div className="fixed bottom-4 right-4 z-40 lg:hidden">
         <button 
           onClick={toggleMenu}
           className="flex items-center justify-center w-12 h-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer shadow-md hover:shadow-lg transition-shadow"
@@ -191,10 +192,10 @@ const PersistentMobileMenu = () => {
         </button>
       </div>
 
-      {/* Menu Overlay - Always rendered but controlled by visibility */}
+      {/* Menu Overlay - Always rendered but controlled by visibility - Mobile only */}
       {createPortal(
         <div
-          className={`fixed inset-0 z-50 transition-opacity duration-300 ${
+          className={`fixed inset-0 z-50 transition-opacity duration-300 lg:hidden ${
             isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
           style={{
@@ -205,10 +206,11 @@ const PersistentMobileMenu = () => {
         >
           {/* Menu Panel */}
           <div
-            className="fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col transform transition-transform duration-300"
+            className="mobile-menu-panel fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white dark:bg-gray-800 shadow-xl flex flex-col transform transition-transform duration-300"
             style={{
               transform: isOpen ? 'translateX(0)' : 'translateX(-100%)',
-              willChange: 'transform'
+              willChange: 'transform',
+              touchAction: 'none'
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -249,7 +251,7 @@ const PersistentMobileMenu = () => {
             {/* Navigation List - with persistent scroll */}
             <div 
               ref={scrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden"
+              className="mobile-menu-scroll-container flex-1 overflow-y-auto overflow-x-hidden"
               onScroll={handleScroll}
               style={{
                 scrollBehavior: 'auto',
@@ -258,7 +260,9 @@ const PersistentMobileMenu = () => {
                 height: '100%',
                 width: '100%',
                 isolation: 'isolate',
-                contain: 'layout style paint'
+                contain: 'layout style paint',
+                touchAction: 'pan-y',
+                overscrollBehavior: 'contain'
               }}
             >
               <div className="p-4 space-y-1">

@@ -38,10 +38,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-// Square configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID || 'sq0idp-TrqOMQPUkNYGCL2Q6h-NKA';
-const SQUARE_LOCATION_ID = import.meta.env.VITE_SQUARE_LOCATION_ID || 'L51V0YQ8H6P10';
-
 const giftCertificateSchema = z.object({
   amount: z.number().min(10, "Minimum amount is $10").max(1000, "Maximum amount is $1000"),
   recipientName: z.string().min(1, "Recipient name is required"),
@@ -55,99 +51,34 @@ type GiftCertificateForm = z.infer<typeof giftCertificateSchema>;
 
 const PRESET_AMOUNTS = [25, 50, 75, 100, 150, 200];
 
-// Payment form component
+// Payment form component for Helcim
 const PaymentForm = ({ total, onSuccess, onError }: { 
   total: number; 
-  onSuccess: () => void; 
+  onSuccess: (paymentId: string) => void; 
   onError: (error: string) => void; 
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [cardElement, setCardElement] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    initializeSquarePaymentForm();
-    
-    return () => {
-      if (cardElement) {
-        cardElement.destroy();
-      }
-    };
-  }, []);
-
-  const initializeSquarePaymentForm = async () => {
-    try {
-      if (!(window as any).Square) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://web.squarecdn.com/v1/square.js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
-
-      const payments = (window as any).Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
-      const card = await payments.card({
-        style: {
-          input: {
-            fontSize: '16px',
-            fontFamily: '"Helvetica Neue", Arial, sans-serif'
-          },
-          '.input-container': {
-            borderColor: '#E5E7EB',
-            borderRadius: '6px'
-          }
-        }
-      });
-      await card.attach('#gift-certificate-square-card-element');
-      
-      setCardElement(card);
-      setIsLoading(false);
-    } catch (err: any) {
-      console.error('Square payment form initialization error:', err);
-      setError('Failed to load payment form. Please try again.');
-      setIsLoading(false);
-    }
-  };
+  const [cardData, setCardData] = useState({
+    cardNumber: '',
+    cardExpiryMonth: '',
+    cardExpiryYear: '',
+    cardCVV: ''
+  });
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!cardElement) {
-      onError('Payment form not ready. Please try again.');
+    // Basic validation
+    if (!cardData.cardNumber || !cardData.cardExpiryMonth || !cardData.cardExpiryYear || !cardData.cardCVV) {
+      onError('Please fill in all card details.');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      const result = await cardElement.tokenize();
-      
-      if (result.status === 'OK') {
-        const nonce = result.token;
-        
-        const response = await apiRequest("POST", "/api/create-payment", {
-          amount: total,
-          sourceId: nonce,
-          type: "gift_certificate_payment",
-          description: "Gift Certificate Purchase"
-        });
-
-        const paymentData = await response.json();
-        console.log('Gift Certificate Payment response:', paymentData);
-        
-        if (paymentData.payment || paymentData.paymentId) {
-          onSuccess();
-        } else {
-          console.error('Unexpected payment response:', paymentData);
-          throw new Error('Payment processing failed');
-        }
-      } else {
-        const errorMessages = result.errors?.map((error: any) => error.message).join(', ') || 'Payment failed';
-        onError(errorMessages);
-      }
+      // Direct card processing deprecated; route via HelcimPay.js
+      throw new Error('Card payments are handled via HelcimPay.js. Start a session via /api/helcim-pay/initialize.');
     } catch (error: any) {
       console.error('Gift Certificate Payment processing error:', error);
       
@@ -175,43 +106,85 @@ const PaymentForm = ({ total, onSuccess, onError }: {
     }
   };
 
-  if (error) {
-    return (
-      <div className="space-y-4">
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <h3 className="text-sm font-medium text-red-800 dark:text-red-200 mb-2">
-            Payment Form Error
-          </h3>
-          <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-        </div>
-        <Button onClick={initializeSquarePaymentForm} className="w-full">
-          Retry
-        </Button>
-      </div>
-    );
-  }
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div 
-        id="gift-certificate-square-card-element" 
-        className="min-h-[60px] border rounded-lg p-3 bg-white"
-        data-testid="card-element"
-        role="textbox"
-        aria-label="Credit card number"
-      >
-      </div>
-      
-      {isLoading && (
-        <div className="flex items-center justify-center text-sm text-muted-foreground">
-          <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2" />
-          Loading secure payment form...
+      <div className="space-y-4">
+        {/* Card Number */}
+        <div>
+          <label htmlFor="cardNumber" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Card Number
+          </label>
+          <input
+            type="text"
+            id="cardNumber"
+            value={cardData.cardNumber}
+            onChange={(e) => setCardData(prev => ({ ...prev, cardNumber: e.target.value }))}
+            placeholder="1234 5678 9012 3456"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+            maxLength={19}
+          />
         </div>
-      )}
+
+        {/* Expiry Date and CVV */}
+        <div className="grid grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="cardExpiryMonth" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Month
+            </label>
+            <select
+              id="cardExpiryMonth"
+              value={cardData.cardExpiryMonth}
+              onChange={(e) => setCardData(prev => ({ ...prev, cardExpiryMonth: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">MM</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                <option key={month} value={month.toString().padStart(2, '0')}>
+                  {month.toString().padStart(2, '0')}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label htmlFor="cardExpiryYear" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Year
+            </label>
+            <select
+              id="cardExpiryYear"
+              value={cardData.cardExpiryYear}
+              onChange={(e) => setCardData(prev => ({ ...prev, cardExpiryYear: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+            >
+              <option value="">YYYY</option>
+              {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                <option key={year} value={year.toString()}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div>
+            <label htmlFor="cardCVV" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              CVV
+            </label>
+            <input
+              type="text"
+              id="cardCVV"
+              value={cardData.cardCVV}
+              onChange={(e) => setCardData(prev => ({ ...prev, cardCVV: e.target.value }))}
+              placeholder="123"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
+              maxLength={4}
+            />
+          </div>
+        </div>
+      </div>
       
       <Button 
         type="submit" 
-        disabled={!cardElement || isProcessing || isLoading}
+        disabled={isProcessing}
         className="w-full"
       >
         {isProcessing ? (
@@ -297,12 +270,16 @@ export default function GiftCertificatesPage() {
     setShowPaymentDialog(true);
   };
 
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = async (paymentId: string) => {
     if (!giftCertificateData) return;
 
     setIsProcessing(true);
     try {
-      await purchaseGiftCertificateMutation.mutateAsync(giftCertificateData);
+      // Pass the payment ID to verify the payment was successful
+      await purchaseGiftCertificateMutation.mutateAsync({
+        ...giftCertificateData,
+        paymentId: paymentId
+      });
     } finally {
       setIsProcessing(false);
     }

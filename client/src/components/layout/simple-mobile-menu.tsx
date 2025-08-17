@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Building2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -70,6 +70,7 @@ const SimpleMobileMenu = () => {
     { icon: Package, label: "Products", href: "/products" },
     { icon: DollarSign, label: "Point of Sale", href: "/pos" },
     { icon: Gift, label: "Gift Certificates", href: "/gift-certificates" },
+    { icon: Building2, label: "Locations", href: "/locations" },
     { icon: MapPin, label: "Rooms", href: "/rooms" },
     { icon: Monitor, label: "Devices", href: "/devices" },
     { icon: CreditCard, label: "Memberships", href: "/memberships" },
@@ -153,7 +154,7 @@ const SimpleMobileMenu = () => {
   return (
     <>
       {/* Menu Button - positioned absolutely in top-left corner */}
-      <div className="fixed top-4 left-4 z-40 lg:hidden">
+      <div className="fixed top-4 left-4 z-40">
         <button 
           onClick={toggleMenu}
           className="flex items-center justify-center w-12 h-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer shadow-md hover:shadow-lg transition-shadow"
@@ -255,8 +256,8 @@ const SimpleMobileMenu = () => {
                       onClick={handleLinkClick}
                       className={`w-full flex items-center px-3 py-2.5 rounded-lg cursor-pointer text-sm font-medium transition-colors text-left ${
                         isActive 
-                          ? "bg-primary text-primary-foreground border-l-4 border-l-primary shadow-sm" 
-                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-l-4 border-l-transparent"
+                          ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
                       }`}
                       style={{
                         color: isActive ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)'

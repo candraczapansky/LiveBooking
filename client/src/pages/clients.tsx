@@ -68,7 +68,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { getInitials, getFullName } from "@/lib/utils";
-import ClientPaymentMethods from "@/components/payment/client-payment-methods";
+
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientAnalytics from "@/components/client/client-analytics";
@@ -134,8 +134,7 @@ const ClientsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
-  const [showPaymentSection, setShowPaymentSection] = useState(false);
-  const [isAddingPaymentMethod, setIsAddingPaymentMethod] = useState(false);
+
   const [location] = useLocation();
   
   // CSV Import state
@@ -1978,62 +1977,16 @@ const ClientsPage = () => {
                 </div>
               </div>
               
-              {/* Optional Payment Method Section */}
-              <div className="border-t pt-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setShowPaymentSection(!showPaymentSection)}
-                  className="flex items-center gap-2 w-full justify-start p-0 h-auto"
-                >
-                  {showPaymentSection ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  <CreditCard className="h-4 w-4" />
-                  <span>Add Payment Method (Optional)</span>
-                </Button>
-                
-                {showPaymentSection && (
-                  <div className="mt-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800">
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      Save time by adding a payment method during client creation.
-                    </p>
-                    
-                    <div className="space-y-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsAddingPaymentMethod(!isAddingPaymentMethod)}
-                        className="w-full"
-                      >
-                        {isAddingPaymentMethod ? "Skip Payment Method" : "Add Payment Method Now"}
-                      </Button>
-                      
-                      {isAddingPaymentMethod && (
-                        <div className="space-y-4 border-t pt-4">
-                          <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                            Payment methods can be added after client creation using Square integration
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+
               
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => {
                   setIsAddDialogOpen(false);
-                  setShowPaymentSection(false);
-                  setIsAddingPaymentMethod(false);
                 }}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={createClientMutation.isPending}>
-                  {createClientMutation.isPending ? "Creating..." : 
-                   isAddingPaymentMethod ? "Create Client & Add Payment Method" : "Create Client"}
+                  {createClientMutation.isPending ? "Creating..." : "Create Client"}
                 </Button>
               </DialogFooter>
             </form>

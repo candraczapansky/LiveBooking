@@ -73,29 +73,12 @@ export default function MembershipPaymentDialog({
       const membershipSubscription = await membershipResponse.json();
 
       // Then create and process the payment
-      let paymentStatus = "pending";
-      let squarePaymentId = null;
+          let paymentStatus = "pending";
+    let helcimPaymentId = null;
 
       if (paymentMethod === "card" && cardToken) {
-        // Process Square payment
-        try {
-          const paymentResponse = await apiRequest("POST", "/api/process-square-payment", {
-            sourceId: cardToken,
-            amount: Math.round(membership.price * 100), // Convert to cents
-            currency: "USD",
-            reference_id: `membership-${membershipSubscription.id}`,
-            note: `Membership payment for ${membership.name}`
-          });
-          const paymentResult = await paymentResponse.json();
-          
-          if (paymentResult.payment?.id) {
-            paymentStatus = "completed";
-            squarePaymentId = paymentResult.payment.id;
-          }
-        } catch (error) {
-          console.error("Square payment failed:", error);
-          paymentStatus = "failed";
-        }
+        // Card payments are handled via HelcimPay.js; do not call legacy endpoint here
+        throw new Error("Card payments are handled via HelcimPay.js. Initialize a session via /api/helcim-pay/initialize.");
       } else if (paymentMethod === "cash") {
         paymentStatus = "completed";
       }
@@ -105,11 +88,12 @@ export default function MembershipPaymentDialog({
         clientId: client.id,
         clientMembershipId: membershipSubscription.id,
         amount: membership.price,
+        totalAmount: membership.price,
         method: paymentMethod,
         status: paymentStatus,
         type: "membership",
         description: `Membership payment for ${membership.name}`,
-        squarePaymentId: squarePaymentId,
+        helcimPaymentId: helcimPaymentId,
         paymentDate: new Date()
       });
       const paymentRecord = await paymentRecordResponse.json();

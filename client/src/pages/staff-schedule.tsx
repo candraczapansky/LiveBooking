@@ -10,13 +10,15 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Search, Filter, Calendar, MoreHorizontal } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Search, Filter, Calendar, MoreHorizontal, MapPin, Clock, Building2 } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function StaffSchedulePage() {
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
   const [location, setLocation] = useLocation();
   const { isOpen: sidebarOpen } = useSidebar();
 
@@ -30,8 +32,25 @@ export default function StaffSchedulePage() {
     queryKey: ['/api/schedules'],
   });
 
+  // Fetch locations for filtering
+  const { data: locations = [] } = useQuery({
+    queryKey: ['/api/locations'],
+  });
+
   const getScheduleCount = (staffId: number) => {
     return (schedules as any[]).filter((schedule: any) => schedule.staffId === staffId).length;
+  };
+
+  const getLocationCount = (staffId: number) => {
+    const staffSchedules = (schedules as any[]).filter((schedule: any) => schedule.staffId === staffId);
+    const uniqueLocations = new Set(staffSchedules.map((schedule: any) => schedule.locationId));
+    return uniqueLocations.size;
+  };
+
+  const getWorkingDaysCount = (staffId: number) => {
+    const staffSchedules = (schedules as any[]).filter((schedule: any) => schedule.staffId === staffId);
+    const uniqueDays = new Set(staffSchedules.map((schedule: any) => schedule.dayOfWeek));
+    return uniqueDays.size;
   };
 
   const getStaffName = (staffMember: any) => {
@@ -50,13 +69,27 @@ export default function StaffSchedulePage() {
     return 'US';
   };
 
-  // Filter staff based on search and role
+  const getLocationName = (locationId: number) => {
+    const location = locations.find((loc: any) => loc.id === locationId);
+    return location?.name || 'Unknown Location';
+  };
+
+  // Filter staff based on search, role, and location
   const filteredStaff = (staff as any[]).filter((staffMember: any) => {
     const name = getStaffName(staffMember).toLowerCase();
     const email = staffMember.user?.email?.toLowerCase() || '';
     const matchesSearch = name.includes(searchTerm.toLowerCase()) || email.includes(searchTerm.toLowerCase());
     const matchesRole = roleFilter === 'all' || staffMember.title.toLowerCase().includes(roleFilter.toLowerCase());
-    return matchesSearch && matchesRole;
+    
+    // Location filter - check if staff has schedules at the selected location
+    let matchesLocation = true;
+    if (locationFilter !== 'all') {
+      const staffSchedules = (schedules as any[]).filter((schedule: any) => schedule.staffId === staffMember.id);
+      const hasLocationSchedule = staffSchedules.some((schedule: any) => schedule.locationId === parseInt(locationFilter));
+      matchesLocation = hasLocationSchedule;
+    }
+    
+    return matchesSearch && matchesRole && matchesLocation;
   });
 
   // Get unique roles for filter
@@ -65,6 +98,12 @@ export default function StaffSchedulePage() {
   const handleRowClick = (staffId: number) => {
     setLocation(`/staff-schedule/${staffId}`);
   };
+
+  // Calculate summary statistics
+  const totalStaff = staff.length;
+  const staffWithSchedules = staff.filter((staffMember: any) => getScheduleCount(staffMember.id) > 0).length;
+  const totalSchedules = schedules.length;
+  const totalLocations = locations.length;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -98,6 +137,46 @@ export default function StaffSchedulePage() {
               </Button>
             </div>
 
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Staff</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalStaff}</div>
+                  <p className="text-xs text-muted-foreground">Active staff members</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Staff with Schedules</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{staffWithSchedules}</div>
+                  <p className="text-xs text-muted-foreground">{((staffWithSchedules / totalStaff) * 100).toFixed(0)}% of staff</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Schedules</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalSchedules}</div>
+                  <p className="text-xs text-muted-foreground">Active schedules</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Locations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalLocations}</div>
+                  <p className="text-xs text-muted-foreground">Available locations</p>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Search and Filter Bar */}
             <div className="flex items-center gap-4 mb-6">
               <div className="relative flex-1 max-w-sm">
@@ -120,6 +199,19 @@ export default function StaffSchedulePage() {
                     {uniqueRoles.map((role) => (
                       <SelectItem key={role} value={role}>
                         {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Filter by location" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Locations</SelectItem>
+                    {locations.map((location: any) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -150,12 +242,22 @@ export default function StaffSchedulePage() {
                       <TableHead>PHONE NUMBER</TableHead>
                       <TableHead>EMAIL</TableHead>
                       <TableHead>SCHEDULES</TableHead>
+                      <TableHead>LOCATIONS</TableHead>
+                      <TableHead>WORKING DAYS</TableHead>
                       <TableHead className="w-12"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredStaff.map((staffMember: any) => {
                       const scheduleCount = getScheduleCount(staffMember.id);
+                      const locationCount = getLocationCount(staffMember.id);
+                      const workingDaysCount = getWorkingDaysCount(staffMember.id);
+                      
+                      // Get staff schedules for location display
+                      const staffSchedules = (schedules as any[]).filter((schedule: any) => schedule.staffId === staffMember.id);
+                      const staffLocations = staffSchedules.map((schedule: any) => getLocationName(schedule.locationId));
+                      const uniqueLocations = [...new Set(staffLocations)];
+                      
                       return (
                         <TableRow 
                           key={staffMember.id} 
@@ -184,8 +286,21 @@ export default function StaffSchedulePage() {
                             {staffMember.user?.email || '-'}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
                               {scheduleCount} {scheduleCount === 1 ? 'schedule' : 'schedules'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3" />
+                              {locationCount} {locationCount === 1 ? 'location' : 'locations'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {workingDaysCount} {workingDaysCount === 1 ? 'day' : 'days'}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -205,7 +320,7 @@ export default function StaffSchedulePage() {
             {filteredStaff.length > 0 && (
               <div className="flex items-center justify-between pt-4">
                 <p className="text-sm text-muted-foreground">
-                  Rows per page: 10
+                  Showing {filteredStaff.length} of {staff.length} staff members
                 </p>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" disabled>

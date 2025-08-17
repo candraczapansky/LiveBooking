@@ -12,19 +12,10 @@ import { validateRequest, requireAuth } from "../middleware/error-handler";
 import { sendEmail } from "../email";
 import { sendSMS, isTwilioConfigured } from "../sms";
 import { redisCache } from "../utils/redis-cache";
+import { insertMarketingCampaignSchema } from "@shared/schema";
 
-// Marketing campaign schema
-const campaignSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  type: z.enum(['email', 'sms', 'both']),
-  targetAudience: z.enum(['all', 'clients', 'staff', 'specific']),
-  targetIds: z.array(z.number()).optional(),
-  subject: z.string().optional(),
-  message: z.string().min(1),
-  scheduledAt: z.date().optional(),
-  status: z.enum(['draft', 'scheduled', 'active', 'completed', 'cancelled']).default('draft'),
-});
+// Use the shared schema for campaign creation
+const campaignSchema = insertMarketingCampaignSchema;
 
 export function registerMarketingRoutes(app: Express, storage: IStorage) {
   // Create marketing campaign
@@ -168,7 +159,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
           if (recipient.email && recipient.emailPromotions) {
             await sendEmail({
               to: recipient.email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
               subject: campaign.subject || 'Glo Head Spa - Special Offer',
               html: campaign.content,
             });
@@ -178,7 +169,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
         if (campaign.type === 'sms' || campaign.type === 'both') {
           if (recipient.phone && recipient.smsPromotions) {
-            await sendSMS(recipient.phone, campaign.content);
+            await sendSMS(recipient.phone, campaign.content, campaign.photoUrl);
             sentCount++;
           }
         }
@@ -302,7 +293,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
         await sendEmail({
           to: recipient.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'noreply@gloheadspa.com',
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           subject: subject || 'Glo Head Spa - Special Offer',
           html: emailContent,
         });
@@ -475,5 +466,31 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     LoggerService.info("Marketing campaign cancelled", { ...context, campaignId });
 
     res.json(updatedCampaign);
+  }));
+
+  // Get SMS configuration status
+  app.get("/api/sms-config-status", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+
+    LoggerService.debug("Checking SMS configuration status", context);
+
+    try {
+      const isConfigured = await isTwilioConfigured();
+      
+      LoggerService.info("SMS configuration status checked", { ...context, isConfigured });
+      
+      res.json({
+        configured: isConfigured,
+        message: isConfigured 
+          ? "SMS is properly configured and ready to send messages"
+          : "SMS is not configured. Please configure Twilio credentials to send SMS campaigns."
+      });
+    } catch (error) {
+      LoggerService.error("Error checking SMS configuration status", { ...context, error });
+      res.json({
+        configured: false,
+        message: "Error checking SMS configuration status"
+      });
+    }
   }));
 } 

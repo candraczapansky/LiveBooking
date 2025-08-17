@@ -21,49 +21,77 @@ const envTwilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER?.replace(/^\+\+/, '
 
 // Initialize Twilio client
 let twilioClient: twilio.Twilio | null = null;
+let isInitializing = false;
+let initializationPromise: Promise<void> | null = null;
 
 async function initializeTwilioClient() {
-  try {
-    // First try to get credentials from database
-    let accountSid = envAccountSid;
-    let authToken = envAuthToken;
-    let twilioPhoneNumber = envTwilioPhoneNumber;
-
-    if (dbConfig) {
-      const dbAccountSid = await dbConfig.getConfig('twilio_account_sid');
-      const dbAuthToken = await dbConfig.getConfig('twilio_auth_token');
-      const dbPhoneNumber = await dbConfig.getConfig('twilio_phone_number');
-
-      if (dbAccountSid && dbAuthToken) {
-        accountSid = dbAccountSid;
-        authToken = dbAuthToken;
-        console.log('SMS Service: Using Twilio credentials from database');
-      }
-      
-      if (dbPhoneNumber) {
-        twilioPhoneNumber = dbPhoneNumber;
-      }
+  if (isInitializing) {
+    // If already initializing, wait for the existing promise
+    if (initializationPromise) {
+      await initializationPromise;
     }
-
-    if (accountSid && authToken) {
-      // Validate Account SID format
-      if (!accountSid.startsWith('AC')) {
-        console.error('Invalid Twilio Account SID format. Account SID must start with "AC". You may have provided an API Key instead.');
-        return;
-      }
-      
-      twilioClient = twilio(accountSid, authToken);
-      console.log('Twilio client initialized successfully');
-    }
-  } catch (error) {
-    console.error('Failed to initialize Twilio client:', error);
+    return;
   }
+
+  if (twilioClient) {
+    // Already initialized
+    return;
+  }
+
+  isInitializing = true;
+  initializationPromise = (async () => {
+    try {
+      // First try to get credentials from database
+      let accountSid = envAccountSid;
+      let authToken = envAuthToken;
+      let twilioPhoneNumber = envTwilioPhoneNumber;
+
+      if (dbConfig) {
+        const dbAccountSid = await dbConfig.getConfig('twilio_account_sid');
+        const dbAuthToken = await dbConfig.getConfig('twilio_auth_token');
+        const dbPhoneNumber = await dbConfig.getConfig('twilio_phone_number');
+
+        if (dbAccountSid && dbAuthToken) {
+          accountSid = dbAccountSid;
+          authToken = dbAuthToken;
+          console.log('SMS Service: Using Twilio credentials from database');
+        }
+        
+        if (dbPhoneNumber) {
+          twilioPhoneNumber = dbPhoneNumber;
+        }
+      }
+
+      if (accountSid && authToken) {
+        // Validate Account SID format
+        if (!accountSid.startsWith('AC')) {
+          console.error('Invalid Twilio Account SID format. Account SID must start with "AC". You may have provided an API Key instead.');
+          return;
+        }
+        
+        twilioClient = twilio(accountSid, authToken);
+        console.log('Twilio client initialized successfully');
+      }
+    } catch (error) {
+      console.error('Failed to initialize Twilio client:', error);
+    } finally {
+      isInitializing = false;
+    }
+  })();
+
+  await initializationPromise;
 }
 
 // Initialize on module load
 initializeTwilioClient();
 
 export interface SMSResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+export interface MMSResult {
   success: boolean;
   messageId?: string;
   error?: string;
@@ -111,7 +139,17 @@ function isValidPhoneNumber(phone: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
-export async function sendSMS(to: string, message: string): Promise<SMSResult> {
+export async function sendSMS(to: string, message: string, photoUrl?: string): Promise<SMSResult> {
+  // If photo is provided, send as MMS
+  if (photoUrl) {
+    return sendMMS(to, message, photoUrl);
+  }
+
+  // Ensure Twilio client is initialized
+  if (!twilioClient) {
+    await initializeTwilioClient();
+  }
+
   // In development mode, simulate SMS sending for test numbers only
   if (process.env.NODE_ENV === 'development') {
     const isTestNumber = to.includes('1234567890') || 
@@ -182,7 +220,104 @@ export async function sendSMS(to: string, message: string): Promise<SMSResult> {
   }
 }
 
+export async function sendMMS(to: string, message: string, photoUrl: string): Promise<MMSResult> {
+  // Ensure Twilio client is initialized
+  if (!twilioClient) {
+    await initializeTwilioClient();
+  }
+
+  // In development mode, simulate MMS sending for test numbers only
+  if (process.env.NODE_ENV === 'development') {
+    const isTestNumber = to.includes('1234567890') || 
+                        to.includes('test') || 
+                        to.includes('demo') || 
+                        to.includes('555-555-') || 
+                        to.includes('5555') || 
+                        to.includes('+15551234567') ||
+                        to.includes('5551234567') ||
+                        to.includes('15551234567');
+    if (isTestNumber) {
+      console.log('DEVELOPMENT MODE: Simulating MMS send to:', to);
+      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Photo URL:', photoUrl);
+      return {
+        success: true,
+        messageId: `dev_mms_${Date.now()}`
+      };
+    } else {
+      console.log('DEVELOPMENT MODE: Sending REAL MMS to:', to);
+      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Photo URL:', photoUrl);
+    }
+  }
+
+  // Get current Twilio phone number from database or environment
+  let currentTwilioPhoneNumber = envTwilioPhoneNumber;
+  if (dbConfig) {
+    const dbPhoneNumber = await dbConfig.getConfig('twilio_phone_number');
+    if (dbPhoneNumber) {
+      currentTwilioPhoneNumber = dbPhoneNumber;
+    }
+  }
+
+  if (!twilioClient || !currentTwilioPhoneNumber) {
+    return {
+      success: false,
+      error: 'Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE_NUMBER environment variables or configure them in the database.'
+    };
+  }
+
+  // Validate phone number before attempting to send
+  if (!isValidPhoneNumber(to)) {
+    return {
+      success: false,
+      error: `Invalid phone number format: ${to}. Please provide a valid phone number.`
+    };
+  }
+
+  try {
+    // Ensure phone number has country code
+    const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+    
+    // For MMS, we need to provide media URLs
+    // Since we're storing photos as base64 data URLs, we need to handle this properly
+    // For now, we'll send as a regular SMS with a note about the photo
+    // In a production environment, you'd want to upload the image to a CDN and use the URL
+    
+    let mmsMessage = message;
+    if (photoUrl) {
+      mmsMessage += '\n\n[Photo attached - sent as MMS]';
+    }
+    
+    const messageResponse = await twilioClient.messages.create({
+      body: mmsMessage,
+      from: currentTwilioPhoneNumber,
+      to: formattedTo,
+      // Note: To send actual MMS with media, you would need to:
+      // 1. Upload the image to a publicly accessible URL (CDN)
+      // 2. Use the media parameter: media: [imageUrl]
+      // For now, we'll send as enhanced SMS
+    });
+
+    return {
+      success: true,
+      messageId: messageResponse.sid
+    };
+  } catch (error: any) {
+    console.error('MMS sending error:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to send MMS'
+    };
+  }
+}
+
 export async function isTwilioConfigured(): Promise<boolean> {
+  // Ensure Twilio client is initialized
+  if (!twilioClient) {
+    await initializeTwilioClient();
+  }
+  
   // Check if we have a Twilio client initialized
   if (twilioClient) {
     return true;

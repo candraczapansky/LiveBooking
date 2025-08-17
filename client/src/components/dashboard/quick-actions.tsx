@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { Plus, UserPlus, Megaphone } from "lucide-react";
+import { Plus, UserPlus, Megaphone, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLocation } from "wouter";
@@ -74,6 +74,10 @@ const QuickActions = () => {
     }
   };
 
+  const handleHelcimTest = () => {
+    navigate('/helcim-test');
+  };
+
   return (
     <Card>
       <CardHeader className="px-3 py-4 border-b border-gray-200 dark:border-gray-700 sm:px-4 sm:py-5">
@@ -105,6 +109,15 @@ const QuickActions = () => {
           size="sm"
         >
           <Megaphone className="h-4 w-4 mr-2" /> Send Promotion
+        </Button>
+
+        <Button 
+          onClick={handleHelcimTest}
+          className="w-full flex items-center justify-center h-10 sm:h-auto"
+          variant="default"
+          size="sm"
+        >
+          <CreditCard className="h-4 w-4 mr-2" /> Test HelcimPay.js
         </Button>
       </CardContent>
     </Card>

@@ -6,7 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import AppointmentPhotos from "./appointment-photos";
 import { NoteInput } from "@/components/ui/note-input";
 import { useLocation } from "wouter";
-import SquarePaymentForm from "./square-payment-form";
+
 
 import {
   Dialog,
@@ -22,6 +22,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
+import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 
 interface AppointmentDetailsProps {
   open: boolean;
@@ -47,13 +49,15 @@ const AppointmentDetails = ({
   const [isProcessingCashPayment, setIsProcessingCashPayment] = useState(false);
   const [isProcessingCardPayment, setIsProcessingCardPayment] = useState(false);
   const [isProcessingGiftCardPayment, setIsProcessingGiftCardPayment] = useState(false);
-  const [isProcessingHelcimPayment, setIsProcessingHelcimPayment] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [showCardPayment, setShowCardPayment] = useState(false);
+  const [showTerminalPayment, setShowTerminalPayment] = useState(false);
+  const [selectedTerminalDevice, setSelectedTerminalDevice] = useState<string>('');
   const [giftCardCode, setGiftCardCode] = useState("");
+  const [showHelcimModal, setShowHelcimModal] = useState(false);
 
   // Fetch appointment details
-  const { data: appointment, isLoading, refetch } = useQuery({
+  const { data: appointment, isLoading } = useQuery({
     queryKey: ['/api/appointments', appointmentId],
     queryFn: async () => {
       if (!appointmentId) return null;
@@ -271,6 +275,7 @@ const AppointmentDetails = ({
   };
 
   const handleCardPayment = () => {
+    // Show the card payment form
     setShowCardPayment(true);
   };
 
@@ -295,6 +300,120 @@ const AppointmentDetails = ({
 
   const handleCardPaymentCancel = () => {
     setShowCardPayment(false);
+  };
+
+  const pollForPaymentConfirmation = async (transactionId: string, paymentId: string) => {
+    let attempts = 0;
+    const maxAttempts = 60; // Poll for up to 5 minutes
+    
+    const pollInterval = setInterval(async () => {
+      attempts++;
+      
+      try {
+        // Check terminal payment status
+        const response = await fetch('/api/terminal/confirm-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transactionId,
+            deviceCode: selectedTerminalDevice // Use the selected terminal device
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (result.success && result.status === 'completed') {
+          clearInterval(pollInterval);
+          
+          // Use the new complete-payment endpoint to sync with calendar
+          try {
+            const completeResponse = await fetch('/api/terminal/complete-payment', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                transactionId,
+                deviceCode: selectedTerminalDevice, // Use the selected terminal device
+                appointmentId: appointment.id,
+                paymentId
+              }),
+            });
+
+            const completeResult = await completeResponse.json();
+            
+            if (completeResult.success) {
+              console.log('✅ Terminal payment completed and calendar synced successfully');
+              
+              toast({
+                title: "Payment Confirmed",
+                description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
+              });
+
+              onOpenChange(false);
+              if (onEdit) onEdit(appointment.id);
+            } else {
+              throw new Error(completeResult.error || 'Failed to sync payment with calendar');
+            }
+          } catch (error: any) {
+            console.error('Error completing terminal payment:', error);
+            
+            // Fallback to manual updates if the new endpoint fails
+            try {
+              await apiRequest("PUT", `/api/payments/${paymentId}`, {
+                status: 'completed'
+              });
+
+              await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+                paymentStatus: 'paid'
+              });
+
+              toast({
+                title: "Payment Confirmed",
+                description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
+              });
+
+              onOpenChange(false);
+              if (onEdit) onEdit(appointment.id);
+            } catch (fallbackError) {
+              console.error('Fallback payment update failed:', fallbackError);
+              toast({
+                title: "Payment Sync Error",
+                description: "Payment completed on terminal but failed to sync with calendar. Please contact support.",
+                variant: "destructive",
+              });
+            }
+          }
+        } else if (result.status === 'failed' || result.status === 'cancelled') {
+          clearInterval(pollInterval);
+          
+          // Mark payment as failed
+          await apiRequest("PUT", `/api/payments/${paymentId}`, {
+            status: 'failed'
+          });
+
+          toast({
+            title: "Payment Failed",
+            description: result.error || 'Payment failed on terminal',
+            variant: "destructive",
+          });
+        }
+        // If still pending, continue polling
+      } catch (error) {
+        console.error('Error checking payment status:', error);
+        
+        if (attempts >= maxAttempts) {
+          clearInterval(pollInterval);
+          toast({
+            title: "Payment Status Check Failed",
+            description: "Unable to confirm payment status. Please check manually.",
+            variant: "destructive",
+          });
+        }
+      }
+    }, 5000); // Check every 5 seconds
   };
 
   const handleGiftCardPayment = async () => {
@@ -488,6 +607,9 @@ const AppointmentDetails = ({
                   <p className="text-sm">
                     <span className="font-medium">Duration:</span> {service.duration} minutes
                   </p>
+                  <p className="text-sm">
+                    <span className="font-medium">Price:</span> {formatPrice(service.price || 0)}
+                  </p>
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">Service information not available</p>
@@ -531,7 +653,7 @@ const AppointmentDetails = ({
               </div>
               <div className="space-y-2">
                 <p className="text-sm">
-                  <span className="font-medium">Amount:</span> {formatPrice((appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0)))}
+                  <span className="font-medium">Amount:</span> {formatPrice(appointment.totalAmount || service?.price || 0)}
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Status:</span> {appointment.paymentStatus || 'pending'}
@@ -546,7 +668,7 @@ const AppointmentDetails = ({
                         className="w-full bg-green-600 hover:bg-green-700"
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
-                        Pay {formatPrice((appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0)))}
+                        Pay {formatPrice(appointment.totalAmount || service?.price || 0)}
                       </Button>
                     ) : (
                       <div className="space-y-3">
@@ -570,8 +692,7 @@ const AppointmentDetails = ({
                           )}
                         </Button>
 
-                        {/* Credit/Debit Card Payment */
-                        }
+                        {/* Credit/Debit Card Payment */}
                         <Button
                           onClick={handleCardPayment}
                           disabled={isProcessingCardPayment}
@@ -580,198 +701,21 @@ const AppointmentDetails = ({
                         >
                           <div className="flex items-center gap-2">
                             <CreditCard className="h-4 w-4" />
-                            Pay with Card (Test Mode)
+                            Pay with Card
                           </div>
                         </Button>
 
-                        {/* Helcim Smart Terminal Payment */}
+                        {/* Smart Terminal Payment */}
                         <Button
-                          onClick={async () => {
-                            if (!appointmentId || !appointment) return;
-                            setIsProcessingHelcimPayment(true);
-                            try {
-                              const amount = (appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0));
-                              // Ask server for health to discover default device/currency if available
-                              let deviceCode = 'UOJS';
-                              try {
-                                const health = await fetch('/api/helcim-smart-terminal/health');
-                                if (health.ok) {
-                                  const info = await health.json();
-                                  if (info?.defaultDeviceCode) deviceCode = info.defaultDeviceCode;
-                                }
-                              } catch {}
-                              
-                              // Prepare purchase data
-                              const purchaseData = {
-                                amount,
-                                transactionAmount: amount,
-                                tipAmount: 0,
-                                currency: 'USD',
-                                appointmentId: appointmentId,
-                                clientId: appointment.clientId,
-                                type: 'appointment_payment',
-                                description: `Helcim terminal payment for appointment #${appointmentId}`
-                              };
-                              
-                              // Use primary path for consistent response format
-                              let resp = await apiRequest("POST", `/api/helcim-smart-terminal/devices/${deviceCode}/purchase`, purchaseData);
-                              // Fallback alias route if first path not found
-                              if (resp.status === 404) {
-                                resp = await apiRequest("POST", `/api/helcim/devices/${deviceCode}/purchase`, purchaseData);
-                              }
-                              const result = await resp.json();
-                              
-                              console.log('Purchase response:', result);
-                              
-                              if (resp.ok || resp.status === 202) {
-                                // Get transaction ID for polling
-                                const transactionId = result.transactionId;
-                                
-                                if (!transactionId) {
-                                  console.error('No transaction ID received from server');
-                                  throw new Error('No transaction ID received - payment cannot be tracked');
-                                }
-                                
-                                toast({
-                                  title: "Payment Sent",
-                                  description: "Please complete the payment on the terminal device",
-                                });
-                                
-                                // Start polling for payment status
-                                let pollCount = 0;
-                                const maxPolls = 60; // Poll for up to 2 minutes
-                                
-                                const pollInterval = setInterval(async () => {
-                                  try {
-                                    pollCount++;
-                                    console.log(`Polling transaction status (${pollCount}/${maxPolls})...`);
-                                    
-                                    const statusResponse = await apiRequest("GET", `/api/helcim-smart-terminal/transactions/${transactionId}/status`);
-                                    const statusData = await statusResponse.json();
-                                    
-                                    if (statusData.status === 'completed') {
-                                      // Payment completed successfully
-                                      clearInterval(pollInterval);
-                                      
-                                      // Complete the transaction in database
-                                      const completeResponse = await apiRequest("POST", `/api/helcim-smart-terminal/transactions/${transactionId}/complete`, {
-                                        purchaseData: purchaseData,
-                                        transactionData: statusData.data
-                                      });
-                                      
-                                      if (completeResponse.ok) {
-                                        toast({
-                                          title: "Payment Successful",
-                                          description: `Payment of $${amount.toFixed(2)} has been completed.`,
-                                        });
-                                        
-                                        setShowPaymentOptions(false);
-                                        
-                                        // Force refresh all appointment data
-                                        await queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
-                                        await queryClient.invalidateQueries({ queryKey: ["/api/appointments", appointmentId] });
-                                        await refetch();
-                                        
-                                        // Also refresh the parent component if it exists
-                                        if (window.location.pathname.includes('/appointments')) {
-                                          setTimeout(() => {
-                                            window.location.reload();
-                                          }, 1000);
-                                        }
-                                      } else {
-                                        throw new Error('Failed to complete transaction');
-                                      }
-                                      
-                                      setIsProcessingHelcimPayment(false);
-                                      
-                                    } else if (statusData.status === 'failed' || statusData.status === 'cancelled') {
-                                      // Payment failed or was cancelled
-                                      clearInterval(pollInterval);
-                                      setIsProcessingHelcimPayment(false);
-                                      
-                                      toast({
-                                        title: "Payment Failed",
-                                        description: "Payment was declined or cancelled on the terminal",
-                                        variant: "destructive",
-                                      });
-                                      
-                                    } else if (pollCount >= maxPolls) {
-                                      // Timeout - stop polling
-                                      clearInterval(pollInterval);
-                                      setIsProcessingHelcimPayment(false);
-                                      
-                                      toast({
-                                        title: "Payment Timeout",
-                                        description: "If payment was completed on terminal, use the 'Confirm Payment' button.",
-                                        variant: "default",
-                                      });
-                                    }
-                                    // Otherwise continue polling (status is 'processing')
-                                    
-                                  } catch (error) {
-                                    console.error('Error polling transaction status:', error);
-                                    // Continue polling despite errors
-                                  }
-                                }, 2000); // Poll every 2 seconds
-                                
-                              } else {
-                                throw new Error(result?.error || 'Failed to initiate terminal payment');
-                              }
-                            } catch (error: any) {
-                              toast({
-                                title: "Payment Error",
-                                description: error.message || "Failed to initiate Helcim terminal payment",
-                                variant: "destructive",
-                              });
-                              setIsProcessingHelcimPayment(false);
-                            }
-                          }}
-                          disabled={isProcessingHelcimPayment}
+                          onClick={() => setShowTerminalPayment(true)}
                           variant="outline"
                           className="w-full"
                         >
                           <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            {isProcessingHelcimPayment ? 'Sending…' : 'Helcim Terminal'}
-                          </div>
-                        </Button>
-
-                        {/* Confirm Terminal Payment (for when terminal shows "already paid") */}
-                        <Button
-                          onClick={async () => {
-                            if (!appointmentId || !appointment) return;
-                            try {
-                              const amount = (appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0));
-                              const resp = await apiRequest("POST", `/api/helcim-smart-terminal/appointments/${appointmentId}/confirm-payment`, {
-                                amount,
-                                clientId: appointment.clientId
-                              });
-                              if (resp.ok) {
-                                await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-                                await queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
-                                toast({
-                                                                  title: "Payment Confirmed",
-                                description: "Terminal payment has been recorded successfully.",
-                                });
-                                setShowPaymentOptions(false);
-                              } else {
-                                const data = await resp.json();
-                                throw new Error(data?.error || 'Failed to record payment');
-                              }
-                            } catch (error: any) {
-                              toast({
-                                title: "Payment Error",
-                                description: error.message || "Failed to record Helcim payment",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          variant="outline"
-                          className="w-full"
-                        >
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-600" />
-                            Confirm Terminal Payment
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                            </svg>
+                            Smart Terminal
                           </div>
                         </Button>
 
@@ -816,16 +760,123 @@ const AppointmentDetails = ({
                       </div>
                     )}
 
-                    {/* Square Card Payment Form */}
+                    {/* Card Payment via Helcim: inline Pay Now that opens popup */}
                     {showCardPayment && appointment && (
-                      <div className="pt-4 border-t">
-                        <SquarePaymentForm
-                          amount={(appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0))}
-                          appointmentId={appointmentId!}
-                          clientId={appointment.clientId}
-                          onSuccess={handleCardPaymentSuccess}
-                          onError={handleCardPaymentError}
-                          onCancel={handleCardPaymentCancel}
+                      <div className="space-y-4">
+                        <div className="bg-muted p-4 rounded-lg">
+                          <div className="flex justify-between items-center text-lg font-semibold">
+                            <span>Total:</span>
+                            <span>${((appointment.totalAmount ?? (appointment.service?.price || 0)) as number).toFixed(2)}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowCardPayment(false)}
+                            className="flex-1"
+                          >
+                            Back
+                          </Button>
+                          <Button
+                            onClick={() => setShowHelcimModal(true)}
+                            className="flex-1"
+                          >
+                            Pay Now
+                          </Button>
+                        </div>
+                        <HelcimPayJsModal
+                          open={showHelcimModal}
+                          onOpenChange={setShowHelcimModal}
+                          amount={(appointment.totalAmount ?? (appointment.service?.price || 0)) as number}
+                          appointmentId={appointment.id}
+                          description={`Card payment for ${appointment.service?.name || 'Appointment'}`}
+                          type="appointment_payment"
+                          onSuccess={async (paymentId: string) => {
+                            try {
+                              await apiRequest('POST', '/api/confirm-payment', { paymentId, appointmentId: appointment.id });
+                              await apiRequest('PUT', `/api/appointments/${appointment.id}`, { 
+                                status: 'completed',
+                                paymentStatus: 'paid' 
+                              });
+                            } catch {}
+                            setShowHelcimModal(false);
+                            setShowCardPayment(false);
+                            setShowPaymentOptions(false);
+                            queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                            queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+                          }}
+                          onError={() => setShowHelcimModal(false)}
+                        />
+                      </div>
+                    )}
+
+                    {/* Smart Terminal Payment */}
+                    {showTerminalPayment && appointment && (
+                      <div className="border rounded-lg p-4 space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">Smart Terminal Payment</h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowTerminalPayment(false)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <SmartTerminalPayment
+                          amount={appointment.totalAmount ?? appointment.service?.price ?? 0}
+                          description={`Payment for ${appointment.service?.name || 'Appointment'}`}
+                          onDeviceSelect={setSelectedTerminalDevice}
+                          onSuccess={async (result: any) => {
+                            try {
+                              // First, create a pending payment record - don't mark as completed yet
+                              const paymentResponse = await apiRequest("POST", "/api/payments", {
+                                clientId: appointment.clientId,
+                                appointmentId: appointment.id,
+                                amount: appointment.totalAmount ?? appointment.service?.price ?? 0,
+                                totalAmount: appointment.totalAmount ?? appointment.service?.price ?? 0,
+                                method: 'card',
+                                status: 'pending', // Start as pending until terminal confirms
+                                type: 'appointment_payment',
+                                description: `Terminal payment for ${appointment.service?.name || 'Appointment'}`,
+                                helcimTransactionId: result.transactionId,
+                                cardLast4: result.cardLast4,
+                                paymentMethod: result.paymentMethod,
+                                paymentDate: new Date()
+                              });
+
+                              const paymentData = await paymentResponse.json();
+
+                              // Update appointment status to pending payment - not completed yet
+                              await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+                                paymentStatus: 'pending', // Keep as pending until terminal confirms
+                                status: 'completed' // Service is completed but payment is pending
+                              });
+
+                              toast({
+                                title: "Payment Processing",
+                                description: `Terminal payment initiated. Please complete payment on terminal.`,
+                              });
+
+                              // Start polling for payment confirmation
+                              pollForPaymentConfirmation(result.transactionId, paymentData.id);
+                            } catch (error: any) {
+                              console.error('Error recording terminal payment:', error);
+                              toast({
+                                title: "Payment Recording Failed",
+                                description: "Failed to record payment. Please try again.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          onError={(error: string) => {
+                            toast({
+                              title: "Terminal Payment Failed",
+                              description: error,
+                              variant: "destructive",
+                            });
+                          }}
+                          onCancel={() => setShowTerminalPayment(false)}
                         />
                       </div>
                     )}

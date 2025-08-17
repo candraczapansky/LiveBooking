@@ -38,6 +38,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
 import TwoFactorDisableModal from "@/components/TwoFactorDisableModal";
+
 import timeZones from "@/lib/timezones"; // We'll add a list of IANA timezones
 import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 
@@ -572,7 +573,7 @@ export default function Settings() {
             </div>
 
             <Tabs defaultValue="business" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 bg-white dark:bg-gray-800">
+              <TabsList className="grid w-full grid-cols-5 bg-white dark:bg-gray-800">
                 <TabsTrigger 
                   value="security"
                   className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
@@ -609,6 +610,7 @@ export default function Settings() {
                 >
                   Business
                 </TabsTrigger>
+
               </TabsList>
 
               {/* Security Tab */}
@@ -1297,6 +1299,8 @@ export default function Settings() {
                   </CardContent>
                 </Card>
               </TabsContent>
+
+
             </Tabs>
           </div>
         </div>
