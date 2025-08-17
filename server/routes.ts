@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import type { IStorage } from "./storage";
 import { z } from "zod";
-import { SquareClient, SquareEnvironment } from "square";
+
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
 import {
@@ -18,8 +18,7 @@ import {
   insertAppointmentHistorySchema,
   insertMembershipSchema,
   insertClientMembershipSchema,
-  insertPaymentSchema,
-  insertSavedPaymentMethodSchema,
+
   insertMarketingCampaignSchema,
   insertPromoCodeSchema,
   insertStaffScheduleSchema,
@@ -39,7 +38,7 @@ import {
   triggerBookingConfirmation, 
   triggerCancellation, 
   triggerNoShow, 
-  triggerAfterPayment,
+
   triggerCustomAutomation,
 } from "./automation-triggers";
 import { PhoneService } from "./phone-service";
@@ -51,8 +50,8 @@ import { JotformIntegration } from "./jotform-integration";
 import { LLMService } from "./llm-service";
 import { AutoRespondService } from "./auto-respond-service";
 import { SMSAutoRespondService } from "./sms-auto-respond-service";
-import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerPaymentRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes, registerLocationRoutes, registerHelcimRoutes } from "./routes/index";
-import { HelcimSmartTerminalService, generateIdempotencyKey as helcimIdk } from './services/helcim-smart-terminal';
+import { registerAuthRoutes, registerUserRoutes, registerAppointmentRoutes, registerAppointmentPhotoRoutes, registerServiceRoutes, registerNoteTemplateRoutes, registerNoteHistoryRoutes, registerLocationRoutes } from "./routes/index";
+
 import { getConfigStatus, validateConfig, DatabaseConfig } from "./config";
 import { hashPassword, comparePassword } from "./utils/password";
 import { insertUserSchema, updateUserSchema } from "@shared/schema";
@@ -117,30 +116,9 @@ const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
 });
 
 // Initialize Square
-const squareApplicationId = process.env.SQUARE_APPLICATION_ID;
-const squareAccessToken = process.env.SQUARE_ACCESS_TOKEN;
-const squareEnvironment = process.env.SQUARE_ENVIRONMENT === 'sandbox' ? SquareEnvironment.Sandbox : SquareEnvironment.Production;
 
-// Initialize Square client with production configuration
-let squareClient: any = null;
 
-try {
-  if (squareAccessToken) {
-    squareClient = new SquareClient({
-      accessToken: squareAccessToken,
-      environment: squareEnvironment,
-      userAgentDetail: 'glo-head-spa-payment-system'
-    });
-    console.log('Square client initialized for environment:', squareEnvironment === SquareEnvironment.Production ? 'Production' : 'Sandbox');
-  } else {
-    console.log('Square access token not found, using mock responses');
-  }
-} catch (error) {
-  console.error('Failed to initialize Square client:', error);
-  console.log('Using mock responses for Square API calls');
-}
 
-// Square API clients will be accessed directly from squareClient
 
 
 
@@ -157,95 +135,20 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerAuthRoutes(app, storage);
   registerUserRoutes(app, storage);
   registerAppointmentRoutes(app, storage);
-  registerHelcimRoutes(app, storage);
   registerAppointmentPhotoRoutes(app, storage);
-  registerPaymentRoutes(app, storage, squareClient);
   registerServiceRoutes(app, storage);
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
   registerLocationRoutes(app);
 
-  // Inline Helcim endpoints (redundant safety to avoid 404s if module registration is skipped in some deployments)
-  try {
-    const helcimApiToken = process.env.HELCIM_API_TOKEN || '';
-    const helcimDefaultDevice = process.env.HELCIM_TERMINAL_DEVICE_CODE || '';
-    const helcimApiUrl = (process.env.HELCIM_API_URL || 'https://api.helcim.com/v2').replace(/\/$/, '');
-    const helcimDefaultCurrency = (process.env.HELCIM_CURRENCY || 'USD').toUpperCase();
-    const helcim = helcimApiToken ? new HelcimSmartTerminalService(helcimApiToken, helcimApiUrl) : null;
 
-    app.get('/api/helcim-smart-terminal/health', (_req, res) => {
-      res.json({ ok: true, configured: !!helcim, defaultDeviceCode: helcimDefaultDevice || null, defaultCurrency: helcimDefaultCurrency });
-    });
+  
 
-    app.post('/api/helcim-smart-terminal/devices/:code/check-readiness', async (req, res) => {
-      if (!helcim) return res.status(500).json({ error: 'Helcim not configured' });
-      const code = req.params.code || helcimDefaultDevice;
-      const result = await helcim.pingDevice(code, helcimIdk('ping'));
-      res.status(result.ok ? 200 : result.status).json({ success: result.ok, ...result.body });
-    });
 
-    app.post('/api/helcim-smart-terminal/devices/:code/purchase', async (req, res) => {
-      try {
-        if (!helcim) return res.status(500).json({ error: 'Helcim not configured' });
-        const code = req.params.code || helcimDefaultDevice;
-        const { amount, currency, appointmentId, clientId, invoiceNumber, customerCode, tipAmount } = req.body || {};
-        if (typeof amount !== 'number' || amount <= 0) return res.status(400).json({ error: 'Invalid amount' });
-        // Make invoice number unique by adding timestamp to prevent "already paid" errors
-        const timestamp = Date.now();
-        const inv = invoiceNumber || (appointmentId ? `APT-${appointmentId}-${timestamp}` : `INV-${timestamp}`);
-        const cust = customerCode || (clientId ? `CLIENT-${clientId}` : undefined);
-        const selectedCurrency = ((currency || helcimDefaultCurrency) as any);
-        const result = await helcim.startPurchase({ code, currency: selectedCurrency, transactionAmount: amount, idempotencyKey: helcimIdk('purchase'), invoiceNumber: inv, customerCode: cust });
-        
-        // Create payment record regardless of terminal status (409 = device not listening but we still want to record the attempt)
-        if (result.ok || result.status === 202 || result.status === 409) {
-          try {
-            // Create payment record - for POS transactions we might not have appointmentId
-            const paymentRecord = await storage.createPayment({
-              appointmentId: appointmentId || null,
-              clientId: clientId || 1,
-              amount: amount - (tipAmount || 0),
-              tipAmount: tipAmount || 0,
-              totalAmount: amount,
-              method: 'helcim_terminal',
-              status: 'completed', // Mark as completed since terminal will handle the actual payment
-              type: appointmentId ? 'appointment' : 'pos_payment',
-              description: appointmentId ? 'Helcim Smart Terminal appointment payment' : 'Helcim Smart Terminal POS payment',
-              paymentDate: new Date()
-            });
-            
-            // If there's an appointment, update its payment status
-            if (appointmentId) {
-              await storage.updateAppointment(appointmentId, { paymentStatus: 'paid' });
-              console.log('✅ Appointment payment status updated to paid');
-            }
-            
-            console.log('✅ Payment record created:', paymentRecord);
-            res.status(result.status).json({ 
-              success: result.ok || result.status === 202, 
-              paymentRecord,
-              ...result.body 
-            });
-          } catch (dbError) {
-            console.error('Database error:', dbError);
-            // Still return success since payment was initiated
-            res.status(result.status).json({ 
-              success: result.ok || result.status === 202, 
-              warning: 'Payment initiated but database update failed',
-              ...result.body 
-            });
-          }
-        } else {
-          res.status(result.status).json({ success: false, ...result.body });
-        }
-      } catch (err: any) {
-        console.error('Helcim purchase error:', err);
-        res.status(500).json({ error: err.message || 'Failed to start Helcim purchase' });
-      }
-    });
-  } catch {
-    // ignore init errors
-  }
+
+
+
+
 
 
 
@@ -1758,7 +1661,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         try {
           if (req.body.paymentStatus === 'paid') {
             console.log('Payment status changed to paid, triggering after payment automations');
-            await triggerAfterPayment(updatedAppointment, storage);
+    
             await triggerCustomAutomation(updatedAppointment, storage, 'checkout completion');
             await triggerCustomAutomation(updatedAppointment, storage, 'service checkout');
             console.log('Payment status change automation triggers executed successfully');
@@ -2028,68 +1931,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
   
-  // Payments routes
-  app.post("/api/payments", validateBody(insertPaymentSchema), async (req, res) => {
-    const newPayment = await storage.createPayment(req.body);
-    return res.status(201).json(newPayment);
-  });
-  
-  app.get("/api/payments", async (req, res) => {
-    const { clientId } = req.query;
-    
-    // If clientId is provided, get payments for specific client
-    if (clientId) {
-      const payments = await storage.getPaymentsByClient(parseInt(clientId as string));
-      return res.status(200).json(payments);
-    }
-    
-    // Otherwise, get all payments for reporting purposes
-    try {
-      console.log('Fetching all payments for reports...');
-      const payments = await storage.getAllPayments();
-      console.log(`Found ${payments.length} payments`);
-      
-      // Get detailed information for each payment
-      const detailedPayments = await Promise.all(
-        payments.map(async (payment) => {
-          const client = await storage.getUser(payment.clientId);
-          const appointment = payment.appointmentId ? await storage.getAppointment(payment.appointmentId) : null;
-          let service = null;
-          
-          if (appointment) {
-            service = await storage.getService(appointment.serviceId);
-          }
-          
-          return {
-            ...payment,
-            client: client ? {
-              id: client.id,
-              firstName: client.firstName,
-              lastName: client.lastName,
-              email: client.email
-            } : null,
-            appointment,
-            service
-          };
-        })
-      );
-      
-      res.json(detailedPayments);
-    } catch (error: any) {
-      console.error('Error fetching payments:', error);
-      res.status(500).json({ error: "Error fetching payments: " + error.message });
-    }
-  });
-  
-  app.put("/api/payments/:id", validateBody(insertPaymentSchema.partial()), async (req, res) => {
-    const id = parseInt(req.params.id);
-    try {
-      const updatedPayment = await storage.updatePayment(id, req.body);
-      return res.status(200).json(updatedPayment);
-    } catch (error) {
-      return res.status(404).json({ error: "Payment not found" });
-    }
-  });
+
 
   // Cash payment confirmation route
   app.post("/api/confirm-cash-payment", async (req, res) => {
@@ -2166,7 +2008,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
       // Trigger custom automations for checkout completion
       try {
-        await triggerAfterPayment(appointment, storage);
+
         await triggerCustomAutomation(appointment, storage, 'checkout completion');
         await triggerCustomAutomation(appointment, storage, 'service checkout');
         console.log('Checkout automation triggers executed successfully');
@@ -2279,7 +2121,6 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
       // Trigger custom automations for checkout completion
       try {
-        await triggerAfterPayment(appointment, storage);
         await triggerCustomAutomation(appointment, storage, 'checkout completion');
         await triggerCustomAutomation(appointment, storage, 'service checkout');
         console.log('Checkout automation triggers executed successfully');
@@ -2516,8 +2357,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
-  // Square payment routes for appointment checkout and POS
-  app.post("/api/create-payment", async (req, res) => {
+
     try {
       const { amount, tipAmount = 0, appointmentId, description, type = "appointment_payment", sourceId } = req.body;
       
@@ -3031,7 +2871,6 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
         // Trigger custom automations for checkout completion
         try {
-          await triggerAfterPayment(appointment, storage);
           await triggerCustomAutomation(appointment, storage, 'checkout completion');
           await triggerCustomAutomation(appointment, storage, 'service checkout');
           console.log('Checkout automation triggers executed successfully');
@@ -3096,7 +2935,6 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
         // Trigger custom automations for checkout completion
         try {
-          await triggerAfterPayment(appointment, storage);
           await triggerCustomAutomation(appointment, storage, 'checkout completion');
           await triggerCustomAutomation(appointment, storage, 'service checkout');
           console.log('Checkout automation triggers executed successfully');
@@ -3116,49 +2954,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
-  // Saved Payment Methods routes
-  app.get("/api/saved-payment-methods", async (req, res) => {
-    const { clientId } = req.query;
-    
-    if (!clientId) {
-      return res.status(400).json({ error: "Client ID is required" });
-    }
-    
-    const savedMethods = await storage.getSavedPaymentMethodsByClient(parseInt(clientId as string));
-    return res.status(200).json(savedMethods);
-  });
 
-  app.post("/api/saved-payment-methods", validateBody(insertSavedPaymentMethodSchema), async (req, res) => {
-    try {
-      const savedMethod = await storage.createSavedPaymentMethod(req.body);
-      return res.status(201).json(savedMethod);
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error saving payment method: " + error.message });
-    }
-  });
-
-  app.delete("/api/saved-payment-methods/:id", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const success = await storage.deleteSavedPaymentMethod(id);
-    
-    if (success) {
-      return res.status(204).end();
-    } else {
-      return res.status(404).json({ error: "Payment method not found" });
-    }
-  });
-
-  app.put("/api/saved-payment-methods/:id/default", async (req, res) => {
-    const id = parseInt(req.params.id);
-    const { clientId } = req.body;
-    
-    try {
-      await storage.setDefaultPaymentMethod(clientId, id);
-      return res.status(200).json({ success: true });
-    } catch (error: any) {
-      return res.status(500).json({ error: "Error setting default payment method: " + error.message });
-    }
-  });
 
   // Marketing Campaign routes
   app.get("/api/marketing-campaigns", async (req, res) => {
@@ -7424,11 +7220,19 @@ If you didn't attempt to log in, please ignore this email and contact support im
 
       console.log('SMS auto-respond result:', result);
 
-      // Return TwiML response for Twilio
-      const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      // Return TwiML response for Twilio with the actual AI response
+      let twiml = '';
+      if (result.responseSent && result.response) {
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Message>${result.response}</Message>
+</Response>`;
+      } else {
+        twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <!-- Auto-response handled by system -->
 </Response>`;
+      }
 
       res.set('Content-Type', 'text/xml');
       res.send(twiml);

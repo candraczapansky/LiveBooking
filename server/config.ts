@@ -27,7 +27,7 @@ export const config = {
   
   // Helcim Configuration
   HELCIM_API_TOKEN: process.env.HELCIM_API_TOKEN || '',
-  HELCIM_API_URL: process.env.HELCIM_API_URL || 'https://api.helcim.com/v2',
+  HELCIM_API_URL: process.env.HELCIM_API_URL || 'https://api.helcim.com/v2/smart-terminal',
   HELCIM_TERMINAL_DEVICE_CODE: process.env.HELCIM_TERMINAL_DEVICE_CODE || 'UOJS'
 };
 

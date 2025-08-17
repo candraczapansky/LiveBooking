@@ -1,0 +1,7 @@
+{
+  "enabled": true,
+  "pythonServiceUrl": "http://localhost:8000",
+  "useForPhoneNumbers": [],
+  "fallbackToTypeScript": true,
+  "logLevel": "info"
+}

@@ -21,7 +21,7 @@ export class HelcimSmartTerminalService {
 	private apiUrl: string;
 	private apiToken: string;
 
-	constructor(apiToken: string, apiUrl: string = 'https://api.helcim.com/v2') {
+	constructor(apiToken: string, apiUrl: string = 'https://api.helcim.com/v2/smart-terminal') {
 		if (!apiToken) throw new Error('HELCIM_API_TOKEN must be set');
 		this.apiToken = apiToken;
 		this.apiUrl = apiUrl.replace(/\/$/, '');
@@ -98,13 +98,32 @@ export class HelcimSmartTerminalService {
 		// Ensure amount is a number with max 2 decimals
 		const normalizedAmount = Math.round(Number(transactionAmount) * 100) / 100;
 		const body: any = { currency, transactionAmount: normalizedAmount };
+		
 		if (invoiceNumber) body.invoiceNumber = invoiceNumber;
 		if (customerCode) body.customerCode = customerCode;
-		return this.request(`/devices/${encodeURIComponent(code)}/payment/purchase`, {
+		
+		const response = await this.request(`/devices/${encodeURIComponent(code)}/payment/purchase`, {
 			method: 'POST',
 			headers: { 'idempotency-key': idempotencyKey },
 			body: JSON.stringify(body)
 		});
+		
+		if (!response.ok) {
+			if (response.status === 401) {
+				throw new Error('Invalid Helcim API token. Please check your configuration.');
+			}
+			if (response.status === 404) {
+				throw new Error('Device not found or API endpoint incorrect. Please verify your Helcim configuration.');
+			}
+			if (response.status === 409) {
+				throw new Error('Device conflict: Device may be offline, sleeping, or processing another transaction');
+			}
+			
+			const errorMessage = response.body?.errors?.[0] || response.body?.message || `HTTP ${response.status}`;
+			throw new Error(`Helcim API error: ${errorMessage}`);
+		}
+		
+		return response;
 	}
 
 	async startRefund(req: HelcimRefundRequest) {

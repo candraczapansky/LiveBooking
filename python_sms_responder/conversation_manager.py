@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
-from .models import ClientInfo, AppointmentInfo
+from models import ClientInfo, AppointmentInfo
 
 class ConversationState:
     """Represents the state of a conversation"""
@@ -101,31 +101,57 @@ class ConversationManager:
         # Log current state for debugging
         self.logger.info(f"Processing message for {phone_number}: '{message}' at step '{state.step}'")
         
-        # Process based on current step
-        if state.step == "greeting":
-            result = self._handle_greeting(state, message)
-        elif state.step == "service_selection":
-            result = self._handle_service_selection(state, message)
-        elif state.step == "time_selection":
-            result = self._handle_time_selection(state, message)
-        elif state.step == "client_info":
-            result = self._handle_client_info(state, message)
-        elif state.step == "confirmation":
-            result = self._handle_confirmation(state, message)
+        # Check if this is a booking-related message
+        message_lower = message.lower()
+        is_booking_request = any(word in message_lower for word in [
+            "book", "appointment", "schedule", "make appointment", "book me",
+            "haircut", "color", "style", "service", "price", "cost"
+        ])
+        
+        # If we're in a booking flow or this is a booking request, handle it
+        if state.step != "greeting" or is_booking_request:
+            # Process based on current step
+            if state.step == "greeting":
+                result = self._handle_greeting(state, message)
+            elif state.step == "service_selection":
+                result = self._handle_service_selection(state, message)
+            elif state.step == "time_selection":
+                result = self._handle_time_selection(state, message)
+            elif state.step == "client_info":
+                result = self._handle_client_info(state, message)
+            elif state.step == "confirmation":
+                result = self._handle_confirmation(state, message)
+            else:
+                result = self._handle_greeting(state, message)
+            
+            # Log result for debugging
+            self.logger.info(f"Conversation result for {phone_number}: {result}")
+            
+            # If we have a specific response, use it
+            if result.get("response"):
+                return result
+            else:
+                # Fall back to AI for general conversation
+                return {
+                    "response": None,
+                    "requires_booking": False,
+                    "step": state.step
+                }
         else:
-            result = self._handle_greeting(state, message)
-        
-        # Log result for debugging
-        self.logger.info(f"Conversation result for {phone_number}: {result}")
-        
-        return result
+            # For general conversation, always let AI handle it
+            self.logger.info(f"General conversation for {phone_number}, letting AI handle it")
+            return {
+                "response": None,
+                "requires_booking": False,
+                "step": "greeting"
+            }
     
     def _handle_greeting(self, state: ConversationState, message: str) -> Dict[str, Any]:
         """Handle initial greeting and service selection"""
         message_lower = message.lower()
         
-        # Check if user wants to book an appointment
-        if any(word in message_lower for word in ["book", "appointment", "schedule", "haircut", "service"]):
+        # Check if user wants to book an appointment (more specific)
+        if any(word in message_lower for word in ["book", "appointment", "schedule", "make appointment", "book me"]):
             state.step = "service_selection"
             return {
                 "response": "Great! I'd be happy to help you book an appointment. Here are our services:\n\n" + 
@@ -134,9 +160,17 @@ class ConversationManager:
                 "step": "service_selection",
                 "requires_booking": True
             }
-        else:
+        elif any(word in message_lower for word in ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"]):
+            # For greetings, let AI handle the response to make it more natural
             return {
-                "response": "Hello! I'm here to help with your salon needs. Would you like to book an appointment?",
+                "response": None,
+                "step": "greeting",
+                "requires_booking": False
+            }
+        else:
+            # For general conversation, let AI handle it
+            return {
+                "response": None,
                 "step": "greeting",
                 "requires_booking": False
             }
@@ -259,15 +293,15 @@ class ConversationManager:
                 
                 if self.db_service:
                     # Try to find existing client
-                    client = await self.db_service.get_client_by_phone(state.phone_number)
+                    client = self.db_service.get_client_by_phone(state.phone_number)
                     
                     if client:
                         # Update existing client
                         client_id = client.id
-                        await self.db_service.update_client(client_id, client_data)
+                        self.db_service.update_client(client_id, client_data)
                     else:
                         # Create new client
-                        client = await self.db_service.create_client(client_data)
+                        client = self.db_service.create_client(client_data)
                         client_id = client.id
                     
                     # Parse date and time
@@ -275,7 +309,7 @@ class ConversationManager:
                     service_info = self.services[state.selected_service]
                     
                     # Create appointment
-                    appointment = await self.db_service.create_appointment(
+                    appointment = self.db_service.create_appointment(
                         client_id=client_id,
                         date=appointment_datetime,
                         service=service_info["name"],

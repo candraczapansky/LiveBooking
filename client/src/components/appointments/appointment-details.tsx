@@ -600,44 +600,122 @@ const AppointmentDetails = ({
                                   if (info?.defaultDeviceCode) deviceCode = info.defaultDeviceCode;
                                 }
                               } catch {}
-                          let resp = await apiRequest("POST", `/api/helcim-smart-terminal/devices/${deviceCode}/purchase`, {
+                              
+                              // Prepare purchase data
+                              const purchaseData = {
                                 amount,
+                                transactionAmount: amount,
+                                tipAmount: 0,
+                                currency: 'USD',
                                 appointmentId: appointmentId,
                                 clientId: appointment.clientId,
+                                type: 'appointment_payment',
                                 description: `Helcim terminal payment for appointment #${appointmentId}`
-                              });
+                              };
+                              
+                              // Use primary path for consistent response format
+                              let resp = await apiRequest("POST", `/api/helcim-smart-terminal/devices/${deviceCode}/purchase`, purchaseData);
                               // Fallback alias route if first path not found
                               if (resp.status === 404) {
-                                resp = await apiRequest("POST", `/api/helcim/devices/${deviceCode}/purchase`, {
-                                  amount,
-                                  currency: 'USD',
-                                  appointmentId: appointmentId,
-                                  clientId: appointment.clientId,
-                                  description: `Helcim terminal payment for appointment #${appointmentId}`
-                                });
+                                resp = await apiRequest("POST", `/api/helcim/devices/${deviceCode}/purchase`, purchaseData);
                               }
-                              const data = await resp.json();
+                              const result = await resp.json();
+                              
+                              console.log('Purchase response:', result);
+                              
                               if (resp.ok || resp.status === 202) {
-                                toast({
-                                  title: "Payment Processed",
-                                  description: "Payment has been sent to the Helcim terminal and recorded.",
-                                });
-                                setShowPaymentOptions(false);
+                                // Get transaction ID for polling
+                                const transactionId = result.transactionId;
                                 
-                                // Wait a bit for the backend to process
-                                setTimeout(async () => {
-                                  // Force refresh all appointment data
-                                  await queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
-                                  await queryClient.invalidateQueries({ queryKey: ["/api/appointments", appointmentId] });
-                                  await refetch();
-                                  
-                                  // Also refresh the parent component if it exists
-                                  if (window.location.pathname.includes('/appointments')) {
-                                    window.location.reload();
+                                if (!transactionId) {
+                                  console.error('No transaction ID received from server');
+                                  throw new Error('No transaction ID received - payment cannot be tracked');
+                                }
+                                
+                                toast({
+                                  title: "Payment Sent",
+                                  description: "Please complete the payment on the terminal device",
+                                });
+                                
+                                // Start polling for payment status
+                                let pollCount = 0;
+                                const maxPolls = 60; // Poll for up to 2 minutes
+                                
+                                const pollInterval = setInterval(async () => {
+                                  try {
+                                    pollCount++;
+                                    console.log(`Polling transaction status (${pollCount}/${maxPolls})...`);
+                                    
+                                    const statusResponse = await apiRequest("GET", `/api/helcim-smart-terminal/transactions/${transactionId}/status`);
+                                    const statusData = await statusResponse.json();
+                                    
+                                    if (statusData.status === 'completed') {
+                                      // Payment completed successfully
+                                      clearInterval(pollInterval);
+                                      
+                                      // Complete the transaction in database
+                                      const completeResponse = await apiRequest("POST", `/api/helcim-smart-terminal/transactions/${transactionId}/complete`, {
+                                        purchaseData: purchaseData,
+                                        transactionData: statusData.data
+                                      });
+                                      
+                                      if (completeResponse.ok) {
+                                        toast({
+                                          title: "Payment Successful",
+                                          description: `Payment of $${amount.toFixed(2)} has been completed.`,
+                                        });
+                                        
+                                        setShowPaymentOptions(false);
+                                        
+                                        // Force refresh all appointment data
+                                        await queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+                                        await queryClient.invalidateQueries({ queryKey: ["/api/appointments", appointmentId] });
+                                        await refetch();
+                                        
+                                        // Also refresh the parent component if it exists
+                                        if (window.location.pathname.includes('/appointments')) {
+                                          setTimeout(() => {
+                                            window.location.reload();
+                                          }, 1000);
+                                        }
+                                      } else {
+                                        throw new Error('Failed to complete transaction');
+                                      }
+                                      
+                                      setIsProcessingHelcimPayment(false);
+                                      
+                                    } else if (statusData.status === 'failed' || statusData.status === 'cancelled') {
+                                      // Payment failed or was cancelled
+                                      clearInterval(pollInterval);
+                                      setIsProcessingHelcimPayment(false);
+                                      
+                                      toast({
+                                        title: "Payment Failed",
+                                        description: "Payment was declined or cancelled on the terminal",
+                                        variant: "destructive",
+                                      });
+                                      
+                                    } else if (pollCount >= maxPolls) {
+                                      // Timeout - stop polling
+                                      clearInterval(pollInterval);
+                                      setIsProcessingHelcimPayment(false);
+                                      
+                                      toast({
+                                        title: "Payment Timeout",
+                                        description: "If payment was completed on terminal, use the 'Confirm Payment' button.",
+                                        variant: "default",
+                                      });
+                                    }
+                                    // Otherwise continue polling (status is 'processing')
+                                    
+                                  } catch (error) {
+                                    console.error('Error polling transaction status:', error);
+                                    // Continue polling despite errors
                                   }
-                                }, 1000);
+                                }, 2000); // Poll every 2 seconds
+                                
                               } else {
-                                throw new Error(data?.error || 'Failed to initiate terminal payment');
+                                throw new Error(result?.error || 'Failed to initiate terminal payment');
                               }
                             } catch (error: any) {
                               toast({
@@ -645,7 +723,6 @@ const AppointmentDetails = ({
                                 description: error.message || "Failed to initiate Helcim terminal payment",
                                 variant: "destructive",
                               });
-                            } finally {
                               setIsProcessingHelcimPayment(false);
                             }
                           }}
@@ -659,21 +736,22 @@ const AppointmentDetails = ({
                           </div>
                         </Button>
 
-                        {/* Mark Helcim Payment Completed (manual fallback) */}
+                        {/* Confirm Terminal Payment (for when terminal shows "already paid") */}
                         <Button
                           onClick={async () => {
                             if (!appointmentId || !appointment) return;
                             try {
                               const amount = (appointment.totalAmount != null ? appointment.totalAmount : (service?.price || 0));
-                              const resp = await apiRequest("POST", `/api/helcim-smart-terminal/appointments/${appointmentId}/mark-completed`, {
-                                amount
+                              const resp = await apiRequest("POST", `/api/helcim-smart-terminal/appointments/${appointmentId}/confirm-payment`, {
+                                amount,
+                                clientId: appointment.clientId
                               });
                               if (resp.ok) {
                                 await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
                                 await queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
                                 toast({
-                                  title: "Payment Recorded",
-                                  description: "Helcim terminal payment marked as completed.",
+                                                                  title: "Payment Confirmed",
+                                description: "Terminal payment has been recorded successfully.",
                                 });
                                 setShowPaymentOptions(false);
                               } else {
@@ -692,8 +770,8 @@ const AppointmentDetails = ({
                           className="w-full"
                         >
                           <div className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Record Helcim Completion
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            Confirm Terminal Payment
                           </div>
                         </Button>
 

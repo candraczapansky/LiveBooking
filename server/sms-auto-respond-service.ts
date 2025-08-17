@@ -3,6 +3,7 @@ import { LLMService } from './llm-service';
 import { SMSAppointmentBookingService } from './sms-appointment-booking';
 import { SMSAppointmentManagementService } from './sms-appointment-management';
 import { sendSMS } from './sms';
+import { processSMSWithPython } from './sms-python-integration';
 
 interface SMSAutoRespondConfig {
   enabled: boolean;
@@ -617,6 +618,16 @@ export class SMSAutoRespondService {
         body: sms.body.substring(0, 50) + '...',
         timestamp: sms.timestamp
       });
+
+      // First, try to process with Python service if available
+      const pythonResult = await processSMSWithPython(sms);
+      if (pythonResult) {
+        console.log('SMS processed by Python service:', pythonResult);
+        return pythonResult;
+      }
+
+      // Fall back to TypeScript implementation
+      console.log('Falling back to TypeScript SMS processing');
 
       // Check if auto-respond is enabled
       if (!this.config.enabled) {

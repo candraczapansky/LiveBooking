@@ -9,6 +9,12 @@ import { createServer } from "http";
 // Load environment variables
 config();
 
+// Debug environment variables
+console.log('🔍 Environment variables check:');
+console.log('  REPL_ID:', process.env.REPL_ID ? 'SET' : 'NOT SET');
+console.log('  HELCIM_API_TOKEN:', process.env.HELCIM_API_TOKEN ? 'SET' : 'NOT SET');
+console.log('  NODE_ENV:', process.env.NODE_ENV);
+
 const app = express();
 
 // Add CORS support for external applications

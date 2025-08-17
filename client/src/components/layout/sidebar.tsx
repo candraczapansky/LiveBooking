@@ -2,7 +2,6 @@ import { useContext, useEffect, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
-import { BusinessBrand } from "@/components/BusinessBrand";
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -206,7 +205,6 @@ const Sidebar = () => {
                   style={{ color: primaryColor }}
                 />
               </Button>
-              {isOpen && <BusinessBrand size="2xl" className="text-primary justify-center ml-4" showName={true} />}
             </div>
             {isMobile && (
               <Button variant="ghost" size="sm" onClick={closeSidebar} className="md:hidden">

@@ -4,7 +4,7 @@ import psycopg2.extras
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
-from .models import ClientInfo, AppointmentInfo
+from models import ClientInfo, AppointmentInfo
 
 class DatabaseService:
     """Service for handling database operations"""
@@ -35,7 +35,7 @@ class DatabaseService:
             self.logger.error(f"Database connection error: {str(e)}")
             raise
     
-    async def get_client_by_phone(self, phone_number: str) -> Optional[ClientInfo]:
+    def get_client_by_phone(self, phone_number: str) -> Optional[ClientInfo]:
         """
         Get client information by phone number
         
@@ -52,20 +52,21 @@ class DatabaseService:
             # Clean phone number for comparison
             clean_phone = self._clean_phone_number(phone_number)
             
-            # Query for client information
+            # Query for client information from users table
             query = """
                 SELECT 
-                    c.id,
-                    c.name,
-                    c.phone,
-                    c.email,
-                    c.preferences,
+                    u.id,
+                    CONCAT(u.first_name, ' ', u.last_name) as name,
+                    u.phone,
+                    u.email,
+                    u.notes as preferences,
                     COUNT(a.id) as total_appointments,
                     MAX(a.date) as last_appointment
-                FROM clients c
-                LEFT JOIN appointments a ON c.id = a.client_id
-                WHERE c.phone = %s OR c.phone = %s OR c.phone = %s
-                GROUP BY c.id, c.name, c.phone, c.email, c.preferences
+                FROM users u
+                LEFT JOIN appointments a ON u.id = a.client_id
+                WHERE u.role = 'client' 
+                AND (u.phone = %s OR u.phone = %s OR u.phone = %s)
+                GROUP BY u.id, u.first_name, u.last_name, u.phone, u.email, u.notes
                 LIMIT 1
             """
             
@@ -81,7 +82,7 @@ class DatabaseService:
             
             if result:
                 # Get upcoming appointments
-                upcoming_appointments = await self._get_upcoming_appointments(result['id'])
+                upcoming_appointments = self._get_upcoming_appointments(result['id'])
                 
                 return ClientInfo(
                     id=result['id'],
@@ -103,7 +104,7 @@ class DatabaseService:
             if 'conn' in locals():
                 conn.close()
     
-    async def _get_upcoming_appointments(self, client_id: int) -> List[AppointmentInfo]:
+    def _get_upcoming_appointments(self, client_id: int) -> List[AppointmentInfo]:
         """
         Get upcoming appointments for a client
         
@@ -156,7 +157,7 @@ class DatabaseService:
             if 'conn' in locals():
                 conn.close()
     
-    async def get_available_slots(self, date: datetime, service: str = None) -> List[Dict[str, Any]]:
+    def get_available_slots(self, date: datetime, service: str = None) -> List[Dict[str, Any]]:
         """
         Get available appointment slots for a given date
         
@@ -226,7 +227,7 @@ class DatabaseService:
             if 'conn' in locals():
                 conn.close()
     
-    async def create_appointment(
+    def create_appointment(
         self, 
         client_id: int, 
         date: datetime, 
@@ -274,7 +275,7 @@ class DatabaseService:
             if 'conn' in locals():
                 conn.close()
     
-    async def update_appointment(
+    def update_appointment(
         self, 
         appointment_id: int, 
         **kwargs
@@ -328,6 +329,107 @@ class DatabaseService:
             if 'conn' in locals():
                 conn.close()
     
+    def create_client(self, client_data: dict) -> Optional[dict]:
+        """
+        Create a new client in the users table
+        
+        Args:
+            client_data: Dictionary with client information
+            
+        Returns:
+            dict: Created client info or None if failed
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Extract name parts
+            full_name = client_data.get('name', '').split(' ', 1)
+            first_name = full_name[0] if full_name else ''
+            last_name = full_name[1] if len(full_name) > 1 else ''
+            
+            # Create user with client role
+            query = """
+                INSERT INTO users (username, password, email, role, first_name, last_name, phone)
+                VALUES (%s, %s, %s, 'client', %s, %s, %s)
+                RETURNING id, first_name, last_name, email, phone
+            """
+            
+            # Generate username from email or phone
+            username = client_data.get('email', '').split('@')[0] if '@' in client_data.get('email', '') else client_data.get('phone', '')
+            
+            cursor.execute(query, (
+                username,
+                'temp_password',  # Temporary password - clients login via SMS
+                client_data.get('email', ''),
+                first_name,
+                last_name,
+                client_data.get('phone', '')
+            ))
+            
+            result = cursor.fetchone()
+            conn.commit()
+            
+            if result:
+                return {'id': result['id']}
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error creating client: {str(e)}")
+            if 'conn' in locals():
+                conn.rollback()
+            return None
+        finally:
+            if 'conn' in locals():
+                conn.close()
+    
+    def update_client(self, client_id: int, client_data: dict) -> bool:
+        """
+        Update client information in the users table
+        
+        Args:
+            client_id: Client ID
+            client_data: Dictionary with updated information
+            
+        Returns:
+            bool: True if updated successfully
+        """
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+            
+            # Extract name parts
+            if 'name' in client_data:
+                full_name = client_data['name'].split(' ', 1)
+                first_name = full_name[0] if full_name else ''
+                last_name = full_name[1] if len(full_name) > 1 else ''
+                
+                query = """
+                    UPDATE users 
+                    SET first_name = %s, last_name = %s, email = %s
+                    WHERE id = %s AND role = 'client'
+                """
+                cursor.execute(query, (first_name, last_name, client_data.get('email', ''), client_id))
+            else:
+                query = """
+                    UPDATE users 
+                    SET email = %s
+                    WHERE id = %s AND role = 'client'
+                """
+                cursor.execute(query, (client_data.get('email', ''), client_id))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error updating client: {str(e)}")
+            if 'conn' in locals():
+                conn.rollback()
+            return False
+        finally:
+            if 'conn' in locals():
+                conn.close()
+    
     def _clean_phone_number(self, phone: str) -> str:
         """Clean phone number for database comparison"""
         return ''.join(filter(str.isdigit, phone))
@@ -344,7 +446,7 @@ class DatabaseService:
             return phone[1:]
         return phone
     
-    async def check_health(self) -> dict:
+    def check_health(self) -> dict:
         """
         Check database service health
         

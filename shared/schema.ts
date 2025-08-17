@@ -333,8 +333,8 @@ export const payments = pgTable("payments", {
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   type: text("type").notNull().default("appointment"), // appointment, pos_payment, membership
   description: text("description"),
-  squarePaymentId: text("square_payment_id"),
   paymentDate: timestamp("payment_date"),
+  transactionId: text("transaction_id"), // External transaction ID from payment processor
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -823,9 +823,6 @@ export const salesHistory = pgTable("sales_history", {
   dayOfWeek: text("day_of_week"),
   monthYear: text("month_year"), // Format: "2025-06" for easy monthly grouping
   quarter: text("quarter"), // Format: "2025-Q2"
-  
-  // External tracking
-  squarePaymentId: text("square_payment_id"),
   
   // Audit trail
   createdBy: integer("created_by"), // User who created the record

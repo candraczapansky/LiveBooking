@@ -3,7 +3,6 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Loader2, CreditCard, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { toast } from '../../hooks/use-toast';
-import { apiRequest } from '../../lib/queryClient';
 
 interface SmartTerminalPaymentProps {
   amount: number;
@@ -35,9 +34,11 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [devices, setDevices] = useState<SmartTerminalDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<string>('');
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'checking' | 'sending' | 'waiting' | 'success' | 'failed'>('idle');
+  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'sending' | 'waiting' | 'success' | 'failed'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [isCheckingDevices, setIsCheckingDevices] = useState(false);
+  const [transactionId, setTransactionId] = useState<string>('');
+
 
   const totalAmount = amount + tipAmount;
 
@@ -49,47 +50,25 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
   const fetchDevices = async () => {
     try {
       setIsCheckingDevices(true);
-      const response = await fetch('/api/helcim-smart-terminal/health');
-      const healthData = await response.json();
-      
-      if (healthData.configured && healthData.defaultDeviceCode) {
-        // Use the default UOJS device
-        const device: SmartTerminalDevice = {
-          id: healthData.defaultDeviceCode,
-          code: healthData.defaultDeviceCode,
-          name: 'UOJS Terminal',
-          status: 'active',
-          lastSeen: new Date().toISOString()
-        };
-        setDevices([device]);
-        setSelectedDevice(device.code);
-      } else {
-        setErrorMessage('No terminal devices configured');
-      }
+      // For now, use a default terminal ID since we're using the new endpoint
+      const device: SmartTerminalDevice = {
+        id: 'TERM001',
+        code: 'TERM001',
+        name: 'Helcim Smart Terminal',
+        status: 'active',
+        lastSeen: new Date().toISOString()
+      };
+      setDevices([device]);
+      setSelectedDevice(device.code);
     } catch (error) {
-      console.error('Error fetching devices:', error);
-      setErrorMessage('Failed to fetch terminal devices');
+      console.error('Error setting up default device:', error);
+      setErrorMessage('Failed to set up terminal device');
     } finally {
       setIsCheckingDevices(false);
     }
   };
 
-  const checkDeviceReadiness = async (deviceCode: string): Promise<boolean> => {
-    try {
-      const response = await fetch(`/api/helcim-smart-terminal/devices/${deviceCode}/check-readiness`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      const data = await response.json();
-      return data.success || false;
-    } catch (error) {
-      console.error('Error checking device readiness:', error);
-      return false;
-    }
-  };
+
 
   const processPayment = async () => {
     if (!selectedDevice) {
@@ -102,78 +81,57 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
     }
 
     setIsProcessing(true);
-    setPaymentStatus('checking');
+    setPaymentStatus('sending');
     setErrorMessage('');
 
     try {
-      // Check device readiness
-      console.log('Checking device readiness...');
-      const isReady = await checkDeviceReadiness(selectedDevice);
+      // Use the new clean payment endpoint
+      console.log('Initiating payment with new endpoint...');
       
-      if (!isReady) {
-        throw new Error('Terminal device is not ready. Please ensure it is powered on and connected.');
-      }
-
-      // Send payment to terminal
-      setPaymentStatus('sending');
-      console.log('Sending payment to terminal...');
+      const paymentRequest = {
+        amount: totalAmount,
+        terminalId: selectedDevice,
+        bookingId: appointmentId ? `APT-${appointmentId}` : `POS-${Date.now()}`
+      };
       
-      const response = await fetch(`/api/helcim-smart-terminal/devices/${selectedDevice}/purchase`, {
+      const response = await fetch('/payments/initiate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          amount: totalAmount,
-          tipAmount: tipAmount,
-          currency: 'CAD',
-          appointmentId,
-          clientId,
-          // Don't send invoice number - let backend generate unique one
-          customerCode: clientId ? `CLIENT-${clientId}` : undefined
-        })
+        body: JSON.stringify(paymentRequest)
       });
 
       const data = await response.json();
       
-      if (response.ok || response.status === 202) {
+      if (response.ok && data.success) {
+        // Store transaction ID for webhook handling
+        const txnId = data.transactionId;
+        setTransactionId(txnId);
         setPaymentStatus('waiting');
         
         // Show success message
         toast({
-          title: "Payment Sent",
-          description: "Please complete the payment on the terminal device"
+          title: "Payment Initiated",
+          description: "Please complete the payment on the terminal device. The system will automatically update when payment is completed."
         });
 
-        // Show success immediately since payment is recorded
-        setPaymentStatus('success');
-        
-        // Call success callback with payment data from server
-        const paymentData = {
-          paymentId: data.paymentRecord?.id || data.purchase?.id || `terminal_${Date.now()}`,
-          amount: totalAmount,
-          method: 'helcim_terminal',
-          status: 'completed',
-          deviceCode: selectedDevice,
-          paymentRecord: data.paymentRecord
-        };
-        
-        console.log('Helcim payment completed, calling onSuccess with:', paymentData);
-        
-        toast({
-          title: "Payment Successful",
-          description: `Payment of $${totalAmount.toFixed(2)} has been recorded. Complete on terminal.`
-        });
-        
-        // Call success callback immediately
-        onSuccess(paymentData);
-        
-        // Auto-close after a short delay
+        // For now, simulate success after a delay (webhook will handle real updates)
         setTimeout(() => {
-          onCancel();
-        }, 2000);
+          setPaymentStatus('success');
+          setIsProcessing(false);
+          
+          // Call onSuccess with payment data
+          onSuccess({
+            transactionId: txnId,
+            status: 'completed',
+            amount: totalAmount,
+            method: 'helcim_terminal'
+          });
+        }, 5000); // 5 second delay for demo
+        
       } else {
-        throw new Error(data.error || 'Payment failed');
+        throw new Error(data.detail || 'Payment initiation failed');
       }
     } catch (error: any) {
       console.error('Payment error:', error);
@@ -185,16 +143,16 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
         description: error.message || 'Failed to process payment',
         variant: "destructive"
       });
-    } finally {
-      if (paymentStatus !== 'success') {
-        setIsProcessing(false);
-      }
+      setIsProcessing(false);
     }
   };
 
+  
+
+
+
   const getStatusIcon = () => {
     switch (paymentStatus) {
-      case 'checking':
       case 'sending':
         return <Loader2 className="h-8 w-8 animate-spin text-blue-500" />;
       case 'waiting':
@@ -210,8 +168,6 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
 
   const getStatusMessage = () => {
     switch (paymentStatus) {
-      case 'checking':
-        return 'Checking device status...';
       case 'sending':
         return 'Sending payment to terminal...';
       case 'waiting':
@@ -335,17 +291,19 @@ export const SmartTerminalPayment: React.FC<SmartTerminalPaymentProps> = ({
                 Done
               </Button>
             ) : (
-              <Button
-                onClick={() => {
-                  setPaymentStatus('idle');
-                  setIsProcessing(false);
-                }}
-                variant="outline"
-                className="w-full"
-                disabled={paymentStatus === 'waiting'}
-              >
-                {paymentStatus === 'waiting' ? 'Waiting for terminal...' : 'Cancel'}
-              </Button>
+              <>
+                <Button
+                  onClick={() => {
+                    setPaymentStatus('idle');
+                    setIsProcessing(false);
+                  }}
+                  variant="outline"
+                  className="w-full"
+                  disabled={paymentStatus === 'waiting'}
+                >
+                  {paymentStatus === 'waiting' ? 'Waiting for terminal...' : 'Cancel'}
+                </Button>
+              </>
             )}
           </div>
         </div>

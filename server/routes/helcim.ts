@@ -25,7 +25,7 @@ export function registerHelcimRoutes(app: Express, storage: IStorage) {
 	const webhookSecret = process.env.HELCIM_WEBHOOK_SECRET || '';
 	const defaultDeviceCode = process.env.HELCIM_TERMINAL_DEVICE_CODE || '';
 	const defaultCurrency = (process.env.HELCIM_CURRENCY || 'USD').toUpperCase() as 'USD' | 'CAD';
-	const helcimApiUrl = (process.env.HELCIM_API_URL || 'https://api.helcim.com/v2').replace(/\/$/, '');
+	const helcimApiUrl = (process.env.HELCIM_API_URL || 'https://api.helcim.com/v2/smart-terminal').replace(/\/$/, '');
 
 	let helcim: HelcimSmartTerminalService | null = null;
 	try {

@@ -4,72 +4,27 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 from datetime import datetime
-import aiosmtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-from .sms_service import SMSService
-from .llm_service import LLMService
-from .database_service import DatabaseService
-from .voice_service import VoiceService
-from .models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
+from sms_service import SMSService
+from llm_service import LLMService
+from database_service import DatabaseService
+from voice_service import VoiceService
+from models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
 
 # Load environment variables
 load_dotenv()
 
-async def send_appointment_confirmation_email(db_service, appointment_id: int, client_email: str):
-    """Send appointment confirmation email"""
+def send_appointment_confirmation_email(db_service, appointment_id: int, client_email: str):
+    """Send appointment confirmation email (placeholder)"""
     try:
-        # Get appointment details
-        appointment = await db_service.get_appointment(appointment_id)
-        if not appointment:
-            raise Exception("Appointment not found")
-            
-        # Create email message
-        msg = MIMEMultipart()
-        msg["From"] = os.getenv("SMTP_FROM_EMAIL", "salon@example.com")
-        msg["To"] = client_email
-        msg["Subject"] = "Your Salon Appointment Confirmation"
-        
-        # Format appointment time
-        appointment_time = appointment.date.strftime("%A, %B %d at %I:%M %p")
-        
-        # Email body
-        body = f"""
-        Thank you for booking your appointment with us!
-        
-        Appointment Details:
-        -------------------
-        Service: {appointment.service}
-        Date: {appointment_time}
-        Duration: {appointment.duration} minutes
-        
-        Location:
-        {os.getenv("SALON_NAME", "[Salon Name]")}
-        {os.getenv("SALON_ADDRESS", "[Salon Address]")}
-        {os.getenv("SALON_PHONE", "[Salon Phone]")}
-        
-        Need to make changes?
-        Simply reply to this SMS conversation or call us directly.
-        
-        We look forward to seeing you!
-        """
-        
-        msg.attach(MIMEText(body, "plain"))
-        
-        # Send email
-        await aiosmtplib.send(
-            msg,
-            hostname=os.getenv("SMTP_HOST", "smtp.example.com"),
-            port=int(os.getenv("SMTP_PORT", "587")),
-            username=os.getenv("SMTP_USERNAME", "your_username"),
-            password=os.getenv("SMTP_PASSWORD", "your_password"),
-            use_tls=True
-        )
+        # For now, just log that we would send an email
+        # Email sending can be implemented later with proper async handling
+        print(f"Would send confirmation email to {client_email} for appointment {appointment_id}")
         
     except Exception as e:
-        print(f"Error sending confirmation email: {e}")
-        raise
+        print(f"Error with confirmation email: {e}")
 
 app = FastAPI(
     title="Salon SMS Responder",
@@ -86,60 +41,107 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize all services when the application starts"""
+    print("🚀 [STARTUP] FastAPI application starting...")
+    success = initialize_services()
+    if success:
+        print("🚀 [STARTUP] Application ready to handle requests!")
+    else:
+        print("❌ [STARTUP] Application started but services failed to initialize!")
+
 # Initialize services lazily
 _sms_service = None
 _llm_service = None
 _db_service = None
 _voice_service = None
 
+def initialize_services():
+    """Initialize and link all services together"""
+    global _sms_service, _llm_service, _db_service, _voice_service
+    
+    print("🔧 [INIT] Initializing services...")
+    
+    try:
+        # 1. Create database service
+        print("🔧 [INIT] Creating database service...")
+        _db_service = DatabaseService()
+        print("✅ Database service created successfully")
+        
+        # 2. Create LLM service
+        print("🔧 [INIT] Creating LLM service...")
+        _llm_service = LLMService()
+        print("✅ LLM service created successfully")
+        
+        # 3. Create SMS service
+        print("🔧 [INIT] Creating SMS service...")
+        _sms_service = SMSService()
+        print("✅ SMS service created successfully")
+        
+        # 4. Create voice service
+        print("🔧 [INIT] Creating voice service...")
+        _voice_service = VoiceService()
+        print("✅ Voice service created successfully")
+        
+        # 5. Link services together (CRITICAL STEP!)
+        print("🔧 [INIT] Linking services together...")
+        _llm_service.set_db_service(_db_service)
+        print("✅ LLM service linked to database service")
+        print("✅ Conversation manager initialized in LLM service")
+        
+        print("🎉 [INIT] All services initialized and linked successfully!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ [INIT] Error initializing services: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def get_sms_service():
     """Get SMS service instance"""
     global _sms_service
     if _sms_service is None:
-        try:
-            _sms_service = SMSService()
-        except Exception as e:
-            print(f"Warning: SMS Service initialization failed: {e}")
-            _sms_service = None
+        print("⚠️ [WARNING] SMS service not initialized!")
     return _sms_service
 
 def get_llm_service():
     """Get LLM service instance"""
     global _llm_service
     if _llm_service is None:
-        try:
-            _llm_service = LLMService()
-        except Exception as e:
-            print(f"Warning: LLM Service initialization failed: {e}")
-            _llm_service = None
+        print("⚠️ [WARNING] LLM service not initialized!")
     return _llm_service
 
 def get_db_service():
     """Get database service instance"""
     global _db_service
     if _db_service is None:
-        try:
-            _db_service = DatabaseService()
-        except Exception as e:
-            print(f"Warning: Database Service initialization failed: {e}")
-            _db_service = None
+        print("⚠️ [WARNING] Database service not initialized!")
     return _db_service
 
 def get_voice_service():
     """Get voice service instance"""
     global _voice_service
     if _voice_service is None:
-        try:
-            _voice_service = VoiceService()
-        except Exception as e:
-            print(f"Warning: Voice Service initialization failed: {e}")
-            _voice_service = None
+        print("⚠️ [WARNING] Voice service not initialized!")
     return _voice_service
 
 @app.get("/")
 async def root():
     """Health check endpoint"""
     return {"message": "Salon SMS Responder is running", "status": "healthy"}
+
+@app.get("/test")
+async def test_page():
+    """Serve the test page"""
+    try:
+        with open("../test-sms-web.html", "r") as f:
+            html_content = f.read()
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=html_content)
+    except Exception as e:
+        return {"error": f"Could not load test page: {str(e)}"}
 
 @app.post("/webhook/sms", response_model=SMSResponse)
 async def handle_sms_webhook(
@@ -154,10 +156,14 @@ async def handle_sms_webhook(
     Handle incoming SMS webhook from Twilio
     """
     try:
+        # Format phone numbers properly (add + if missing)
+        from_phone = From if From.startswith('+') else f"+{From}" if From else From
+        to_phone = To if To.startswith('+') else f"+{To}" if To else To
+        
         # Create SMSRequest object from form data
         request = SMSRequest(
-            From=From,
-            To=To,
+            From=from_phone,
+            To=to_phone,
             Body=Body,
             MessageSid=MessageSid,
             AccountSid=AccountSid,
@@ -168,32 +174,46 @@ async def handle_sms_webhook(
         print(f"Received SMS from {request.From}: {request.Body}")
         
         try:
-            # Get services
+            print(f"\n📱 [WEBHOOK] SMS received from {request.From}: '{request.Body}'")
+            
+            # Get pre-initialized services
+            print(f"📱 [WEBHOOK] Getting services...")
             db_service = get_db_service()
             llm_service = get_llm_service()
             sms_service = get_sms_service()
             
+            print(f"📱 [WEBHOOK] Service status:")
+            print(f"   - Database: {'✅ Available' if db_service else '❌ Not available'}")
+            print(f"   - LLM: {'✅ Available' if llm_service else '❌ Not available'}")
+            print(f"   - SMS: {'✅ Available' if sms_service else '❌ Not available'}")
+            
             if not all([db_service, llm_service, sms_service]):
+                print(f"❌ [WEBHOOK] CRITICAL: Some services not available!")
                 raise Exception("Required services not available")
             
-            # Initialize LLM service with database service
-            llm_service.set_db_service(db_service)
+            # Services are already linked during startup - no need to call set_db_service again
+            print(f"📱 [WEBHOOK] Services already linked during startup")
             
             # Get client information from database
-            client_info = await db_service.get_client_by_phone(request.From)
+            print(f"📱 [WEBHOOK] Getting client info for {request.From}...")
+            client_info = db_service.get_client_by_phone(request.From)
+            print(f"📱 [WEBHOOK] Client info: {'✅ Found' if client_info else '❌ Not found'}")
             
             # Generate AI response using LLM
+            print(f"📱 [WEBHOOK] Calling LLM service with message: '{request.Body}'")
             response_data = await llm_service.generate_response(
                 user_message=request.Body,
                 client_info=client_info,
                 phone_number=request.From
             )
             
+            print(f"📱 [WEBHOOK] LLM service returned: {response_data}")
+            
             # Handle appointment booking if needed
             if isinstance(response_data, dict) and response_data.get("booking_confirmed"):
                 # Send confirmation email
                 try:
-                    await send_appointment_confirmation_email(
+                    send_appointment_confirmation_email(
                         db_service,
                         response_data["appointment_id"],
                         response_data.get("client_email")
@@ -203,6 +223,7 @@ async def handle_sms_webhook(
             
             # Get the response text
             ai_response = response_data if isinstance(response_data, str) else response_data.get("response", "")
+            print(f"🔍 Final response to send: '{ai_response}'")
             
         except Exception as e:
             print(f"Error processing SMS: {e}")
@@ -212,7 +233,7 @@ async def handle_sms_webhook(
         response_sent = False
         if sms_service:
             try:
-                response_sent = await sms_service.send_sms(
+                response_sent = sms_service.send_sms(
                     to=request.From,
                     message=ai_response
                 )
@@ -390,6 +411,73 @@ async def get_call_status(call_sid: str):
         print(f"Error getting call status: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error getting call status: {str(e)}")
 
+@app.post("/test/sms")
+async def test_sms_endpoint(
+    message: str = Form(...),
+    from_phone: str = Form("+15551234567")
+):
+    """
+    Test endpoint for SMS conversation - simulates receiving an SMS
+    """
+    try:
+        print(f"\n🧪 [TEST] TEST MODE - Simulating SMS from {from_phone}: {message}")
+        
+        # Get services
+        print(f"🧪 [TEST] Getting services...")
+        db_service = get_db_service()
+        llm_service = get_llm_service()
+        sms_service = get_sms_service()
+        
+        print(f"🧪 [TEST] Service status:")
+        print(f"   - Database: {'✅ Available' if db_service else '❌ Not available'}")
+        print(f"   - LLM: {'✅ Available' if llm_service else '❌ Not available'}")
+        print(f"   - SMS: {'✅ Available' if sms_service else '❌ Not available'}")
+        
+        if not all([db_service, llm_service, sms_service]):
+            print(f"❌ [TEST] CRITICAL: Some services not available!")
+            raise Exception("Required services not available")
+        
+        # Services are already linked during startup - no need to call set_db_service again
+        print(f"🧪 [TEST] Services already linked during startup")
+        
+        # Get client information from database
+        print(f"🧪 [TEST] Getting client info for {from_phone}...")
+        client_info = db_service.get_client_by_phone(from_phone)
+        print(f"🧪 [TEST] Client info: {'✅ Found' if client_info else '❌ Not found'}")
+        
+        # Generate AI response using LLM
+        print(f"🧪 [TEST] Calling LLM service with message: '{message}'")
+        response_data = await llm_service.generate_response(
+            user_message=message,
+            client_info=client_info,
+            phone_number=from_phone
+        )
+        
+        print(f"🧪 [TEST] LLM service returned: {response_data}")
+        
+        # Send response via SMS service (will be simulated for test numbers)
+        response_sent = False
+        if sms_service:
+            try:
+                response_sent = sms_service.send_sms(
+                    to=from_phone,
+                    message=response_data
+                )
+            except Exception as e:
+                print(f"SMS service error: {e}")
+        
+        return {
+            "success": True,
+            "message": "Test SMS processed successfully",
+            "ai_response": response_data,
+            "response_sent": response_sent,
+            "test_mode": True
+        }
+        
+    except Exception as e:
+        print(f"Error in test SMS: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in test SMS: {str(e)}")
+
 @app.get("/health")
 async def health_check():
     """Detailed health check"""
@@ -404,7 +492,7 @@ async def health_check():
     }
     
     if sms_service:
-        health_status["services"]["sms_service"] = await sms_service.check_health()
+        health_status["services"]["sms_service"] = sms_service.check_health()
     else:
         health_status["services"]["sms_service"] = {"status": "unavailable", "error": "Not configured"}
     
@@ -414,7 +502,7 @@ async def health_check():
         health_status["services"]["llm_service"] = {"status": "unavailable", "error": "Not configured"}
     
     if db_service:
-        health_status["services"]["database_service"] = await db_service.check_health()
+        health_status["services"]["database_service"] = db_service.check_health()
     else:
         health_status["services"]["database_service"] = {"status": "unavailable", "error": "Not configured"}
     

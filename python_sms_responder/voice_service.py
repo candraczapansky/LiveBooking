@@ -4,7 +4,7 @@ Voice Service for handling Twilio voice calls with AI integration
 import os
 import logging
 from typing import Dict, Optional, List
-from twilio.twiml import VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse
 from twilio.rest import Client
 import openai
 from dotenv import load_dotenv
