@@ -139,20 +139,22 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       setIsLoading(true);
       Promise.all([
         fetch(`/api/services/${serviceId}`).then(res => res.json()),
-        fetch(`/api/services/${serviceId}/staff`).then(res => res.json())
+        // Fallback approach: fetch all staff-service assignments and filter by serviceId
+        fetch(`/api/staff-services`).then(res => res.json()),
       ])
-        .then(([serviceData, staffData]) => {
-          // Transform staff data to match form requirements
-          console.log("Raw staff data from API:", staffData);
-          const assignedStaff = staffData
-            .filter((staff: any) => staff.id && staff.user) // Only include staff with valid ID and user data
-            .map((staff: any) => ({
-              staffId: staff.id, // This should be the staff member's ID
-              customRate: staff.customRate || undefined,
-              customCommissionRate: staff.customCommissionRate || undefined,
+        .then(([serviceData, allAssignments]) => {
+          const assignmentsForService = Array.isArray(allAssignments)
+            ? allAssignments.filter((a: any) => a && a.serviceId === serviceId)
+            : [];
+
+          const assignedStaff = assignmentsForService
+            .filter((assignment: any) => typeof assignment.staffId === 'number')
+            .map((assignment: any) => ({
+              staffId: assignment.staffId,
+              customRate: assignment.customRate || undefined,
+              customCommissionRate: assignment.customCommissionRate || undefined,
             }));
-          console.log("Transformed staff data for form:", assignedStaff);
-          
+
           form.reset({
             name: serviceData.name,
             description: serviceData.description || "",
