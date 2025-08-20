@@ -828,9 +828,7 @@ We look forward to seeing you!
 Best regards,
 Glo Head Spa`,
             active: true,
-            sentCount: 0,
-            lastRun: null,
-            customTriggerName: null
+            timing: 'immediate'
           });
           
           console.log('Default automation rules created successfully');
@@ -1643,12 +1641,7 @@ Glo Head Spa`,
     return {
       ...appointment,
       startTime: this.convertLocalToDate(appointment.startTime),
-      endTime: this.convertLocalToDate(appointment.endTime),
-      service: row.services,
-      staff: row.staff ? {
-        ...row.staff,
-        user: row.users
-      } : null
+      endTime: this.convertLocalToDate(appointment.endTime)
     };
   }
 
@@ -2076,7 +2069,7 @@ Glo Head Spa`,
     
     return {
       ...photo,
-      createdAt: this.convertLocalToDate(photo.createdAt)
+      createdAt: photo.createdAt ? this.convertLocalToDate(photo.createdAt) : null
     };
   }
 
@@ -2320,7 +2313,8 @@ Glo Head Spa`,
       .values({
         ...campaignData,
         sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
-      })
+        targetClientIds: typeof campaignData.targetClientIds === 'string' ? campaignData.targetClientIds : null,
+      } as any)
       .returning();
     return newCampaign;
   }
@@ -2631,7 +2625,16 @@ Glo Head Spa`,
 
   // Staff Schedule operations
   async createStaffSchedule(schedule: InsertStaffSchedule): Promise<StaffSchedule> {
-    const [newSchedule] = await db.insert(staffSchedules).values(schedule).returning();
+    // Ensure serviceCategories is properly formatted as an array
+    const scheduleData = {
+      ...schedule,
+      serviceCategories: Array.isArray(schedule.serviceCategories) 
+        ? schedule.serviceCategories 
+        : schedule.serviceCategories 
+          ? [schedule.serviceCategories] 
+          : []
+    };
+    const [newSchedule] = await db.insert(staffSchedules).values(scheduleData as any).returning();
     return newSchedule;
   }
 
@@ -2649,7 +2652,16 @@ Glo Head Spa`,
   }
 
   async updateStaffSchedule(id: number, scheduleData: Partial<InsertStaffSchedule>): Promise<StaffSchedule> {
-    const [updatedSchedule] = await db.update(staffSchedules).set(scheduleData).where(eq(staffSchedules.id, id)).returning();
+    // Ensure serviceCategories is properly formatted as an array if provided
+    const updateData = {
+      ...scheduleData,
+      ...(scheduleData.serviceCategories && {
+        serviceCategories: Array.isArray(scheduleData.serviceCategories) 
+          ? scheduleData.serviceCategories 
+          : [scheduleData.serviceCategories]
+      })
+    };
+    const [updatedSchedule] = await db.update(staffSchedules).set(updateData as any).where(eq(staffSchedules.id, id)).returning();
     if (!updatedSchedule) {
       throw new Error('Staff schedule not found');
     }
@@ -3064,14 +3076,14 @@ Glo Head Spa`,
             fieldsData = JSON.parse(fieldsData);
           }
         }
-        form.fields = fieldsData as any[];
+        (form as any).fields = fieldsData;
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = [] as unknown as string; // Ensure correct type for schema
+        (form as any).fields = []; // Return empty array on parsing error
       }
     } else {
-      form.fields = [] as unknown as string; // Ensure fields is a string-type column
+      (form as any).fields = []; // Ensure fields is always available as array
     }
     
     return form;
@@ -3135,14 +3147,14 @@ Glo Head Spa`,
             fieldsData = JSON.parse(fieldsData);
           }
         }
-        form.fields = fieldsData;
+        (form as any).fields = fieldsData;
       } catch (error) {
         console.error('Error parsing form fields JSON:', error);
         console.error('Raw fields data that caused error:', form.fields);
-        form.fields = []; // Return empty array
+        (form as any).fields = []; // Return empty array
       }
     } else {
-      form.fields = []; // Ensure fields is always an array
+      (form as any).fields = []; // Ensure fields is always an array
     }
     
     return form;

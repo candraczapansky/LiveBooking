@@ -728,18 +728,13 @@ const AppointmentsPage = () => {
         }
         
         /* Reduce internal calendar scrolling; let page scroll instead */
-        .rbc-calendar {
-          overflow: visible !important;
-        }
-        .rbc-time-view {
-          overflow: visible !important;
-        }
-        .rbc-time-content {
-          overflow: visible !important;
-          -webkit-overflow-scrolling: auto !important;
-        }
-        .rbc-time-content > * {
-          overflow: visible !important;
+        .rbc-calendar { overflow: visible !important; }
+        .rbc-time-view { overflow: visible !important; }
+        .rbc-time-content { overflow: visible !important; -webkit-overflow-scrolling: auto !important; }
+        .rbc-time-content > * { overflow: visible !important; }
+        /* Keep time gutter and content aligned when page scrolls */
+        .rbc-time-gutter, .rbc-time-content, .rbc-time-header, .rbc-time-header-content {
+          position: static !important;
         }
         
         .rbc-month-view {
@@ -756,12 +751,14 @@ const AppointmentsPage = () => {
           height: auto !important;
         }
         
-        /* Ensure proper scrolling for all calendar views */
+        /* Ensure proper scrolling for all calendar views - let page scroll instead */
         .rbc-time-view .rbc-time-content,
         .rbc-month-view .rbc-month-content,
         .rbc-day-view .rbc-day-content {
-          overflow: auto !important;
+          overflow: visible !important;
+          overflow-y: visible !important;
           max-height: none !important;
+          height: auto !important;
         }
         
         /* Fix scrolling for calendar events and slots */
@@ -770,31 +767,18 @@ const AppointmentsPage = () => {
           overflow: visible !important;
         }
         
-        /* Ensure calendar toolbar doesn't interfere with scrolling */
+        /* Let calendar toolbar scroll with content to avoid overlap with times gutter */
         .rbc-toolbar {
-          position: sticky !important;
-          top: 0 !important;
-          background: white !important;
-          z-index: 10 !important;
+          position: static !important;
+          top: auto !important;
+          background: transparent !important;
+          z-index: auto !important;
         }
+        .dark .rbc-toolbar { background: transparent !important; }
         
-        /* Dark mode support for toolbar */
-        .dark .rbc-toolbar {
-          background: rgb(17 24 39) !important;
-        }
-        
-        /* Responsive height adjustments */
-        @media (max-width: 1024px) {
-          .rbc-calendar {
-            height: calc(100vh - 250px) !important;
-          }
-        }
-        
-        @media (max-width: 768px) {
-          .rbc-calendar {
-            height: calc(100vh - 200px) !important;
-          }
-        }
+        /* Remove fixed viewport heights so gutter and grid scroll together with page */
+        @media (max-width: 1024px) { .rbc-calendar { height: auto !important; } }
+        @media (max-width: 768px) { .rbc-calendar { height: auto !important; } }
         
         /* Ensure calendar events are properly scrollable */
         .rbc-event {
@@ -806,6 +790,7 @@ const AppointmentsPage = () => {
         .rbc-time-grid,
         .rbc-month-grid {
           overflow: visible !important;
+          height: auto !important;
         }
         
         /* Ensure proper touch scrolling on mobile */
@@ -813,22 +798,8 @@ const AppointmentsPage = () => {
           -webkit-overflow-scrolling: touch !important;
         }
 
-        /* Make calendar container much taller so day view fits without internal scroll */
-        .appointments-calendar-container {
-          height: 1400px !important;
-        }
-        @media (max-width: 1536px) { /* 2xl and below */
-          .appointments-calendar-container { height: 1200px !important; }
-        }
-        @media (max-width: 1280px) { /* xl and below */
-          .appointments-calendar-container { height: 1000px !important; }
-        }
-        @media (max-width: 1024px) { /* lg and below */
-          .appointments-calendar-container { height: 900px !important; }
-        }
-        @media (max-width: 768px) { /* md and below */
-          .appointments-calendar-container { height: 800px !important; }
-        }
+        /* Let page control height; remove forced calendar heights */
+        .appointments-calendar-container { height: auto !important; }
 
         /* Compact mini calendar styles (left sidebar) */
         .appointments-mini-calendar .rdp { width: 100% !important; }

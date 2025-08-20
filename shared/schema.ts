@@ -37,6 +37,7 @@ export const users = pgTable("users", {
   twoFactorEmailCode: text("two_factor_email_code"), // Temporary email verification code
   twoFactorEmailCodeExpiry: timestamp("two_factor_email_code_expiry"), // When email code expires
   notes: text("notes"), // Client notes for staff reference
+  birthday: date("birthday"), // Client's birthday for marketing campaigns
 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -186,6 +187,7 @@ export const services = pgTable("services", {
   bufferTimeBefore: integer("buffer_time_before").default(0), // in minutes
   bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
   color: text("color").default("#3B82F6"), // hex color code
+  isActive: boolean("is_active").default(true),
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({

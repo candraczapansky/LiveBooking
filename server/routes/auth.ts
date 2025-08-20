@@ -328,7 +328,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         LoggerService.error("Failed to send password reset email", {
           ...context,
           userId: user.id,
-          error: error.message,
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
 
         throw new Error("Failed to send password reset email");
@@ -348,7 +348,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
 
       // Find user by reset token
       const users = await storage.getAllUsers();
-      const user = users.find(u => u.resetToken === token && u.resetTokenExpiry > new Date());
+      const user = users.find(u => u.resetToken === token && u.resetTokenExpiry && u.resetTokenExpiry > new Date());
 
       if (!user) {
         throw new AuthenticationError("Invalid or expired reset token");
@@ -454,6 +454,16 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       });
     }
 
+    // Get staff information if user is staff
+    let staffId = null;
+    if (user.role === "staff") {
+      const allStaff = await storage.getAllStaff();
+      const staffMember = allStaff.find(s => s.userId === user.id);
+      if (staffMember) {
+        staffId = staffMember.id;
+      }
+    }
+
     res.json({
       success: true,
       user: {
@@ -463,7 +473,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-        staffId: user.staffId,
+        staffId,
       },
     });
   }));
@@ -524,7 +534,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       res.status(500).json({
         success: false,
         message: "Failed to grant admin permissions",
-        error: error.message
+        error: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   }));
@@ -542,7 +552,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         services: {
           database: "connected",
           email: process.env.SENDGRID_API_KEY ? "configured" : "not_configured",
-          sms: isTwilioConfigured() ? "configured" : "not_configured",
+          sms: await isTwilioConfigured() ? "configured" : "not_configured",
         },
       });
     } catch (error) {
@@ -550,7 +560,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         success: false,
         status: "unhealthy",
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }));
@@ -617,7 +627,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       res.status(500).json({
         success: false,
         message: "Failed to grant admin permissions",
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
     }
   }));

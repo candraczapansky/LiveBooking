@@ -486,7 +486,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
       `;
 
       const retentionResult = await db.execute(retentionQuery);
-      const retentionRate = parseFloat(retentionResult.rows[0]?.retention_rate || '0');
+      const retentionRate = parseFloat((retentionResult.rows[0]?.retention_rate || '0') as string);
 
       if (retentionRate < 70) {
         insights.push({
@@ -514,7 +514,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
       `;
 
       const noShowResult = await db.execute(noShowQuery);
-      const noShowRate = parseFloat(noShowResult.rows[0]?.no_show_rate || '0');
+      const noShowRate = parseFloat((noShowResult.rows[0]?.no_show_rate || '0') as string);
 
       if (noShowRate > 10) {
         insights.push({
@@ -539,7 +539,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
       `;
 
       const revenueResult = await db.execute(revenueQuery);
-      const currentRevenue = parseFloat(revenueResult.rows[0]?.current_revenue || '0');
+      const currentRevenue = parseFloat((revenueResult.rows[0]?.current_revenue || '0') as string);
 
       // Get previous period revenue for comparison
       const prevRevenueQuery = sql`
@@ -553,7 +553,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
       `;
 
       const prevRevenueResult = await db.execute(prevRevenueQuery);
-      const previousRevenue = parseFloat(prevRevenueResult.rows[0]?.previous_revenue || '0');
+      const previousRevenue = parseFloat((prevRevenueResult.rows[0]?.previous_revenue || '0') as string);
 
       if (previousRevenue > 0) {
         const revenueChange = ((currentRevenue - previousRevenue) / previousRevenue) * 100;

@@ -30,7 +30,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to fetch permissions",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -97,7 +97,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to fetch permission groups",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -131,7 +131,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to create permission group",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -188,7 +188,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to update permission group",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -216,7 +216,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to delete permission group",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -276,7 +276,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to fetch user permissions",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })
@@ -300,7 +300,7 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to assign permission group",
-          error: error.message
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     })

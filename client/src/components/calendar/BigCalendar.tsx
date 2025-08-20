@@ -50,8 +50,8 @@ interface BigCalendarProps {
 const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate }) => {
   // Limit visible time range to reduce internal scrolling and show more calendar content
   const today = new Date();
-  const minTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8, 0, 0);
-  const maxTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 20, 0, 0);
+  const minTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 6, 0, 0);
+  const maxTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 22, 0, 0);
 
   return (
     <div style={{ height: '100%' }}>
@@ -65,7 +65,7 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         onSelectEvent={onSelectEvent}
         onSelectSlot={onSelectSlot}
         selectable
-        style={{ height: '100%' }}
+        style={{ height: 'auto' }}
         min={minTime}
         max={maxTime}
         step={30}

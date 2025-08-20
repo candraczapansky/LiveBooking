@@ -140,10 +140,11 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       });
     } catch (error) {
       console.error('Error granting admin permissions:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       res.status(500).json({
         success: false,
         message: "Failed to grant admin permissions",
-        error: error.message
+        error: errorMessage
       });
     }
   });

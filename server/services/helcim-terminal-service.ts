@@ -32,7 +32,10 @@ export class HelcimTerminalService {
 
       if (response.data.success) {
         // Store config if test is successful
-        await this.configService.saveTerminalConfig(config);
+        await this.configService.saveTerminalConfig({
+          ...config,
+          isActive: true
+        });
         console.log(`✅ Terminal ${config.terminalId} initialized for location ${config.locationId}`);
         return true;
       }

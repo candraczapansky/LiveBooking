@@ -782,7 +782,10 @@ export class SMSAutoRespondService {
           twoFactorBackupCodes: null,
           twoFactorMethod: 'authenticator',
           twoFactorEmailCode: null,
-          twoFactorEmailCodeExpiry: null
+          twoFactorEmailCodeExpiry: null,
+          helcimCustomerId: null,
+          notes: null,
+          birthday: null
         };
         console.log('Using temporary client for SMS auto-respond:', client);
       }
