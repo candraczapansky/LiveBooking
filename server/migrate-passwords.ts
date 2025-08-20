@@ -1,5 +1,5 @@
-import { DatabaseStorage } from './storage';
-import { hashPassword } from './utils/password';
+import { DatabaseStorage } from './storage.js';
+import { hashPassword } from './utils/password.js';
 
 async function migratePasswords() {
   const storage = new DatabaseStorage();

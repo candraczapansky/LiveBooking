@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { IStorage } from '../storage';
-import { encrypt, decrypt } from '../utils/encryption';
+import type { IStorage } from '../storage.js';
+import { encrypt, decrypt } from '../utils/encryption.js';
 
 // Terminal configuration schema
 const TerminalConfigSchema = z.object({

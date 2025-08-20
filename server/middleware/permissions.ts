@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { PermissionsService } from '../services/permissions';
-import { IStorage } from '../storage';
+import { PermissionsService } from '../services/permissions.js';
+import { IStorage } from '../storage.js';
 
 export interface AuthenticatedRequest extends Request {
   user?: {

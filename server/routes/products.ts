@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
-import { insertProductSchema } from "@shared/schema";
+import { insertProductSchema } from "@shared/schema.js";
 import { asyncHandler, NotFoundError } from "../utils/errors.js";
 import { validateRequest } from "../middleware/error-handler.js";
 

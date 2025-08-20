@@ -1,6 +1,6 @@
 import { eq, and, or, inArray, desc, asc, gte, lte, like, ilike } from 'drizzle-orm';
-import type { IStorage } from '../storage';
-import LoggerService from './logger';
+import type { IStorage } from '../storage.js';
+import LoggerService from './logger.js';
 
 // Query optimization utilities
 export class QueryOptimizer {

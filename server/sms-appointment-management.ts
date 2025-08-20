@@ -1,4 +1,4 @@
-import { IStorage } from './storage';
+import { IStorage } from './storage.js';
 import { format, parseISO, addDays, isAfter, isBefore } from 'date-fns';
 
 interface AppointmentManagementRequest {

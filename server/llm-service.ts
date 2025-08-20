@@ -1,5 +1,5 @@
-import { IStorage } from "./storage";
-import { config, DatabaseConfig } from "./config";
+import { IStorage } from "./storage.js";
+import { config, DatabaseConfig } from "./config.js";
 
 interface LLMConfig {
   apiKey?: string;

@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { LoggerService } from './logger';
+import { LoggerService } from './logger.js';
 
 // Redis client configuration
 const redisConfig = {

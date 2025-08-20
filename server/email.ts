@@ -7,7 +7,7 @@ import {
   marketingCampaignTemplate,
   generateEmailHTML,
   generateEmailText
-} from './email-templates';
+} from './email-templates.js';
 import Handlebars from 'handlebars';
 
 let mailService: MailService | null = null;

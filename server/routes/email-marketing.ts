@@ -1,7 +1,7 @@
 import express from 'express';
-import { EmailAutomationService } from '../email-automation';
-import { MarketingCampaignService } from '../marketing-campaigns';
-import { sendEmail } from '../email';
+import { EmailAutomationService } from '../email-automation.js';
+import { MarketingCampaignService } from '../marketing-campaigns.js';
+import { sendEmail } from '../email.js';
 import { 
   appointmentConfirmationTemplate, 
   appointmentReminderTemplate, 
@@ -9,8 +9,8 @@ import {
   birthdayTemplate,
   generateEmailHTML,
   generateEmailText
-} from '../email-templates';
-import type { IStorage } from '../storage';
+} from '../email-templates.js';
+import type { IStorage } from '../storage.js';
 import { addDays, format } from 'date-fns';
 
 const router = express.Router();

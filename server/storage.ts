@@ -52,8 +52,8 @@ import {
   userPermissionGroups, UserPermissionGroup, InsertUserPermissionGroup,
   userDirectPermissions, UserDirectPermission, InsertUserDirectPermission,
   phoneCalls, PhoneCall, InsertPhoneCall
-} from "../shared/schema";
-import { db } from "./db";
+} from "../shared/schema.js";
+import { db } from "./db.js";
 import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {

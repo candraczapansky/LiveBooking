@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
 import { z } from "zod";
-import { insertAppointmentSchema, insertAppointmentHistorySchema } from "@shared/schema";
+import { insertAppointmentSchema, insertAppointmentHistorySchema } from "@shared/schema.js";
 import { 
   ValidationError, 
   NotFoundError, 

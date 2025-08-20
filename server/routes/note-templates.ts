@@ -1,9 +1,9 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
-import { insertNoteTemplateSchema, updateNoteTemplateSchema } from "@shared/schema";
-import { validateRequest } from "../middleware/error-handler";
-import { asyncHandler } from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
+import type { IStorage } from "../storage.js";
+import { insertNoteTemplateSchema, updateNoteTemplateSchema } from "@shared/schema.js";
+import { validateRequest } from "../middleware/error-handler.js";
+import { asyncHandler } from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
 
 export function registerNoteTemplateRoutes(app: Express, storage: IStorage) {
   // Get all note templates

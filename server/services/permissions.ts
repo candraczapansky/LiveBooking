@@ -1,5 +1,5 @@
-import { IStorage } from '../storage';
-import { Permission, PermissionGroup, UserPermissionGroup, UserDirectPermission, PermissionGroupMapping } from '../../shared/schema';
+import { IStorage } from '../storage.js';
+import { Permission, PermissionGroup, UserPermissionGroup, UserDirectPermission, PermissionGroupMapping } from '../../shared/schema.js';
 
 export interface PermissionCheck {
   userId: number;

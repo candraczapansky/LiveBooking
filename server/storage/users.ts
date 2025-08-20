@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
-import { db } from '../db';
-import { users, type User } from '../../shared/schema';
+import { db } from '../db.js';
+import { users, type User } from '../../shared/schema.js';
 
 export class UsersStorage {
   async getAllUsers(): Promise<User[]> {

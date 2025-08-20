@@ -26,8 +26,9 @@
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
-
-    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "Bundler",
     "baseUrl": ".",
     "types": ["node", "vite/client"],
     "downlevelIteration": true,

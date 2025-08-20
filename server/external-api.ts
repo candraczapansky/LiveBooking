@@ -1,6 +1,6 @@
 import { Express } from 'express';
-import { IStorage } from './storage';
-import { validateApiKey, optionalApiKey } from './middleware/auth';
+import { IStorage } from './storage.js';
+import { validateApiKey, optionalApiKey } from './middleware/auth.js';
 import { z } from 'zod';
 
 // Validation schemas

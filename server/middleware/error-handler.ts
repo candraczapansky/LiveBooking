@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { handleError, logError } from '../utils/errors';
-import LoggerService from '../utils/logger';
+import { handleError, logError } from '../utils/errors.js';
+import LoggerService from '../utils/logger.js';
 import jwt from 'jsonwebtoken';
 
 // Global error handling middleware

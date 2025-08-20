@@ -1,6 +1,6 @@
 import twilio from 'twilio';
-import { db } from './db';
-import { phoneCalls, callRecordings, users } from '@shared/schema';
+import { db } from './db.js';
+import { phoneCalls, callRecordings, users } from '@shared/schema.js';
 import { eq, and, desc, gte, lte } from 'drizzle-orm';
 
 const accountSid = process.env.TWILIO_ACCOUNT_SID;

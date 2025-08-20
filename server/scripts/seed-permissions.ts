@@ -1,5 +1,5 @@
-import { IStorage } from '../storage';
-import { PermissionsService } from '../services/permissions';
+import { IStorage } from '../storage.js';
+import { PermissionsService } from '../services/permissions.js';
 
 // Default permissions organized by category
 const DEFAULT_PERMISSIONS = [

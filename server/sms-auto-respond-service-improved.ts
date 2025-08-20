@@ -1,7 +1,7 @@
-import { IStorage } from './storage';
-import { LLMService } from './llm-service';
-import { SMSAppointmentBookingService } from './sms-appointment-booking';
-import { SMSAppointmentManagementService } from './sms-appointment-management';
+import { IStorage } from './storage.js';
+import { LLMService } from './llm-service.js';
+import { SMSAppointmentBookingService } from './sms-appointment-booking.js';
+import { SMSAppointmentManagementService } from './sms-appointment-management.js';
 
 // ============================================================================
 // TYPES AND INTERFACES

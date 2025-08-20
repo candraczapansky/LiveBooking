@@ -1,5 +1,5 @@
-import { IStorage } from './storage';
-import { LLMService } from './llm-service';
+import { IStorage } from './storage.js';
+import { LLMService } from './llm-service.js';
 
 interface SMSMessage {
   from: string;

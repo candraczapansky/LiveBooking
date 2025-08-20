@@ -1,5 +1,5 @@
-import { LoggerService } from './logger';
-import { redisCache } from './redis-cache';
+import { LoggerService } from './logger.js';
+import { redisCache } from './redis-cache.js';
 
 // Application metrics
 interface AppMetrics {

@@ -1,5 +1,5 @@
-import { DatabaseStorage } from "./storage";
-import { DatabaseConfig } from "./config";
+import { DatabaseStorage } from "./storage.js";
+import { DatabaseConfig } from "./config.js";
 
 async function setupOpenAIKey() {
   try {

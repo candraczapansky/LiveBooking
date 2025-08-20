@@ -1,5 +1,5 @@
-import { PermissionsStorage } from './permissions';
-import { UsersStorage } from './users';
+import { PermissionsStorage } from './permissions.js';
+import { UsersStorage } from './users.js';
 
 export interface IStorage {
   // User methods

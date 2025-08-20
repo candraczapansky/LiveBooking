@@ -1,4 +1,4 @@
-import { IStorage } from "./storage";
+import { IStorage } from "./storage.js";
 
 interface CheckSoftwareConfig {
   providerId: number;

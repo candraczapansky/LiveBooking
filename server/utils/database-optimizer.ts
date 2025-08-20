@@ -1,6 +1,6 @@
-import { db } from '../db';
+import { db } from '../db.js';
 import { sql } from 'drizzle-orm';
-import { ProductionLogger } from './production-logger';
+import { ProductionLogger } from './production-logger.js';
 
 // Cache interface
 interface CacheEntry<T> {

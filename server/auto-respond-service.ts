@@ -1,7 +1,7 @@
-import { IStorage } from './storage';
-import { LLMService } from './llm-service';
-import { sendEmail } from './email';
-import { sendSMS } from './sms';
+import { IStorage } from './storage.js';
+import { LLMService } from './llm-service.js';
+import { sendEmail } from './email.js';
+import { sendSMS } from './sms.js';
 
 interface AutoRespondConfig {
   enabled: boolean;

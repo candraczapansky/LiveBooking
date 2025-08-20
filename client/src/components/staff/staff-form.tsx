@@ -202,7 +202,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     enabled: !!staffId && open,
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/staff/${staffId}/services`);
-      return res.json();
+      const body = await res.json();
+      return Array.isArray(body) ? body : (body?.data ?? []);
     }
   });
 
@@ -212,7 +213,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     enabled: open,
     queryFn: async () => {
       const res = await apiRequest('GET', '/api/services');
-      return res.json();
+      const body = await res.json();
+      return Array.isArray(body) ? body : (body?.data ?? []);
     }
   });
 
@@ -1003,14 +1005,18 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a service" />
+                      <SelectValue placeholder={(allServices || []).length === 0 ? 'No services available' : 'Select a service'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {(allServices || []).map((svc: any) => (
-                        <SelectItem key={svc.id} value={svc.id.toString()}>
-                          {svc.name}
-                        </SelectItem>
-                      ))}
+                      {(allServices || []).length === 0 ? (
+                        <div className="px-2 py-1.5 text-sm text-gray-500">No services available</div>
+                      ) : (
+                        (allServices || []).map((svc: any) => (
+                          <SelectItem key={svc.id} value={svc.id.toString()}>
+                            {svc.name}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <Button

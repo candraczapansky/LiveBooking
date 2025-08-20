@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
 import { z } from "zod";
-import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema, insertClientSchema } from "@shared/schema";
+import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema, insertClientSchema } from "@shared/schema.js";
 import { hashPassword } from "../utils/password.js";
 
 // Helper to validate request body using schema

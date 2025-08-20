@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { z } from 'zod';
-import { TerminalConfigService } from './terminal-config-service';
+import { TerminalConfigService } from './terminal-config-service.js';
 
 // Terminal configuration schema
 const TerminalConfigSchema = z.object({

@@ -1,4 +1,4 @@
-import { IStorage } from './storage';
+import { IStorage } from './storage.js';
 import { addMinutes, parseISO, format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 interface AppointmentBookingRequest {

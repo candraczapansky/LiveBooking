@@ -1,4 +1,4 @@
-import { sendEmail } from './email';
+import { sendEmail } from './email.js';
 import { 
   appointmentConfirmationTemplate, 
   appointmentReminderTemplate, 
@@ -6,8 +6,8 @@ import {
   birthdayTemplate,
   generateEmailHTML,
   generateEmailText
-} from './email-templates';
-import type { IStorage } from './storage';
+} from './email-templates.js';
+import type { IStorage } from './storage.js';
 import { addHours, addDays, isAfter, format } from 'date-fns';
 
 interface AppointmentData {

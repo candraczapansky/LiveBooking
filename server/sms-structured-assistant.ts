@@ -1,6 +1,6 @@
-import { IStorage } from './storage';
-import { SMSAppointmentBookingService } from './sms-appointment-booking';
-import { sendSMS } from './sms';
+import { IStorage } from './storage.js';
+import { SMSAppointmentBookingService } from './sms-appointment-booking.js';
+import { sendSMS } from './sms.js';
 
 interface ConversationState {
   phoneNumber: string;
