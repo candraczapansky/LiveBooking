@@ -30,12 +30,44 @@ export function securityHeaders() {
         directives: {
           defaultSrc: ["'self'"],
           // Do NOT use 'unsafe-dynamic'. If you later add nonces, consider 'strict-dynamic' in script-src only
-          scriptSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: [
+            "'self'",
+            "'unsafe-inline'",
+            // Allow Helcim hosted scripts
+            "https://secure.helcim.app",
+            "https://*.helcim.app",
+            "https://api.helcim.com",
+            "https://*.helcim.com",
+          ],
+          // Some browsers distinguish between script elements and other script sources
+          scriptSrcElem: [
+            "'self'",
+            "'unsafe-inline'",
+            "https://secure.helcim.app",
+            "https://*.helcim.app",
+            "https://api.helcim.com",
+            "https://*.helcim.com",
+          ],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
           imgSrc: ["'self'", "data:", "blob:", "https:"],
           fontSrc: ["'self'", "https://fonts.gstatic.com"],
-          connectSrc: ["'self'", "https:", "wss:"],
-          frameSrc: ["'self'"],
+          connectSrc: [
+            "'self'",
+            "https:",
+            "wss:",
+            // Helcim APIs and widgets may open connections
+            "https://api.helcim.com",
+            "https://*.helcim.com",
+            "https://secure.helcim.app",
+            "https://*.helcim.app",
+          ],
+          frameSrc: [
+            "'self'",
+            // Allow Helcim iframes/widgets
+            "https://secure.helcim.app",
+            "https://*.helcim.app",
+            "https://*.helcim.com",
+          ],
           objectSrc: ["'none'"],
           ...(cspReportUri ? { reportUri: [cspReportUri] } : {}),
         },

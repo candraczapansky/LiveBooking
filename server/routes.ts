@@ -182,6 +182,51 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
+  // Update a staff member
+  app.patch("/api/staff/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid staff id" });
+      }
+
+      const existing = await storage.getStaff(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Accept both snake_case and camelCase from client
+      const body = req.body || {};
+      const updateData: any = {};
+      if (body.title !== undefined) updateData.title = body.title;
+      if (body.bio !== undefined) updateData.bio = body.bio;
+      if (body.locationId !== undefined) updateData.locationId = body.locationId;
+      if (body.commission_type !== undefined || body.commissionType !== undefined) {
+        updateData.commissionType = body.commission_type ?? body.commissionType;
+      }
+      if (body.commission_rate !== undefined || body.commissionRate !== undefined) {
+        updateData.commissionRate = body.commission_rate ?? body.commissionRate;
+      }
+      if (body.hourly_rate !== undefined || body.hourlyRate !== undefined) {
+        updateData.hourlyRate = body.hourly_rate ?? body.hourlyRate;
+      }
+      if (body.fixed_rate !== undefined || body.fixedRate !== undefined) {
+        updateData.fixedRate = body.fixed_rate ?? body.fixedRate;
+      }
+      if (body.photo_url !== undefined || body.photoUrl !== undefined) {
+        updateData.photoUrl = body.photo_url ?? body.photoUrl;
+      }
+
+      const updated = await storage.updateStaff(id, updateData);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to update staff"
+      });
+    }
+  });
+
   // Staff-services assignments
   app.get("/api/staff-services", async (req: Request, res: Response) => {
     try {

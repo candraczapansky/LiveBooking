@@ -25,7 +25,8 @@ import {
   StickyNote,
   Building2,
   ChevronDown,
-  Mail
+  Mail,
+  ShoppingBag
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -79,6 +80,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
   const [isStaffExpanded, setIsStaffExpanded] = useState<boolean>(isInStaffSection);
   const isInCommunicationsSection = location === '/automations' || location === '/marketing' || location === '/ai-messaging';
   const [isCommsExpanded, setIsCommsExpanded] = useState<boolean>(isInCommunicationsSection);
+  const isInRetailSection = location === '/pos' || location === '/products' || location === '/gift-certificates';
+  const [isRetailExpanded, setIsRetailExpanded] = useState<boolean>(isInRetailSection);
 
   useEffect(() => {
     if (isInStaffSection) {
@@ -90,6 +93,11 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
       setIsCommsExpanded(true);
     }
   }, [location]);
+  useEffect(() => {
+    if (isInRetailSection) {
+      setIsRetailExpanded(true);
+    }
+  }, [location]);
 
   const menuItems = [
     { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
@@ -97,14 +105,12 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
     { icon: <Users size={20} />, label: "Clients", href: "/clients" },
     { icon: <UserCircle size={20} fill="none" />, label: "Staff", href: "/staff" },
     { icon: <Scissors size={20} />, label: "Services", href: "/services" },
-    { icon: <Package size={20} />, label: "Products", href: "/products" },
-    { icon: <CreditCard size={20} />, label: "POS", href: "/pos" },
+    { icon: <ShoppingBag size={20} />, label: "Retail", href: "#" },
     { icon: <DollarSign size={20} />, label: "Payroll", href: "/payroll" },
     { icon: <MapPin size={20} />, label: "Locations", href: "/locations" },
     { icon: <Monitor size={20} />, label: "Devices", href: "/devices" },
     { icon: <BarChart3 size={20} />, label: "Reports", href: "/reports" },
     { icon: <Mail size={20} fill="none" />, label: "SMS & Email", href: "#" },
-    { icon: <Gift size={20} />, label: "Gift Certificates", href: "/gift-certificates" },
     { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
     { icon: <FileText size={20} />, label: "Forms", href: "/forms" },
     { icon: <StickyNote size={20} />, label: "Note Templates", href: "/note-templates" },
@@ -246,6 +252,72 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                             label="AI Messaging"
                             href="/ai-messaging"
                             isActive={location === "/ai-messaging"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'Retail') {
+                const isActive = isInRetailSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsRetailExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isRetailExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isRetailExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<CreditCard size={18} />}
+                          label="POS"
+                          href="/pos"
+                          isActive={location === "/pos"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Gift size={18} />}
+                            label="Gift Certificates"
+                            href="/gift-certificates"
+                            isActive={location === "/gift-certificates"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Package size={18} />}
+                            label="Products"
+                            href="/products"
+                            isActive={location === "/products"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />

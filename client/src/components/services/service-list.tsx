@@ -169,13 +169,13 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Service</TableHead>
-                {!categoryId && <TableHead>Category</TableHead>}
-                <TableHead>Duration</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Staff</TableHead>
-                <TableHead>Color</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="w-[55%] min-w-[480px]">Service</TableHead>
+                {!categoryId && <TableHead className="w-[10%]">Category</TableHead>}
+                <TableHead className="w-28">Duration</TableHead>
+                <TableHead className="w-28">Price</TableHead>
+                <TableHead className="w-32">Staff</TableHead>
+                <TableHead className="w-40">Color</TableHead>
+                <TableHead className="text-right w-28">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -194,33 +194,35 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
               ) : (
                 filteredServices?.map((service: Service) => (
                   <TableRow key={service.id}>
-                    <TableCell>
+                    <TableCell className="align-top">
                       <div className="font-medium">{service.name}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{service.description}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                        {service.description}
+                      </div>
                     </TableCell>
                     {!categoryId && (
-                      <TableCell>
+                      <TableCell className="align-top whitespace-nowrap">
                         <span className="inline-block px-2 py-1 text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-full">
                           {service.category?.name || 'Uncategorized'}
                         </span>
                       </TableCell>
                     )}
-                    <TableCell>{formatDuration(service.duration)}</TableCell>
-                    <TableCell>{formatPrice(service.price)}</TableCell>
-                    <TableCell>{getStaffForService(service.id)}</TableCell>
-                    <TableCell>
+                    <TableCell className="align-top whitespace-nowrap">{formatDuration(service.duration)}</TableCell>
+                    <TableCell className="align-top whitespace-nowrap">{formatPrice(service.price)}</TableCell>
+                    <TableCell className="align-top whitespace-nowrap">{getStaffForService(service.id)}</TableCell>
+                    <TableCell className="align-top">
                       <div className="flex items-center gap-2">
                         <div 
                           className="w-6 h-6 rounded-full border border-gray-300 dark:border-gray-600"
                           style={{ backgroundColor: service.color || "#3B82F6" }}
                           title={service.color || "#3B82F6"}
                         />
-                        <span className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                        <span className="text-xs font-mono text-gray-600 dark:text-gray-400 whitespace-nowrap">
                           {service.color || "#3B82F6"}
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right align-top">
                       <Button
                         variant="ghost"
                         size="sm"
