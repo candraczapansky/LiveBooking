@@ -35,6 +35,14 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
+import CategoryList from "@/components/services/category-list";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type Product = {
   id: number;
@@ -79,6 +87,7 @@ export default function Products() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -106,6 +115,11 @@ export default function Products() {
   // Fetch products
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
+  });
+
+  // Fetch categories (reuse service categories for products UI)
+  const { data: categories = [] } = useQuery<any[]>({
+    queryKey: ["/api/service-categories"],
   });
 
   // Create product mutation
@@ -253,6 +267,16 @@ export default function Products() {
     
     let productData = { ...formData };
     
+    // Require category selection
+    if (!productData.category || productData.category.trim() === "") {
+      toast({
+        title: "Category required",
+        description: "Please select a category",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // If a file is selected, convert it to base64
     if (selectedFile) {
       try {
@@ -309,12 +333,19 @@ export default function Products() {
 
 
 
-  const filteredProducts = (products as Product[])?.filter((product: Product) =>
-    product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()))
-  ) || [];
+  const selectedCategoryName = selectedCategoryId !== null
+    ? (categories as any[])?.find((c: any) => c.id === selectedCategoryId)?.name
+    : null;
+
+  const filteredProducts = (products as Product[])?.filter((product: Product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesCategory = selectedCategoryName ? product.category === selectedCategoryName : true;
+    return matchesSearch && matchesCategory;
+  }) || [];
 
   const totalProducts = products?.length || 0;
   const activeProducts = products?.filter((p: Product) => p.isActive).length || 0;
@@ -393,401 +424,432 @@ export default function Products() {
               </Card>
             </div>
 
-            {/* Search and Add Product */}
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center mb-4 sm:mb-6">
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input
-                  type="search"
-                  placeholder="Search products..."
-                  className="pl-8 w-full sm:w-80"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+            {/* Categories + Products Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              {/* Categories Sidebar */}
+              <div className="lg:col-span-1">
+                <CategoryList
+                  selectedCategoryId={selectedCategoryId}
+                  onCategorySelect={setSelectedCategoryId}
                 />
               </div>
 
-              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => resetForm()} className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Product
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-auto">
-                  <DialogHeader>
-                    <DialogTitle>Add New Product</DialogTitle>
-                    <DialogDescription>
-                      Enter the details for the new product below.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="name">Product Name *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="category">Category *</Label>
-                        <Input
-                          id="category"
-                          value={formData.category}
-                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
+              {/* Search, Add Product, and Products List */}
+              <div className="lg:col-span-3">
+                {/* Search and Add Product */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 sm:justify-between sm:items-center mb-4 sm:mb-6">
+                  <div className="relative flex-1 sm:flex-none">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                    <Input
+                      type="search"
+                      placeholder="Search products..."
+                      className="pl-8 w-full sm:w-80"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
 
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        rows={3}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="sku">SKU</Label>
-                        <Input
-                          id="sku"
-                          value={formData.sku}
-                          onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="barcode">Barcode</Label>
-                        <Input
-                          id="barcode"
-                          value={formData.barcode}
-                          onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="brand">Brand</Label>
-                        <Input
-                          id="brand"
-                          value={formData.brand}
-                          onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="price">Retail Price *</Label>
-                        <Input
-                          id="price"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.price}
-                          onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="costPrice">Cost Price</Label>
-                        <Input
-                          id="costPrice"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.costPrice}
-                          onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="stockQuantity">Stock Quantity *</Label>
-                        <Input
-                          id="stockQuantity"
-                          type="number"
-                          min="0"
-                          value={formData.stockQuantity}
-                          onChange={(e) => setFormData({ ...formData, stockQuantity: parseInt(e.target.value) || 0 })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
-                        <Input
-                          id="minStockLevel"
-                          type="number"
-                          min="0"
-                          value={formData.minStockLevel}
-                          onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="weight">Weight (grams)</Label>
-                        <Input
-                          id="weight"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.weight}
-                          onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="dimensions">Dimensions (L x W x H)</Label>
-                        <Input
-                          id="dimensions"
-                          value={formData.dimensions}
-                          onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
-                          placeholder="e.g., 10 x 5 x 3 cm"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="productImage">Product Image</Label>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            id="productImage"
-                            accept="image/*"
-                            onChange={handleFileSelect}
-                            className="hidden"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="flex items-center gap-2"
-                          >
-                            <Upload className="h-4 w-4" />
-                            {selectedFile ? 'Change Image' : 'Upload Image'}
-                          </Button>
-                          {selectedFile && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={removeImage}
-                              className="text-destructive"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        {imagePreview && (
-                          <div className="mt-2">
-                            <img
-                              src={imagePreview}
-                              alt="Product preview"
-                              className="h-20 w-20 object-cover rounded-md border"
+                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button onClick={() => resetForm()} className="w-full sm:w-auto min-h-[44px] text-sm sm:text-base">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Product
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto mx-auto">
+                      <DialogHeader>
+                        <DialogTitle>Add New Product</DialogTitle>
+                        <DialogDescription>
+                          Enter the details for the new product below.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="name">Product Name *</Label>
+                            <Input
+                              id="name"
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              required
                             />
                           </div>
-                        )}
-                        {selectedFile && (
-                          <p className="text-sm text-muted-foreground">
-                            {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
-                          </p>
-                        )}
-                      </div>
-                    </div>
+                          <div>
+                            <Label htmlFor="category">Category *</Label>
+                            <Select
+                              value={formData.category}
+                              onValueChange={(value) => setFormData({ ...formData, category: value })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Array.isArray(categories) && categories.length > 0 ? (
+                                  (categories as any[]).map((category: any) => (
+                                    <SelectItem key={category.id} value={category.name}>
+                                      {category.name}
+                                    </SelectItem>
+                                  ))
+                                ) : (
+                                  <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
+                                    No categories available
+                                  </div>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
 
-                    <div className="flex items-center space-x-6">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="isActive"
-                          checked={formData.isActive}
-                          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                        />
-                        <Label htmlFor="isActive">Active</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="isTaxable"
-                          checked={formData.isTaxable}
-                          onCheckedChange={(checked) => setFormData({ ...formData, isTaxable: checked })}
-                        />
-                        <Label htmlFor="isTaxable">Taxable</Label>
-                      </div>
-                    </div>
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea
+                            id="description"
+                            value={formData.description}
+                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                            rows={3}
+                          />
+                        </div>
 
-                    <DialogFooter>
-                      <Button type="submit" disabled={createProductMutation.isPending}>
-                        {createProductMutation.isPending ? "Creating..." : "Create Product"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="sku">SKU</Label>
+                            <Input
+                              id="sku"
+                              value={formData.sku}
+                              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="barcode">Barcode</Label>
+                            <Input
+                              id="barcode"
+                              value={formData.barcode}
+                              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="brand">Brand</Label>
+                            <Input
+                              id="brand"
+                              value={formData.brand}
+                              onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="price">Retail Price *</Label>
+                            <Input
+                              id="price"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.price}
+                              onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="costPrice">Cost Price</Label>
+                            <Input
+                              id="costPrice"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.costPrice}
+                              onChange={(e) => setFormData({ ...formData, costPrice: parseFloat(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="stockQuantity">Stock Quantity *</Label>
+                            <Input
+                              id="stockQuantity"
+                              type="number"
+                              min="0"
+                              value={formData.stockQuantity}
+                              onChange={(e) => setFormData({ ...formData, stockQuantity: parseInt(e.target.value) || 0 })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="minStockLevel">Minimum Stock Level</Label>
+                            <Input
+                              id="minStockLevel"
+                              type="number"
+                              min="0"
+                              value={formData.minStockLevel}
+                              onChange={(e) => setFormData({ ...formData, minStockLevel: parseInt(e.target.value) || 0 })}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="weight">Weight (grams)</Label>
+                            <Input
+                              id="weight"
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.weight}
+                              onChange={(e) => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="dimensions">Dimensions (L x W x H)</Label>
+                            <Input
+                              id="dimensions"
+                              value={formData.dimensions}
+                              onChange={(e) => setFormData({ ...formData, dimensions: e.target.value })}
+                              placeholder="e.g., 10 x 5 x 3 cm"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="productImage">Product Image</Label>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                ref={fileInputRef}
+                                type="file"
+                                id="productImage"
+                                accept="image/*"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-2"
+                              >
+                                <Upload className="h-4 w-4" />
+                                {selectedFile ? 'Change Image' : 'Upload Image'}
+                              </Button>
+                              {selectedFile && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={removeImage}
+                                  className="text-destructive"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                            {imagePreview && (
+                              <div className="mt-2">
+                                <img
+                                  src={imagePreview}
+                                  alt="Product preview"
+                                  className="h-20 w-20 object-cover rounded-md border"
+                                />
+                              </div>
+                            )}
+                            {selectedFile && (
+                              <p className="text-sm text-muted-foreground">
+                                {selectedFile.name} ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-6">
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="isActive"
+                              checked={formData.isActive}
+                              onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+                            />
+                            <Label htmlFor="isActive">Active</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              id="isTaxable"
+                              checked={formData.isTaxable}
+                              onCheckedChange={(checked) => setFormData({ ...formData, isTaxable: checked })}
+                            />
+                            <Label htmlFor="isTaxable">Taxable</Label>
+                          </div>
+                        </div>
+
+                        <DialogFooter>
+                          <Button type="submit" disabled={createProductMutation.isPending}>
+                            {createProductMutation.isPending ? "Creating..." : "Create Product"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {/* Products */}
+                <Card>
+                  <CardHeader className="px-3 sm:px-6">
+                    <CardTitle className="text-lg sm:text-xl">Products ({filteredProducts.length})</CardTitle>
+                    <CardDescription className="text-sm">
+                      Manage your product inventory and details
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-3 sm:px-6">
+                    {isLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* Mobile Card Layout */}
+                        <div className="block md:hidden space-y-3">
+                          {filteredProducts.map((product: Product) => (
+                            <Card key={product.id} className="border border-gray-200 dark:border-gray-700">
+                              <CardContent className="p-4">
+                                <div className="flex justify-between items-start mb-3">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-base truncate">{product.name}</h3>
+                                    {product.brand && (
+                                      <p className="text-sm text-gray-500 truncate">{product.brand}</p>
+                                    )}
+                                    {product.sku && (
+                                      <p className="text-xs text-gray-400">SKU: {product.sku}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(product)}
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDelete(product.id)}
+                                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                                
+                                <div className="flex items-center justify-between text-sm">
+                                  <div className="flex items-center gap-3">
+                                    <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                                    <span className="font-semibold text-lg">${product.price.toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm">Stock: {product.stockQuantity}</span>
+                                    {product.stockQuantity <= product.minStockLevel && (
+                                      <Badge variant="destructive" className="text-xs">Low</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-3 flex justify-between items-center">
+                                  <Badge variant={product.isActive ? "default" : "secondary"} className="text-xs">
+                                    {product.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+
+                        {/* Desktop Table Layout */}
+                        <div className="hidden md:block">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Product</TableHead>
+                                <TableHead>Category</TableHead>
+                                <TableHead>Price</TableHead>
+                                <TableHead>Stock</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {filteredProducts.map((product: Product) => (
+                                <TableRow key={product.id}>
+                                  <TableCell>
+                                    <div>
+                                      <div className="font-medium">{product.name}</div>
+                                      {product.brand && (
+                                        <div className="text-sm text-gray-500">{product.brand}</div>
+                                      )}
+                                      {product.sku && (
+                                        <div className="text-xs text-gray-400">SKU: {product.sku}</div>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary">{product.category}</Badge>
+                                  </TableCell>
+                                  <TableCell>${product.price.toFixed(2)}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <span>{product.stockQuantity}</span>
+                                      {product.stockQuantity <= product.minStockLevel && (
+                                        <Badge variant="destructive" className="text-xs">Low</Badge>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant={product.isActive ? "default" : "secondary"}>
+                                      {product.isActive ? "Active" : "Inactive"}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEdit(product)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDelete(product.id)}
+                                        className="text-red-600 hover:text-red-700"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </>
+                    )}
+
+                    {!isLoading && filteredProducts.length === 0 && (
+                      <div className="text-center py-8">
+                        <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                        <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                          No products found
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                          Get started by adding your first product to the inventory.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
-            {/* Products */}
-            <Card>
-              <CardHeader className="px-3 sm:px-6">
-                <CardTitle className="text-lg sm:text-xl">Products ({filteredProducts.length})</CardTitle>
-                <CardDescription className="text-sm">
-                  Manage your product inventory and details
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="px-3 sm:px-6">
-                {isLoading ? (
-                  <div className="flex justify-center py-8">
-                    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
-                  </div>
-                ) : (
-                  <>
-                    {/* Mobile Card Layout */}
-                    <div className="block md:hidden space-y-3">
-                      {filteredProducts.map((product: Product) => (
-                        <Card key={product.id} className="border border-gray-200 dark:border-gray-700">
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-base truncate">{product.name}</h3>
-                                {product.brand && (
-                                  <p className="text-sm text-gray-500 truncate">{product.brand}</p>
-                                )}
-                                {product.sku && (
-                                  <p className="text-xs text-gray-400">SKU: {product.sku}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEdit(product)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(product.id)}
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-3">
-                                <Badge variant="secondary" className="text-xs">{product.category}</Badge>
-                                <span className="font-semibold text-lg">${product.price.toFixed(2)}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">Stock: {product.stockQuantity}</span>
-                                {product.stockQuantity <= product.minStockLevel && (
-                                  <Badge variant="destructive" className="text-xs">Low</Badge>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <div className="mt-3 flex justify-between items-center">
-                              <Badge variant={product.isActive ? "default" : "secondary"} className="text-xs">
-                                {product.isActive ? "Active" : "Inactive"}
-                              </Badge>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-
-                    {/* Desktop Table Layout */}
-                    <div className="hidden md:block">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Price</TableHead>
-                            <TableHead>Stock</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredProducts.map((product: Product) => (
-                            <TableRow key={product.id}>
-                              <TableCell>
-                                <div>
-                                  <div className="font-medium">{product.name}</div>
-                                  {product.brand && (
-                                    <div className="text-sm text-gray-500">{product.brand}</div>
-                                  )}
-                                  {product.sku && (
-                                    <div className="text-xs text-gray-400">SKU: {product.sku}</div>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">{product.category}</Badge>
-                              </TableCell>
-                              <TableCell>${product.price.toFixed(2)}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span>{product.stockQuantity}</span>
-                                  {product.stockQuantity <= product.minStockLevel && (
-                                    <Badge variant="destructive" className="text-xs">Low</Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={product.isActive ? "default" : "secondary"}>
-                                  {product.isActive ? "Active" : "Inactive"}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleEdit(product)}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDelete(product.id)}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </>
-                )}
-
-                {!isLoading && filteredProducts.length === 0 && (
-                  <div className="text-center py-8">
-                    <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                    <h3 className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                      No products found
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                      Get started by adding your first product to the inventory.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            
 
             {/* Edit Product Dialog */}
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -811,12 +873,27 @@ export default function Products() {
                     </div>
                     <div>
                       <Label htmlFor="edit-category">Category *</Label>
-                      <Input
-                        id="edit-category"
+                      <Select
                         value={formData.category}
-                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        required
-                      />
+                        onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.isArray(categories) && categories.length > 0 ? (
+                            (categories as any[]).map((category: any) => (
+                              <SelectItem key={category.id} value={category.name}>
+                                {category.name}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
+                              No categories available
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
