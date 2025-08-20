@@ -32,6 +32,8 @@ import { registerLocationRoutes } from "./routes/locations";
 import { registerPermissionRoutes } from "./routes/permissions";
 import { registerBusinessSettingsRoutes } from "./routes/business-settings";
 import { registerNotificationRoutes } from "./routes/notifications";
+import { registerPaymentRoutes } from "./routes/payments";
+import { registerMarketingRoutes } from "./routes/marketing";
 import createTerminalRoutes from "./routes/terminal-routes";
 import helcimPaymentsRouter from "./routes/payments/helcim";
 
@@ -69,11 +71,13 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerPermissionRoutes(app);
   registerBusinessSettingsRoutes(app, storage);
   registerNotificationRoutes(app, storage);
+  registerPaymentRoutes(app, storage);
+  registerMarketingRoutes(app, storage);
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));
-  // Temporarily disable problematic routes in build phase
-  // app.use('/api/payments/helcim', helcimPaymentsRouter);
+  // Enable helcim payment routes
+  app.use('/api/payments/helcim', helcimPaymentsRouter);
 
   // Staff routes
   app.get("/api/staff", async (req: Request, res: Response) => {

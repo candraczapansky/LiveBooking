@@ -884,4 +884,13 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     res.json(updatedPaymentMethod);
   }));
+
+  // Get all gift cards
+  app.get("/api/gift-cards", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    LoggerService.debug("Fetching all gift cards", context);
+
+    const giftCards = await storage.getAllGiftCards();
+    res.json(giftCards);
+  }));
 } 
