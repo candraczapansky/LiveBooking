@@ -1,27 +1,27 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { insertUserSchema } from "@shared/schema";
-import { sendSMS, isTwilioConfigured } from "../sms";
-import { sendEmail } from "../email";
-import { hashPassword, comparePassword } from "../utils/password";
+import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { sendEmail } from "../email.js";
+import { hashPassword, comparePassword } from "../utils/password.js";
 import { 
   ValidationError, 
   AuthenticationError, 
   ConflictError, 
   NotFoundError,
   asyncHandler 
-} from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest, requireRole } from "../middleware/error-handler";
+} from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
+import { validateRequest, requireRole } from "../middleware/error-handler.js";
 import { 
   generateToken, 
   authRateLimiter, 
   validateInput,
   sanitizeInputString,
   escapeHtml 
-} from "../middleware/security";
-import { authenticateToken, requireAdmin } from "../middleware/auth";
+} from "../middleware/security.js";
+import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 
 // Input validation schemas
 const loginSchema = z.object({

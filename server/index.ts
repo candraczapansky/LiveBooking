@@ -1,11 +1,11 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { config } from "dotenv";
-import { registerRoutes } from "./routes";
-import { setupVite, serveStatic, log } from "./vite";
-import { DatabaseStorage } from "./storage";
-import { securityHeaders } from "./middleware/security";
-import { EmailAutomationService } from "./email-automation";
-import { MarketingCampaignService } from "./marketing-campaigns";
+import { registerRoutes } from "./routes/index.js";
+import { setupVite, serveStatic, log } from "./vite.js";
+import { DatabaseStorage } from "./storage.js";
+import { securityHeaders } from "./middleware/security.js";
+import { EmailAutomationService } from "./email-automation.js";
+import { MarketingCampaignService } from "./marketing-campaigns.js";
 import { createServer } from "http";
 
 // Load environment variables
@@ -133,8 +133,9 @@ async function findAvailablePort(startPort: number): Promise<number> {
       serveStatic(app);
     }
 
-    // Find an available port (default 3002 for Replit proxy compatibility)
-    const preferredPort = parseInt(process.env.PORT || '3002');
+    // Find an available port. In production, default to 5000 to match Nginx/PM2 configs.
+    const defaultPort = process.env.NODE_ENV === 'production' ? '5000' : '3002';
+    const preferredPort = parseInt(process.env.PORT || defaultPort);
     const port = await findAvailablePort(preferredPort);
     
     if (port !== preferredPort) {

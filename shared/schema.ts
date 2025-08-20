@@ -17,7 +17,6 @@ export const users = pgTable("users", {
   state: text("state"),
   zipCode: text("zip_code"),
   profilePicture: text("profile_picture"), // Base64 encoded image data
-  squareCustomerId: text("square_customer_id"), // Legacy field for backward compatibility
   helcimCustomerId: text("helcim_customer_id"),
   // Password reset fields
   resetToken: text("reset_token"),
@@ -126,7 +125,6 @@ export const insertClientSchema = createInsertSchema(users).omit({
   password: true,
   createdAt: true,
   role: true,
-  squareCustomerId: true,
 });
 
 // Service Categories schema

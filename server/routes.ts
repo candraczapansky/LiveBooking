@@ -1,10 +1,10 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import type { IStorage } from "./storage";
+import type { IStorage } from "./storage.js";
 import { z } from "zod";
-import { LLMService } from "./llm-service";
-import { SMSAutoRespondService } from "./sms-auto-respond-service";
-import { AutoRespondService } from "./auto-respond-service";
+import { LLMService } from "./llm-service.js";
+import { SMSAutoRespondService } from "./sms-auto-respond-service.js";
+import { AutoRespondService } from "./auto-respond-service.js";
 
 // speakeasy and qrcode are optional; remove imports if not used in this module
 import {
@@ -21,21 +21,21 @@ import {
   insertMembershipSchema,
   insertClientMembershipSchema,
   insertStaffScheduleSchema,
-} from "../shared/schema";
+} from "../shared/schema.js";
 
 // Import route registration functions
-import { registerAuthRoutes } from "./routes/auth";
-import { registerUserRoutes } from "./routes/users";
-import { registerAppointmentRoutes } from "./routes/appointments";
-import { registerServiceRoutes } from "./routes/services";
-import { registerLocationRoutes } from "./routes/locations";
-import { registerPermissionRoutes } from "./routes/permissions";
-import { registerBusinessSettingsRoutes } from "./routes/business-settings";
-import { registerNotificationRoutes } from "./routes/notifications";
-import { registerPaymentRoutes } from "./routes/payments";
-import { registerMarketingRoutes } from "./routes/marketing";
-import createTerminalRoutes from "./routes/terminal-routes";
-import helcimPaymentsRouter from "./routes/payments/helcim";
+import { registerAuthRoutes } from "./routes/auth.js";
+import { registerUserRoutes } from "./routes/users.js";
+import { registerAppointmentRoutes } from "./routes/appointments.js";
+import { registerServiceRoutes } from "./routes/services.js";
+import { registerLocationRoutes } from "./routes/locations.js";
+import { registerPermissionRoutes } from "./routes/permissions.js";
+import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
+import { registerNotificationRoutes } from "./routes/notifications.js";
+import { registerPaymentRoutes } from "./routes/payments.js";
+import { registerMarketingRoutes } from "./routes/marketing.js";
+import createTerminalRoutes from "./routes/terminal-routes.js";
+import helcimPaymentsRouter from "./routes/payments/helcim.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -88,6 +88,41 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error("Error getting staff:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to get staff"
+      });
+    }
+  });
+
+  // Return services assigned to a specific staff member (detailed service objects)
+  app.get("/api/staff/:staffId/services", async (req: Request, res: Response) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      if (Number.isNaN(staffId)) {
+        return res.status(400).json({ error: "Invalid staffId" });
+      }
+
+      // Get assignments
+      const assignments = await storage.getStaffServices(staffId);
+
+      // Map to full service objects and include assignment metadata
+      const services = (
+        await Promise.all(assignments.map(async (assignment) => {
+          const service = await storage.getService(assignment.serviceId);
+          if (!service) return null;
+          return {
+            ...service,
+            staffServiceId: assignment.id,
+            staffId: assignment.staffId,
+            customRate: assignment.customRate ?? null,
+            customCommissionRate: assignment.customCommissionRate ?? null,
+          };
+        }))
+      ).filter(Boolean);
+
+      return res.json(services);
+    } catch (error) {
+      console.error("Error getting services for staff:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get services for staff",
       });
     }
   });

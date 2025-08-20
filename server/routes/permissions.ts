@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import { authenticateToken, requireAdmin } from "../middleware/auth";
-import { asyncHandler } from "../utils/errors";
-import { db } from "../db";
+import { authenticateToken, requireAdmin } from "../middleware/auth.js";
+import { asyncHandler } from "../utils/errors.js";
+import { db } from "../db.js";
 import { eq, inArray } from "drizzle-orm";
 import {
   permissions as permissionsTable,

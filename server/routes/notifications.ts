@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
-import { asyncHandler } from "../utils/errors";
+import type { IStorage } from "../storage.js";
+import { asyncHandler } from "../utils/errors.js";
 
 export function registerNotificationRoutes(app: Express, storage: IStorage) {
   // Get notifications with optional limit

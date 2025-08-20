@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash2, PlusCircle, Search, Briefcase } from "lucide-react";
+import { Edit, Trash2, UserPlus, Search, Briefcase } from "lucide-react";
 import Sidebar from "@/components/layout/sidebar";
 import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -187,7 +187,7 @@ const StaffPageSimple = () => {
                 onClick={handleAddStaff} 
                 className="w-full sm:w-auto h-12 sm:h-10 text-base sm:text-sm font-medium"
               >
-                <PlusCircle className="w-5 h-5 mr-2" />
+                <UserPlus className="w-5 h-5 mr-2" />
                 Add Staff
               </Button>
             </div>

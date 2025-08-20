@@ -1,4 +1,5 @@
 import { useLocation } from 'wouter';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { 
@@ -22,8 +23,10 @@ import {
   FileText,
   Bot,
   StickyNote,
-  Building2
+  Building2,
+  ChevronDown
 } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -72,11 +75,25 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
   const { toggleSidebar, closeSidebar } = useSidebar();
+  const isInStaffSection = location === '/staff' || location === '/schedule' || location.startsWith('/staff-schedule');
+  const [isStaffExpanded, setIsStaffExpanded] = useState<boolean>(isInStaffSection);
+  const isInCommunicationsSection = location === '/automations' || location === '/marketing' || location === '/ai-messaging';
+  const [isCommsExpanded, setIsCommsExpanded] = useState<boolean>(isInCommunicationsSection);
+
+  useEffect(() => {
+    if (isInStaffSection) {
+      setIsStaffExpanded(true);
+    }
+  }, [location]);
+  useEffect(() => {
+    if (isInCommunicationsSection) {
+      setIsCommsExpanded(true);
+    }
+  }, [location]);
 
   const menuItems = [
     { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
     { icon: <Calendar size={20} />, label: "Appointments", href: "/appointments" },
-    { icon: <CalendarDays size={20} />, label: "Schedule", href: "/schedule" },
     { icon: <Users size={20} />, label: "Clients", href: "/clients" },
     { icon: <UserCircle size={20} />, label: "Staff", href: "/staff" },
     { icon: <Scissors size={20} />, label: "Services", href: "/services" },
@@ -86,13 +103,11 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
     { icon: <MapPin size={20} />, label: "Locations", href: "/locations" },
     { icon: <Monitor size={20} />, label: "Devices", href: "/devices" },
     { icon: <BarChart3 size={20} />, label: "Reports", href: "/reports" },
-    { icon: <Zap size={20} />, label: "Automations", href: "/automations" },
-    { icon: <Megaphone size={20} />, label: "Marketing", href: "/marketing" },
+    { icon: <Mail size={20} />, label: "SMS & Email", href: "#" },
     { icon: <Gift size={20} />, label: "Gift Certificates", href: "/gift-certificates" },
     { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
     { icon: <FileText size={20} />, label: "Forms", href: "/forms" },
     { icon: <StickyNote size={20} />, label: "Note Templates", href: "/note-templates" },
-    { icon: <Bot size={20} />, label: "AI Messaging", href: "/ai-messaging" },
     { icon: <Building2 size={20} />, label: "Memberships", href: "/memberships" },
     { icon: <Settings size={20} />, label: "Settings", href: "/settings" },
   ];
@@ -117,18 +132,143 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
         <div className="flex flex-col h-full">
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
-            {menuItems.map((item) => (
-              <div key={item.href} className="mb-1">
-                <SidebarItem
-                  icon={item.icon}
-                  label={item.label}
-                  href={item.href}
-                  isActive={location === item.href}
-                  isOpen={isOpen}
-                  onClick={handleItemClick}
-                />
-              </div>
-            ))}
+            {menuItems.map((item) => {
+              if (item.label === 'Staff') {
+                const isActive = isInStaffSection;
+                return (
+                  <div key={item.href} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsStaffExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isStaffExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isStaffExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<UserCircle size={18} />}
+                          label="Staff"
+                          href="/staff"
+                          isActive={location === "/staff"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<CalendarDays size={18} />}
+                            label="Schedule"
+                            href="/schedule"
+                            isActive={location === "/schedule"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'SMS & Email') {
+                const isActive = isInCommunicationsSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsCommsExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isCommsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isCommsExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<Zap size={18} />}
+                          label="Automations"
+                          href="/automations"
+                          isActive={location === "/automations"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Megaphone size={18} />}
+                            label="Marketing"
+                            href="/marketing"
+                            isActive={location === "/marketing"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Bot size={18} />}
+                            label="AI Messaging"
+                            href="/ai-messaging"
+                            isActive={location === "/ai-messaging"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <div key={item.href} className="mb-1">
+                  <SidebarItem
+                    icon={item.icon}
+                    label={item.label}
+                    href={item.href}
+                    isActive={location === item.href}
+                    isOpen={isOpen}
+                    onClick={handleItemClick}
+                  />
+                </div>
+              );
+            })}
           </nav>
 
           {/* User Info */}

@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema, insertClientSchema } from "@shared/schema";
-import { hashPassword } from "../utils/password";
+import { hashPassword } from "../utils/password.js";
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {

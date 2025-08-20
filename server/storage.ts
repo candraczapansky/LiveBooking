@@ -206,6 +206,7 @@ export interface IStorage {
   setDefaultPaymentMethod(clientId: number, paymentMethodId: number): Promise<boolean>;
 
   // User Square operations
+  // Deprecated: Square customer ID is no longer used
   updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User>;
   updateUserHelcimCustomerId(userId: number, helcimCustomerId: string): Promise<User>;
 
@@ -2217,7 +2218,10 @@ Glo Head Spa`,
   }
 
   async updateUserSquareCustomerId(userId: number, squareCustomerId: string): Promise<User> {
-    return this.updateUser(userId, { squareCustomerId });
+    // No-op in current system; maintain compatibility by returning the user unchanged
+    const user = await this.getUserById(userId);
+    if (!user) throw new Error('User not found');
+    return user as any;
   }
 
   async updateUserHelcimCustomerId(userId: number, helcimCustomerId: string): Promise<User> {

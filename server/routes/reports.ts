@@ -1,7 +1,7 @@
 import { Express } from "express";
-import { IStorage } from "../storage";
-import { db } from "../db";
-import { salesHistory, appointments, services, serviceCategories, products, users, staff } from "../../shared/schema";
+import { IStorage } from "../storage.js";
+import { db } from "../db.js";
+import { salesHistory, appointments, services, serviceCategories, products, users, staff } from "../../shared/schema.js";
 import { eq, and, gte, lte, sql } from "drizzle-orm";
 
 // Helper function to format price

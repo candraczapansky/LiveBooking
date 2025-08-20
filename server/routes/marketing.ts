@@ -1,17 +1,17 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { 
   ValidationError, 
   NotFoundError, 
   ConflictError, 
   asyncHandler 
-} from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest, requireAuth } from "../middleware/error-handler";
-import { sendEmail } from "../email";
-import { sendSMS, isTwilioConfigured } from "../sms";
-import { redisCache } from "../utils/redis-cache";
+} from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
+import { validateRequest, requireAuth } from "../middleware/error-handler.js";
+import { sendEmail } from "../email.js";
+import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { redisCache } from "../utils/redis-cache.js";
 import { insertMarketingCampaignSchema } from "@shared/schema";
 
 // Use the shared schema for campaign creation

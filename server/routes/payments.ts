@@ -1,18 +1,18 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
-import { insertPaymentSchema, insertSavedPaymentMethodSchema } from "../../shared/schema";
+import { insertPaymentSchema, insertSavedPaymentMethodSchema } from "../../shared/schema.js";
 import { 
   ValidationError, 
   NotFoundError, 
   ConflictError, 
   ExternalServiceError,
   asyncHandler 
-} from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest, requireAuth } from "../middleware/error-handler";
+} from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
+import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 
-import cache, { invalidateCache } from "../utils/cache";
+import cache, { invalidateCache } from "../utils/cache.js";
 
 // Move this function to the top level
 async function createSalesHistoryRecord(storage: IStorage, paymentData: any, transactionType: string, additionalData?: any) {

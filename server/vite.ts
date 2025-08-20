@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config";
+import viteConfig from "../vite.config.js";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -73,12 +73,28 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Resolve the built client directory robustly across different run modes
+  //  - When running compiled JS: dist/server -> dist/public
+  //  - When running via ts-node: server -> ../dist/public
+  //  - As a last resort, try CWD based resolution
+  const candidatePaths = [
+    path.resolve(import.meta.dirname, "..", "public"),
+    path.resolve(import.meta.dirname, "..", "..", "dist", "public"),
+    path.resolve(process.cwd(), "dist", "public"),
+  ];
 
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+  const distPath = candidatePaths.find((p) => fs.existsSync(p));
+
+  if (!distPath) {
+    // Do not crash; respond with a helpful message instead of 500 on every request
+    log("Static build not found. Expected one of: " + candidatePaths.join(", "));
+    app.use((req, res) => {
+      res
+        .status(500)
+        .type("text/plain")
+        .send("Build not found. Please run 'npm run build' on the server.");
+    });
+    return;
   }
 
   app.use(express.static(distPath));

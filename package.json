@@ -4,8 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development DISABLE_AUTOMATIC_SERVICE_CREATION=true tsx server/index.ts",
-    "build": "tsc",
-    "start": "node dist/index.js",
+    "build": "vite build && tsc",
+    "start": "NODE_ENV=production node --experimental-specifier-resolution=node dist/server/index.js",
     "start-clean": "rm -rf node_modules && npm install && npm run dev"
   },
   "dependencies": {

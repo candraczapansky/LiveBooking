@@ -766,7 +766,6 @@ export class SMSAutoRespondService {
           state: null,
           zipCode: null,
           profilePicture: null,
-          squareCustomerId: null,
           resetToken: null,
           resetTokenExpiry: null,
           createdAt: null,

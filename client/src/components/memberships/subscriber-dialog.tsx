@@ -239,7 +239,7 @@ export default function SubscriberDialog({
 
         setPaymentResult({
           membership: membershipSubscription,
-          payment: paymentRecord,
+          paymentRecord,
           payment: paymentData.payment
         });
 

@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, X, Shield, CheckCircle } from "lucide-react";
 // Removed Checkbox to prevent nested state update loops during permission toggles
 import { Badge } from "@/components/ui/badge";
+// Select already imported above in this file
 
 // Staff form schema
 const staffFormSchema = z.object({
@@ -194,6 +195,28 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       form.reset();
     }
   }, [open, form]);
+
+  // Assigned services for this staff member (edit mode)
+  const { data: assignedServices, isLoading: assignedServicesLoading } = useQuery({
+    queryKey: ['/api/staff', staffId, 'services'],
+    enabled: !!staffId && open,
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/staff/${staffId}/services`);
+      return res.json();
+    }
+  });
+
+  // All services for dropdown
+  const { data: allServices } = useQuery({
+    queryKey: ['/api/services'],
+    enabled: open,
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/services');
+      return res.json();
+    }
+  });
+
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
@@ -938,6 +961,80 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 </div>
               )}
             </div>
+
+            {/* Services Assignment (Edit only) */}
+            {staffId && (
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Assign Services</h3>
+                </div>
+
+                {/* Assigned services list */}
+                {assignedServicesLoading ? (
+                  <div className="text-sm text-gray-500">Loading services…</div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {(assignedServices || []).length === 0 && (
+                      <div className="text-sm text-gray-500">No services assigned</div>
+                    )}
+                    {(assignedServices || []).map((svc: any) => (
+                      <div key={svc.id} className="inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs">
+                        <span>{svc.name}</span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await apiRequest('DELETE', `/api/staff/${staffId}/services/${svc.id}`);
+                              queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+                            } catch (e) {}
+                          }}
+                          className="text-gray-500 hover:text-red-600"
+                          aria-label="Remove service"
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add service */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                  <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(allServices || []).map((svc: any) => (
+                        <SelectItem key={svc.id} value={svc.id.toString()}>
+                          {svc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      const idNum = parseInt(selectedServiceId);
+                      if (!idNum) {
+                        console.error('Select a service first');
+                        return;
+                      }
+                      try {
+                        await apiRequest('POST', '/api/staff-services', { staffId, serviceId: idNum });
+                        setSelectedServiceId("");
+                        queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+                      } catch (e) {}
+                    }}
+                    className="h-9"
+                  >
+                    Add Service
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

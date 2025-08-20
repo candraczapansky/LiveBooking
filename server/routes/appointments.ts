@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { insertAppointmentSchema, insertAppointmentHistorySchema } from "@shared/schema";
 import { 
@@ -7,11 +7,11 @@ import {
   NotFoundError, 
   ConflictError, 
   asyncHandler 
-} from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest, requireAuth } from "../middleware/error-handler";
-import { sendEmail } from "../email";
-import { sendSMS, isTwilioConfigured } from "../sms";
+} from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
+import { validateRequest, requireAuth } from "../middleware/error-handler.js";
+import { sendEmail } from "../email.js";
+import { sendSMS, isTwilioConfigured } from "../sms.js";
 
 export function registerAppointmentRoutes(app: Express, storage: IStorage) {
   // TEST ENDPOINT: Check SendGrid configuration

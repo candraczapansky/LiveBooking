@@ -21,7 +21,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { PlusCircle, Search, Edit, Trash2, Scissors } from "lucide-react";
+import { UserPlus, Search, Edit, Trash2, Scissors } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +56,92 @@ type StaffMember = {
     email: string;
     phone?: string;
   };
+};
+
+// Display assigned services as badges with ability to remove
+const AssignedServicesBadges = ({ staffId }: { staffId: number }) => {
+  const queryClient = useQueryClient();
+  const { data: services, isLoading } = useQuery({
+    queryKey: ['/api/staff', staffId, 'services'],
+    queryFn: async () => {
+      const res = await fetch(`/api/staff/${staffId}/services`);
+      if (!res.ok) throw new Error('Failed to fetch staff services');
+      return res.json();
+    }
+  });
+
+  if (isLoading) {
+    return <div className="text-xs text-gray-500">Loading services…</div>;
+  }
+
+  if (!services || services.length === 0) {
+    return <div className="text-xs text-gray-500">No services assigned</div>;
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {services.map((service: any) => (
+        <div key={`${staffId}-${service.id}`} className="inline-flex items-center gap-1 border rounded-full px-2 py-0.5 text-xs">
+          <span>{service.name}</span>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await apiRequest('DELETE', `/api/staff/${staffId}/services/${service.id}`);
+                queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+              } catch (e) {}
+            }}
+            className="text-gray-500 hover:text-red-600"
+            aria-label="Remove service"
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Controls to assign a new service to a staff member
+const ServiceAssignmentControls = ({ staffId, allServices }: { staffId: number; allServices: any[] }) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+
+  const handleAdd = async () => {
+    const idNum = parseInt(selectedServiceId);
+    if (!idNum) {
+      toast({ title: 'Select a service', description: 'Please choose a service to assign.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await apiRequest('POST', '/api/staff-services', { staffId, serviceId: idNum });
+      setSelectedServiceId("");
+      queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+      toast({ title: 'Service assigned', description: 'Service added to staff.' });
+    } catch (e: any) {
+      toast({ title: 'Failed to assign', description: e?.message || 'Could not assign service', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+      <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
+        <SelectTrigger id={`service-select-${staffId}`}>
+          <SelectValue placeholder="Select a service" />
+        </SelectTrigger>
+        <SelectContent>
+          {(allServices || []).map((svc: any) => (
+            <SelectItem key={svc.id} value={svc.id.toString()}>
+              {svc.name} {typeof svc.price === 'number' ? `- ${formatPrice(svc.price)}` : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button variant="outline" onClick={handleAdd} className="h-9">Add Service</Button>
+    </div>
+  );
 };
 
 const StaffPage = () => {
@@ -86,6 +179,16 @@ const StaffPage = () => {
     queryFn: async () => {
       const response = await fetch('/api/staff');
       if (!response.ok) throw new Error('Failed to fetch staff');
+      return response.json();
+    }
+  });
+
+  // Fetch all services for assignment UI
+  const { data: allServices } = useQuery({
+    queryKey: ['/api/services'],
+    queryFn: async () => {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     }
   });
@@ -214,7 +317,7 @@ const StaffPage = () => {
                       }}
                       type="button"
                     >
-                      <PlusCircle className="h-4 w-4" />
+                      <UserPlus className="h-4 w-4" />
                       <span className="ml-1">Add Staff</span>
                     </button>
                   )}
@@ -320,6 +423,19 @@ const StaffPage = () => {
                             </div>
                           )}
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Services Assignment Section */}
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Assign Services</h4>
+
+                      {/* Current assigned services badges */}
+                      <AssignedServicesBadges staffId={staffMember.id} />
+
+                      {/* Add/Remove service control */}
+                      <div className="mt-3">
+                        <ServiceAssignmentControls staffId={staffMember.id} allServices={allServices || []} />
                       </div>
                     </div>
                   </div>

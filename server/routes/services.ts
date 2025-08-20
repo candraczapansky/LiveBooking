@@ -1,5 +1,5 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { insertServiceSchema, insertServiceCategorySchema } from "@shared/schema";
 import { 
@@ -7,10 +7,10 @@ import {
   NotFoundError, 
   ConflictError, 
   asyncHandler 
-} from "../utils/errors";
-import LoggerService, { getLogContext } from "../utils/logger";
-import { validateRequest, requireAuth } from "../middleware/error-handler";
-import cache, { invalidateCache } from "../utils/cache";
+} from "../utils/errors.js";
+import LoggerService, { getLogContext } from "../utils/logger.js";
+import { validateRequest, requireAuth } from "../middleware/error-handler.js";
+import cache, { invalidateCache } from "../utils/cache.js";
 
 export function registerServiceRoutes(app: Express, storage: IStorage) {
   // Get all services
