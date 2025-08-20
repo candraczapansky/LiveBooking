@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -142,7 +142,6 @@ const FormsPage = () => {
         <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
           sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
         }`}>
-          <Header />
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
             <div className="max-w-7xl mx-auto px-2 sm:px-0">
               <div className="flex items-center justify-center h-64">
@@ -166,7 +165,6 @@ const FormsPage = () => {
         <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
           sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
         }`}>
-          <Header />
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
             <div className="max-w-7xl mx-auto px-2 sm:px-0">
               <div className="text-center py-12">
@@ -200,7 +198,6 @@ const FormsPage = () => {
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
         sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
       }`}>
-        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto px-2 sm:px-0">

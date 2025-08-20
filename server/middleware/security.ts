@@ -17,36 +17,45 @@ export function generateToken(user: any): string {
   
   const secret = process.env.JWT_SECRET || 'fallback-secret';
   
-  return jwt.sign(payload, secret, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-  });
+  return jwt.sign(payload, secret as any, { expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as any } as any);
 }
 
 // Security headers middleware
 export function securityHeaders() {
-  return helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        fontSrc: ["'self'", "https://fonts.gstatic.com"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "https://api.squareup.com", "https://api.twilio.com"],
-        frameSrc: ["'none'"],
-        objectSrc: ["'none'"],
-        upgradeInsecureRequests: [],
+  const cspReportUri = process.env.CSP_REPORT_URI;
+
+  return [
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          // Do NOT use 'unsafe-dynamic'. If you later add nonces, consider 'strict-dynamic' in script-src only
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+          imgSrc: ["'self'", "data:", "blob:", "https:"],
+          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          connectSrc: ["'self'", "https:", "wss:"],
+          frameSrc: ["'self'"],
+          objectSrc: ["'none'"],
+          ...(cspReportUri ? { reportUri: [cspReportUri] } : {}),
+        },
       },
-    },
-    hsts: {
-      maxAge: 31536000,
-      includeSubDomains: true,
-      preload: true,
-    },
-    noSniff: true,
-    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-    xssFilter: true,
-  });
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      noSniff: true,
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      // xssFilter is deprecated in modern browsers; Helmet no longer needs it explicitly
+    }),
+    // Permissions-Policy replacement for legacy Feature-Policy
+    (req: Request, res: Response, next: NextFunction) => {
+      const policy = process.env.PERMISSIONS_POLICY || 'geolocation=(), microphone=(), camera=()';
+      res.setHeader('Permissions-Policy', policy);
+      next();
+    }
+  ];
 }
 
 // CORS configuration

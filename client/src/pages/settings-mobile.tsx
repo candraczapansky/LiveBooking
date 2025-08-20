@@ -9,7 +9,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { apiRequest } from "@/lib/queryClient";
 
 import { 
@@ -798,7 +798,6 @@ export default function SettingsMobile() {
         marginLeft: 0,
         overflow: "hidden"
       }}>
-        <Header />
         
         <main style={{
           flex: 1,

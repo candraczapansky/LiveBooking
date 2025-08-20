@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Header rendered by MainLayout
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -76,7 +76,7 @@ import ClientCommunication from "@/components/client/client-communication";
 import ClientSearchFilters from "@/components/client/client-search-filters";
 import ClientNoteHistory from "@/components/client/client-note-history";
 // Square payment configuration
-const SQUARE_APP_ID = import.meta.env.VITE_SQUARE_APPLICATION_ID;
+
 
 type Client = {
   id: number;
@@ -290,8 +290,6 @@ const ClientsPage = () => {
       });
       addForm.reset();
       setIsAddDialogOpen(false);
-      setShowPaymentSection(false);
-      setIsAddingPaymentMethod(false);
     },
     onError: (error) => {
       toast({
@@ -1198,7 +1196,6 @@ const ClientsPage = () => {
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
         sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
       }`}>
-        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto px-2 sm:px-0">

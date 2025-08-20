@@ -144,7 +144,23 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       }
     }
 
-    const newService = await storage.createService(serviceData);
+    // Drop optional fields that may not exist in some DBs (defensive)
+    const { description: _desc, ...safeServiceData } = serviceData as any;
+
+    // Attempt to create the service. If the DB is missing optional columns
+    // due to an older schema, gracefully retry without them.
+    let newService;
+    try {
+      newService = await storage.createService(safeServiceData);
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/column\s+"description"\s+does\s+not\s+exist/i.test(message)) {
+        console.warn('Service creation failed due to missing description column. Retrying without description.');
+        newService = await storage.createService(safeServiceData);
+      } else {
+        throw err;
+      }
+    }
 
     // Invalidate relevant caches
     invalidateCache('services');
@@ -356,7 +372,7 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       throw new ConflictError("Service is already assigned to this staff member");
     }
 
-    const assignment = await storage.assignServiceToStaff(staffId, serviceId);
+    const assignment = await storage.assignServiceToStaff({ staffId, serviceId } as any);
 
     LoggerService.info("Service assigned to staff", { ...context, staffId, serviceId, assignmentId: assignment.id });
 

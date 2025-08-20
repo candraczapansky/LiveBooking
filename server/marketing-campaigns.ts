@@ -6,24 +6,24 @@ import { addDays, format } from 'date-fns';
 interface CampaignData {
   id: number;
   name: string;
-  type: 'email' | 'sms';
+  type: string; // 'email' | 'sms'
   audience: string;
-  subject?: string;
+  subject?: string | null;
   content: string;
-  htmlContent?: string;
-  templateDesign?: string;
-  sendDate?: Date;
-  status: 'draft' | 'scheduled' | 'sent' | 'failed';
-  sentCount: number;
-  deliveredCount: number;
-  failedCount: number;
-  openedCount: number;
-  clickedCount: number;
-  unsubscribedCount: number;
-  ctaButton?: string;
-  ctaUrl?: string;
-  specialOffer?: string;
-  promoCode?: string;
+  htmlContent?: string | null;
+  templateDesign?: string | null;
+  sendDate?: Date | string | null;
+  status: string;
+  sentCount?: number | null;
+  deliveredCount?: number | null;
+  failedCount?: number | null;
+  openedCount?: number | null;
+  clickedCount?: number | null;
+  unsubscribedCount?: number | null;
+  ctaButton?: string | null;
+  ctaUrl?: string | null;
+  specialOffer?: string | null;
+  promoCode?: string | null;
 }
 
 interface CampaignStats {
@@ -153,10 +153,11 @@ export class MarketingCampaignService {
               campaignTitle: campaign.name,
               campaignSubtitle: campaign.subject || '',
               campaignContent: campaign.htmlContent || campaign.content,
-              ctaButton: campaign.ctaButton,
-              ctaUrl: campaign.ctaUrl,
-              specialOffer: campaign.specialOffer,
-              promoCode: campaign.promoCode,
+              // optional campaign CTA fields may not exist in DB schema
+              ctaButton: (campaign as any).ctaButton,
+              ctaUrl: (campaign as any).ctaUrl,
+              specialOffer: (campaign as any).specialOffer,
+              promoCode: (campaign as any).promoCode,
               unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${recipient.id}`
             };
 
@@ -251,10 +252,7 @@ export class MarketingCampaignService {
       templateDesign: campaignData.templateDesign,
       sendDate: campaignData.sendDate,
       status: campaignData.status,
-      ctaButton: campaignData.ctaButton,
-      ctaUrl: campaignData.ctaUrl,
-      specialOffer: campaignData.specialOffer,
-      promoCode: campaignData.promoCode
+      // extra fields omitted in DB schema
     });
 
     console.log(`✅ Campaign created: ${campaign.name}`);
@@ -283,15 +281,15 @@ export class MarketingCampaignService {
 
     const stats: CampaignStats = {
       totalRecipients: await this.getTargetAudienceCount(campaign.audience),
-      sentCount: campaign.sentCount,
-      deliveredCount: campaign.deliveredCount,
-      failedCount: campaign.failedCount,
-      openedCount: campaign.openedCount,
-      clickedCount: campaign.clickedCount,
-      unsubscribedCount: campaign.unsubscribedCount,
-      openRate: campaign.deliveredCount > 0 ? (campaign.openedCount / campaign.deliveredCount) * 100 : 0,
-      clickRate: campaign.deliveredCount > 0 ? (campaign.clickedCount / campaign.deliveredCount) * 100 : 0,
-      unsubscribeRate: campaign.deliveredCount > 0 ? (campaign.unsubscribedCount / campaign.deliveredCount) * 100 : 0
+      sentCount: campaign.sentCount || 0,
+      deliveredCount: campaign.deliveredCount || 0,
+      failedCount: campaign.failedCount || 0,
+      openedCount: campaign.openedCount || 0,
+      clickedCount: campaign.clickedCount || 0,
+      unsubscribedCount: campaign.unsubscribedCount || 0,
+      openRate: (campaign.deliveredCount || 0) > 0 ? ((campaign.openedCount || 0) / (campaign.deliveredCount || 0)) * 100 : 0,
+      clickRate: (campaign.deliveredCount || 0) > 0 ? ((campaign.clickedCount || 0) / (campaign.deliveredCount || 0)) * 100 : 0,
+      unsubscribeRate: (campaign.deliveredCount || 0) > 0 ? ((campaign.unsubscribedCount || 0) / (campaign.deliveredCount || 0)) * 100 : 0
     };
 
     return stats;
@@ -331,10 +329,10 @@ export class MarketingCampaignService {
         campaignTitle: campaign.name,
         campaignSubtitle: campaign.subject || '',
         campaignContent: campaign.htmlContent || campaign.content,
-        ctaButton: campaign.ctaButton,
-        ctaUrl: campaign.ctaUrl,
-        specialOffer: campaign.specialOffer,
-        promoCode: campaign.promoCode,
+        ctaButton: (campaign as any).ctaButton,
+        ctaUrl: (campaign as any).ctaUrl,
+        specialOffer: (campaign as any).specialOffer,
+        promoCode: (campaign as any).promoCode,
         unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/test`
       };
 
@@ -442,7 +440,7 @@ export class MarketingCampaignService {
       const campaign = await this.storage.getMarketingCampaign(campaignId);
       if (campaign) {
         await this.storage.updateMarketingCampaign(campaignId, {
-          openedCount: campaign.openedCount + 1
+          openedCount: (campaign.openedCount || 0) + 1
         });
       }
     } catch (error) {
@@ -458,7 +456,7 @@ export class MarketingCampaignService {
       const campaign = await this.storage.getMarketingCampaign(campaignId);
       if (campaign) {
         await this.storage.updateMarketingCampaign(campaignId, {
-          clickedCount: campaign.clickedCount + 1
+          clickedCount: (campaign.clickedCount || 0) + 1
         });
       }
     } catch (error) {
@@ -474,7 +472,7 @@ export class MarketingCampaignService {
       const campaign = await this.storage.getMarketingCampaign(campaignId);
       if (campaign) {
         await this.storage.updateMarketingCampaign(campaignId, {
-          unsubscribedCount: campaign.unsubscribedCount + 1
+          unsubscribedCount: (campaign.unsubscribedCount || 0) + 1
         });
       }
 
@@ -506,12 +504,12 @@ export class MarketingCampaignService {
     });
 
     const totalCampaigns = dateFilteredCampaigns.length;
-    const totalEmailsSent = dateFilteredCampaigns.reduce((sum, campaign) => sum + campaign.sentCount, 0);
+    const totalEmailsSent = dateFilteredCampaigns.reduce((sum, campaign) => sum + (campaign.sentCount || 0), 0);
     
     const campaignsWithRates = dateFilteredCampaigns.map(campaign => ({
       ...campaign,
-      openRate: campaign.deliveredCount > 0 ? (campaign.openedCount / campaign.deliveredCount) * 100 : 0,
-      clickRate: campaign.deliveredCount > 0 ? (campaign.clickedCount / campaign.deliveredCount) * 100 : 0
+      openRate: (campaign.deliveredCount || 0) > 0 ? ((campaign.openedCount || 0) / (campaign.deliveredCount || 0)) * 100 : 0,
+      clickRate: (campaign.deliveredCount || 0) > 0 ? ((campaign.clickedCount || 0) / (campaign.deliveredCount || 0)) * 100 : 0
     }));
 
     const averageOpenRate = campaignsWithRates.length > 0 

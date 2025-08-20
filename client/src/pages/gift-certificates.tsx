@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -409,7 +409,6 @@ export default function GiftCertificatesPage() {
         </div>
         
         <div className={`flex-1 flex flex-col transition-all duration-300 ${isOpen ? 'lg:ml-64' : 'lg:ml-16'}`}>
-          <Header />
           
           <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-6">
             <div className="w-full max-w-6xl mx-auto">

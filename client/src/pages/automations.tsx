@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -400,7 +400,6 @@ Glo Head Spa`,
     <div className="min-h-screen bg-background">
       <SidebarController />
       <div className={`transition-all duration-300 ease-in-out ${isMobile ? 'ml-0' : 'ml-16'}`}>
-        <Header />
         <main className="p-6">
           <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">

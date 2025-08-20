@@ -30,12 +30,7 @@ const productionConfigSchema = z.object({
   TWILIO_AUTH_TOKEN: z.string().optional(),
   TWILIO_PHONE_NUMBER: z.string().optional(),
   
-  // Payment Configuration
-  SQUARE_APPLICATION_ID: z.string().optional(),
-  SQUARE_ACCESS_TOKEN: z.string().optional(),
-  SQUARE_ENVIRONMENT: z.enum(['sandbox', 'production']).default('sandbox'),
-  
-  // Logging
+    // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_FILE_ENABLED: z.string().transform(val => val === 'true').default('true'),
   
@@ -171,17 +166,6 @@ export class ProductionConfig {
         accountSid: this.config.TWILIO_ACCOUNT_SID,
         authToken: this.config.TWILIO_AUTH_TOKEN,
         phoneNumber: this.config.TWILIO_PHONE_NUMBER,
-      },
-    };
-  }
-
-  // Payment configuration
-  get payment() {
-    return {
-      square: {
-        applicationId: this.config.SQUARE_APPLICATION_ID,
-        accessToken: this.config.SQUARE_ACCESS_TOKEN,
-        environment: this.config.SQUARE_ENVIRONMENT,
       },
     };
   }

@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, PlusCircle, Search, Briefcase } from "lucide-react";
-import Header from "@/components/layout/header";
 import Sidebar from "@/components/layout/sidebar";
 import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -178,8 +177,6 @@ const StaffPageSimple = () => {
       
       {/* Main Content */}
       <div className="lg:pl-64 min-h-screen lg:h-screen flex flex-col">
-        <Header />
-        
         {/* Content Area */}
         <div className="flex-1 p-4 sm:p-6 overflow-auto lg:overflow-auto">
           {/* Header Section */}

@@ -69,8 +69,8 @@ export class PermissionsService {
           groups.push(group);
           
           // Get permissions for this group
-          const groupMappings = await this.storage.getPermissionGroupMappings(userGroup.groupId);
-          for (const mapping of groupMappings) {
+          const groupMappings = await (this.storage as any).getPermissionGroupMappings?.(userGroup.groupId) ?? [];
+          for (const mapping of groupMappings as any[]) {
             const permission = await this.storage.getPermission(mapping.permissionId);
             if (permission && permission.isActive) {
               groupPermissions.add(permission.name);
@@ -124,7 +124,7 @@ export class PermissionsService {
       const group = await this.storage.getPermissionGroup(groupId);
       if (!group) return null;
       
-      const mappings = await this.storage.getPermissionGroupMappings(groupId);
+      const mappings = await (this.storage as any).getPermissionGroupMappings?.(groupId) ?? [];
       const permissions: Permission[] = [];
       
       for (const mapping of mappings) {
@@ -163,7 +163,7 @@ export class PermissionsService {
       // Add permissions to the group
       if (groupData.permissionIds && groupData.permissionIds.length > 0) {
         for (const permissionId of groupData.permissionIds) {
-          await this.storage.createPermissionGroupMapping({
+          await (this.storage as any).createPermissionGroupMapping?.({
             groupId: group.id,
             permissionId,
           });
@@ -196,11 +196,11 @@ export class PermissionsService {
       // Update permissions if provided
       if (updates.permissionIds !== undefined) {
         // Remove existing permissions
-        await this.storage.deletePermissionGroupMappings(groupId);
+        await (this.storage as any).deletePermissionGroupMappings?.(groupId);
         
         // Add new permissions
         for (const permissionId of updates.permissionIds) {
-          await this.storage.createPermissionGroupMapping({
+          await (this.storage as any).createPermissionGroupMapping?.({
             groupId,
             permissionId,
           });
@@ -220,12 +220,12 @@ export class PermissionsService {
   async assignPermissionGroupToUser(userId: number, groupId: number, assignedBy: number): Promise<UserPermissionGroup> {
     try {
       // Check if user already has this group
-      const existingAssignment = await this.storage.getUserPermissionGroup(userId, groupId);
+      const existingAssignment = await (this.storage as any).getUserPermissionGroup?.(userId, groupId);
       if (existingAssignment) {
         throw new Error('User already has this permission group');
       }
       
-      return await this.storage.createUserPermissionGroup({
+      return await (this.storage as any).createUserPermissionGroup?.({
         userId,
         groupId,
         assignedBy,
@@ -241,12 +241,12 @@ export class PermissionsService {
    */
   async removePermissionGroupFromUser(userId: number, groupId: number): Promise<boolean> {
     try {
-      const assignment = await this.storage.getUserPermissionGroup(userId, groupId);
+      const assignment = await (this.storage as any).getUserPermissionGroup?.(userId, groupId);
       if (!assignment) {
         return false;
       }
       
-      await this.storage.deleteUserPermissionGroup(assignment.id);
+      await (this.storage as any).deleteUserPermissionGroup?.(assignment.id);
       return true;
     } catch (error) {
       console.error('Error removing permission group from user:', error);
@@ -260,16 +260,16 @@ export class PermissionsService {
   async grantDirectPermission(userId: number, permissionId: number, assignedBy: number): Promise<UserDirectPermission> {
     try {
       // Check if permission already exists
-      const existingPermission = await this.storage.getUserDirectPermission(userId, permissionId);
+      const existingPermission = await (this.storage as any).getUserDirectPermission?.(userId, permissionId);
       if (existingPermission) {
         // Update existing permission
-        return await this.storage.updateUserDirectPermission(existingPermission.id, {
+        return await (this.storage as any).updateUserDirectPermission?.(existingPermission.id, {
           isGranted: true,
           assignedBy,
         });
       }
       
-      return await this.storage.createUserDirectPermission({
+      return await (this.storage as any).createUserDirectPermission?.({
         userId,
         permissionId,
         isGranted: true,
@@ -287,16 +287,16 @@ export class PermissionsService {
   async denyDirectPermission(userId: number, permissionId: number, assignedBy: number): Promise<UserDirectPermission> {
     try {
       // Check if permission already exists
-      const existingPermission = await this.storage.getUserDirectPermission(userId, permissionId);
+      const existingPermission = await (this.storage as any).getUserDirectPermission?.(userId, permissionId);
       if (existingPermission) {
         // Update existing permission
-        return await this.storage.updateUserDirectPermission(existingPermission.id, {
+        return await (this.storage as any).updateUserDirectPermission?.(existingPermission.id, {
           isGranted: false,
           assignedBy,
         });
       }
       
-      return await this.storage.createUserDirectPermission({
+      return await (this.storage as any).createUserDirectPermission?.({
         userId,
         permissionId,
         isGranted: false,
@@ -313,12 +313,12 @@ export class PermissionsService {
    */
   async removeDirectPermission(userId: number, permissionId: number): Promise<boolean> {
     try {
-      const permission = await this.storage.getUserDirectPermission(userId, permissionId);
+      const permission = await (this.storage as any).getUserDirectPermission?.(userId, permissionId);
       if (!permission) {
         return false;
       }
       
-      await this.storage.deleteUserDirectPermission(permission.id);
+      await (this.storage as any).deleteUserDirectPermission?.(permission.id);
       return true;
     } catch (error) {
       console.error('Error removing direct permission:', error);

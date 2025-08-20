@@ -15,16 +15,16 @@ export interface AutomationContext {
 
 export interface ClientData {
   id: number;
-  email?: string;
-  phone?: string;
-  firstName?: string;
-  lastName?: string;
-  emailAppointmentReminders?: boolean;
-  smsAppointmentReminders?: boolean;
-  emailAccountManagement?: boolean;
-  smsAccountManagement?: boolean;
-  emailPromotions?: boolean;
-  smsPromotions?: boolean;
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAppointmentReminders?: boolean | null;
+  smsAppointmentReminders?: boolean | null;
+  emailAccountManagement?: boolean | null;
+  smsAccountManagement?: boolean | null;
+  emailPromotions?: boolean | null;
+  smsPromotions?: boolean | null;
 }
 
 export interface ServiceData {

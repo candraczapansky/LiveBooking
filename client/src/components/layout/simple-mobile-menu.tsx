@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Building2 } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Building2, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -60,7 +60,7 @@ const SimpleMobileMenu = () => {
     };
   }, [user]);
 
-  const navigationItems = [
+  const baseNavigationItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: Calendar, label: "Client Appointments", href: "/appointments" },
     { icon: CalendarDays, label: "Staff Working Hours", href: "/schedule" },
@@ -83,6 +83,12 @@ const SimpleMobileMenu = () => {
     { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
     { icon: Settings, label: "Settings", href: "/settings" },
   ];
+
+  // Add admin-only menu items
+  const navigationItems = [...baseNavigationItems];
+  if (currentUser?.role === 'admin') {
+    navigationItems.splice(-1, 0, { icon: Shield, label: "Permissions", href: "/permissions" });
+  }
 
   const toggleMenu = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();

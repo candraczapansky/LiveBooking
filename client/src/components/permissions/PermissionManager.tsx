@@ -104,47 +104,85 @@ const PermissionManager: React.FC = () => {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false);
   const [isEditGroupOpen, setIsEditGroupOpen] = useState(false);
   const [isAssignGroupOpen, setIsAssignGroupOpen] = useState(false);
+  const [selectedCreatePermIds, setSelectedCreatePermIds] = useState<Set<number>>(new Set());
+  const [selectedEditPermIds, setSelectedEditPermIds] = useState<Set<number>>(new Set());
 
   // Fetch permissions
-  const { data: permissions, isLoading: permissionsLoading } = useQuery({
+  const { data: permissions, isLoading: permissionsLoading, error: permissionsError } = useQuery({
     queryKey: ['permissions'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/permissions');
-      const data = await response.json();
-      return data.data as Permission[];
+      try {
+        const response = await apiRequest('GET', '/api/permissions');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch permissions: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.data as Permission[];
+      } catch (error) {
+        console.error('Error fetching permissions:', error);
+        throw error;
+      }
     },
+    retry: 1,
   });
 
   // Fetch permission groups
-  const { data: groups, isLoading: groupsLoading } = useQuery({
+  const { data: groups, isLoading: groupsLoading, error: groupsError } = useQuery({
     queryKey: ['permission-groups'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/permission-groups');
-      const data = await response.json();
-      return data.data as PermissionGroup[];
+      try {
+        const response = await apiRequest('GET', '/api/permission-groups');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch permission groups: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.data as PermissionGroup[];
+      } catch (error) {
+        console.error('Error fetching permission groups:', error);
+        throw error;
+      }
     },
+    retry: 1,
   });
 
   // Fetch users
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      const response = await apiRequest('GET', '/api/users');
-      const data = await response.json();
-      return data.data as User[];
+      try {
+        const response = await apiRequest('GET', '/api/users');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch users: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.data as User[] || [];
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        throw error;
+      }
     },
+    retry: 1,
   });
 
   // Fetch user permissions
-  const { data: userPermissions, isLoading: userPermissionsLoading } = useQuery({
+  const { data: userPermissions, isLoading: userPermissionsLoading, error: userPermissionsError } = useQuery({
     queryKey: ['user-permissions', selectedUser?.id],
     queryFn: async () => {
       if (!selectedUser) return null;
-      const response = await apiRequest('GET', `/api/users/${selectedUser.id}/permissions`);
-      const data = await response.json();
-      return data.data as UserPermissions;
+      try {
+        const response = await apiRequest('GET', `/api/users/${selectedUser.id}/permissions`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch user permissions: ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.data as UserPermissions;
+      } catch (error) {
+        console.error('Error fetching user permissions:', error);
+        throw error;
+      }
     },
     enabled: !!selectedUser,
+    retry: 1,
   });
 
   // Create permission group mutation
@@ -199,7 +237,7 @@ const PermissionManager: React.FC = () => {
   const handleCreateGroup = (formData: FormData) => {
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
-    const selectedPermissions = Array.from(formData.getAll('permissions')).map(Number);
+    const selectedPermissions = Array.from(selectedCreatePermIds);
 
     createGroupMutation.mutate({
       name,
@@ -213,7 +251,7 @@ const PermissionManager: React.FC = () => {
 
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
-    const selectedPermissions = Array.from(formData.getAll('permissions')).map(Number);
+    const selectedPermissions = Array.from(selectedEditPermIds);
 
     updateGroupMutation.mutate({
       id: selectedGroup.id,
@@ -236,12 +274,47 @@ const PermissionManager: React.FC = () => {
     });
   };
 
+  // Show loading state
   if (permissionsLoading || groupsLoading || usersLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
           <p className="mt-2 text-sm text-gray-600">Loading permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Initialize edit selections when opening the dialog
+  useEffect(() => {
+    if (isEditGroupOpen && selectedGroup) {
+      setSelectedEditPermIds(new Set((selectedGroup.permissions || []).map(p => p.id)));
+    }
+  }, [isEditGroupOpen, selectedGroup]);
+
+  // Reset create selections when opening create dialog
+  useEffect(() => {
+    if (isCreateGroupOpen) {
+      setSelectedCreatePermIds(new Set());
+    }
+  }, [isCreateGroupOpen]);
+
+  // Show error states
+  if (permissionsError || groupsError || usersError) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <XCircle className="h-12 w-12 mx-auto" />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Permissions</h3>
+          <p className="text-sm text-gray-600 mb-4">
+            {permissionsError?.message || groupsError?.message || usersError?.message || 'An error occurred while loading permissions.'}
+          </p>
+          <Button onClick={() => window.location.reload()} variant="outline">
+            Try Again
+          </Button>
         </div>
       </div>
     );
@@ -293,24 +366,39 @@ const PermissionManager: React.FC = () => {
                       <CardDescription>{group.description}</CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedGroup(group);
-                            setIsEditGroupOpen(true);
-                          }}
-                        >
-                          <Edit className="w-4 h-4 mr-1" />
-                          Edit
-                        </Button>
-                        {!group.isSystem && (
-                          <Button variant="outline" size="sm" className="text-red-600">
-                            <Trash2 className="w-4 h-4 mr-1" />
-                            Delete
+                      <div className="space-y-3">
+                        <div>
+                          <div className="text-sm text-gray-600 mb-1">Selected permissions ({group.permissions?.length || 0})</div>
+                          {group.permissions && group.permissions.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {group.permissions.map((p) => (
+                                <Badge key={p.id} variant="outline">{p.name}</Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-gray-500">No permissions assigned</div>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedGroup(group);
+                              setSelectedEditPermIds(new Set((group.permissions || []).map(p => p.id)));
+                              setIsEditGroupOpen(true);
+                            }}
+                          >
+                            <Edit className="w-4 h-4 mr-1" />
+                            Edit
                           </Button>
-                        )}
+                          {!group.isSystem && (
+                            <Button variant="outline" size="sm" className="text-red-600">
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -491,8 +579,14 @@ const PermissionManager: React.FC = () => {
                           <div key={permission.id} className="flex items-center space-x-2">
                             <Checkbox
                               id={`permission-${permission.id}`}
-                              name="permissions"
-                              value={permission.id}
+                              checked={selectedCreatePermIds.has(permission.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedCreatePermIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (checked) next.add(permission.id); else next.delete(permission.id);
+                                  return next;
+                                });
+                              }}
                             />
                             <Label htmlFor={`permission-${permission.id}`} className="text-sm">
                               {permission.description}
@@ -553,9 +647,14 @@ const PermissionManager: React.FC = () => {
                             <div key={permission.id} className="flex items-center space-x-2">
                               <Checkbox
                                 id={`edit-permission-${permission.id}`}
-                                name="permissions"
-                                value={permission.id}
-                                defaultChecked={selectedGroup.permissions?.some(p => p.id === permission.id)}
+                                checked={selectedEditPermIds.has(permission.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedEditPermIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(permission.id); else next.delete(permission.id);
+                                    return next;
+                                  });
+                                }}
                               />
                               <Label htmlFor={`edit-permission-${permission.id}`} className="text-sm">
                                 {permission.description}

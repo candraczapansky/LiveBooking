@@ -21,112 +21,52 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
-// Cache for the correct API base URL
-let cachedApiBaseUrl: string | null = null;
-
-async function findCorrectApiUrl(): Promise<string> {
-  if (cachedApiBaseUrl) {
-    return cachedApiBaseUrl;
-  }
-
-  const isReplit = window.location.hostname.includes('replit.dev');
-  
-  if (isReplit) {
-    // For Replit, we need to use the default URL without port specification
-    // The Replit proxy will handle routing to the correct port
-    const baseUrl = `https://${window.location.hostname}`;
-    console.log('🔍 Replit detected, using base URL:', baseUrl);
-    cachedApiBaseUrl = baseUrl;
-    return baseUrl;
-  }
-  
-  // For local development, use relative URLs
-  console.log('🔍 Local development detected, using relative URLs');
-  return '';
-}
-
-function withBaseUrl(url: string) {
-  // For local development, use relative URLs to ensure proxy is used
-  if (!window.location.hostname.includes('replit.dev')) {
-    console.log('🔍 Local development detected, using relative URLs');
-    if (url.startsWith('/')) {
-      return url;
-    }
-    return url;
-  }
-  
-  // For Replit, we need to find the correct port
-  console.log('🔍 Replit detected, will find correct API URL');
-  return url.startsWith('/') ? url : url; // We'll handle the base URL in the fetch call
-}
+// Always use relative URLs for API requests
+// This ensures proper handling of both development and production environments
 
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  // Get user and token from localStorage for authentication
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  
+  // Get token from localStorage
   const token = localStorage.getItem('token');
-  
-  const headers: Record<string, string> = {};
-  if (data) {
-    headers["Content-Type"] = "application/json";
-  }
-  
-  // Add JWT token to Authorization header for authentication
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // For Replit, we need to find the correct API URL
-  let fullUrl = url;
-  if (window.location.hostname.includes('replit.dev')) {
-    const baseUrl = await findCorrectApiUrl();
-    fullUrl = url.startsWith('/') ? `${baseUrl}${url}` : url;
-    console.log('🔍 Making API request to:', fullUrl);
-  } else {
-    fullUrl = withBaseUrl(url);
-  }
+  // Always use relative URLs
+  const fullUrl = url.startsWith('/') ? url : `/${url}`;
 
-  let res = await fetch(fullUrl, {
-    method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+  try {
+    const res = await fetch(fullUrl, {
+      method,
+      headers,
+      body: data ? JSON.stringify(data) : undefined,
+      credentials: "include",
+    });
 
-  // If we get a 401, try to refresh the token and retry once
-  if (res.status === 401) {
-    console.log('Received 401, attempting to refresh token...');
-    
-    // Import the refreshToken function dynamically to avoid circular dependencies
-    const { refreshToken } = await import('./auth-helper');
-    const refreshSuccess = await refreshToken();
-    
-    if (refreshSuccess) {
-      // Get the new token
-      const newToken = localStorage.getItem('token');
-      if (newToken) {
-        // Update headers with new token
-        headers["Authorization"] = `Bearer ${newToken}`;
-        
-        // Retry the request with the new token
-        res = await fetch(fullUrl, {
-          method,
-          headers,
-          body: data ? JSON.stringify(data) : undefined,
-          credentials: "include",
-        });
-      }
+    // Handle 401 Unauthorized
+    if (res.status === 401) {
+      // Clear invalid auth state
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      
+      // Redirect to login
+      window.location.href = '/login';
+      throw new Error('Authentication required');
     }
-  }
 
-  await throwIfResNotOk(res);
-  return res;
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    console.error('API Request failed:', error);
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -135,63 +75,46 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    // Get user and token from localStorage for authentication
-    const userStr = localStorage.getItem('user');
-    const user = userStr ? JSON.parse(userStr) : null;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    
+    // Get token from localStorage
     const token = localStorage.getItem('token');
-    
-    const headers: Record<string, string> = {};
-    
-    // Add JWT token to Authorization header for authentication
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // For Replit, we need to find the correct API URL
-    let fullUrl = queryKey[0] as string;
-    if (window.location.hostname.includes('replit.dev')) {
-      const baseUrl = await findCorrectApiUrl();
-      fullUrl = (queryKey[0] as string).startsWith('/') ? `${baseUrl}${queryKey[0] as string}` : queryKey[0] as string;
-      console.log('🔍 Making query request to:', fullUrl);
-    } else {
-      fullUrl = withBaseUrl(queryKey[0] as string);
-    }
+    // Always use relative URLs
+    const fullUrl = (queryKey[0] as string).startsWith('/') ? queryKey[0] as string : `/${queryKey[0]}`;
 
-    let res = await fetch(fullUrl, {
-      headers,
-      credentials: "include",
-    });
+    try {
+      const res = await fetch(fullUrl, {
+        headers,
+        credentials: "include",
+      });
 
-    // If we get a 401, try to refresh the token and retry once
-    if (res.status === 401) {
-      console.log('Query received 401, attempting to refresh token...');
-      
-      // Import the refreshToken function dynamically to avoid circular dependencies
-      const { refreshToken } = await import('./auth-helper');
-      const refreshSuccess = await refreshToken();
-      
-      if (refreshSuccess) {
-        // Get the new token
-        const newToken = localStorage.getItem('token');
-        if (newToken) {
-          // Update headers with new token
-          headers["Authorization"] = `Bearer ${newToken}`;
-          
-          // Retry the request with the new token
-          res = await fetch(fullUrl, {
-            headers,
-            credentials: "include",
-          });
+      // Handle 401 Unauthorized
+      if (res.status === 401) {
+        if (unauthorizedBehavior === "returnNull") {
+          return null;
         }
+        
+        // Clear invalid auth state
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        
+        // Redirect to login
+        window.location.href = '/login';
+        throw new Error('Authentication required');
       }
-    }
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      console.error('Query failed:', error);
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({

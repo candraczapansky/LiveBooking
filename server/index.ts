@@ -2,7 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { config } from "dotenv";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { PgStorage } from "./storage";
+import { DatabaseStorage } from "./storage";
+import { securityHeaders } from "./middleware/security";
 import { EmailAutomationService } from "./email-automation";
 import { MarketingCampaignService } from "./marketing-campaigns";
 import { createServer } from "http";
@@ -14,37 +15,36 @@ const app = express();
 
 // Add CORS support for external applications
 app.use((req, res, next) => {
-  // Get the origin from the request
-  const origin = req.headers.origin;
-  
-  // Allow specific origins or use the request origin
-  const allowedOrigins = [
-    'https://47af059e-e7df-4462-a4ea-be61df9b2343-00-16m9j5e89xdj.kirk.replit.dev',
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:4173'
-  ];
-  
-  // If the request has an origin and it's in our allowed list, use it
-  // Otherwise, don't set Access-Control-Allow-Origin for credentials requests
-  if (origin && allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
+  const origin = req.headers.origin as string | undefined;
+
+  // Allow common local dev and any Replit-hosted origin (with or without port)
+  const isAllowed = !!origin && (
+    origin.includes('.replit.dev') ||
+    origin.startsWith('http://localhost') ||
+    origin.startsWith('http://127.0.0.1') ||
+    origin.startsWith('http://0.0.0.0')
+  );
+
+  if (isAllowed) {
+    res.header('Access-Control-Allow-Origin', origin!);
   }
-  
+
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle preflight requests
+
   if (req.method === 'OPTIONS') {
-    res.sendStatus(200);
-  } else {
-    next();
+    return res.sendStatus(204);
   }
+
+  next();
 });
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Apply security headers early
+app.use(...securityHeaders());
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -103,7 +103,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
 
 (async () => {
   try {
-    const storage = new PgStorage();
+    const storage = new DatabaseStorage();
     
     // Initialize email automation service
     const emailAutomationService = new EmailAutomationService(storage);
@@ -133,8 +133,8 @@ async function findAvailablePort(startPort: number): Promise<number> {
       serveStatic(app);
     }
 
-    // Find an available port starting from 5000
-    const preferredPort = parseInt(process.env.PORT || '5000');
+    // Find an available port (default 3002 for Replit proxy compatibility)
+    const preferredPort = parseInt(process.env.PORT || '3002');
     const port = await findAvailablePort(preferredPort);
     
     if (port !== preferredPort) {

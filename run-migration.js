@@ -1,52 +1,44 @@
-// Run the terminal_devices table migration
-import { db } from './server/db.js';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { sql } from 'drizzle-orm';
+import fs from 'fs';
 
-const migrations = [
-  // Create table
-  `CREATE TABLE IF NOT EXISTS terminal_devices (
-    id SERIAL PRIMARY KEY,
-    device_code TEXT NOT NULL UNIQUE,
-    device_name TEXT NOT NULL,
-    location_id INTEGER REFERENCES locations(id),
-    status TEXT DEFAULT 'active' NOT NULL,
-    device_type TEXT DEFAULT 'smart_terminal' NOT NULL,
-    last_seen TIMESTAMP,
-    is_default BOOLEAN DEFAULT FALSE,
-    api_enabled BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-  )`,
-  
-  // Create indexes
-  'CREATE INDEX IF NOT EXISTS idx_terminal_devices_device_code ON terminal_devices(device_code)',
-  'CREATE INDEX IF NOT EXISTS idx_terminal_devices_location_id ON terminal_devices(location_id)',
-  'CREATE INDEX IF NOT EXISTS idx_terminal_devices_status ON terminal_devices(status)',
-  'CREATE INDEX IF NOT EXISTS idx_terminal_devices_is_default ON terminal_devices(is_default)'
-];
+// Get database URL from environment or use default
+const DATABASE_URL = "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
 
-console.log('🚀 Running terminal_devices table migration...');
+// Initialize database connection
+const client = neon(DATABASE_URL);
+const db = drizzle(client);
 
-try {
-  // Execute each migration statement separately
-  for (let i = 0; i < migrations.length; i++) {
-    console.log(`📝 Executing migration ${i + 1}/${migrations.length}...`);
-    await db.execute(migrations[i]);
-    console.log(`✅ Migration ${i + 1} completed`);
-  }
-  
-  console.log('✅ All migrations completed successfully!');
-  console.log('✅ terminal_devices table created with all indexes');
-  
-  // Verify the table was created
-  const result = await db.execute('SELECT COUNT(*) as count FROM terminal_devices');
-  console.log('✅ Table verification:', result.rows[0]);
-  
-} catch (error) {
-  console.error('❌ Migration failed:', error.message);
-  if (error.message.includes('already exists')) {
-    console.log('ℹ️  Table already exists, this is fine');
+async function runMigration() {
+  try {
+    console.log('Running migration...');
+
+    // Read and run the migration SQL
+    const migrationSql = fs.readFileSync('./migrations/0010_add_permissions_tables.sql', 'utf8');
+    await db.execute(sql.raw(migrationSql));
+
+    console.log('✅ Migration completed successfully!');
+
+    // Assign admin user to admin group
+    const adminGroupResult = await db.execute(sql`
+      SELECT id FROM permission_groups WHERE name = 'admin';
+    `);
+
+    if (adminGroupResult.rows.length > 0) {
+      const adminGroupId = adminGroupResult.rows[0].id;
+      await db.execute(sql`
+        INSERT INTO user_permission_groups (user_id, group_id)
+        VALUES (1, ${adminGroupId})
+        ON CONFLICT (user_id, group_id) DO NOTHING;
+      `);
+      console.log('✅ Admin user assigned to admin group!');
+    }
+
+  } catch (error) {
+    console.error('Error running migration:', error);
   }
 }
 
-console.log('🏁 Migration script completed');
-process.exit(0);
+// Run the migration
+runMigration();

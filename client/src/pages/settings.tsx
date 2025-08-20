@@ -5,37 +5,36 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-
-import { Badge } from "@/components/ui/badge";
+// import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Lock, 
-  Sun, 
-  Moon, 
+  // Sun, 
+  // Moon, 
   Camera, 
   Save, 
-  Shield, 
+  // Shield, 
   Smartphone,
   Palette,
   Eye,
   EyeOff,
-  CheckCircle,
-  AlertTriangle,
-  Info,
+  // CheckCircle,
+  // AlertTriangle,
+  // Info,
   Settings as SettingsIcon
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { apiRequest } from "@/lib/queryClient";
+// import { apiRequest } from "@/lib/queryClient";
 import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
 import TwoFactorDisableModal from "@/components/TwoFactorDisableModal";
 
@@ -60,18 +59,7 @@ export default function Settings() {
   const { user, updateUser, colorPreferencesApplied } = useContext(AuthContext);
   const { isOpen: sidebarOpen } = useSidebar();
 
-  // Theme states
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedDarkMode = localStorage.getItem('darkMode');
-      if (savedDarkMode !== null) {
-        return savedDarkMode === 'true';
-      }
-      // Default to false instead of checking current state
-      return false;
-    }
-    return false;
-  });
+  // Theme states - Dark Mode removed
 
   // Color customization states
   const [customColor, setCustomColor] = useState(() => {
@@ -555,9 +543,8 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <SidebarController isOpen={sidebarOpen} isMobile={false} />
       <div className={`transition-all duration-300 ${sidebarOpen ? 'lg:ml-64' : 'lg:ml-0'}`}>
-        <Header />
         
         <div className="p-4 sm:p-6 lg:p-8">
           <div className="max-w-4xl mx-auto space-y-6">
@@ -1021,27 +1008,7 @@ export default function Settings() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Theme Toggle */}
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label className="text-base">Dark Mode</Label>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Switch between light and dark themes
-                        </p>
-                      </div>
-                      <Switch
-                        checked={darkMode}
-                        onCheckedChange={(checked) => {
-                          setDarkMode(checked);
-                          localStorage.setItem('darkMode', checked.toString());
-                          if (checked) {
-                            document.documentElement.classList.add('dark');
-                          } else {
-                            document.documentElement.classList.remove('dark');
-                          }
-                        }}
-                      />
-                    </div>
+                    {/* Dark Mode toggle removed per request */}
 
                     {/* Primary Color */}
                     <div>

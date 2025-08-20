@@ -1,0 +1,61 @@
+const { neon } = require('@neondatabase/serverless');
+const { drizzle } = require('drizzle-orm/neon-http');
+const { sql } = require('drizzle-orm');
+
+// Get database URL from environment or use default
+const DATABASE_URL = "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
+
+// Initialize database connection
+const client = neon(DATABASE_URL);
+const db = drizzle(client);
+
+async function updateRole() {
+  try {
+    console.log('Updating user role...');
+
+    // First, check current user info
+    const userResult = await db.execute(sql`
+      SELECT id, username, first_name, last_name, role
+      FROM users
+      WHERE id = 1;
+    `);
+
+    if (userResult.rows.length === 0) {
+      console.error('User not found');
+      return;
+    }
+
+    const user = userResult.rows[0];
+    console.log('Current user info:', {
+      id: user.id,
+      username: user.username,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role
+    });
+
+    // Update user role to admin
+    const updateResult = await db.execute(sql`
+      UPDATE users
+      SET role = 'admin'
+      WHERE id = 1
+      RETURNING id, username, first_name, last_name, role;
+    `);
+
+    const updatedUser = updateResult.rows[0];
+    console.log('✅ Successfully updated user role!');
+    console.log('Updated user info:', {
+      id: updatedUser.id,
+      username: updatedUser.username,
+      firstName: updatedUser.first_name,
+      lastName: updatedUser.last_name,
+      role: updatedUser.role
+    });
+
+  } catch (error) {
+    console.error('Error updating user role:', error);
+  }
+}
+
+// Run the update
+updateRole();

@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense, lazy } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import { useLocation } from "@/contexts/LocationContext";
+import { useSidebar } from "@/contexts/SidebarContext";
 import { apiRequest } from "@/lib/queryClient";
-import AppointmentForm from "@/components/appointments/appointment-form";
-import AppointmentCheckout from "@/components/appointments/appointment-checkout";
-import AppointmentDetails from "@/components/appointments/appointment-details";
+const AppointmentForm = lazy(() => import("@/components/appointments/appointment-form"));
+const AppointmentCheckout = lazy(() => import("@/components/appointments/appointment-checkout"));
+const AppointmentDetails = lazy(() => import("@/components/appointments/appointment-details"));
 import { Plus, Calendar, Filter, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +23,7 @@ const AppointmentsPage = () => {
   const queryClient = useQueryClient();
 
   const { selectedLocation } = useLocation();
+  const { isOpen: isSidebarOpen, isMobile: isSidebarMobile } = useSidebar();
   
   // State
   // Note: Calendar starts on daily view by default, showing all staff per location
@@ -347,217 +349,311 @@ const AppointmentsPage = () => {
 
   // Helper: Get unavailable (gray) times for each staff/resource for the current view and date
   function getBackgroundEvents() {
-    if (!schedules || !staff) return [];
-    const events: any[] = [];
-    
-    // Debug: Log schedules and staff data
-    console.log('🔍 getBackgroundEvents Debug:');
-    console.log('Schedules count:', schedules.length);
-    console.log('Staff count:', staff.length);
-    console.log('Selected staff filter:', selectedStaffFilter);
-    console.log('Calendar view:', calendarView);
-    console.log('Selected date:', selectedDate);
-    
-    // Use filtered staff for background events - same logic as filteredResources
-    const staffToShow = (() => {
-      if (selectedStaffFilter !== "all") {
-        return staff.filter((s: any) => s.id === parseInt(selectedStaffFilter));
-      }
+    try {
+      if (!schedules || !staff) return [];
+      const events: any[] = [];
       
-      // For day view, only show staff who are scheduled for the selected date AND location
-      if (calendarView === 'day') {
-        const dateToCheck = selectedDate || new Date();
-        return staff.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
-      }
+      // Debug: Log schedules and staff data
+      console.log('🔍 getBackgroundEvents Debug:');
+      console.log('Schedules count:', schedules.length);
+      console.log('Staff count:', staff.length);
+      console.log('Selected staff filter:', selectedStaffFilter);
+      console.log('Calendar view:', calendarView);
+      console.log('Selected date:', selectedDate);
       
-      // For week and month views, only show staff who have schedules at the selected location
-      if (selectedLocation?.id) {
-        return staff.filter((s: any) => {
-          const hasLocationSchedule = schedules.some((schedule: any) => 
-            schedule.staffId === s.id && schedule.locationId === selectedLocation.id
-          );
-          return hasLocationSchedule;
-        });
-      }
-      
-      // If no location selected, show all staff
-      return staff;
-    })();
-    console.log('Staff to show:', staffToShow.length);
-    staffToShow.forEach((s: any, index: number) => {
-      console.log(`Staff ${index}: ${s.id} - ${s.user?.firstName} ${s.user?.lastName}`);
-    });
-    
-    // For each staff member
-    staffToShow.forEach((s: any) => {
-      console.log(`Processing staff ${s.id}: ${s.user?.firstName} ${s.user?.lastName}`);
-      
-      // For each day in the current view (for now, just use selectedDate or today)
-      const baseDate = selectedDate || new Date();
-      // For week view, show for all 7 days; for day view, just one day
-      const days = calendarView === 'week'
-        ? Array.from({ length: 7 }, (_, i) => {
-            const d = new Date(baseDate);
-            d.setDate(baseDate.getDate() - d.getDay() + i); // start from Sunday
-            return d;
-          })
-        : [baseDate];
-      
-      console.log(`Calendar view: ${calendarView}, Base date: ${baseDate.toISOString().slice(0, 10)}`);
-      console.log(`Days to check: ${days.length} days`);
-      days.forEach((day, index) => {
-        console.log(`Day ${index}: ${day.toISOString().slice(0, 10)} (${day.toLocaleDateString('en-US', { weekday: 'long' })})`);
-      });
-      
-      days.forEach((date) => {
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        console.log(`Checking ${dayName} for staff ${s.id}`);
-        console.log(`Date being checked: ${date.toISOString().slice(0, 10)}`);
-        
-        // Find all schedules for this staff on this day (including blocked ones)
-        const allStaffSchedules = (schedules as any[]).filter((sch: any) => {
-          const matchesStaff = sch.staffId === s.id;
-          const matchesDay = sch.dayOfWeek === dayName;
+      // Use filtered staff for background events - same logic as filteredResources
+      const staffToShow = (() => {
+        try {
+          if (selectedStaffFilter !== "all") {
+            return staff.filter((s: any) => s.id === parseInt(selectedStaffFilter));
+          }
           
-          // Fix date comparison logic
-          const todayString = date.toISOString().slice(0, 10);
-          const startDateString = typeof sch.startDate === 'string' 
-            ? sch.startDate 
-            : new Date(sch.startDate).toISOString().slice(0, 10);
-          const endDateString = sch.endDate 
-            ? (typeof sch.endDate === 'string' 
-              ? sch.endDate 
-              : new Date(sch.endDate).toISOString().slice(0, 10))
-            : null;
+          // For day view, only show staff who are scheduled for the selected date AND location
+          if (calendarView === 'day') {
+            const dateToCheck = selectedDate || new Date();
+            return staff.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
+          }
           
-          const matchesStartDate = startDateString <= todayString;
-          const matchesEndDate = !endDateString || endDateString >= todayString;
-          
-          console.log(`Schedule ${sch.id}: staff=${matchesStaff}, day=${matchesDay}, startDate=${startDateString}<=${todayString}=${matchesStartDate}, endDate=${endDateString}>=${todayString}=${matchesEndDate}`);
-          
-          return matchesStaff && matchesDay && matchesStartDate && matchesEndDate;
-        });
-        
-        console.log(`Found ${allStaffSchedules.length} schedules for ${dayName} for staff ${s.id}`);
-        if (allStaffSchedules.length > 0) {
-          console.log('Schedule details:', allStaffSchedules);
-        }
-        
-        // Separate blocked and non-blocked schedules
-        const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
-        const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
-        
-        console.log(`Available schedules: ${availableSchedules.length}, Blocked schedules: ${blockedSchedules.length}`);
-        
-        // Get existing appointments for this staff on this day
-        const staffAppointments = appointments.filter((apt: any) => {
-          const aptDate = new Date(apt.startTime);
-          return apt.staffId === s.id && 
-                 aptDate.toDateString() === date.toDateString();
-        });
-        
-        // If no schedule at all, gray out the whole day
-        if (allStaffSchedules.length === 0) {
-          console.log(`No schedules found for ${dayName}, graying out entire day`);
-          events.push({
-            start: startOfDay(date),
-            end: endOfDay(date),
-            resourceId: s.id,
-            allDay: false,
-            title: '',
-            type: 'unavailable',
-            style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
-            isBackground: true, // Mark as background event
-          });
-        } else {
-          // Handle blocked schedules - show them as grayed out areas
-          blockedSchedules.forEach((sch: any) => {
-            const [startHour, startMinute] = sch.startTime.split(':').map(Number);
-            const [endHour, endMinute] = sch.endTime.split(':').map(Number);
-            const blockStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
-            const blockEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
-            
-            console.log(`Adding blocked schedule: ${sch.startTime} - ${sch.endTime}`);
-            events.push({
-              start: blockStart,
-              end: blockEnd,
-              resourceId: s.id,
-              allDay: false,
-              title: 'Blocked',
-              type: 'unavailable',
-              style: { backgroundColor: '#6b7280', opacity: 0.8 }, // Darker gray for blocked slots
-              isBackground: true, // Mark as background event
+          // For week and month views, only show staff who have schedules at the selected location
+          if (selectedLocation?.id) {
+            return staff.filter((s: any) => {
+              const hasLocationSchedule = schedules.some((schedule: any) => 
+                schedule.staffId === s.id && schedule.locationId === selectedLocation.id
+              );
+              return hasLocationSchedule;
             });
-          });
+          }
           
-          // Handle available schedules - gray out before/after working hours
-          availableSchedules.forEach((sch: any) => {
-            const [startHour, startMinute] = sch.startTime.split(':').map(Number);
-            const [endHour, endMinute] = sch.endTime.split(':').map(Number);
-            const workStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
-            const workEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
-            
-            console.log(`Adding available schedule: ${sch.startTime} - ${sch.endTime}`);
-            
-            // Before work
-            if (startHour > 0 || startMinute > 0) {
-              events.push({
-                start: startOfDay(date),
-                end: workStart,
-                resourceId: s.id,
-                allDay: false,
-                title: '',
-                type: 'unavailable',
-                style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
-                isBackground: true, // Mark as background event
-              });
-            }
-            
-            // After work
-            if (endHour < 23 || endMinute < 59) {
-              events.push({
-                start: workEnd,
-                end: endOfDay(date),
-                resourceId: s.id,
-                allDay: false,
-                title: '',
-                type: 'unavailable',
-                style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
-                isBackground: true, // Mark as background event
-              });
-            }
-            
-            // Gray out time slots that conflict with existing appointments
-            staffAppointments.forEach((apt: any) => {
-              const aptStart = new Date(apt.startTime);
-              const aptEnd = new Date(apt.endTime || apt.startTime);
+          // If no location selected, show all staff
+          return staff;
+        } catch (error) {
+          console.error('Error filtering staff:', error);
+          return [];
+        }
+      })();
+      
+      console.log('Staff to show:', staffToShow.length);
+      
+      // For each staff member
+      staffToShow.forEach((s: any) => {
+        try {
+          if (!s || !s.id) {
+            console.warn('Invalid staff member:', s);
+            return;
+          }
+          
+          console.log(`Processing staff ${s.id}: ${s.user?.firstName} ${s.user?.lastName}`);
+          
+          // For each day in the current view (for now, just use selectedDate or today)
+          const baseDate = selectedDate || new Date();
+          if (isNaN(baseDate.getTime())) {
+            console.warn('Invalid base date:', baseDate);
+            return;
+          }
+          
+          // For week view, show for all 7 days; for day view, just one day
+          const days = calendarView === 'week'
+            ? Array.from({ length: 7 }, (_, i) => {
+                try {
+                  const d = new Date(baseDate);
+                  d.setDate(baseDate.getDate() - d.getDay() + i); // start from Sunday
+                  return isNaN(d.getTime()) ? null : d;
+                } catch (e) {
+                  console.warn('Error creating week day:', e);
+                  return null;
+                }
+              }).filter((d): d is Date => d !== null)
+            : [baseDate];
+          
+          console.log(`Calendar view: ${calendarView}, Base date: ${baseDate.toISOString().slice(0, 10)}`);
+          console.log(`Days to check: ${days.length} days`);
+          
+          days.forEach((date) => {
+            try {
+              if (isNaN(date.getTime())) {
+                console.warn('Invalid date:', date);
+                return;
+              }
               
-              // Only gray out if the appointment is within working hours
-              if (aptStart >= workStart && aptEnd <= workEnd) {
-                console.log(`Adding booked appointment: ${aptStart} - ${aptEnd}`);
+              const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+              console.log(`Checking ${dayName} for staff ${s.id}`);
+              
+              // Find all schedules for this staff on this day (including blocked ones)
+              const allStaffSchedules = (schedules as any[]).filter((sch: any) => {
+                try {
+                  if (!sch || !sch.startDate) {
+                    console.warn('Invalid schedule:', sch);
+                    return false;
+                  }
+                  
+                  const matchesStaff = sch.staffId === s.id;
+                  const matchesDay = sch.dayOfWeek === dayName;
+                  
+                  // Fix date comparison logic
+                  const todayString = date.toISOString().slice(0, 10);
+                  let startDateString: string;
+                  let endDateString: string | null;
+                  
+                  try {
+                    startDateString = typeof sch.startDate === 'string' 
+                      ? sch.startDate 
+                      : new Date(sch.startDate).toISOString().slice(0, 10);
+                  } catch (e) {
+                    console.warn('Error parsing schedule start date:', e);
+                    return false;
+                  }
+                  
+                  try {
+                    endDateString = sch.endDate 
+                      ? (typeof sch.endDate === 'string' 
+                        ? sch.endDate 
+                        : new Date(sch.endDate).toISOString().slice(0, 10))
+                      : null;
+                  } catch (e) {
+                    console.warn('Error parsing schedule end date:', e);
+                    endDateString = null;
+                  }
+                  
+                  const matchesStartDate = startDateString <= todayString;
+                  const matchesEndDate = !endDateString || endDateString >= todayString;
+                  
+                  return matchesStaff && matchesDay && matchesStartDate && matchesEndDate;
+                } catch (error) {
+                  console.warn('Error filtering schedule:', error);
+                  return false;
+                }
+              });
+              
+              // Separate blocked and non-blocked schedules
+              const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
+              const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
+              
+              // Get existing appointments for this staff on this day
+              const staffAppointments = appointments.filter((apt: any) => {
+                try {
+                  if (!apt || !apt.startTime) return false;
+                  const aptDate = new Date(apt.startTime);
+                  return !isNaN(aptDate.getTime()) && 
+                         apt.staffId === s.id && 
+                         aptDate.toDateString() === date.toDateString();
+                } catch (e) {
+                  console.warn('Error filtering appointment:', e);
+                  return false;
+                }
+              });
+              
+              // If no schedule at all, gray out the whole day
+              if (allStaffSchedules.length === 0) {
                 events.push({
-                  start: aptStart,
-                  end: aptEnd,
+                  start: startOfDay(date),
+                  end: endOfDay(date),
                   resourceId: s.id,
                   allDay: false,
-                  title: 'Booked',
+                  title: '',
                   type: 'unavailable',
-                  style: { backgroundColor: '#9ca3af', opacity: 0.7 }, // Darker gray for booked slots
-                  isBackground: true, // Mark as background event
+                  style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                  isBackground: true,
+                });
+              } else {
+                // Handle blocked schedules
+                blockedSchedules.forEach((sch: any) => {
+                  try {
+                    if (!sch.startTime || !sch.endTime) return;
+                    
+                    const [startHour, startMinute] = sch.startTime.split(':').map(Number);
+                    const [endHour, endMinute] = sch.endTime.split(':').map(Number);
+                    
+                    if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+                      console.warn('Invalid schedule times:', sch.startTime, sch.endTime);
+                      return;
+                    }
+                    
+                    const blockStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
+                    const blockEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+                    
+                    if (isNaN(blockStart.getTime()) || isNaN(blockEnd.getTime())) {
+                      console.warn('Invalid block times:', blockStart, blockEnd);
+                      return;
+                    }
+                    
+                    events.push({
+                      start: blockStart,
+                      end: blockEnd,
+                      resourceId: s.id,
+                      allDay: false,
+                      title: 'Blocked',
+                      type: 'unavailable',
+                      style: { backgroundColor: '#6b7280', opacity: 0.8 },
+                      isBackground: true,
+                    });
+                  } catch (error) {
+                    console.warn('Error processing blocked schedule:', error);
+                  }
+                });
+                
+                // Handle available schedules
+                availableSchedules.forEach((sch: any) => {
+                  try {
+                    if (!sch.startTime || !sch.endTime) return;
+                    
+                    const [startHour, startMinute] = sch.startTime.split(':').map(Number);
+                    const [endHour, endMinute] = sch.endTime.split(':').map(Number);
+                    
+                    if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+                      console.warn('Invalid schedule times:', sch.startTime, sch.endTime);
+                      return;
+                    }
+                    
+                    const workStart = setMinutes(setHours(startOfDay(date), startHour), startMinute);
+                    const workEnd = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+                    
+                    if (isNaN(workStart.getTime()) || isNaN(workEnd.getTime())) {
+                      console.warn('Invalid work times:', workStart, workEnd);
+                      return;
+                    }
+                    
+                    // Before work
+                    if (startHour > 0 || startMinute > 0) {
+                      events.push({
+                        start: startOfDay(date),
+                        end: workStart,
+                        resourceId: s.id,
+                        allDay: false,
+                        title: '',
+                        type: 'unavailable',
+                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        isBackground: true,
+                      });
+                    }
+                    
+                    // After work
+                    if (endHour < 23 || endMinute < 59) {
+                      events.push({
+                        start: workEnd,
+                        end: endOfDay(date),
+                        resourceId: s.id,
+                        allDay: false,
+                        title: '',
+                        type: 'unavailable',
+                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        isBackground: true,
+                      });
+                    }
+                    
+                    // Gray out booked appointments
+                    staffAppointments.forEach((apt: any) => {
+                      try {
+                        if (!apt.startTime) return;
+                        
+                        const aptStart = new Date(apt.startTime);
+                        const aptEnd = apt.endTime ? new Date(apt.endTime) : new Date(aptStart.getTime() + 3600000);
+                        
+                        if (isNaN(aptStart.getTime()) || isNaN(aptEnd.getTime())) {
+                          console.warn('Invalid appointment times:', aptStart, aptEnd);
+                          return;
+                        }
+                        
+                        // Only gray out if the appointment is within working hours
+                        if (aptStart >= workStart && aptEnd <= workEnd) {
+                          events.push({
+                            start: aptStart,
+                            end: aptEnd,
+                            resourceId: s.id,
+                            allDay: false,
+                            title: 'Booked',
+                            type: 'unavailable',
+                            style: { backgroundColor: '#9ca3af', opacity: 0.7 },
+                            isBackground: true,
+                          });
+                        }
+                      } catch (error) {
+                        console.warn('Error processing appointment:', error);
+                      }
+                    });
+                  } catch (error) {
+                    console.warn('Error processing available schedule:', error);
+                  }
                 });
               }
-            });
+            } catch (error) {
+              console.warn('Error processing day:', error);
+            }
           });
+        } catch (error) {
+          console.warn('Error processing staff member:', error);
         }
       });
-    });
-    
-    console.log(`Total background events created: ${events.length}`);
-    return events;
+      
+      console.log(`Total background events created: ${events.length}`);
+      return events;
+    } catch (error) {
+      console.error('Error generating background events:', error);
+      return [];
+    }
   }
 
   return (
-    <div className="min-h-screen lg:h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <style>{`
         /* Hide unwanted calendar elements */
         .rbc-calendar div[style*='background: white'],
@@ -631,18 +727,19 @@ const AppointmentsPage = () => {
           }
         }
         
-        /* Ensure calendar scrolling works properly */
+        /* Reduce internal calendar scrolling; let page scroll instead */
         .rbc-calendar {
           overflow: visible !important;
         }
-        
         .rbc-time-view {
           overflow: visible !important;
         }
-        
         .rbc-time-content {
-          overflow: auto !important;
-          -webkit-overflow-scrolling: touch !important;
+          overflow: visible !important;
+          -webkit-overflow-scrolling: auto !important;
+        }
+        .rbc-time-content > * {
+          overflow: visible !important;
         }
         
         .rbc-month-view {
@@ -655,8 +752,8 @@ const AppointmentsPage = () => {
         
         /* Fix calendar container scrolling */
         .rbc-calendar-container {
-          overflow: auto !important;
-          height: 100% !important;
+          overflow: visible !important;
+          height: auto !important;
         }
         
         /* Ensure proper scrolling for all calendar views */
@@ -708,22 +805,66 @@ const AppointmentsPage = () => {
         /* Fix calendar grid scrolling */
         .rbc-time-grid,
         .rbc-month-grid {
-          overflow: auto !important;
+          overflow: visible !important;
         }
         
         /* Ensure proper touch scrolling on mobile */
         .rbc-calendar * {
           -webkit-overflow-scrolling: touch !important;
         }
+
+        /* Make calendar container much taller so day view fits without internal scroll */
+        .appointments-calendar-container {
+          height: 1400px !important;
+        }
+        @media (max-width: 1536px) { /* 2xl and below */
+          .appointments-calendar-container { height: 1200px !important; }
+        }
+        @media (max-width: 1280px) { /* xl and below */
+          .appointments-calendar-container { height: 1000px !important; }
+        }
+        @media (max-width: 1024px) { /* lg and below */
+          .appointments-calendar-container { height: 900px !important; }
+        }
+        @media (max-width: 768px) { /* md and below */
+          .appointments-calendar-container { height: 800px !important; }
+        }
+
+        /* Compact mini calendar styles (left sidebar) */
+        .appointments-mini-calendar .rdp { width: 100% !important; }
+        .appointments-mini-calendar .rdp-months,
+        .appointments-mini-calendar .rdp-month { display: block !important; }
+        .appointments-mini-calendar .rdp-table { width: 100% !important; }
+        .appointments-mini-calendar .rdp-head_row,
+        .appointments-mini-calendar .rdp-row {
+          display: grid !important;
+          grid-template-columns: repeat(7, minmax(0, 1fr));
+          gap: 0 !important;
+        }
+        .appointments-mini-calendar .rdp-head_cell,
+        .appointments-mini-calendar .rdp-cell {
+          padding: 2px !important;
+          text-align: center !important;
+          vertical-align: middle !important;
+        }
+        .appointments-mini-calendar .rdp-day {
+          width: 36px !important;
+          height: 36px !important;
+          padding: 0 !important;
+          margin: 0 auto !important;
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          border-radius: 0.375rem !important;
+        }
       `}</style>
-      <SidebarController />
+      <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />
       <div className="min-h-screen flex flex-col transition-all duration-300">
-        <Header />
-        <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-3 sm:gap-4 lg:gap-6 min-h-0">
-            {/* Mobile Mini Calendar - Shown on mobile at top */}
-            <div className="block lg:hidden mb-4">
-              <Card className="p-4">
+        <main className="flex-1 p-3 sm:p-4 md:p-6">
+          <div className="max-w-7xl mx-auto flex flex-row gap-3 sm:gap-4 lg:gap-6">
+            {/* Left Sidebar: Mini Calendar */}
+            <div className="appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px]">
+              <Card className="p-2 sm:p-3 w-[260px] sm:w-[280px]">
                 <MiniCalendar
                   mode="single"
                   selected={selectedDate}
@@ -731,26 +872,25 @@ const AppointmentsPage = () => {
                     setSelectedDate(date as Date);
                     setCalendarView('day');
                   }}
-                  className="w-full"
+                  className="w-full rounded-lg border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm"
+                  classNames={{
+                    months: "space-y-2",
+                    month: "space-y-2",
+                    table: "w-full border-collapse",
+                    head_row: "grid grid-cols-7",
+                    row: "grid grid-cols-7 mt-2",
+                    head_cell: "text-muted-foreground w-9 text-center",
+                    cell: "h-9 w-9 text-center p-0",
+                    day: "h-9 w-9 p-0 font-normal",
+                  }}
+                  numberOfMonths={1}
+                  fixedWeeks
                 />
               </Card>
             </div>
 
-            {/* Desktop Left Sidebar: Mini Calendar */}
-            <div className="hidden lg:flex flex-col w-72 gap-6 flex-shrink-0">
-              <MiniCalendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date as Date);
-                  setCalendarView('day');
-                }}
-                className="rounded-lg border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm"
-              />
-            </div>
-
             {/* Main Content */}
-            <div className="flex-1 flex flex-col gap-3 sm:gap-4 lg:gap-6 min-h-0 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+            <div className="flex-1 flex flex-col gap-3 sm:gap-4 lg:gap-6">
               {/* Header */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                 <div>
@@ -849,43 +989,85 @@ const AppointmentsPage = () => {
                     </div>
                   )}
                   
-                  <div className="w-full h-full min-h-0 overflow-auto" style={{ height: 'calc(100vh - 300px)' }}>
+                  <div className="w-full">
                     <div
-                      className="overflow-x-auto w-full touch-manipulation min-h-[400px] lg:min-h-0"
+                      className="appointments-calendar-container overflow-x-auto w-full touch-manipulation"
                       style={{ 
-                        minWidth: `${Math.max((filteredResources?.length || 0) * 200, 320)}px`,
-                        maxHeight: '100%',
-                        height: calendarView === 'day' ? 'calc(100vh - 380px)' : 'calc(100vh - 300px)'
+                        minWidth: `${Math.max((filteredResources?.length || 0) * 220, 360)}px`
                       }}
                     >
                       <BigCalendar
-                        key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate?.toISOString().slice(0, 10)}`}
+                        key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}`}
                         events={(() => {
-                          const appointmentEvents = filteredAppointments?.map((apt: any) => {
-                            const client = users?.find((u: any) => u.id === apt.clientId);
-                            const service = services?.find((s: any) => s.id === apt.serviceId);
+                          try {
+                            const appointmentEvents = filteredAppointments?.map((apt: any) => {
+                              if (!apt || !apt.startTime) {
+                                console.warn('Invalid appointment data:', apt);
+                                return null;
+                              }
+
+                              try {
+                                const client = users?.find((u: any) => u.id === apt.clientId);
+                                const service = services?.find((s: any) => s.id === apt.serviceId);
+                                
+                                // Validate and parse dates
+                                let startDate: Date;
+                                let endDate: Date;
+                                
+                                try {
+                                  startDate = new Date(apt.startTime);
+                                  // Ensure it's a valid date
+                                  if (isNaN(startDate.getTime())) {
+                                    console.warn('Invalid start date:', apt.startTime);
+                                    return null;
+                                  }
+                                } catch (e) {
+                                  console.warn('Error parsing start date:', e);
+                                  return null;
+                                }
+                                
+                                try {
+                                  endDate = apt.endTime ? new Date(apt.endTime) : new Date(startDate.getTime() + 3600000); // Default to 1 hour if no end time
+                                  // Ensure it's a valid date
+                                  if (isNaN(endDate.getTime())) {
+                                    console.warn('Invalid end date:', apt.endTime);
+                                    endDate = new Date(startDate.getTime() + 3600000); // Fallback to 1 hour duration
+                                  }
+                                } catch (e) {
+                                  console.warn('Error parsing end date:', e);
+                                  endDate = new Date(startDate.getTime() + 3600000); // Fallback to 1 hour duration
+                                }
+                                
+                                // Ensure end date is after start date
+                                if (endDate <= startDate) {
+                                  endDate = new Date(startDate.getTime() + 3600000); // Set to 1 hour duration
+                                }
+                                
+                                return {
+                                  id: apt.id,
+                                  title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || 'Unknown Service'}`,
+                                  start: startDate,
+                                  end: endDate,
+                                  resourceId: apt.staffId,
+                                  type: 'appointment',
+                                  resource: {
+                                    ...apt,
+                                    serviceColor: service?.color || '#3B82F6', // Use service color or default blue
+                                  },
+                                };
+                              } catch (error) {
+                                console.error('Error processing appointment:', error);
+                                return null;
+                              }
+                            }).filter(Boolean) || [];
                             
-                            // Always convert to Date objects to avoid calendar errors
-                            const startDate = apt.startTime ? new Date(apt.startTime) : new Date();
-                            const endDate = apt.endTime ? new Date(apt.endTime) : startDate;
+                            console.log('📅 Valid appointment events created:', appointmentEvents.length);
                             
-                            return {
-                              id: apt.id,
-                              title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || 'Unknown Service'}`,
-                              start: startDate,
-                              end: endDate,
-                              resourceId: apt.staffId,
-                              type: 'appointment',
-                              resource: {
-                                ...apt,
-                                serviceColor: service?.color || '#3B82F6', // Use service color or default blue
-                              },
-                            };
-                          }) || [];
-                          
-                          console.log('📅 Appointment events created:', appointmentEvents.length);
-                          
-                          return appointmentEvents;
+                            return appointmentEvents;
+                          } catch (error) {
+                            console.error('Error creating appointment events:', error);
+                            return [];
+                          }
                         })()}
                         backgroundEvents={(() => {
                           const backgroundEvents = getBackgroundEvents();
@@ -926,35 +1108,41 @@ const AppointmentsPage = () => {
       </div>
 
       {/* Appointment Form */}
-      <AppointmentForm
-        open={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        appointmentId={selectedAppointmentId}
-        onAppointmentCreated={(appointment) => {
-          console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
-          refetch();
-        }}
-        appointments={appointments} // Pass appointments to form for consistent filtering
-      />
+      <Suspense fallback={null}>
+        <AppointmentForm
+          open={isFormOpen}
+          onOpenChange={setIsFormOpen}
+          appointmentId={selectedAppointmentId}
+          onAppointmentCreated={(appointment) => {
+            console.log("[APPOINTMENTS PAGE] onAppointmentCreated called with:", appointment);
+            refetch();
+          }}
+          appointments={appointments}
+        />
+      </Suspense>
 
       {/* Appointment Details */}
-      <AppointmentDetails
-        open={isDetailsOpen}
-        onOpenChange={setIsDetailsOpen}
-        appointmentId={detailsAppointmentId}
-        onEdit={handleEditAppointment}
-        onDelete={handleDeleteAppointment}
-      />
+      <Suspense fallback={null}>
+        <AppointmentDetails
+          open={isDetailsOpen}
+          onOpenChange={setIsDetailsOpen}
+          appointmentId={detailsAppointmentId}
+          onEdit={handleEditAppointment}
+          onDelete={handleDeleteAppointment}
+        />
+      </Suspense>
 
       {/* Checkout Component */}
-      {checkoutAppointment && (
-        <AppointmentCheckout
-          appointment={checkoutAppointment}
-          isOpen={isCheckoutOpen}
-          onClose={() => setIsCheckoutOpen(false)}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
+      <Suspense fallback={null}>
+        {checkoutAppointment && (
+          <AppointmentCheckout
+            appointment={checkoutAppointment}
+            isOpen={isCheckoutOpen}
+            onClose={() => setIsCheckoutOpen(false)}
+            onSuccess={handlePaymentSuccess}
+          />
+        )}
+      </Suspense>
     </div>
   );
 };

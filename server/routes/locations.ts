@@ -208,6 +208,6 @@ router.patch('/:id/toggle-active', requireAuth, async (req, res) => {
 
 export default router;
 
-export const registerLocationRoutes = (app: express.Application) => {
+export const registerLocationRoutes = (app: express.Application, storage: any) => {
   app.use('/api/locations', router);
 }; 

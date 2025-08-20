@@ -20,6 +20,15 @@ let emailAutomationService: EmailAutomationService;
 let marketingCampaignService: MarketingCampaignService;
 let storageInstance: IStorage;
 
+interface ClientData {
+  id: number;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAppointmentReminders?: boolean | null;
+  emailPromotions?: boolean | null;
+}
+
 export function initializeEmailMarketingRoutes(storage: IStorage) {
   storageInstance = storage;
   emailAutomationService = new EmailAutomationService(storage);
@@ -37,7 +46,7 @@ router.post('/automation/appointment-confirmation', async (req, res) => {
       return res.status(400).json({ error: 'Appointment ID is required' });
     }
 
-    const appointment = await storageInstance.getAppointment(appointmentId);
+    const appointment = await storageInstance.getAppointment(appointmentId as any);
     if (!appointment) {
       return res.status(404).json({ error: 'Appointment not found' });
     }
@@ -57,8 +66,8 @@ router.post('/automation/appointment-confirmation', async (req, res) => {
       id: appointment.staffId,
       userId: appointment.staffId,
       user: {
-        firstName: staffUser.firstName,
-        lastName: staffUser.lastName
+        firstName: staffUser.firstName ?? undefined,
+        lastName: staffUser.lastName ?? undefined
       }
     };
 

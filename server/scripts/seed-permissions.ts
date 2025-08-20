@@ -406,7 +406,7 @@ export async function seedPermissions(storage: IStorage) {
     const createdPermissions: { [key: string]: number } = {};
     
     for (const permission of DEFAULT_PERMISSIONS) {
-      const existingPermission = await storage.getPermissionByName(permission.name);
+      const existingPermission = await (storage as any).getPermissionByName?.(permission.name) ?? undefined;
       if (!existingPermission) {
         const created = await storage.createPermission({
           name: permission.name,
@@ -427,7 +427,7 @@ export async function seedPermissions(storage: IStorage) {
     // Create permission groups
     console.log('\nCreating permission groups...');
     for (const group of DEFAULT_PERMISSION_GROUPS) {
-      const existingGroup = await storage.getPermissionGroupByName(group.name);
+      const existingGroup = await (storage as any).getPermissionGroupByName?.(group.name) ?? undefined;
       if (!existingGroup) {
         const createdGroup = await permissionsService.createPermissionGroup({
           name: group.name,

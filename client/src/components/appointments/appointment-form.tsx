@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import CheckoutWithTerminal from "@/components/payment/checkout-with-terminal";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1184,17 +1185,44 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                     ) : (
                       <div className="space-y-3">
                         <span className="text-sm text-muted-foreground">Amount: {formatPrice(appointment.totalAmount || selectedService?.price || 0)}</span>
-                        <Button
-                          type="button"
-                          onClick={() => {
-                            setShowCheckout(true);
-                            onOpenChange(false); // Close the appointment dialog
-                          }}
-                          className="w-full bg-green-600 hover:bg-green-700"
-                        >
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Process Payment
-                        </Button>
+                        <div className="space-y-2">
+                          <CheckoutWithTerminal
+                            locationId={appointment.locationId || ''}
+                            amount={appointment.totalAmount || selectedService?.price || 0}
+                            reference={`appointment-${appointment.id}`}
+                            description={`Payment for ${selectedService?.name || 'appointment'}`}
+                            onPaymentComplete={async (result) => {
+                              // Update appointment payment status
+                              await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+                                paymentStatus: 'paid',
+                                paymentId: result.paymentId
+                              });
+                              toast({
+                                title: "Payment Successful",
+                                description: "Appointment has been paid for",
+                              });
+                              onOpenChange(false);
+                            }}
+                            onPaymentError={(error) => {
+                              toast({
+                                title: "Payment Failed",
+                                description: error,
+                                variant: "destructive",
+                              });
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setShowCheckout(true);
+                              onOpenChange(false); // Close the appointment dialog
+                            }}
+                            className="w-full bg-green-600 hover:bg-green-700"
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Other Payment Methods
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1347,7 +1347,7 @@ export class SMSAppointmentBookingService {
       }
 
       // Verify the appointment belongs to this phone number
-      if (appointment.clientPhone !== clientPhone) {
+      if ((appointment as any).clientPhone !== clientPhone) {
         return {
           success: false,
           message: 'This appointment doesn\'t match your phone number. Please verify the appointment ID or call us directly.'
@@ -1359,7 +1359,7 @@ export class SMSAppointmentBookingService {
       
       return {
         success: true,
-        message: `Your appointment for ${appointment.serviceName} on ${appointment.date} at ${appointment.time} has been cancelled successfully.`
+        message: `Your appointment has been cancelled successfully.`
       };
 
     } catch (error: any) {

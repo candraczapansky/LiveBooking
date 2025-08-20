@@ -5,7 +5,6 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+
 import {
   Form,
   FormControl,
@@ -41,6 +41,7 @@ const serviceFormSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 minute"),
   price: z.coerce.number().min(0, "Price must be a positive number"),
   categoryId: z.coerce.number().min(1, "Category is required"),
+  locationId: z.coerce.number().optional(),
   
   // Optional fields - explicitly marked as optional
   description: z.string().optional(),
@@ -75,36 +76,36 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
   const { data: serviceCategories } = useQuery({
     queryKey: ['/api/service-categories'],
     queryFn: async () => {
-      const response = await fetch('/api/service-categories');
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      return response.json();
+      const response = await apiRequest('GET', '/api/service-categories');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
     }
   });
 
   const { data: staffMembers } = useQuery({
     queryKey: ['/api/staff'],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      return response.json();
+      const response = await apiRequest('GET', '/api/staff');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
     }
   });
 
   const { data: rooms } = useQuery({
     queryKey: ['/api/rooms'],
     queryFn: async () => {
-      const response = await fetch('/api/rooms');
-      if (!response.ok) throw new Error('Failed to fetch rooms');
-      return response.json();
+      const response = await apiRequest('GET', '/api/rooms');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
     }
   });
 
   const { data: devices } = useQuery({
     queryKey: ['/api/devices'],
     queryFn: async () => {
-      const response = await fetch('/api/devices');
-      if (!response.ok) throw new Error('Failed to fetch devices');
-      return response.json();
+      const response = await apiRequest('GET', '/api/devices');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
     }
   });
 
@@ -124,6 +125,13 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       requiredDevices: [],
     },
   });
+
+  // Reset form when dialog opens/closes
+  useEffect(() => {
+    if (!open) {
+      form.reset();
+    }
+  }, [open, form]);
 
   // Fetch service data if editing
   useEffect(() => {
@@ -203,16 +211,16 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         duration: Number(data.duration),
         price: Number(data.price),
         categoryId: Number(data.categoryId),
+        locationId: undefined, // Let the backend assign the default location
       };
       
-      // Only add optional fields if they are meaningful
-      if (data.description && data.description.trim() !== "") {
-        cleanServiceData.description = data.description.trim();
-      }
+      // Temporarily skip sending description to avoid DBs missing this optional column
+      // if (data.description && data.description.trim() !== "") {
+      //   cleanServiceData.description = data.description.trim();
+      // }
       
-      if (data.roomId && Number(data.roomId) > 0) {
-        cleanServiceData.roomId = Number(data.roomId);
-      }
+      // Always include roomId in the request, even if null
+      cleanServiceData.roomId = data.roomId ? Number(data.roomId) : null;
       
       if (typeof data.bufferTimeBefore === 'number' && data.bufferTimeBefore >= 0) {
         cleanServiceData.bufferTimeBefore = Number(data.bufferTimeBefore);
@@ -350,8 +358,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     }
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (values: ServiceFormValues) => {
     
     // Check if categories are available
     if (!serviceCategories || serviceCategories.length === 0) {
@@ -410,13 +417,15 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
     }
     
     // If valid, proceed with submission
-    const values = form.getValues();
+
     if (serviceId) {
       updateServiceMutation.mutate(values);
     } else {
       createServiceMutation.mutate(values);
     }
   };
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -430,8 +439,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="mt-4">
+          <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="name"
@@ -533,12 +543,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <Select
-                      value={field.value?.toString() || ""}
-                      onValueChange={(value) => {
-                        if (value && value !== "") {
-                          field.onChange(parseInt(value));
-                        }
-                      }}
+                      value={typeof field.value === 'number' ? String(field.value) : (field.value || '')}
+                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -547,9 +553,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                       </FormControl>
                       <SelectContent>
                         {!serviceCategories || serviceCategories.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
                             No categories available
-                          </SelectItem>
+                          </div>
                         ) : (
                           serviceCategories.map((category: any) => (
                             <SelectItem key={category.id} value={category.id.toString()}>
@@ -571,8 +577,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                   <FormItem>
                     <FormLabel>Room (Optional)</FormLabel>
                     <Select
-                      value={field.value?.toString() || "none"}
-                      onValueChange={(value) => field.onChange(value === "none" ? null : parseInt(value))}
+                      value={field.value === null || field.value === undefined ? 'none' : String(field.value)}
+                      onValueChange={(value) => field.onChange(value === 'none' ? null : parseInt(value))}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -768,20 +774,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => {
-                  console.log("Test toast button clicked");
-                  toast({
-                    title: "Test Toast",
-                    description: "This is a test toast to verify the system is working",
-                    variant: "default",
-                  });
-                }}
-              >
-                Test Toast
-              </Button>
+
               <Button 
                 type="submit" 
                 disabled={isLoading || createServiceMutation.isPending || updateServiceMutation.isPending}
@@ -795,6 +788,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             </DialogFooter>
           </form>
         </Form>
+        </div>
       </DialogContent>
     </Dialog>
   );

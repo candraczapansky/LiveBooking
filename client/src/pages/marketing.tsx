@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import EmailTemplateEditor, { EmailTemplateEditorRef } from "@/components/email/EmailTemplateEditor";
 
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -591,7 +591,6 @@ const MarketingPage = () => {
       </div>
       
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
-        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">

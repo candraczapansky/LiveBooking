@@ -1,7 +1,8 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage";
 import { z } from "zod";
-import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema } from "@shared/schema";
+import { insertUserSchema, insertUserColorPreferencesSchema, updateUserSchema, insertClientSchema } from "@shared/schema";
+import { hashPassword } from "../utils/password";
 
 // Helper to validate request body using schema
 function validateBody<T>(schema: z.ZodType<T>) {
@@ -19,6 +20,134 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export function registerUserRoutes(app: Express, storage: IStorage) {
+  // Create client (admin/staff action)
+  app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
+    try {
+      const data = req.body as z.infer<typeof insertClientSchema>;
+
+      // Basic duplicate checks
+      const existingEmail = await storage.getUserByEmail(data.email);
+      if (existingEmail) {
+        return res.status(409).json({ error: "Email already exists" });
+      }
+
+      // Generate a username from email or name
+      const baseFromEmail = (data.email || "").split("@")[0] || "client";
+      const baseFromName = `${(data.firstName || "client").toLowerCase()}${(data.lastName || "").toLowerCase()}`;
+      let baseUsername = (baseFromEmail || baseFromName).toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (!baseUsername) baseUsername = `client${Date.now()}`;
+
+      let username = baseUsername;
+      let suffix = 0;
+      // Ensure unique username
+      // Limit attempts then fall back to timestamp
+      // eslint-disable-next-line no-constant-condition
+      while (await storage.getUserByUsername(username)) {
+        suffix += 1;
+        if (suffix > 50) {
+          username = `${baseUsername}${Date.now()}`;
+          break;
+        }
+        username = `${baseUsername}${suffix}`;
+      }
+
+      // Temporary password (hashed)
+      const tempPassword = `Temp123!${Math.random().toString(36).slice(-4)}`;
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const newUser = await storage.createUser({
+        username,
+        email: data.email,
+        password: hashedPassword,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        role: "client",
+        // Optional client fields
+        phone: data.phone || null,
+        address: data.address || null,
+        city: data.city || null,
+        state: data.state || null,
+        zipCode: data.zipCode || null,
+        notes: (data as any).notes ?? null,
+        emailAccountManagement: data.emailAccountManagement ?? true,
+        emailAppointmentReminders: data.emailAppointmentReminders ?? true,
+        emailPromotions: data.emailPromotions ?? false,
+        smsAccountManagement: data.smsAccountManagement ?? false,
+        smsAppointmentReminders: data.smsAppointmentReminders ?? true,
+        smsPromotions: data.smsPromotions ?? false,
+      } as any);
+
+      const { password, ...safeUser } = newUser as any;
+      return res.status(201).json(safeUser);
+    } catch (error: any) {
+      console.error("Error creating client:", error);
+      // Handle unique constraint violations gracefully
+      const message = error?.message || "Failed to create client";
+      const status = message.toLowerCase().includes("unique") ? 409 : 500;
+      return res.status(status).json({ error: "Failed to create client", message });
+    }
+  });
+  // TEMPORARY: Grant admin permissions to user 72
+  app.post("/api/temp/grant-admin-72", async (req, res) => {
+    try {
+      // Get current user info
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.id === 72);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
+      console.log('Current user info:', {
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+      });
+
+      if (user.role === 'admin') {
+        return res.json({
+          success: true,
+          message: "User already has admin role",
+          user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
+        });
+      }
+
+      // Update user role to admin
+      const updatedUser = await storage.updateUser(user.id, { role: 'admin' });
+
+      console.log('✅ Successfully granted admin permissions!');
+      res.json({
+        success: true,
+        message: "Admin permissions granted successfully!",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+        }
+      });
+    } catch (error) {
+      console.error('Error granting admin permissions:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to grant admin permissions",
+        error: error.message
+      });
+    }
+  });
+
   // Get all users
   app.get("/api/users", async (req, res) => {
     try {

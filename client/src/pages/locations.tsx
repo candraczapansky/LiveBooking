@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -105,6 +105,7 @@ const LocationsPage = () => {
   const [locationToEdit, setLocationToEdit] = useState<Location | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [inlineEdits, setInlineEdits] = useState<Record<number, { phone?: string; email?: string }>>({});
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -288,6 +289,33 @@ const LocationsPage = () => {
     },
   });
 
+  // Inline partial update for quick edits (e.g., phone/email)
+  const updateInlineFieldsMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: Partial<LocationFormValues> }) => {
+      const response = await apiRequest("PUT", `/api/locations/${id}`, data);
+      return response.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/locations'] });
+      setInlineEdits((prev) => {
+        const next = { ...prev };
+        delete next[variables.id];
+        return next;
+      });
+      toast({
+        title: "Saved",
+        description: "Location details updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update location",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Form submission handler
   const onSubmit = async (data: LocationFormValues) => {
     // Ensure authentication before submitting
@@ -360,7 +388,6 @@ const LocationsPage = () => {
       </div>
       
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
-        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6">
           <div className="max-w-7xl mx-auto">
@@ -473,17 +500,69 @@ const LocationsPage = () => {
                     
                     <CardContent className="pb-4 px-6">
                       <div className="space-y-4">
-                        {location.phone && (
+                        {location.phone && location.phone.trim() !== "" ? (
                           <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <Phone className="h-4 w-4 text-gray-500" />
                             <span className="font-medium text-gray-700 dark:text-gray-300">{location.phone}</span>
                           </div>
+                        ) : (
+                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <Phone className="h-4 w-4 text-gray-500" />
+                            <Input
+                              placeholder="(555) 123-4567"
+                              value={inlineEdits[location.id]?.phone ?? ""}
+                              onChange={(e) =>
+                                setInlineEdits((prev) => ({
+                                  ...prev,
+                                  [location.id]: { ...prev[location.id], phone: e.target.value },
+                                }))
+                              }
+                              className="flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              disabled={!((inlineEdits[location.id]?.phone ?? "").trim()) || updateInlineFieldsMutation.isPending}
+                              onClick={() => {
+                                const phoneVal = (inlineEdits[location.id]?.phone ?? "").trim();
+                                if (!phoneVal) return;
+                                updateInlineFieldsMutation.mutate({ id: location.id, data: { phone: phoneVal } });
+                              }}
+                            >
+                              {updateInlineFieldsMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
                         )}
-                        
-                        {location.email && (
+
+                        {location.email && location.email.trim() !== "" ? (
                           <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
                             <Mail className="h-4 w-4 text-gray-500" />
                             <span className="font-medium text-gray-700 dark:text-gray-300">{location.email}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <Mail className="h-4 w-4 text-gray-500" />
+                            <Input
+                              placeholder="info@example.com"
+                              value={inlineEdits[location.id]?.email ?? ""}
+                              onChange={(e) =>
+                                setInlineEdits((prev) => ({
+                                  ...prev,
+                                  [location.id]: { ...prev[location.id], email: e.target.value },
+                                }))
+                              }
+                              className="flex-1"
+                            />
+                            <Button
+                              size="sm"
+                              disabled={!((inlineEdits[location.id]?.email ?? "").trim()) || updateInlineFieldsMutation.isPending}
+                              onClick={() => {
+                                const emailVal = (inlineEdits[location.id]?.email ?? "").trim();
+                                if (!emailVal) return;
+                                updateInlineFieldsMutation.mutate({ id: location.id, data: { email: emailVal } });
+                              }}
+                            >
+                              {updateInlineFieldsMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
                           </div>
                         )}
                         

@@ -159,46 +159,51 @@ async function seedPermissions() {
     
     for (const categoryName of categories) {
       console.log(`Creating category: ${categoryName}`);
-      const result = await db.execute(
+      const result: any = await db.execute(
         sql`INSERT INTO permission_categories (name, description) VALUES (${categoryName}, ${`Permissions for ${categoryName}`}) ON CONFLICT (name) DO NOTHING RETURNING id, name`
       );
-      if (result.length > 0) {
-        categoryMap.set(categoryName, result[0].id);
-        console.log(`Created category: ${categoryName} with ID: ${result[0].id}`);
+      const rows = result?.rows ?? result;
+      if (rows && rows.length > 0) {
+        const row = rows[0];
+        categoryMap.set(categoryName, row.id);
+        console.log(`Created category: ${categoryName} with ID: ${row.id}`);
       } else {
         // Get existing category ID
-        const existing = await db.execute(
+        const existing: any = await db.execute(
           sql`SELECT id FROM permission_categories WHERE name = ${categoryName}`
         );
-        if (existing.length > 0) {
-          categoryMap.set(categoryName, existing[0].id);
-          console.log(`Found existing category: ${categoryName} with ID: ${existing[0].id}`);
+        const existingRows = existing?.rows ?? existing;
+        if (existingRows && existingRows.length > 0) {
+          categoryMap.set(categoryName, existingRows[0].id);
+          console.log(`Found existing category: ${categoryName} with ID: ${existingRows[0].id}`);
         }
       }
     }
     
     // Create permissions
-    const permissionMap = new Map();
+    const permissionMap = new Map<string, number>();
     
     for (const permission of DEFAULT_PERMISSIONS) {
       console.log(`Creating permission: ${permission.name}`);
       const categoryId = categoryMap.get(permission.category);
       
-      const result = await db.execute(
+      const result: any = await db.execute(
         sql`INSERT INTO permissions (name, description, category_id, is_active) VALUES (${permission.name}, ${permission.description}, ${categoryId}, true) ON CONFLICT (name) DO NOTHING RETURNING id, name`
       );
+      const rows = result?.rows ?? result;
       
-      if (result.length > 0) {
-        permissionMap.set(permission.name, result[0].id);
-        console.log(`Created permission: ${permission.name} with ID: ${result[0].id}`);
+      if (rows && rows.length > 0) {
+        permissionMap.set(permission.name, rows[0].id);
+        console.log(`Created permission: ${permission.name} with ID: ${rows[0].id}`);
       } else {
         // Get existing permission ID
-        const existing = await db.execute(
+        const existing: any = await db.execute(
           sql`SELECT id FROM permissions WHERE name = ${permission.name}`
         );
-        if (existing.length > 0) {
-          permissionMap.set(permission.name, existing[0].id);
-          console.log(`Found existing permission: ${permission.name} with ID: ${existing[0].id}`);
+        const existingRows = existing?.rows ?? existing;
+        if (existingRows && existingRows.length > 0) {
+          permissionMap.set(permission.name, existingRows[0].id);
+          console.log(`Found existing permission: ${permission.name} with ID: ${existingRows[0].id}`);
         }
       }
     }
@@ -207,21 +212,23 @@ async function seedPermissions() {
     for (const group of DEFAULT_PERMISSION_GROUPS) {
       console.log(`Creating permission group: ${group.name}`);
       
-      const result = await db.execute(
+      const result: any = await db.execute(
         sql`INSERT INTO permission_groups (name, description, is_active) VALUES (${group.name}, ${group.description}, true) ON CONFLICT (name) DO NOTHING RETURNING id, name`
       );
+      const rows = result?.rows ?? result;
       
       let groupId;
-      if (result.length > 0) {
-        groupId = result[0].id;
+      if (rows && rows.length > 0) {
+        groupId = rows[0].id;
         console.log(`Created permission group: ${group.name} with ID: ${groupId}`);
       } else {
         // Get existing group ID
-        const existing = await db.execute(
+        const existing: any = await db.execute(
           sql`SELECT id FROM permission_groups WHERE name = ${group.name}`
         );
-        if (existing.length > 0) {
-          groupId = existing[0].id;
+        const existingRows = existing?.rows ?? existing;
+        if (existingRows && existingRows.length > 0) {
+          groupId = existingRows[0].id;
           console.log(`Found existing permission group: ${group.name} with ID: ${groupId}`);
         }
       }
@@ -245,14 +252,17 @@ async function seedPermissions() {
     console.log('Permission seeding completed successfully!');
     
     // Print summary
-    const permissionCount = await db.execute(sql`SELECT COUNT(*) as count FROM permissions`);
-    const groupCount = await db.execute(sql`SELECT COUNT(*) as count FROM permission_groups`);
-    const categoryCount = await db.execute(sql`SELECT COUNT(*) as count FROM permission_categories`);
+    const permissionCountRes: any = await db.execute(sql`SELECT COUNT(*) as count FROM permissions`);
+    const groupCountRes: any = await db.execute(sql`SELECT COUNT(*) as count FROM permission_groups`);
+    const categoryCountRes: any = await db.execute(sql`SELECT COUNT(*) as count FROM permission_categories`);
+    const permissionCountRows = permissionCountRes?.rows ?? permissionCountRes;
+    const groupCountRows = groupCountRes?.rows ?? groupCountRes;
+    const categoryCountRows = categoryCountRes?.rows ?? categoryCountRes;
     
     console.log(`\nSummary:`);
-    console.log(`- ${permissionCount[0].count} permissions created`);
-    console.log(`- ${groupCount[0].count} permission groups created`);
-    console.log(`- ${categoryCount[0].count} permission categories created`);
+    console.log(`- ${permissionCountRows?.[0]?.count ?? 0} permissions created`);
+    console.log(`- ${groupCountRows?.[0]?.count ?? 0} permission groups created`);
+    console.log(`- ${categoryCountRows?.[0]?.count ?? 0} permission categories created`);
     
   } catch (error) {
     console.error('Error seeding permissions:', error);

@@ -306,6 +306,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       try {
         await sendEmail({
           to: user.email,
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           subject: "Password Reset Request",
           html: `
             <h2>Password Reset Request</h2>
@@ -467,6 +468,67 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
     });
   }));
 
+  // TEMPORARY: Grant admin permissions to user 72
+  app.post("/api/temp/grant-admin-72", asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // Get current user info
+      const users = await storage.getAllUsers();
+      const user = users.find(u => u.id === 1);
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found"
+        });
+      }
+
+      console.log('Current user info:', {
+        id: user.id,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role
+      });
+
+      if (user.role === 'admin') {
+        return res.json({
+          success: true,
+          message: "User already has admin role",
+          user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          }
+        });
+      }
+
+      // Update user role to admin
+      const updatedUser = await storage.updateUser(user.id, { role: 'admin' });
+
+      console.log('✅ Successfully granted admin permissions!');
+      res.json({
+        success: true,
+        message: "Admin permissions granted successfully!",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+        }
+      });
+    } catch (error) {
+      console.error('Error granting admin permissions:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to grant admin permissions",
+        error: error.message
+      });
+    }
+  }));
+
   // Health check endpoint
   app.get("/api/health", asyncHandler(async (req: Request, res: Response) => {
     try {
@@ -488,6 +550,73 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         success: false,
         status: "unhealthy",
         timestamp: new Date().toISOString(),
+        error: error.message,
+      });
+    }
+  }));
+
+  // TEMPORARY: Grant admin permissions to current user
+  app.post("/api/temp/grant-admin", 
+    authenticateToken,
+    asyncHandler(async (req: Request, res: Response) => {
+    try {
+      // Get current user from request (if authenticated)
+      const currentUser = (req as any).user;
+      
+      if (!currentUser) {
+        return res.status(401).json({
+          success: false,
+          message: "Authentication required",
+        });
+      }
+
+      // Get fresh user data from database
+      const user = await storage.getUserById(currentUser.id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      console.log(`Granting admin permissions to user: ${user.username} (${user.firstName} ${user.lastName})`);
+      console.log(`Current role: ${user.role}`);
+
+      if (user.role === 'admin') {
+        return res.json({
+          success: true,
+          message: "User already has admin role",
+          user: {
+            id: user.id,
+            username: user.username,
+            role: user.role,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          },
+        });
+      }
+
+      // Update user role to admin
+      const updatedUser = await storage.updateUser(user.id, { role: 'admin' });
+
+      console.log(`Successfully granted admin permissions to ${user.username}`);
+
+      res.json({
+        success: true,
+        message: "Admin permissions granted successfully!",
+        user: {
+          id: updatedUser.id,
+          username: updatedUser.username,
+          role: updatedUser.role,
+          firstName: updatedUser.firstName,
+          lastName: updatedUser.lastName,
+        },
+      });
+    } catch (error) {
+      console.error('Error granting admin permissions:', error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to grant admin permissions",
         error: error.message,
       });
     }

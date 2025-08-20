@@ -240,78 +240,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize user from localStorage
   useEffect(() => {
-    // Check if we're on a public route (forms/:id) first
-    const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
-    
-    // If we're on a public route, don't try to authenticate at all
-    if (isPublicFormRoute) {
-      setLoading(false);
-      return;
-    }
-    
-    const storedUser = localStorage.getItem("user");
-    
-    if (storedUser) {
+    const initializeAuth = async () => {
       try {
+        // Check if we're on a public route (forms/:id) first
+        const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
+        if (isPublicFormRoute) {
+          setLoading(false);
+          return;
+        }
+
+        // Check for stored user and token
+        const storedUser = localStorage.getItem("user");
+        const token = localStorage.getItem("token");
+
+        if (!storedUser || !token) {
+          setLoading(false);
+          return;
+        }
+
         const userData: User = JSON.parse(storedUser);
         
-        // Add a timeout to prevent infinite loading
-        const timeoutId = setTimeout(() => {
-          setUser(userData);
-          setIsAuthenticated(true);
-          setLoading(false);
-        }, 3000); // 3 second timeout
-        
-        // Fetch fresh user data from database
-        fetchFreshUserData(userData.id).then((freshUserData) => {
-          clearTimeout(timeoutId);
+        // Set initial state from localStorage immediately
+        setUser(userData);
+        setIsAuthenticated(true);
+
+        try {
+          // Try to fetch fresh user data
+          const freshUserData = await fetchFreshUserData(userData.id);
+          
           if (freshUserData) {
+            // Update with fresh data
             setUser(freshUserData);
-            setIsAuthenticated(true);
-            setLoading(false);
-            // Update localStorage with fresh data
             localStorage.setItem('user', JSON.stringify(freshUserData));
             
-            // Also update profilePicture in localStorage for backward compatibility
             if (freshUserData.profilePicture) {
               localStorage.setItem('profilePicture', freshUserData.profilePicture);
             }
             
-            // Dispatch event to notify all components of the fresh user data
             window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: freshUserData }));
-            
-            // Apply color preferences
-            loadAndApplyColorPreferences(freshUserData.id);
-          } else {
-            // Fallback to localStorage data if API fails
-            setUser(userData);
-            setIsAuthenticated(true);
-            setLoading(false);
-            
-            // Dispatch event to notify all components of the fallback user data
-            window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: userData }));
-            
-            // Apply color preferences
-            loadAndApplyColorPreferences(userData.id);
+            await loadAndApplyColorPreferences(freshUserData.id);
           }
-        }).catch(() => {
-          clearTimeout(timeoutId);
-          // If API fails, use localStorage data
-          setUser(userData);
-          setIsAuthenticated(true);
-          setLoading(false);
-          
-          window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: userData }));
-          loadAndApplyColorPreferences(userData.id);
-        });
+        } catch (error) {
+          console.error('Error fetching fresh user data:', error);
+          // Continue with localStorage data
+          await loadAndApplyColorPreferences(userData.id);
+        }
       } catch (error) {
+        console.error('Error initializing auth:', error);
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        setIsAuthenticated(false);
+        setUser(null);
+      } finally {
         setLoading(false);
       }
-    } else {
-      // For public routes or no stored user, just set loading to false
-      setLoading(false);
-    }
+    };
+
+    initializeAuth();
   }, []);
 
   // Apply color preferences whenever user data changes

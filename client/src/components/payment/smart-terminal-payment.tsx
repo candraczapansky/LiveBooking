@@ -1,0 +1,201 @@
+import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { CreditCard, CheckCircle, XCircle } from 'lucide-react';
+
+interface SmartTerminalPaymentProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  amount: number;
+  onSuccess?: (response: any) => void;
+  onError?: (error: any) => void;
+  description?: string;
+}
+
+export default function SmartTerminalPayment({
+  open,
+  onOpenChange,
+  amount,
+  onSuccess,
+  onError,
+  description = "Payment",
+}: SmartTerminalPaymentProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const { toast } = useToast();
+
+  const startPayment = async () => {
+    try {
+      setIsLoading(true);
+      setStatus('processing');
+      setMessage('Initializing payment terminal...');
+
+      // Start the payment process
+      const response = await apiRequest('POST', '/api/payments/terminal/start', {
+        amount,
+        description,
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || 'Failed to start payment');
+      }
+
+      // Poll for payment status
+      await pollPaymentStatus(data.paymentId);
+
+    } catch (error) {
+      console.error('Payment failed:', error);
+      setStatus('error');
+      setMessage('Payment failed. Please try again.');
+      handlePaymentError(error);
+    }
+  };
+
+  const pollPaymentStatus = async (paymentId: string) => {
+    try {
+      let attempts = 0;
+      const maxAttempts = 60; // 2 minutes with 2-second intervals
+      
+      const poll = async () => {
+        if (attempts >= maxAttempts) {
+          throw new Error('Payment timed out');
+        }
+
+        const response = await apiRequest('GET', `/api/payments/terminal/status/${paymentId}`);
+        const data = await response.json();
+
+        if (data.status === 'completed') {
+          setStatus('success');
+          setMessage('Payment successful!');
+          handlePaymentSuccess(data);
+          return;
+        } else if (data.status === 'failed') {
+          throw new Error(data.message || 'Payment failed');
+        }
+
+        // Update status message
+        setMessage(data.message || 'Processing payment...');
+        
+        // Continue polling
+        attempts++;
+        setTimeout(poll, 2000);
+      };
+
+      await poll();
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const handlePaymentSuccess = (response: any) => {
+    toast({
+      title: "Payment Successful",
+      description: "Your payment has been processed successfully.",
+    });
+    onSuccess?.(response);
+    setTimeout(() => {
+      onOpenChange(false);
+      setStatus('idle');
+      setMessage('');
+    }, 2000);
+  };
+
+  const handlePaymentError = (error: any) => {
+    toast({
+      title: "Payment Failed",
+      description: "There was an error processing your payment. Please try again.",
+      variant: "destructive",
+    });
+    onError?.(error);
+    setTimeout(() => {
+      onOpenChange(false);
+      setStatus('idle');
+      setMessage('');
+    }, 2000);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Terminal Payment</DialogTitle>
+          <DialogDescription>
+            Process payment using the card terminal
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="grid gap-4 py-4">
+          <div className="flex flex-col items-center justify-center p-4 space-y-4">
+            {status === 'idle' && (
+              <>
+                <CreditCard className="h-16 w-16 text-gray-400" />
+                <p className="text-center text-gray-600">
+                  Click start to begin processing payment on the terminal
+                </p>
+                <Button
+                  onClick={startPayment}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  {isLoading ? "Starting..." : "Start Payment"}
+                </Button>
+              </>
+            )}
+
+            {status === 'processing' && (
+              <>
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-gray-900"></div>
+                <p className="text-center text-gray-600">{message}</p>
+              </>
+            )}
+
+            {status === 'success' && (
+              <>
+                <CheckCircle className="h-16 w-16 text-green-500" />
+                <p className="text-center text-gray-600">{message}</p>
+              </>
+            )}
+
+            {status === 'error' && (
+              <>
+                <XCircle className="h-16 w-16 text-red-500" />
+                <p className="text-center text-gray-600">{message}</p>
+                <Button
+                  onClick={startPayment}
+                  disabled={isLoading}
+                  className="w-full"
+                >
+                  Try Again
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <Button
+            variant="outline"
+            onClick={() => {
+              onOpenChange(false);
+              setStatus('idle');
+              setMessage('');
+            }}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}

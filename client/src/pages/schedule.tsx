@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -73,7 +73,6 @@ const SchedulePage = () => {
       </div>
       
       <div className="lg:pl-64">
-        <Header />
         
         <main className="p-3 lg:p-6">
           <div className="w-full space-y-4 lg:space-y-6">

@@ -23,71 +23,50 @@ interface SidebarProviderProps {
 
 export const SidebarProvider = ({ children }: SidebarProviderProps) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [isOpen, setIsOpen] = useState(!isMobile);
+  const [isOpen, setIsOpen] = useState(window.innerWidth >= 768);
 
-  // Initialize global state
-  useEffect(() => {
-    (window as any).sidebarIsOpen = isOpen;
-  }, [isOpen]);
-
+  // Handle window resize
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
+      
+      // Close sidebar on mobile, keep open on desktop
       if (mobile) {
         setIsOpen(false);
-        (window as any).sidebarIsOpen = false;
       } else {
         setIsOpen(true);
-        (window as any).sidebarIsOpen = true;
       }
     };
 
-    // Set initial state
+    // Add event listener
+    window.addEventListener('resize', handleResize);
+    
+    // Initial check
     handleResize();
 
-    window.addEventListener('resize', handleResize);
+    // Cleanup
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Listen for global state changes (for compatibility with other pages)
+  // Handle route changes
   useEffect(() => {
-    const checkGlobalState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined && globalSidebarState !== isOpen) {
-        setIsOpen(globalSidebarState);
+    const handleRouteChange = () => {
+      if (isMobile) {
+        setIsOpen(false);
       }
     };
 
-    const interval = setInterval(checkGlobalState, 100);
-    return () => clearInterval(interval);
-  }, [isOpen]);
-
-  const [isToggling, setIsToggling] = useState(false);
+    window.addEventListener('popstate', handleRouteChange);
+    return () => window.removeEventListener('popstate', handleRouteChange);
+  }, [isMobile]);
 
   const toggleSidebar = () => {
-    // Prevent rapid toggling
-    if (isToggling) {
-      return;
-    }
-    
-    setIsToggling(true);
-    const newState = !isOpen;
-    setIsOpen(newState);
-    
-    // Update global state for compatibility with other pages
-    (window as any).sidebarIsOpen = newState;
-    
-    // Reset toggle flag after a short delay
-    setTimeout(() => {
-      setIsToggling(false);
-    }, 300);
+    setIsOpen(prev => !prev);
   };
 
   const closeSidebar = () => {
     setIsOpen(false);
-    // Update global state for compatibility with other pages
-    (window as any).sidebarIsOpen = false;
   };
 
   return (

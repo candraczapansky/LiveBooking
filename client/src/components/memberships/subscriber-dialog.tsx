@@ -56,7 +56,7 @@ type ClientMembership = {
   startDate: string;
   endDate: string;
   active: boolean;
-  squareSubscriptionId?: string;
+
   client: User;
   membership: Membership;
 };
@@ -113,41 +113,7 @@ export default function SubscriberDialog({
     enabled: open
   });
 
-  // Initialize Square payment form
-  const initializeSquarePayment = async () => {
-    if (!window.Square) {
-      console.error('Square Web SDK not loaded');
-      return;
-    }
 
-    try {
-      setIsPaymentLoading(true);
-      const payments = window.Square.payments(SQUARE_APP_ID, SQUARE_LOCATION_ID);
-      const card = await payments.card({
-        style: {
-          input: {
-            fontSize: '16px',
-            fontFamily: '"Helvetica Neue", Arial, sans-serif'
-          },
-          '.input-container': {
-            borderColor: '#E5E7EB',
-            borderRadius: '6px'
-          }
-        }
-      });
-      await card.attach('#square-card-membership');
-      setCardElement(card);
-      setIsPaymentLoading(false);
-    } catch (error: any) {
-      console.error('Square payment form initialization error:', error);
-      setIsPaymentLoading(false);
-      toast({
-        title: "Payment Error",
-        description: "Failed to load payment form. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
 
   // Reset dialog state when opening/closing
   useEffect(() => {
@@ -162,12 +128,7 @@ export default function SubscriberDialog({
     }
   }, [open]);
 
-  // Initialize Square payment when payment step is shown
-  useEffect(() => {
-    if (showPaymentStep && !cardElement) {
-      initializeSquarePayment();
-    }
-  }, [showPaymentStep]);
+
 
   // Add subscriber mutation - now initiates payment flow
   const addSubscriberMutation = useMutation({
@@ -271,7 +232,7 @@ export default function SubscriberDialog({
           status: "completed",
           type: "membership",
           description: `Membership payment for ${membership.name}`,
-          squarePaymentId: paymentData.payment.id,
+
           paymentDate: new Date()
         });
         const paymentRecord = await paymentRecordResponse.json();
@@ -279,7 +240,7 @@ export default function SubscriberDialog({
         setPaymentResult({
           membership: membershipSubscription,
           payment: paymentRecord,
-          squarePayment: paymentData.payment
+          payment: paymentData.payment
         });
 
         setPaymentCompleted(true);
@@ -320,7 +281,7 @@ export default function SubscriberDialog({
       await apiRequest("POST", "/api/send-receipt-email", {
         recipientEmail: email,
         receiptData: {
-          transactionId: paymentResult.squarePayment.id,
+          transactionId: paymentResult.payment.id,
           amount: membership.price,
           items: [{
             name: membership.name,
@@ -360,7 +321,7 @@ export default function SubscriberDialog({
       await apiRequest("POST", "/api/send-receipt-sms", {
         recipientPhone: phone,
         receiptData: {
-          transactionId: paymentResult.squarePayment.id,
+          transactionId: paymentResult.payment.id,
           amount: membership.price,
           items: [{
             name: membership.name,

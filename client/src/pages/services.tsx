@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import CategoryList from "@/components/services/category-list";
 import ServiceList from "@/components/services/service-list";
 import ServiceForm from "@/components/services/service-form";
@@ -49,7 +49,6 @@ const ServicesPage = () => {
       <SidebarController />
       
       <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
-        <Header />
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
           <div className="max-w-7xl mx-auto px-2 sm:px-0">

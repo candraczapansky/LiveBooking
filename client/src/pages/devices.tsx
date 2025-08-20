@@ -4,7 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,6 @@ export default function DevicesPage() {
         <div className={`flex flex-col transition-all duration-300 ${
           sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
         }`}>
-          <Header />
           <main className="flex-1 p-6">
             <div className="space-y-6 px-2 sm:px-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -141,7 +140,6 @@ export default function DevicesPage() {
       <div className={`flex flex-col transition-all duration-300 ${
         sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
-        <Header />
         <main className="flex-1 p-6">
           <div className="space-y-6 px-2 sm:px-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

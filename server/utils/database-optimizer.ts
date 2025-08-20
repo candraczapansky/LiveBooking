@@ -445,8 +445,9 @@ export async function createDatabaseIndexes(): Promise<void> {
     }
 
     ProductionLogger.info('Database indexes created successfully');
-  } catch (error) {
-    ProductionLogger.error('Failed to create database indexes', { error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    ProductionLogger.error('Failed to create database indexes', { error: message });
     throw error;
   }
 }
@@ -459,8 +460,9 @@ export function monitorDatabaseConnection(): void {
       .then(() => {
         ProductionLogger.logDatabaseConnection('connected');
       })
-      .catch((error) => {
-        ProductionLogger.logDatabaseConnection('error', { error: error.message });
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        ProductionLogger.logDatabaseConnection('error', { error: message });
       });
   }, 60000); // Check every minute
 }

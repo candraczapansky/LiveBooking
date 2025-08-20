@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SidebarController } from "@/components/layout/sidebar";
 import Header from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import CheckoutWithTerminal from "@/components/payment/checkout-with-terminal";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -102,6 +103,7 @@ type Transaction = {
 
 export default function PointOfSale() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -315,6 +317,20 @@ export default function PointOfSale() {
   });
 
   // Helcim popup payment handlers
+  const handlePaymentSuccess = (result: any) => {
+    toast({
+      title: "Payment Successful",
+      description: `Payment processed successfully`,
+    });
+    // Clear cart and reset state
+    clearCart();
+    setSelectedClient(null);
+    setManualEmail("");
+    setManualPhone("");
+    setTipAmount(0);
+    setShowReceiptDialog(true);
+  };
+
   const handleHelcimSuccess = async (paymentId: string) => {
     try {
       console.log('✅ Helcim popup payment successful:', paymentId);
@@ -653,7 +669,6 @@ export default function PointOfSale() {
       </div>
       
       <div className="flex-1 flex flex-col transition-all duration-300">
-        <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 md:p-4 lg:p-6">
           <div className="w-full max-w-7xl mx-auto">
@@ -1283,6 +1298,18 @@ export default function PointOfSale() {
                         </div>
 
                         <div className="space-y-2">
+                          <CheckoutWithTerminal
+                            locationId={selectedLocation?.id || ''}
+                            amount={getGrandTotal()}
+                            description="POS Transaction"
+                            onPaymentComplete={(result) => {
+                              handlePaymentSuccess(result);
+                              setIsCheckoutOpen(false);
+                            }}
+                            onPaymentError={(error) => {
+                              handlePaymentError(error);
+                            }}
+                          />
                           <Button
                             className="w-full"
                             onClick={() => setIsCheckoutOpen(true)}

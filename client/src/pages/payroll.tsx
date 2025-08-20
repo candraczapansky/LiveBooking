@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AuthContext } from "@/contexts/AuthProvider";
 import { SidebarController } from "@/components/layout/sidebar";
 import { useSidebar } from "@/contexts/SidebarContext";
-import Header from "@/components/layout/header";
+// import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { 
   Calendar, 
@@ -357,7 +357,6 @@ const PayrollPage: React.FC = () => {
       <div className={`h-screen flex flex-col transition-all duration-300 ${
         sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
       }`}>
-        <Header />
         
         <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6 pb-4 sm:pb-6 overflow-auto">
           <div className="w-full max-w-none sm:max-w-7xl mx-auto px-0 sm:px-4">

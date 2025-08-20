@@ -1,0 +1,54 @@
+/* Scrollbar Utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .profile-circle {
+    @apply w-[120px] h-[120px] min-w-[120px] min-h-[120px] max-w-[120px] max-h-[120px] rounded-[60px] flex-shrink-0 transform-none;
+  }
+
+  html {
+    @apply h-full overflow-x-hidden;
+  }
+
+  body {
+    @apply m-0 p-0 min-h-screen overflow-x-hidden bg-background text-foreground transition-colors duration-300;
+  }
+
+  #root {
+    @apply min-h-screen overflow-x-hidden bg-background text-foreground;
+  }
+
+  input, select, textarea {
+    @apply text-base;
+  }
+
+  .container, [class*="max-w"] {
+    @apply max-w-full w-full mx-0 px-3;
+  }
+
+  button, 
+  input, 
+  select, 
+  textarea,
+  [role="button"] {
+    @apply min-h-[44px] min-w-[44px] p-3 text-base;
+  }
+
+  button:has(svg:only-child), 
+  [role="button"]:has(svg:only-child) {
+    @apply min-h-[44px] min-w-[44px] p-3;
+  }
+
+  .btn-sm, 
+  button[class*="size-sm"] {
+    @apply min-h-[40px] min-w-[40px] p-2;
+  }
+}

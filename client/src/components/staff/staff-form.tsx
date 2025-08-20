@@ -35,7 +35,7 @@ import { AntiAutofillInput } from "@/components/ui/anti-autofill-input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Upload, X, Shield, CheckCircle } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
+// Removed Checkbox to prevent nested state update loops during permission toggles
 import { Badge } from "@/components/ui/badge";
 
 // Staff form schema
@@ -88,6 +88,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       permissionGroups: [],
     },
   });
+
+  // Watch permission groups once to avoid multiple subscriptions per render
+  const selectedPermissionGroups = form.watch('permissionGroups') || [];
 
   // Fetch permission groups
   const { data: permissionGroups, isLoading: permissionGroupsLoading } = useQuery({
@@ -203,7 +206,8 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const baseUsername = `${data.firstName.toLowerCase()}${data.lastName.toLowerCase()}`.replace(/[^a-z0-9]/g, '');
       const timestamp = Date.now().toString().slice(-4); // Last 4 digits of timestamp
       const username = `${baseUsername}${timestamp}`;
-      const defaultPassword = `${data.firstName}123!`; // Simple default password
+      const randomSuffix = Math.random().toString(36).slice(-6);
+      const defaultPassword = `${data.firstName || 'Staff'}${randomSuffix}!A1`; // Ensure >= 8 chars to satisfy backend validation
       
       console.log(`Creating user with username: ${username}`);
       
@@ -247,9 +251,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         throw error; // Re-throw to be handled by onError
       }
 
-      // Create staff member
-      const staffData = {
-        userId: userId,
+      // Create staff member using the userId obtained above
+      console.log("Created user with ID:", userId);
+
+      const staffData: any = {
+        userId,
         title: data.title,
         bio: data.bio || "",
         commissionType: data.commissionType,
@@ -257,6 +263,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
       };
+      if (data.photo) {
+        staffData.photoUrl = data.photo;
+      }
 
       console.log("Sending staff data to /api/staff:", staffData);
 
@@ -294,7 +303,6 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       } catch (error) {
         console.error("Staff creation error:", error);
         // If staff creation fails, we should clean up the user we just created
-        // This is a basic cleanup - in production you might want more robust error handling
         if (userId) {
           try {
             await apiRequest("DELETE", `/api/users/${userId}`);
@@ -347,11 +355,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       const staffUpdateData = {
         title: data.title,
         bio: data.bio,
-        commissionType: data.commissionType,
-        commissionRate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
-        hourlyRate: data.commissionType === 'hourly' ? data.hourlyRate : null,
-        fixedRate: data.commissionType === 'fixed' ? data.fixedSalary : null,
-        photoUrl: data.photo || null,
+        commission_type: data.commissionType,
+        commission_rate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
+        hourly_rate: data.commissionType === 'hourly' ? data.hourlyRate : null,
+        fixed_rate: data.commissionType === 'fixed' ? data.fixedSalary : null,
+        photo_url: data.photo || null,
       };
 
       console.log("Sending PATCH request to:", `/api/staff/${staffId}`, "with data:", staffUpdateData);
@@ -895,31 +903,26 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     <div
                       key={group.id}
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        form.watch('permissionGroups')?.includes(group.id)
+                        selectedPermissionGroups.includes(group.id)
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                       onClick={() => {
-                        const currentGroups = form.watch('permissionGroups') || [];
-                        if (currentGroups.includes(group.id)) {
-                          form.setValue('permissionGroups', currentGroups.filter(id => id !== group.id));
-                        } else {
-                          form.setValue('permissionGroups', [...currentGroups, group.id]);
-                        }
+                        const currentGroups = selectedPermissionGroups;
+                        const next = currentGroups.includes(group.id)
+                          ? currentGroups.filter((id: number) => id !== group.id)
+                          : [...currentGroups, group.id];
+                        form.setValue('permissionGroups', next, { shouldDirty: true, shouldTouch: true });
                       }}
                     >
                       <div className="flex items-start space-x-3">
-                        <Checkbox
-                          checked={form.watch('permissionGroups')?.includes(group.id) || false}
-                          onChange={() => {
-                            const currentGroups = form.watch('permissionGroups') || [];
-                            if (currentGroups.includes(group.id)) {
-                              form.setValue('permissionGroups', currentGroups.filter(id => id !== group.id));
-                            } else {
-                              form.setValue('permissionGroups', [...currentGroups, group.id]);
-                            }
-                          }}
-                        />
+                        <div className="mt-0.5 h-4 w-4 flex items-center justify-center">
+                          {selectedPermissionGroups.includes(group.id) ? (
+                            <CheckCircle className="h-4 w-4 text-blue-600" />
+                          ) : (
+                            <span className="inline-block h-4 w-4 border border-gray-300 rounded" />
+                          )}
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium">{group.name}</h4>

@@ -15,20 +15,20 @@ interface AppointmentData {
   clientId: number;
   serviceId: number;
   staffId: number;
-  startTime: string;
-  endTime: string;
+  startTime: string | Date;
+  endTime: string | Date;
   status: string;
-  totalAmount?: number;
+  totalAmount?: number | null;
 }
 
 interface ClientData {
   id: number;
-  email?: string;
-  firstName?: string;
-  lastName?: string;
-  emailAppointmentReminders?: boolean;
-  emailPromotions?: boolean;
-  birthday?: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  emailAppointmentReminders?: boolean | null;
+  emailPromotions?: boolean | null;
+  birthday?: string | Date | null;
 }
 
 interface ServiceData {
@@ -264,8 +264,7 @@ export class EmailAutomationService {
         if (!client.birthday || !client.emailPromotions || !client.email) {
           return false;
         }
-        
-        const birthday = new Date(client.birthday);
+        const birthday = new Date(client.birthday as any);
         const birthdayStr = format(birthday, 'MM-dd');
         return birthdayStr === todayStr;
       });

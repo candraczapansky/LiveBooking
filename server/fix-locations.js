@@ -1,7 +1,7 @@
-const { drizzle } = require('drizzle-orm/postgres-js');
-const postgres = require('postgres');
-const { locations, services, staff, rooms, appointments } = require('../shared/schema');
-const { eq } = require('drizzle-orm');
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import { locations, services, staff, rooms, appointments } from '../shared/schema';
+import { eq } from 'drizzle-orm';
 
 // Database connection
 const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/postgres';
