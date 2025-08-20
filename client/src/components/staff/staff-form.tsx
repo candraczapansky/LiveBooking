@@ -110,37 +110,50 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     enabled: !!staffId && open,
   });
 
+  // Once we know the staff record (for userId), fetch the related user
+  const { data: staffUser } = useQuery({
+    queryKey: ['staff-user', (staffData as any)?.userId],
+    enabled: open && !!staffId && !!(staffData as any)?.userId,
+    queryFn: async () => {
+      const userId = (staffData as any)?.userId;
+      const res = await apiRequest('GET', `/api/users/${userId}`);
+      return res.json();
+    }
+  });
+
   // Update form when staff data changes
   useEffect(() => {
     if (staffQueryData && open) {
       console.log("Setting form data from staffQueryData:", staffQueryData);
-      // staffQueryData comes back as an array, so we need to get the first element
-      const staffData = Array.isArray(staffQueryData) ? staffQueryData[0] : staffQueryData;
-      setStaffData(staffData);
+      // staffQueryData is a list; find the matching staff by id
+      const staffFromList = Array.isArray(staffQueryData)
+        ? staffQueryData.find((s: any) => s?.id === staffId)
+        : staffQueryData;
+      setStaffData(staffFromList);
       
       // Load user's permission groups
       const loadUserPermissions = async () => {
         try {
-          const userId = staffData?.userId;
+          const userId = staffFromList?.userId;
           if (userId) {
             const response = await apiRequest("GET", `/api/user-permission-groups/${userId}`);
             const userGroups = await response.json();
             const groupIds = userGroups.data?.map((group: any) => group.groupId) || [];
             
             const formData = {
-              title: staffData?.title || "",
-              bio: staffData?.bio || "",
-              commissionRate: staffData?.commissionType === 'commission' 
-                ? (staffData?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
+              title: staffFromList?.title || "",
+              bio: staffFromList?.bio || "",
+              commissionRate: staffFromList?.commissionType === 'commission' 
+                ? (staffFromList?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
                 : 0,
-              hourlyRate: staffData?.hourlyRate || 0,
-              fixedSalary: staffData?.fixedRate || 0,
-              commissionType: staffData?.commissionType || "commission",
-              firstName: staffData?.user?.firstName || "",
-              lastName: staffData?.user?.lastName || "",
-              email: staffData?.user?.email || "",
-              phone: staffData?.user?.phone || "",
-              photo: staffData?.photoUrl || "",
+              hourlyRate: staffFromList?.hourlyRate || 0,
+              fixedSalary: staffFromList?.fixedRate || 0,
+              commissionType: staffFromList?.commissionType || "commission",
+              firstName: "",
+              lastName: "",
+              email: "",
+              phone: "",
+              photo: staffFromList?.photoUrl || "",
               permissionGroups: groupIds,
             };
             console.log("Form data being set:", formData);
@@ -150,19 +163,19 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           console.error("Failed to load user permission groups:", error);
           // Set form data without permission groups if loading fails
           const formData = {
-            title: staffData?.title || "",
-            bio: staffData?.bio || "",
-            commissionRate: staffData?.commissionType === 'commission' 
-              ? (staffData?.commissionRate || 0) * 100
+            title: staffFromList?.title || "",
+            bio: staffFromList?.bio || "",
+            commissionRate: staffFromList?.commissionType === 'commission' 
+              ? (staffFromList?.commissionRate || 0) * 100
               : 0,
-            hourlyRate: staffData?.hourlyRate || 0,
-            fixedSalary: staffData?.fixedRate || 0,
-            commissionType: staffData?.commissionType || "commission",
-            firstName: staffData?.user?.firstName || "",
-            lastName: staffData?.user?.lastName || "",
-            email: staffData?.user?.email || "",
-            phone: staffData?.user?.phone || "",
-            photo: staffData?.photoUrl || "",
+            hourlyRate: staffFromList?.hourlyRate || 0,
+            fixedSalary: staffFromList?.fixedRate || 0,
+            commissionType: staffFromList?.commissionType || "commission",
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone: "",
+            photo: staffFromList?.photoUrl || "",
             permissionGroups: [],
           };
           form.reset(formData);
@@ -188,6 +201,16 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       });
     }
   }, [staffQueryData, open, staffId, form]);
+
+  // When staff user profile loads, inject name/email/phone into form
+  useEffect(() => {
+    if (open && staffId && staffUser) {
+      form.setValue('firstName', staffUser.firstName || "");
+      form.setValue('lastName', staffUser.lastName || "");
+      form.setValue('email', staffUser.email || "");
+      form.setValue('phone', staffUser.phone || "");
+    }
+  }, [open, staffId, staffUser, form]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -312,8 +335,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           console.log("Assigning permission groups:", data.permissionGroups);
           for (const groupId of data.permissionGroups) {
             try {
-              await apiRequest("POST", "/api/user-permission-groups", {
-                userId: userId,
+              await apiRequest("POST", `/api/users/${userId}/permission-groups`, {
                 groupId: groupId
               });
               console.log(`Assigned permission group ${groupId} to user ${userId}`);
@@ -406,15 +428,15 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         
         // First, get current permission groups
         try {
-          const currentGroupsResponse = await apiRequest("GET", `/api/user-permission-groups/${userId}`);
+          const currentGroupsResponse = await apiRequest("GET", `/api/users/${userId}/permissions`);
           const currentGroups = await currentGroupsResponse.json();
-          const currentGroupIds = currentGroups.data?.map((group: any) => group.groupId) || [];
+          const currentGroupIds = (currentGroups?.data?.groups || []).map((g: any) => g.id).filter(Boolean);
           
           // Remove groups that are no longer selected
           for (const groupId of currentGroupIds) {
             if (!data.permissionGroups.includes(groupId)) {
               try {
-                await apiRequest("DELETE", `/api/user-permission-groups/${userId}/${groupId}`);
+                await apiRequest("DELETE", `/api/users/${userId}/permission-groups/${groupId}`);
                 console.log(`Removed permission group ${groupId} from user ${userId}`);
               } catch (error) {
                 console.error(`Failed to remove permission group ${groupId}:`, error);
@@ -426,8 +448,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           for (const groupId of data.permissionGroups) {
             if (!currentGroupIds.includes(groupId)) {
               try {
-                await apiRequest("POST", "/api/user-permission-groups", {
-                  userId: userId,
+                await apiRequest("POST", `/api/users/${userId}/permission-groups`, {
                   groupId: groupId
                 });
                 console.log(`Added permission group ${groupId} to user ${userId}`);

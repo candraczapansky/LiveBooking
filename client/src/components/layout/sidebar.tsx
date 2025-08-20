@@ -25,8 +25,7 @@ import {
   StickyNote,
   Building2,
   ChevronDown,
-  UserCog,
-  MessageSquare
+  Mail
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -96,7 +95,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
     { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
     { icon: <Calendar size={20} />, label: "Appointments", href: "/appointments" },
     { icon: <Users size={20} />, label: "Clients", href: "/clients" },
-    { icon: <UserCog size={20} />, label: "Staff", href: "/staff" },
+    { icon: <UserCircle size={20} fill="none" />, label: "Staff", href: "/staff" },
     { icon: <Scissors size={20} />, label: "Services", href: "/services" },
     { icon: <Package size={20} />, label: "Products", href: "/products" },
     { icon: <CreditCard size={20} />, label: "POS", href: "/pos" },
@@ -104,7 +103,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
     { icon: <MapPin size={20} />, label: "Locations", href: "/locations" },
     { icon: <Monitor size={20} />, label: "Devices", href: "/devices" },
     { icon: <BarChart3 size={20} />, label: "Reports", href: "/reports" },
-    { icon: <MessageSquare size={20} />, label: "SMS & Email", href: "#" },
+    { icon: <Mail size={20} fill="none" />, label: "SMS & Email", href: "#" },
     { icon: <Gift size={20} />, label: "Gift Certificates", href: "/gift-certificates" },
     { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
     { icon: <FileText size={20} />, label: "Forms", href: "/forms" },

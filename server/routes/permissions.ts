@@ -3,7 +3,7 @@ import { z } from "zod";
 import { authenticateToken, requireAdmin } from "../middleware/auth.js";
 import { asyncHandler } from "../utils/errors.js";
 import { db } from "../db.js";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, and } from "drizzle-orm";
 import {
   permissions as permissionsTable,
   permissionGroups as permissionGroupsTable,
@@ -300,6 +300,36 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to assign permission group",
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    })
+  );
+
+  // Remove permission group from user
+  app.delete("/api/users/:id/permission-groups/:groupId",
+    authenticateToken,
+    requireAdmin,
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const userId = parseInt(req.params.id);
+        const groupId = parseInt(req.params.groupId);
+        await db.delete(userPermissionGroupsTable)
+          .where(
+            and(
+              eq(userPermissionGroupsTable.userId, userId),
+              eq(userPermissionGroupsTable.groupId, groupId)
+            )
+          );
+        res.json({
+          success: true,
+          message: "Permission group removed from user"
+        });
+      } catch (error) {
+        console.error('Error removing permission group from user:', error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to remove permission group from user",
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }

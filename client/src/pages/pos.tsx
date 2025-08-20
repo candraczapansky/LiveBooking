@@ -675,7 +675,7 @@ export default function PointOfSale() {
             <div className="flex flex-col xl:flex-row gap-3 sm:gap-4 lg:gap-6 min-h-0">
               
               {/* Services Selection Panel */}
-              <div className="flex-1 flex flex-col min-w-0 xl:min-w-[60%]">
+              <div className="flex-1 flex flex-col min-w-0 xl:min-w-[60%] order-2 xl:order-1">
                 <div className="mb-3 sm:mb-4 lg:mb-6">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-3 sm:mb-4 gap-2 sm:gap-3">
                     <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 dark:text-gray-100">Point of Sale</h1>
@@ -1178,7 +1178,7 @@ export default function PointOfSale() {
               </div>
 
               {/* Cart Panel */}
-              <div className="w-full xl:w-80 2xl:w-96 flex flex-col xl:min-w-[320px]">
+              <div className="w-full xl:w-80 2xl:w-96 flex flex-col xl:min-w-[320px] order-1 xl:order-2">
                 <Card className="flex-1 flex flex-col h-full xl:max-h-[calc(100vh-8rem)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">

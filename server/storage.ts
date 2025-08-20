@@ -483,7 +483,7 @@ export class DatabaseStorage implements IStorage {
   private async initializeConnection() {
     const DATABASE_URL = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
     const sql = neon(DATABASE_URL as string, { arrayMode: false, fullResults: false } as any);
-    const db = drizzle(sql as any, { schema: (await import("../shared/schema")) as any });
+    const db = drizzle(sql as any, { schema: (await import("../shared/schema.js")) as any });
     try {
       // Test database connection
       await db.select().from(users).limit(1);
