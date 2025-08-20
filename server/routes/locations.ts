@@ -1,8 +1,8 @@
 import express from 'express';
-import { db } from '../db';
-import { locations, appointments, insertLocationSchema, updateLocationSchema } from '../../shared/schema';
+import { db } from '../db.js';
+import { locations, appointments, insertLocationSchema, updateLocationSchema } from '../../shared/schema.js';
 import { eq, and, desc, count } from 'drizzle-orm';
-import { requireAuth } from '../middleware/error-handler';
+import { requireAuth } from '../middleware/error-handler.js';
 
 const router = express.Router();
 

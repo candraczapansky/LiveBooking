@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { config } from "dotenv";
-import { registerRoutes } from "./routes/index.js";
+import { registerRoutes } from "./routes.js";
 import { setupVite, serveStatic, log } from "./vite.js";
 import { DatabaseStorage } from "./storage.js";
 import { securityHeaders } from "./middleware/security.js";

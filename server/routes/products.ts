@@ -1,8 +1,8 @@
 import type { Express, Request, Response } from "express";
-import type { IStorage } from "../storage";
+import type { IStorage } from "../storage.js";
 import { insertProductSchema } from "@shared/schema";
-import { asyncHandler, NotFoundError } from "../utils/errors";
-import { validateRequest } from "../middleware/error-handler";
+import { asyncHandler, NotFoundError } from "../utils/errors.js";
+import { validateRequest } from "../middleware/error-handler.js";
 
 export function registerProductRoutes(app: Express, storage: IStorage) {
   // Get all products

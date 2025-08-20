@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { randomBytes } from 'crypto';
-import { helcimService } from '../../services/helcim-service';
+import { helcimService } from '../../services/helcim-service.js';
 
 const router = Router();
 

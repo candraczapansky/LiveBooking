@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { HelcimTerminalService } from '../services/helcim-terminal-service';
-import type { IStorage } from '../storage';
-import { TerminalConfigService } from '../services/terminal-config-service';
+import { HelcimTerminalService } from '../services/helcim-terminal-service.js';
+import type { IStorage } from '../storage.js';
+import { TerminalConfigService } from '../services/terminal-config-service.js';
 
 // Factory to create router with storage dependency
 export default function createTerminalRoutes(storage: IStorage) {

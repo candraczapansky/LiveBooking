@@ -7,5 +7,4 @@ export { registerServiceRoutes } from './services.js';
 export { registerMarketingRoutes } from './marketing.js';
 export { registerNoteTemplateRoutes } from './note-templates.js';
 export { registerNoteHistoryRoutes } from './note-history.js';
-export { registerLocationRoutes } from './locations.js'; 
-export { registerRoutes } from '../routes.js';
+export { registerLocationRoutes } from './locations.js';

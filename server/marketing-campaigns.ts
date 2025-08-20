@@ -1,6 +1,6 @@
-import { sendEmail } from './email';
-import { marketingCampaignTemplate, generateEmailHTML, generateEmailText } from './email-templates';
-import type { IStorage } from './storage';
+import { sendEmail } from './email.js';
+import { marketingCampaignTemplate, generateEmailHTML, generateEmailText } from './email-templates.js';
+import type { IStorage } from './storage.js';
 import { addDays, format } from 'date-fns';
 
 interface CampaignData {

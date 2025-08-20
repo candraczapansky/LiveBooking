@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
-import { LoggerService } from '../utils/logger';
+import { LoggerService } from '../utils/logger.js';
 
 // JWT token generation
 export function generateToken(user: any): string {
