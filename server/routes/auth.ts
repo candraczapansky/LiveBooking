@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
 import { z } from "zod";
-import { insertUserSchema } from "@shared/schema.js";
+import { insertUserSchema } from "../../shared/schema.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
 import { sendEmail } from "../email.js";
 import { hashPassword, comparePassword } from "../utils/password.js";

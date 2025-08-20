@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
 import { z } from "zod";
-import { insertServiceSchema, insertServiceCategorySchema } from "@shared/schema.js";
+import { insertServiceSchema, insertServiceCategorySchema } from "../../shared/schema.js";
 import { 
   ValidationError, 
   NotFoundError, 
@@ -133,8 +133,8 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     // Set default location if not provided
     if (!serviceData.locationId) {
       // Import db and locations table for direct access
-      const { db } = await import("../db");
-      const { locations } = await import("@shared/schema");
+      const { db } = await import("../db.js");
+      const { locations } = await import("../../shared/schema.js");
       
       const allLocations = await db.select().from(locations);
       const defaultLocation = allLocations.find((loc: any) => loc.isDefault) || allLocations[0];

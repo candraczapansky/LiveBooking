@@ -9,7 +9,7 @@ import {
   permissionGroups as permissionGroupsTable,
   permissionGroupMappings as permissionGroupMappingsTable,
   userPermissionGroups as userPermissionGroupsTable,
-} from "@shared/schema.js";
+} from "../../shared/schema.js";
 
 export function registerPermissionRoutes(app: Express) {
   console.log("🔐 Registering permission routes");

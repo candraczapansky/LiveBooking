@@ -12,7 +12,7 @@ import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
 import { redisCache } from "../utils/redis-cache.js";
-import { insertMarketingCampaignSchema } from "@shared/schema.js";
+import { insertMarketingCampaignSchema } from "../../shared/schema.js";
 
 // Use the shared schema for campaign creation
 const campaignSchema = insertMarketingCampaignSchema;

@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
-import { insertNoteTemplateSchema, updateNoteTemplateSchema } from "@shared/schema.js";
+import { insertNoteTemplateSchema, updateNoteTemplateSchema } from "../../shared/schema.js";
 import { validateRequest } from "../middleware/error-handler.js";
 import { asyncHandler } from "../utils/errors.js";
 import LoggerService, { getLogContext } from "../utils/logger.js";

@@ -28,6 +28,7 @@ import { registerAuthRoutes } from "./routes/auth.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
 import { registerServiceRoutes } from "./routes/services.js";
+import { registerProductRoutes } from "./routes/products.js";
 import { registerLocationRoutes } from "./routes/locations.js";
 import { registerPermissionRoutes } from "./routes/permissions.js";
 import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
@@ -67,6 +68,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerUserRoutes(app, storage);
   registerAppointmentRoutes(app, storage);
   registerServiceRoutes(app, storage);
+  registerProductRoutes(app, storage);
   registerLocationRoutes(app, storage);
   registerPermissionRoutes(app);
   registerBusinessSettingsRoutes(app, storage);

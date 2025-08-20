@@ -1,7 +1,7 @@
 import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
 import type { IStorage } from './storage.js';
-import type { AutomationRule } from '@shared/schema.js';
+import type { AutomationRule } from '../shared/schema.js';
 
 export interface AutomationContext {
   appointmentId: number;
