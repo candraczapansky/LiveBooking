@@ -400,9 +400,11 @@ export const payments = pgTable("payments", {
   status: text("status").notNull().default("pending"), // pending, completed, failed, refunded
   type: text("type").notNull().default("appointment"), // appointment, pos_payment, membership
   description: text("description"),
+  notes: text("notes"), // Additional payment notes
   squarePaymentId: text("square_payment_id"), // Optional for backward compatibility
   helcimPaymentId: text("helcim_payment_id"),
   paymentDate: timestamp("payment_date"),
+  processedAt: timestamp("processed_at"), // When payment was actually processed
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -411,6 +413,7 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
 }).extend({
   paymentDate: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
+  processedAt: z.union([z.date(), z.string().transform((str) => new Date(str))]).optional(),
 });
 
 // Staff earnings tracking

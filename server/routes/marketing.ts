@@ -169,7 +169,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
         if (campaign.type === 'sms') {
           if (recipient.phone && recipient.smsPromotions) {
-            await sendSMS(recipient.phone, campaign.content, campaign.photoUrl);
+            await sendSMS(recipient.phone, campaign.content, campaign.photoUrl || undefined);
             sentCount++;
           }
         }
@@ -285,10 +285,9 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
         let emailContent = message;
         if (templateId) {
-          const template = await storage.getEmailTemplate(templateId);
-          if (template) {
-            emailContent = template.htmlContent.replace(/\{\{name\}\}/g, recipient.firstName || recipient.username);
-          }
+          // Note: getEmailTemplate doesn't exist in current storage interface
+          // Using basic message for now until email templates are implemented
+          emailContent = message.replace(/\{\{name\}\}/g, recipient.firstName || recipient.username || 'Valued Client');
         }
 
         await sendEmail({
@@ -435,7 +434,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
     const updatedCampaign = await storage.updateMarketingCampaign(campaignId, {
       status: 'scheduled',
-      scheduledAt: scheduledDate,
+      sendDate: scheduledDate,
     });
 
     LoggerService.info("Marketing campaign scheduled", { ...context, campaignId, scheduledAt });

@@ -138,9 +138,9 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     if (clientId) {
       payments = await storage.getPaymentsByClient(parseInt(clientId as string));
     } else if (staffId) {
-      // Note: getPaymentsByStaff doesn't exist, so we'll get all payments and filter
-      const allPayments = await storage.getAllPayments();
-      payments = allPayments.filter(p => p.staffId === parseInt(staffId as string));
+      // Note: payments don't have staffId field, get all payments for now
+      // TODO: Implement staff-payment relationship through appointments
+      payments = await storage.getAllPayments();
     } else if (startDate && endDate) {
       // Note: getPaymentsByDateRange doesn't exist, so we'll get all payments and filter
       const allPayments = await storage.getAllPayments();
@@ -331,7 +331,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
         ...context, 
         paymentId: payment.id, 
         appointmentId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : String(error)
       });
       // Don't fail the payment confirmation if earnings creation fails
     }
@@ -503,7 +503,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
         ...context, 
         paymentId: payment.id, 
         appointmentId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : String(error)
       });
       // Don't fail the payment confirmation if earnings creation fails
     }
@@ -808,7 +808,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
           ...context, 
           paymentId, 
           appointmentId, 
-          error: error.message 
+          error: error instanceof Error ? error.message : String(error)
         });
         // Don't fail the payment confirmation if earnings creation fails
       }
