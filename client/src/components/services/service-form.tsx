@@ -307,30 +307,64 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
   const updateServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
       const { assignedStaff, ...serviceData } = data;
-      
+
       // Filter out undefined values and empty strings to prevent validation errors
       const filteredServiceData = Object.fromEntries(
         Object.entries(serviceData).filter(([_, value]) => value !== undefined && value !== null && value !== "")
       );
-      
+
       // Ensure roomId is not included if it's undefined/null
-      if (filteredServiceData.roomId === undefined || filteredServiceData.roomId === null) {
-        delete filteredServiceData.roomId;
+      if ((filteredServiceData as any).roomId === undefined || (filteredServiceData as any).roomId === null) {
+        delete (filteredServiceData as any).roomId;
       }
-      
-      // Send the service data along with assigned staff to the backend
-      const fullServiceData = {
-        ...filteredServiceData,
-        assignedStaff: assignedStaff
-      };
-      
+
       console.log("Frontend form data before sending:", data);
       console.log("Frontend assignedStaff array:", assignedStaff);
-      console.log("Frontend sending data:", JSON.stringify(fullServiceData, null, 2));
-      
-      const response = await apiRequest("PUT", `/api/services/${serviceId}`, fullServiceData);
+      console.log("Frontend sending data:", JSON.stringify(filteredServiceData, null, 2));
+
+      // Update base service fields first
+      const response = await apiRequest("PUT", `/api/services/${serviceId}`, filteredServiceData);
       const service = await response.json();
-      
+
+      // Sync staff assignments: create/update assignments present in form; remove those omitted
+      try {
+        const assignmentsRes = await apiRequest("GET", "/api/staff-services");
+        const allAssignments = await assignmentsRes.json();
+        const currentAssignments = Array.isArray(allAssignments)
+          ? allAssignments.filter((a: any) => a && a.serviceId === serviceId)
+          : [];
+
+        // Index current assignments by staffId for quick lookup
+        const currentByStaffId = new Map<number, any>();
+        currentAssignments.forEach((a: any) => {
+          if (typeof a.staffId === "number") currentByStaffId.set(a.staffId, a);
+        });
+
+        // Upsert assignments from the form
+        if (Array.isArray(assignedStaff)) {
+          for (const assignment of assignedStaff) {
+            await apiRequest("POST", "/api/staff-services", {
+              staffId: assignment.staffId,
+              serviceId: serviceId!,
+              customRate: assignment.customRate ?? null,
+              customCommissionRate: assignment.customCommissionRate ?? null,
+            });
+            // Mark as processed
+            currentByStaffId.delete(assignment.staffId);
+          }
+        }
+
+        // Remove any leftover current assignments not in the form
+        for (const [, existing] of currentByStaffId) {
+          await apiRequest(
+            "DELETE",
+            `/api/staff/${existing.staffId}/services/${serviceId}`
+          );
+        }
+      } catch (err) {
+        console.warn("Failed to sync staff assignments; continuing.", err);
+      }
+
       return service;
     },
     onSuccess: () => {

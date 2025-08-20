@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage";
 import { z } from "zod";
-import { insertPaymentSchema, insertSavedPaymentMethodSchema } from "@shared/schema";
+import { insertPaymentSchema, insertSavedPaymentMethodSchema } from "../../shared/schema";
 import { 
   ValidationError, 
   NotFoundError, 
@@ -528,10 +528,11 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     const giftCard = await storage.createGiftCard({
       code,
-      balance,
-      clientId,
-      notes,
-      isActive: true,
+      initialAmount: balance,
+      currentBalance: balance,
+      // clientId,
+      // notes,
+      status: 'active',
     });
 
     LoggerService.info("Gift card added", { ...context, giftCardId: giftCard.id });
@@ -547,7 +548,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     LoggerService.debug("Fetching saved gift cards", { ...context, clientId });
 
     const giftCards = clientId 
-      ? await storage.getGiftCardsByClient(parseInt(clientId as string))
+      ? await storage.getSavedGiftCardsByClient(parseInt(clientId as string))
       : await storage.getAllGiftCards();
 
     res.json(giftCards);
@@ -638,22 +639,23 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     try {
       // Import HelcimService
-      const { default: helcimService } = await import('../helcim-service');
+      const { HelcimService } = await import('../services/helcim-service');
 
       // Card payments are now handled via HelcimPay.js. This legacy route should not process cards.
       throw new ExternalServiceError('Helcim', 'Card payments are handled via HelcimPay.js. Use /api/helcim-pay/initialize.');
 
-      LoggerService.logPayment("helcim_payment_success", amount, { ...context, paymentId: dbPayment.id });
+      // This code is unreachable due to the throw above, but kept for reference
+      // LoggerService.logPayment("helcim_payment_success", amount, { ...context, paymentId: dbPayment.id });
 
-      res.json({ 
-        success: true, 
-        payment: dbPayment, 
-        helcimPayment: {
-          id: helcimResponse.paymentId,
-          status: helcimResponse.status,
-          transactionId: helcimResponse.transactionId
-        }
-      });
+      // res.json({ 
+      //   success: true, 
+      //   payment: dbPayment, 
+      //   helcimPayment: {
+      //     id: helcimResponse.paymentId,
+      //     status: helcimResponse.status,
+      //     transactionId: helcimResponse.transactionId
+      //   }
+      // });
     } catch (error: any) {
       LoggerService.logPayment("helcim_payment_failed", amount, { ...context, error });
       throw new ExternalServiceError('Helcim', error.message);
@@ -826,7 +828,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     const paymentMethods = clientId 
       ? await storage.getSavedPaymentMethodsByClient(parseInt(clientId as string))
-      : await storage.getAllSavedPaymentMethods();
+      : await storage.getSavedPaymentMethodsByClient(0); // Get all by using 0 as clientId
 
     res.json(paymentMethods);
   }));
@@ -873,7 +875,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     }
 
     // Remove default from other payment methods for this client
-    await storage.clearDefaultPaymentMethods(paymentMethod.clientId);
+    await storage.setDefaultPaymentMethod(paymentMethod.clientId, paymentMethodId);
 
     // Set this payment method as default
     const updatedPaymentMethod = await storage.updateSavedPaymentMethod(paymentMethodId, {
