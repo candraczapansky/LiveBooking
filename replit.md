@@ -63,7 +63,7 @@ The application uses PostgreSQL, managed via Drizzle ORM, with a schema encompas
 - **State Management**: @tanstack/react-query.
 - **Forms & Validation**: react-hook-form, zod, @hookform/resolvers.
 - **Data Visualization**: Recharts.
-- **Payment Processing**: Square Web SDK for credit card payments.
+- **Payment Processing**: Square Web SDK for credit card payments, Square Node.js SDK.
 
 ### Backend Dependencies
 
@@ -71,3 +71,5 @@ The application uses PostgreSQL, managed via Drizzle ORM, with a schema encompas
 - **Database**: @neondatabase/serverless (for PostgreSQL connection), Drizzle ORM.
 - **Authentication**: connect-pg-simple (for session management).
 - **Email/SMS**: SendGrid (for email delivery), Twilio (for SMS).
+- **Security & Utilities**: speakeasy (for 2FA), qrcode (for QR code generation).
+- **Payment Processing**: Square Node.js SDK for payment processing integration.
