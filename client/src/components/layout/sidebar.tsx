@@ -129,19 +129,16 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
   }, [location]);
 
   const menuItems = [
-    { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
-    { icon: <Calendar size={20} />, label: "Appointments", href: "/appointments" },
-    { icon: <Users size={20} />, label: "clients", href: "#" },
-    { icon: <UserCircle size={20} fill="none" />, label: "Staff", href: "/staff" },
-    { icon: <Scissors size={20} />, label: "services", href: "#" },
-    { icon: <ShoppingBag size={20} />, label: "Retail", href: "#" },
-    { icon: <BarChart3 size={20} />, label: "isights", href: "#" },
-    { icon: <Building2 size={20} />, label: "business", href: "#" },
-    
-    { icon: <Mail size={20} fill="none" />, label: "SMS & Email", href: "#" },
-    { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
-    
-    
+    { icon: <LayoutDashboard className="w-5 h-5" strokeWidth={1.75} />, label: "Dashboard", href: "/dashboard" },
+    { icon: <Calendar className="w-5 h-5" strokeWidth={1.75} />, label: "Appointments", href: "/appointments" },
+    { icon: <Users className="w-5 h-5" strokeWidth={1.75} />, label: "clients", href: "#" },
+    { icon: <UserCircle className="w-5 h-5" strokeWidth={1.75} />, label: "Staff", href: "/staff" },
+    { icon: <Scissors className="w-5 h-5" strokeWidth={1.75} />, label: "services", href: "#" },
+    { icon: <ShoppingBag className="w-5 h-5" strokeWidth={1.75} />, label: "Retail", href: "#" },
+    { icon: <BarChart3 className="w-5 h-5" strokeWidth={1.75} />, label: "isights", href: "#" },
+    { icon: <Building2 className="w-5 h-5" strokeWidth={1.75} />, label: "business", href: "#" },
+    { icon: <Mail className="w-5 h-5" strokeWidth={1.75} />, label: "SMS & Email", href: "#" },
+    { icon: <Phone className="w-5 h-5" strokeWidth={1.75} />, label: "Phone", href: "/phone" },
   ];
 
   // Always render; on mobile it slides in with an overlay
@@ -190,8 +187,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isStaffExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isStaffExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -199,7 +196,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isStaffExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<UserCircle size={18} />}
+                          icon={<UserCircle className="w-5 h-5" strokeWidth={1.75} />}
                           label="Staff"
                           href="/staff"
                           isActive={location === "/staff"}
@@ -208,7 +205,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<CalendarDays size={18} />}
+                            icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
                             label="Schedule"
                             href="/schedule"
                             isActive={location === "/schedule"}
@@ -246,8 +243,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isClientsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isClientsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -255,7 +252,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isClientsExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<Users size={18} />}
+                          icon={<Users className="w-5 h-5" strokeWidth={1.75} />}
                           label="Client Profiles"
                           href="/clients"
                           isActive={location === "/clients"}
@@ -264,7 +261,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<FileText size={18} />}
+                            icon={<FileText className="w-5 h-5" strokeWidth={1.75} />}
                             label="Forms"
                             href="/forms"
                             isActive={location === "/forms"}
@@ -274,7 +271,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         </div>
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<StickyNote size={18} />}
+                            icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
                             label="Note Templates"
                             href="/note-templates"
                             isActive={location === "/note-templates"}
@@ -284,7 +281,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         </div>
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Building2 size={18} />}
+                            icon={<Building2 className="w-5 h-5" strokeWidth={1.75} />}
                             label="Memberships"
                             href="/memberships"
                             isActive={location === "/memberships"}
@@ -322,8 +319,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isCommsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isCommsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -331,7 +328,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isCommsExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<Zap size={18} />}
+                          icon={<Zap className="w-5 h-5" strokeWidth={1.75} />}
                           label="Automations"
                           href="/automations"
                           isActive={location === "/automations"}
@@ -340,7 +337,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Megaphone size={18} />}
+                            icon={<Megaphone className="w-5 h-5" strokeWidth={1.75} />}
                             label="Marketing"
                             href="/marketing"
                             isActive={location === "/marketing"}
@@ -350,7 +347,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         </div>
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Bot size={18} />}
+                            icon={<Bot className="w-5 h-5" strokeWidth={1.75} />}
                             label="AI Messaging"
                             href="/ai-messaging"
                             isActive={location === "/ai-messaging"}
@@ -388,8 +385,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isRetailExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isRetailExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -397,7 +394,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isRetailExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<CreditCard size={18} />}
+                          icon={<CreditCard className="w-5 h-5" strokeWidth={1.75} />}
                           label="POS"
                           href="/pos"
                           isActive={location === "/pos"}
@@ -406,7 +403,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Gift size={18} />}
+                            icon={<Gift className="w-5 h-5" strokeWidth={1.75} />}
                             label="Gift Certificates"
                             href="/gift-certificates"
                             isActive={location === "/gift-certificates"}
@@ -416,7 +413,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         </div>
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Package size={18} />}
+                            icon={<Package className="w-5 h-5" strokeWidth={1.75} />}
                             label="Products"
                             href="/products"
                             isActive={location === "/products"}
@@ -454,8 +451,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isServicesExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isServicesExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -463,7 +460,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isServicesExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<Scissors size={18} />}
+                          icon={<Scissors className="w-5 h-5" strokeWidth={1.75} />}
                           label="Services"
                           href="/services"
                           isActive={location === "/services"}
@@ -472,7 +469,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Monitor size={18} />}
+                            icon={<Monitor className="w-5 h-5" strokeWidth={1.75} />}
                             label="Devices"
                             href="/devices"
                             isActive={location === "/devices"}
@@ -482,7 +479,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         </div>
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<MapPin size={18} />}
+                            icon={<MapPin className="w-5 h-5" strokeWidth={1.75} />}
                             label="Rooms"
                             href="/rooms"
                             isActive={location === "/rooms"}
@@ -520,8 +517,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isInsightsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isInsightsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -529,7 +526,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isInsightsExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<BarChart3 size={18} />}
+                          icon={<BarChart3 className="w-5 h-5" strokeWidth={1.75} />}
                           label="Reports"
                           href="/reports"
                           isActive={location === "/reports"}
@@ -538,7 +535,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<DollarSign size={18} />}
+                            icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
                             label="Payroll"
                             href="/payroll"
                             isActive={location === "/payroll"}
@@ -576,8 +573,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       <span className="ml-3">{item.label}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
-                          size={16}
-                          className={`transition-transform duration-200 ${isBusinessExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          className={`w-5 h-5 transition-transform duration-200 ${isBusinessExpanded ? 'rotate-180' : 'rotate-0'}`}
+                          strokeWidth={1.75}
                         />
                       </span>
                     </button>
@@ -585,7 +582,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                     {isBusinessExpanded && (
                       <div className="ml-6 mt-1">
                         <SidebarItem
-                          icon={<MapPin size={18} />}
+                          icon={<MapPin className="w-5 h-5" strokeWidth={1.75} />}
                           label="Locations"
                           href="/locations"
                           isActive={location === "/locations"}
@@ -594,7 +591,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         />
                         <div className="mt-1">
                           <SidebarItem
-                            icon={<Settings size={18} />}
+                            icon={<Settings className="w-5 h-5" strokeWidth={1.75} />}
                             label="Settings"
                             href="/settings"
                             isActive={location === "/settings"}
@@ -605,7 +602,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         {user?.role === 'admin' && (
                           <div className="mt-1">
                             <SidebarItem
-                              icon={<Shield size={18} />}
+                              icon={<Shield className="w-5 h-5" strokeWidth={1.75} />}
                               label="Permissions"
                               href="/permissions"
                               isActive={location === "/permissions"}

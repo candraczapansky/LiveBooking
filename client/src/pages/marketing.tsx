@@ -251,6 +251,9 @@ const MarketingPage = () => {
     const currentAudience = campaignForm.watch("audience");
     if (currentAudience !== "Specific Clients") {
       setSelectedClients([]);
+      setShowClientSelector(false);
+    } else {
+      setShowClientSelector(true);
     }
   }, [campaignForm.watch("audience")]);
 
@@ -1131,7 +1134,11 @@ const MarketingPage = () => {
                         <Input
                           placeholder="Search clients by name or email..."
                           value={clientSearchQuery}
-                          onChange={(e) => setClientSearchQuery(e.target.value)}
+                          onFocus={() => setShowClientSelector(true)}
+                          onChange={(e) => {
+                            setClientSearchQuery(e.target.value);
+                            if (!showClientSelector) setShowClientSelector(true);
+                          }}
                           className="pr-10"
                         />
                         <button
@@ -1150,7 +1157,7 @@ const MarketingPage = () => {
                             .filter((client) => {
                               const searchTerm = clientSearchQuery.toLowerCase();
                               const fullName = `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase();
-                              const email = client.email.toLowerCase();
+                              const email = (client.email || '').toLowerCase();
                               return fullName.includes(searchTerm) || email.includes(searchTerm);
                             })
                             .filter((client) => !selectedClients.some(selected => selected.id === client.id))

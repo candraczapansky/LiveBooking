@@ -189,7 +189,7 @@ const SimpleMobileMenu = () => {
           className="flex items-center justify-center w-12 h-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer shadow-md hover:shadow-lg transition-shadow"
           aria-label="Toggle mobile menu"
         >
-          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" strokeWidth={2} />
         </button>
       </div>
 
@@ -247,7 +247,7 @@ const SimpleMobileMenu = () => {
                 className="flex items-center justify-center w-10 h-10 bg-transparent border-none rounded-md cursor-pointer p-0 hover:bg-gray-100 dark:hover:bg-gray-700"
                 aria-label="Close mobile menu"
               >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                <X className="w-6 h-6 text-gray-500 dark:text-gray-400" strokeWidth={2} />
               </button>
             </div>
 
@@ -291,9 +291,9 @@ const SimpleMobileMenu = () => {
                               : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
                           }`}
                         >
-                          <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
+                          <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.75} />
                           <span className="truncate flex-1">{item.label}</span>
-                          <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} />
+                          <ChevronDown className={`w-5 h-5 ml-2 transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} strokeWidth={1.75} />
                         </button>
                         {open && (
                           <div className="pl-8 mt-1 space-y-1">
@@ -311,7 +311,7 @@ const SimpleMobileMenu = () => {
                                       : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
                                   }`}
                                 >
-                                  <ChildIcon className="w-4 h-4 mr-3 flex-shrink-0" />
+                                  <ChildIcon className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.75} />
                                   <span className="truncate flex-1">{child.label}</span>
                                 </Link>
                               );
@@ -332,17 +332,13 @@ const SimpleMobileMenu = () => {
                           ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
                           : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
                       }`}
-                      style={{
-                        color: isActive ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)'
-                      }}
                     >
                       <IconComponent 
-                        className="w-4 h-4 mr-3 flex-shrink-0" 
-                        style={{ color: isActive ? 'hsl(0 0% 100%)' : 'hsl(330 81% 60%)' }}
+                        className="w-5 h-5 mr-3 flex-shrink-0" 
+                        strokeWidth={1.75}
                       />
                       <span 
-                        className="truncate flex-1" 
-                        style={{ color: isActive ? 'hsl(0 0% 100%)' : 'hsl(0 0% 0%)' }}
+                        className="truncate flex-1"
                       >
                         {item.label}
                       </span>
@@ -363,10 +359,9 @@ const SimpleMobileMenu = () => {
                   closeMenu();
                 }}
                 className="flex items-center w-full px-3 py-2.5 border border-red-500 bg-transparent text-red-600 dark:text-red-400 text-sm font-medium rounded-lg cursor-pointer transition-colors hover:border-2 hover:border-red-600 hover:text-red-700 focus:border-2 focus:border-red-600 focus:text-red-700"
-                style={{ color: 'hsl(0 84% 60%)', background: 'transparent' }}
               >
-                <LogOut className="w-4 h-4 mr-3" style={{ color: 'hsl(0 84% 60%)' }} />
-                <span style={{ color: 'hsl(0 84% 60%)' }}>Sign Out</span>
+                <LogOut className="w-5 h-5 mr-3" strokeWidth={1.75} />
+                <span>Sign Out</span>
               </button>
             </div>
           </div>

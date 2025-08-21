@@ -58,15 +58,21 @@
   }
 }
 
-/* Button Icons */
-button svg:not([data-hamburger]) {
-  color: var(--text-primary) !important;
-  fill: currentColor !important;
+/* Global lucide icon normalization */
+svg.lucide {
+  stroke-width: 1.75 !important;
+  stroke: currentColor !important;
+  fill: none !important;
+}
+
+/* Button icon defaults (lucide) */
+button svg.lucide:not([data-hamburger]) {
+  stroke: currentColor !important;
+  fill: none !important;
 }
 
 [data-hamburger="true"] {
   color: hsl(var(--primary)) !important;
-  fill: hsl(var(--primary)) !important;
 }
 
 /* Profile Picture */
