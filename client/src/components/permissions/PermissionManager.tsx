@@ -274,18 +274,6 @@ const PermissionManager: React.FC = () => {
     });
   };
 
-  // Show loading state
-  if (permissionsLoading || groupsLoading || usersLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-2 text-sm text-gray-600">Loading permissions...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Initialize edit selections when opening the dialog
   useEffect(() => {
     if (isEditGroupOpen && selectedGroup) {
@@ -299,6 +287,18 @@ const PermissionManager: React.FC = () => {
       setSelectedCreatePermIds(new Set());
     }
   }, [isCreateGroupOpen]);
+
+  // Show loading state (after all hooks are declared to preserve hook order)
+  if (permissionsLoading || groupsLoading || usersLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading permissions...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Show error states
   if (permissionsError || groupsError || usersError) {

@@ -207,8 +207,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     LoggerService.info("Creating new appointment", { ...context, appointmentData });
 
-    // Validate appointment time conflicts
+    // Validate appointment time conflicts (staff and rooms)
     const allAppointments = await storage.getAllAppointments();
+    const allServices = await storage.getAllServices();
+    const serviceIdToRoomId = new Map<number, number | null>(
+      allServices.map((svc: any) => [svc.id, (svc as any).roomId ?? null])
+    );
+    const newAppointmentRoomId = serviceIdToRoomId.get(appointmentData.serviceId) ?? null;
     
     // Debug: Log the appointment data being checked
     LoggerService.info("Checking for conflicts", {
@@ -244,8 +249,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       const newEnd = new Date(appointmentData.endTime);
       
       const hasTimeOverlap = aptStart < newEnd && aptEnd > newStart;
-      
-      const isConflict = isSameStaff && isSameLocation && isActive && hasTimeOverlap;
+
+      // Room conflict: if the new service requires a room, block overlap with any appointment whose service uses the same room
+      const existingRoomId = serviceIdToRoomId.get(apt.serviceId) ?? null;
+      const isSameRoom = newAppointmentRoomId != null && existingRoomId != null && existingRoomId === newAppointmentRoomId;
+
+      // Conflict if same staff at same location OR same room, with overlapping times
+      const isConflict = isActive && hasTimeOverlap && ((isSameStaff && isSameLocation) || isSameRoom);
       
       if (isSameStaff && isActive) {
         LoggerService.debug("Checking appointment for conflict", {
@@ -260,11 +270,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           newAppointment: {
             startTime: appointmentData.startTime,
             endTime: appointmentData.endTime,
-            locationId: appointmentData.locationId
+            locationId: appointmentData.locationId,
+            roomId: newAppointmentRoomId ?? null
           },
           isSameLocation,
           hasTimeOverlap,
-          isConflict
+          isConflict,
+          isSameRoom
         });
       }
       
@@ -628,23 +640,38 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Appointment");
     }
 
-    // Check for time conflicts if time is being updated
-    if (updateData.startTime || updateData.endTime) {
+    // Check for time conflicts (staff/location and rooms) if time or related fields are being updated
+    if (updateData.startTime || updateData.endTime || updateData.staffId || updateData.serviceId || updateData.locationId) {
       const allAppointments = await storage.getAllAppointments();
-      const conflictingAppointments = allAppointments.filter((apt: any) => 
-        apt.id !== appointmentId &&
-        apt.staffId === (updateData.staffId || existingAppointment.staffId) &&
-        apt.status !== 'cancelled' &&
-        apt.status !== 'completed' &&
-        ((new Date(apt.startTime) <= new Date(updateData.endTime || existingAppointment.endTime) && 
-          new Date(apt.endTime) >= new Date(updateData.startTime || existingAppointment.startTime)))
+      const allServices = await storage.getAllServices();
+      const serviceIdToRoomId = new Map<number, number | null>(
+        allServices.map((svc: any) => [svc.id, (svc as any).roomId ?? null])
       );
+
+      const effectiveStart = new Date(updateData.startTime || existingAppointment.startTime);
+      const effectiveEnd = new Date(updateData.endTime || existingAppointment.endTime);
+      const effectiveStaffId = updateData.staffId || existingAppointment.staffId;
+      const effectiveLocationId = (updateData as any).locationId ?? existingAppointment.locationId;
+      const effectiveServiceId = updateData.serviceId || existingAppointment.serviceId;
+      const effectiveRoomId = serviceIdToRoomId.get(effectiveServiceId) ?? null;
+
+      const conflictingAppointments = allAppointments.filter((apt: any) => {
+        const isDifferentAppointment = apt.id !== appointmentId;
+        const isActive = apt.status !== 'cancelled' && apt.status !== 'completed';
+        const hasTimeOverlap = new Date(apt.startTime) < effectiveEnd && new Date(apt.endTime) > effectiveStart;
+        const isSameStaff = apt.staffId === effectiveStaffId;
+        const isSameLocation = effectiveLocationId === null || apt.locationId === effectiveLocationId;
+        const existingRoomId = serviceIdToRoomId.get(apt.serviceId) ?? null;
+        const isSameRoom = effectiveRoomId != null && existingRoomId != null && existingRoomId === effectiveRoomId;
+        return isDifferentAppointment && isActive && hasTimeOverlap && ((isSameStaff && isSameLocation) || isSameRoom);
+      });
 
       if (conflictingAppointments.length > 0) {
         LoggerService.warn("Appointment update time conflict detected", { 
           ...context, 
           appointmentId,
-          conflictingAppointments: conflictingAppointments.map((apt: any) => apt.id) 
+          conflictingAppointments: conflictingAppointments.map((apt: any) => apt.id),
+          type: 'staff/location or room'
         });
         throw new ConflictError("Updated appointment time conflicts with existing appointments");
       }

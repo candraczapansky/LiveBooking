@@ -1,6 +1,6 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Building2, Shield } from "lucide-react";
+import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Building2, Shield, ChevronDown, ShoppingBag } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -60,28 +60,51 @@ const SimpleMobileMenu = () => {
     };
   }, [user]);
 
-  const baseNavigationItems = [
+  const isRetailRoute = ["/pos", "/products", "/gift-certificates"].includes(location);
+  const [isRetailOpen, setIsRetailOpen] = useState<boolean>(isRetailRoute);
+
+  // Insights group (no persisted open state needed here)
+
+  const baseNavigationItems: any[] = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: Calendar, label: "Client Appointments", href: "/appointments" },
     { icon: CalendarDays, label: "Staff Working Hours", href: "/schedule" },
-    { icon: Users, label: "Clients", href: "/clients" },
+    { icon: Users, label: "clients", href: "#", children: [
+      { icon: Users, label: "Client Profiles", href: "/clients" },
+      { icon: FileText, label: "Forms", href: "/forms" },
+      { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
+      { icon: CreditCard, label: "Memberships", href: "/memberships" },
+    ]},
     { icon: UserCircle, label: "Staff", href: "/staff" },
     { icon: Scissors, label: "Services", href: "/services" },
-    { icon: Package, label: "Products", href: "/products" },
-    { icon: DollarSign, label: "Point of Sale", href: "/pos" },
-    { icon: Gift, label: "Gift Certificates", href: "/gift-certificates" },
-    { icon: Building2, label: "Locations", href: "/locations" },
+    {
+      icon: ShoppingBag,
+      label: "Retail",
+      href: "#",
+      children: [
+        { icon: DollarSign, label: "POS", href: "/pos" },
+        { icon: Gift, label: "Gift Certificates", href: "/gift-certificates" },
+        { icon: Package, label: "Products", href: "/products" },
+      ],
+    },
     { icon: MapPin, label: "Rooms", href: "/rooms" },
     { icon: Monitor, label: "Devices", href: "/devices" },
-    { icon: CreditCard, label: "Memberships", href: "/memberships" },
-    { icon: BarChart3, label: "Reports", href: "/reports" },
+    
+    { icon: BarChart3, label: "isights", href: "#", children: [
+      { icon: BarChart3, label: "Reports", href: "/reports" },
+      { icon: DollarSign, label: "Payroll", href: "/payroll" },
+    ]},
+    { icon: Building2, label: "business", href: "#", children: [
+      { icon: MapPin, label: "Locations", href: "/locations" },
+      { icon: Settings, label: "Settings", href: "/settings" },
+    ]},
     { icon: Megaphone, label: "Marketing", href: "/marketing" },
     { icon: Zap, label: "Automations", href: "/automations" },
     { icon: FileText, label: "Forms", href: "/forms" },
     { icon: Phone, label: "Phone", href: "/phone" },
     { icon: Bot, label: "AI Messaging", href: "/ai-messaging" },
     { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
-    { icon: Settings, label: "Settings", href: "/settings" },
+    
   ];
 
   // Add admin-only menu items
@@ -251,10 +274,54 @@ const SimpleMobileMenu = () => {
               }}
             >
               <div className="p-4 space-y-1">
-                {navigationItems.map((item) => {
+                {navigationItems.map((item: any) => {
                   const IconComponent = item.icon;
                   const isActive = location === item.href || (item.href === "/dashboard" && location === "/");
                   
+                  if (item.children) {
+                    const isGroupActive = item.children.some((c: any) => c.href === location);
+                    const open = item.label === 'Retail' ? isRetailOpen : false;
+                    return (
+                      <div key={item.label} className="w-full">
+                        <button
+                          onClick={() => item.label === 'Retail' ? setIsRetailOpen(prev => !prev) : undefined}
+                          className={`w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            isGroupActive 
+                              ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
+                              : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
+                          }`}
+                        >
+                          <IconComponent className="w-4 h-4 mr-3 flex-shrink-0" />
+                          <span className="truncate flex-1">{item.label}</span>
+                          <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} />
+                        </button>
+                        {open && (
+                          <div className="pl-8 mt-1 space-y-1">
+                            {item.children.map((child: any) => {
+                              const ChildIcon = child.icon;
+                              const childActive = location === child.href;
+                              return (
+                                <Link
+                                  key={child.href}
+                                  href={child.href}
+                                  onClick={handleLinkClick}
+                                  className={`w-full flex items-center px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${
+                                    childActive 
+                                      ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
+                                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
+                                  }`}
+                                >
+                                  <ChildIcon className="w-4 h-4 mr-3 flex-shrink-0" />
+                                  <span className="truncate flex-1">{child.label}</span>
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
                   return (
                     <Link
                       key={item.href}

@@ -26,7 +26,8 @@ import {
   Building2,
   ChevronDown,
   Mail,
-  ShoppingBag
+  ShoppingBag,
+  Shield
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -82,6 +83,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
   const [isCommsExpanded, setIsCommsExpanded] = useState<boolean>(isInCommunicationsSection);
   const isInRetailSection = location === '/pos' || location === '/products' || location === '/gift-certificates';
   const [isRetailExpanded, setIsRetailExpanded] = useState<boolean>(isInRetailSection);
+  const isInInsightsSection = location === '/reports' || location === '/payroll';
+  const [isInsightsExpanded, setIsInsightsExpanded] = useState<boolean>(isInInsightsSection);
+  const isInBusinessSection = location === '/locations' || location === '/settings' || location === '/permissions';
+  const [isBusinessExpanded, setIsBusinessExpanded] = useState<boolean>(isInBusinessSection);
+  const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships';
+  const [isClientsExpanded, setIsClientsExpanded] = useState<boolean>(isInClientsSection);
+  const isInServicesSection = location === '/services' || location === '/devices' || location === '/rooms';
+  const [isServicesExpanded, setIsServicesExpanded] = useState<boolean>(isInServicesSection);
 
   useEffect(() => {
     if (isInStaffSection) {
@@ -98,24 +107,41 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
       setIsRetailExpanded(true);
     }
   }, [location]);
+  useEffect(() => {
+    if (isInInsightsSection) {
+      setIsInsightsExpanded(true);
+    }
+  }, [location]);
+  useEffect(() => {
+    if (isInBusinessSection) {
+      setIsBusinessExpanded(true);
+    }
+  }, [location]);
+  useEffect(() => {
+    if (isInClientsSection) {
+      setIsClientsExpanded(true);
+    }
+  }, [location]);
+  useEffect(() => {
+    if (isInServicesSection) {
+      setIsServicesExpanded(true);
+    }
+  }, [location]);
 
   const menuItems = [
     { icon: <LayoutDashboard size={20} />, label: "Dashboard", href: "/dashboard" },
     { icon: <Calendar size={20} />, label: "Appointments", href: "/appointments" },
-    { icon: <Users size={20} />, label: "Clients", href: "/clients" },
+    { icon: <Users size={20} />, label: "clients", href: "#" },
     { icon: <UserCircle size={20} fill="none" />, label: "Staff", href: "/staff" },
-    { icon: <Scissors size={20} />, label: "Services", href: "/services" },
+    { icon: <Scissors size={20} />, label: "services", href: "#" },
     { icon: <ShoppingBag size={20} />, label: "Retail", href: "#" },
-    { icon: <DollarSign size={20} />, label: "Payroll", href: "/payroll" },
-    { icon: <MapPin size={20} />, label: "Locations", href: "/locations" },
-    { icon: <Monitor size={20} />, label: "Devices", href: "/devices" },
-    { icon: <BarChart3 size={20} />, label: "Reports", href: "/reports" },
+    { icon: <BarChart3 size={20} />, label: "isights", href: "#" },
+    { icon: <Building2 size={20} />, label: "business", href: "#" },
+    
     { icon: <Mail size={20} fill="none" />, label: "SMS & Email", href: "#" },
     { icon: <Phone size={20} />, label: "Phone", href: "/phone" },
-    { icon: <FileText size={20} />, label: "Forms", href: "/forms" },
-    { icon: <StickyNote size={20} />, label: "Note Templates", href: "/note-templates" },
-    { icon: <Building2 size={20} />, label: "Memberships", href: "/memberships" },
-    { icon: <Settings size={20} />, label: "Settings", href: "/settings" },
+    
+    
   ];
 
   // Always render; on mobile it slides in with an overlay
@@ -186,6 +212,82 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                             label="Schedule"
                             href="/schedule"
                             isActive={location === "/schedule"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'clients') {
+                const isActive = isInClientsSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsClientsExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isClientsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isClientsExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<Users size={18} />}
+                          label="Client Profiles"
+                          href="/clients"
+                          isActive={location === "/clients"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<FileText size={18} />}
+                            label="Forms"
+                            href="/forms"
+                            isActive={location === "/forms"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<StickyNote size={18} />}
+                            label="Note Templates"
+                            href="/note-templates"
+                            isActive={location === "/note-templates"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Building2 size={18} />}
+                            label="Memberships"
+                            href="/memberships"
+                            isActive={location === "/memberships"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />
@@ -322,6 +424,196 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                             onClick={handleItemClick}
                           />
                         </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'services') {
+                const isActive = isInServicesSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsServicesExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isServicesExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isServicesExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<Scissors size={18} />}
+                          label="Services"
+                          href="/services"
+                          isActive={location === "/services"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Monitor size={18} />}
+                            label="Devices"
+                            href="/devices"
+                            isActive={location === "/devices"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<MapPin size={18} />}
+                            label="Rooms"
+                            href="/rooms"
+                            isActive={location === "/rooms"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'isights') {
+                const isActive = isInInsightsSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsInsightsExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                      `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isInsightsExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isInsightsExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<BarChart3 size={18} />}
+                          label="Reports"
+                          href="/reports"
+                          isActive={location === "/reports"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<DollarSign size={18} />}
+                            label="Payroll"
+                            href="/payroll"
+                            isActive={location === "/payroll"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              if (item.label === 'business') {
+                const isActive = isInBusinessSection;
+                return (
+                  <div key={item.label} className="mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsBusinessExpanded((prev) => !prev)}
+                      className={`
+                        w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                        transition-all duration-200
+                        ${isActive
+                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                        }
+                      `}
+                    >
+                      <span className={`
+                        flex-shrink-0 transition-transform duration-200
+                        ${isActive ? 'text-white' : 'text-primary'}
+                     `}>
+                        {item.icon}
+                      </span>
+                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-auto text-gray-500 dark:text-gray-400">
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-200 ${isBusinessExpanded ? 'rotate-180' : 'rotate-0'}`}
+                        />
+                      </span>
+                    </button>
+
+                    {isBusinessExpanded && (
+                      <div className="ml-6 mt-1">
+                        <SidebarItem
+                          icon={<MapPin size={18} />}
+                          label="Locations"
+                          href="/locations"
+                          isActive={location === "/locations"}
+                          isOpen={isOpen}
+                          onClick={handleItemClick}
+                        />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Settings size={18} />}
+                            label="Settings"
+                            href="/settings"
+                            isActive={location === "/settings"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        {user?.role === 'admin' && (
+                          <div className="mt-1">
+                            <SidebarItem
+                              icon={<Shield size={18} />}
+                              label="Permissions"
+                              href="/permissions"
+                              isActive={location === "/permissions"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

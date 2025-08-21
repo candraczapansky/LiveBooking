@@ -948,17 +948,33 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   {permissionGroups?.data?.map((group: any) => (
                     <div
                       key={group.id}
+                      role="checkbox"
+                      aria-checked={selectedPermissionGroups.includes(group.id)}
+                      tabIndex={0}
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                         selectedPermissionGroups.includes(group.id)
                           ? 'border-blue-500 bg-blue-50'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
                         const currentGroups = selectedPermissionGroups;
                         const next = currentGroups.includes(group.id)
                           ? currentGroups.filter((id: number) => id !== group.id)
                           : [...currentGroups, group.id];
                         form.setValue('permissionGroups', next, { shouldDirty: true, shouldTouch: true });
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          const currentGroups = selectedPermissionGroups;
+                          const next = currentGroups.includes(group.id)
+                            ? currentGroups.filter((id: number) => id !== group.id)
+                            : [...currentGroups, group.id];
+                          form.setValue('permissionGroups', next, { shouldDirty: true, shouldTouch: true });
+                        }
                       }}
                     >
                       <div className="flex items-start space-x-3">

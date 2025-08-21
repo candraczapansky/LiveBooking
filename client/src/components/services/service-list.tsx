@@ -169,7 +169,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[55%] min-w-[480px]">Service</TableHead>
+                <TableHead className="w-[70%] min-w-[640px]">Service</TableHead>
                 {!categoryId && <TableHead className="w-[10%]">Category</TableHead>}
                 <TableHead className="w-28">Duration</TableHead>
                 <TableHead className="w-28">Price</TableHead>
@@ -196,7 +196,7 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
                   <TableRow key={service.id}>
                     <TableCell className="align-top">
                       <div className="font-medium">{service.name}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words leading-relaxed">
+                      <div className="text-sm text-gray-600 dark:text-gray-300 whitespace-normal break-words leading-relaxed">
                         {service.description}
                       </div>
                     </TableCell>
