@@ -136,9 +136,12 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         try {
           const userId = staffFromList?.userId;
           if (userId) {
-            const response = await apiRequest("GET", `/api/user-permission-groups/${userId}`);
-            const userGroups = await response.json();
-            const groupIds = userGroups.data?.map((group: any) => group.groupId) || [];
+            // Use the supported endpoint that returns the user's assigned groups
+            const response = await apiRequest('GET', `/api/users/${userId}/permissions`);
+            const userPermissions = await response.json();
+            const groupIds = (userPermissions?.data?.groups || [])
+              .map((g: any) => g.id)
+              .filter(Boolean);
             
             const formData = {
               title: staffFromList?.title || "",
@@ -399,14 +402,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
       }
 
       // Update staff information
-      const staffUpdateData = {
+      const staffUpdateData: any = {
         title: data.title,
         bio: data.bio,
         commission_type: data.commissionType,
         commission_rate: data.commissionType === 'commission' ? data.commissionRate / 100 : null,
         hourly_rate: data.commissionType === 'hourly' ? data.hourlyRate : null,
         fixed_rate: data.commissionType === 'fixed' ? data.fixedSalary : null,
-        photo_url: data.photo || null,
       };
 
       console.log("Sending PATCH request to:", `/api/staff/${staffId}`, "with data:", staffUpdateData);
@@ -448,9 +450,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
           for (const groupId of data.permissionGroups) {
             if (!currentGroupIds.includes(groupId)) {
               try {
-                await apiRequest("POST", `/api/users/${userId}/permission-groups`, {
-                  groupId: groupId
-                });
+                const addRes = await apiRequest("POST", `/api/users/${userId}/permission-groups`, { groupId });
+                if (!addRes.ok) {
+                  const err = await addRes.json();
+                  console.error('Failed to add group:', err);
+                }
                 console.log(`Added permission group ${groupId} to user ${userId}`);
               } catch (error) {
                 console.error(`Failed to add permission group ${groupId}:`, error);
@@ -462,6 +466,12 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         }
       }
 
+      // Refetch updated permissions to reflect changes immediately
+      try {
+        const refreshed = await apiRequest('GET', `/api/users/${userId}/permissions`);
+        const refreshedJson = await refreshed.json();
+        console.log('Refreshed permissions:', refreshedJson);
+      } catch {}
       return updatedStaff;
     },
     onSuccess: () => {

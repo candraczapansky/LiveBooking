@@ -290,11 +290,23 @@ export function registerPermissionRoutes(app: Express) {
       try {
         const userId = parseInt(req.params.id);
         const { groupId } = req.body;
-        await db.insert(userPermissionGroupsTable).values({ userId, groupId });
-        res.json({
-          success: true,
-          message: "Permission group assigned successfully"
-        });
+        await db.insert(userPermissionGroupsTable).values({ userId, groupId }).onConflictDoNothing();
+        // Return current groups for confirmation
+        const groups = await db
+          .select({
+            id: permissionGroupsTable.id,
+            name: permissionGroupsTable.name,
+            description: permissionGroupsTable.description,
+            isActive: permissionGroupsTable.isActive,
+            isSystem: permissionGroupsTable.isSystem,
+          })
+          .from(userPermissionGroupsTable)
+          .leftJoin(
+            permissionGroupsTable,
+            eq(userPermissionGroupsTable.groupId, permissionGroupsTable.id)
+          )
+          .where(eq(userPermissionGroupsTable.userId, userId));
+        res.json({ success: true, data: { userId, groups: groups.filter(g => g.id) } });
       } catch (error) {
         console.error('Error assigning permission group:', error);
         res.status(500).json({

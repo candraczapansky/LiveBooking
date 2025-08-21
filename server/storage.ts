@@ -1429,14 +1429,40 @@ Glo Head Spa`,
   }
 
   async getStaff(id: number): Promise<Staff | undefined> {
-    const [result] = await db.select().from(staff).where(eq(staff.id, id));
-    return result;
+    const [result] = await db
+      .select({
+        id: staff.id,
+        userId: staff.userId,
+        title: staff.title,
+        bio: staff.bio,
+        locationId: staff.locationId,
+        commissionType: staff.commissionType,
+        commissionRate: staff.commissionRate,
+        hourlyRate: staff.hourlyRate,
+        fixedRate: staff.fixedRate,
+      })
+      .from(staff)
+      .where(eq(staff.id, id));
+    return result as unknown as Staff | undefined;
   }
 
   async getStaffByUserId(userId: number): Promise<Staff | undefined> {
     try {
-      const [result] = await db.select().from(staff).where(eq(staff.userId, userId));
-      return result;
+      const [result] = await db
+        .select({
+          id: staff.id,
+          userId: staff.userId,
+          title: staff.title,
+          bio: staff.bio,
+          locationId: staff.locationId,
+          commissionType: staff.commissionType,
+          commissionRate: staff.commissionRate,
+          hourlyRate: staff.hourlyRate,
+          fixedRate: staff.fixedRate,
+        })
+        .from(staff)
+        .where(eq(staff.userId, userId));
+      return result as unknown as Staff | undefined;
     } catch (error) {
       console.error('Error getting staff by user id:', error);
       return undefined;
@@ -1469,11 +1495,35 @@ Glo Head Spa`,
 
   async updateStaff(id: number, staffData: Partial<InsertStaff>): Promise<Staff> {
     try {
-      const [result] = await db.update(staff).set(staffData).where(eq(staff.id, id)).returning();
+      // Whitelist updatable columns only; include keys present even if null to allow clearing values
+      const safeUpdate: any = {};
+      if ((staffData as any).title !== undefined) safeUpdate.title = (staffData as any).title;
+      if ((staffData as any).bio !== undefined) safeUpdate.bio = (staffData as any).bio;
+      if ((staffData as any).locationId !== undefined) safeUpdate.locationId = (staffData as any).locationId;
+      if ((staffData as any).commissionType !== undefined) safeUpdate.commissionType = (staffData as any).commissionType;
+      if ((staffData as any).commissionRate !== undefined) safeUpdate.commissionRate = (staffData as any).commissionRate;
+      if ((staffData as any).hourlyRate !== undefined) safeUpdate.hourlyRate = (staffData as any).hourlyRate;
+      if ((staffData as any).fixedRate !== undefined) safeUpdate.fixedRate = (staffData as any).fixedRate;
+
+      const [result] = await db
+        .update(staff)
+        .set(safeUpdate)
+        .where(eq(staff.id, id))
+        .returning({
+          id: staff.id,
+          userId: staff.userId,
+          title: staff.title,
+          bio: staff.bio,
+          locationId: staff.locationId,
+          commissionType: staff.commissionType,
+          commissionRate: staff.commissionRate,
+          hourlyRate: staff.hourlyRate,
+          fixedRate: staff.fixedRate,
+        });
       if (!result) {
         throw new Error('Staff member not found');
       }
-      return result;
+      return result as unknown as Staff;
     } catch (error) {
       console.error('Error updating staff:', error);
       throw error;
