@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sql } from 'drizzle-orm';
 import type { IStorage } from '../storage.js';
 import { encrypt, decrypt } from '../utils/encryption.js';
 
@@ -33,44 +34,39 @@ export class TerminalConfigService {
       // Store in database
       let terminalConfig;
       try {
-        terminalConfig = await (this.storage as any).db.insert("terminal_configurations").values({
-          terminalId: config.terminalId,
-          locationId: config.locationId,
-          apiToken: encryptedToken,
-          deviceCode: config.deviceCode,
-          isActive: true,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        }).returning().execute();
+        const insertSql = sql`INSERT INTO terminal_configurations (
+          terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
+        ) VALUES (
+          ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
+        ) RETURNING *` as any;
+        const result: any = await (this.storage as any).db.execute(insertSql);
+        terminalConfig = result?.rows || result;
       } catch (e: any) {
         // Auto-create table on first use if missing
         const message = String(e?.message || e);
         if (message.includes('relation') && message.includes('terminal_configurations')) {
           console.warn('⚠️ terminal_configurations not found. Creating it now...');
-          const sql = `
-            CREATE TABLE IF NOT EXISTS terminal_configurations (
-              id SERIAL PRIMARY KEY,
-              terminal_id TEXT NOT NULL,
-              location_id TEXT NOT NULL,
-              api_token TEXT NOT NULL,
-              device_code TEXT NOT NULL,
-              is_active BOOLEAN DEFAULT true,
-              created_at TIMESTAMP DEFAULT NOW(),
-              updated_at TIMESTAMP DEFAULT NOW(),
-              UNIQUE(location_id, terminal_id)
-            );
-          `;
-          await (this.storage as any).db.execute(sql as any);
+          const createSql = `
+CREATE TABLE IF NOT EXISTS terminal_configurations (
+  id SERIAL PRIMARY KEY,
+  terminal_id TEXT NOT NULL,
+  location_id TEXT NOT NULL,
+  api_token TEXT NOT NULL,
+  device_code TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(location_id, terminal_id)
+);`;
+          await (this.storage as any).db.execute(createSql as any);
           // Retry insert
-          terminalConfig = await (this.storage as any).db.insert("terminal_configurations").values({
-            terminalId: config.terminalId,
-            locationId: config.locationId,
-            apiToken: encryptedToken,
-            deviceCode: config.deviceCode,
-            isActive: true,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          }).returning().execute();
+          const retrySql = sql`INSERT INTO terminal_configurations (
+            terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
+          ) VALUES (
+            ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
+          ) RETURNING *` as any;
+          const retryResult: any = await (this.storage as any).db.execute(retrySql);
+          terminalConfig = retryResult?.rows || retryResult;
         } else {
           throw e;
         }
@@ -88,13 +84,9 @@ export class TerminalConfigService {
    */
   async getTerminalConfig(locationId: string): Promise<TerminalConfig | null> {
     try {
-      const config = await (this.storage as any).db
-        .select()
-        .from("terminal_configurations")
-        .where("locationId", "=", locationId)
-        .where("isActive", "=", true)
-        .limit(1)
-        .execute();
+      const sel = sql`SELECT * FROM terminal_configurations WHERE location_id = ${locationId} AND is_active = true LIMIT 1` as any;
+      const res: any = await (this.storage as any).db.execute(sel);
+      const config = res?.rows || res || [];
 
       if (!config.length) {
         return null;
@@ -118,13 +110,9 @@ export class TerminalConfigService {
    */
   async getTerminalConfigByDeviceCode(deviceCode: string): Promise<TerminalConfig | null> {
     try {
-      const config = await (this.storage as any).db
-        .select()
-        .from("terminal_configurations")
-        .where("deviceCode", "=", deviceCode)
-        .where("isActive", "=", true)
-        .limit(1)
-        .execute();
+      const sel = sql`SELECT * FROM terminal_configurations WHERE device_code = ${deviceCode} AND is_active = true LIMIT 1` as any;
+      const res: any = await (this.storage as any).db.execute(sel);
+      const config = res?.rows || res || [];
 
       if (!config.length) {
         return null;
@@ -152,17 +140,18 @@ export class TerminalConfigService {
         updates.apiToken = await encrypt(updates.apiToken);
       }
 
-      const updated = await (this.storage as any).db
-        .update("terminal_configurations")
-        .set({
-          ...updates,
-          updatedAt: new Date(),
-        })
-        .where("locationId", "=", locationId)
-        .returning()
-        .execute();
-
-      return updated[0];
+      // Build dynamic update SQL
+      const fields: string[] = [];
+      const values: any[] = [];
+      if (updates.terminalId) { fields.push(`terminal_id = $${fields.length + 1}`); values.push(updates.terminalId); }
+      if (updates.deviceCode) { fields.push(`device_code = $${fields.length + 1}`); values.push(updates.deviceCode); }
+      if (updates.apiToken) { fields.push(`api_token = $${fields.length + 1}`); values.push(updates.apiToken); }
+      if (typeof updates.isActive === 'boolean') { fields.push(`is_active = $${fields.length + 1}`); values.push(updates.isActive); }
+      fields.push(`updated_at = NOW()`);
+      const updateSql = `UPDATE terminal_configurations SET ${fields.join(', ')} WHERE location_id = $${fields.length + 1} RETURNING *`;
+      const result: any = await (this.storage as any).db.execute({ text: updateSql, args: [...values, locationId] } as any);
+      const rows = result?.rows || result || [];
+      return rows[0];
     } catch (error: any) {
       console.error('❌ Error updating terminal configuration:', error);
       throw error;
@@ -174,14 +163,8 @@ export class TerminalConfigService {
    */
   async deactivateTerminalConfig(locationId: string) {
     try {
-      await (this.storage as any).db
-        .update("terminal_configurations")
-        .set({
-          isActive: false,
-          updatedAt: new Date(),
-        })
-        .where("locationId", "=", locationId)
-        .execute();
+      const deactivateSql = sql`UPDATE terminal_configurations SET is_active = false, updated_at = NOW() WHERE location_id = ${locationId}` as any;
+      await (this.storage as any).db.execute(deactivateSql);
 
       return true;
     } catch (error: any) {
