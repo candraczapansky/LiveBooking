@@ -34,18 +34,20 @@ export class TerminalConfigService {
       // Store in database
       let terminalConfig;
       try {
+        const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
         const insertSql = sql`INSERT INTO terminal_configurations (
           terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
         ) VALUES (
           ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
         ) RETURNING *` as any;
-        const result: any = await (this.storage as any).db.execute(insertSql);
+        const result: any = await dbClient.execute(insertSql);
         terminalConfig = result?.rows || result;
       } catch (e: any) {
         // Auto-create table on first use if missing
         const message = String(e?.message || e);
         if (message.includes('relation') && message.includes('terminal_configurations')) {
           console.warn('⚠️ terminal_configurations not found. Creating it now...');
+          const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
           const createSql = `
 CREATE TABLE IF NOT EXISTS terminal_configurations (
   id SERIAL PRIMARY KEY,
@@ -58,14 +60,14 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
   updated_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(location_id, terminal_id)
 );`;
-          await (this.storage as any).db.execute(createSql as any);
+          await dbClient.execute(createSql as any);
           // Retry insert
           const retrySql = sql`INSERT INTO terminal_configurations (
             terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
           ) VALUES (
             ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
           ) RETURNING *` as any;
-          const retryResult: any = await (this.storage as any).db.execute(retrySql);
+          const retryResult: any = await dbClient.execute(retrySql);
           terminalConfig = retryResult?.rows || retryResult;
         } else {
           throw e;
@@ -84,8 +86,9 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
    */
   async getTerminalConfig(locationId: string): Promise<TerminalConfig | null> {
     try {
+      const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
       const sel = sql`SELECT * FROM terminal_configurations WHERE location_id = ${locationId} AND is_active = true LIMIT 1` as any;
-      const res: any = await (this.storage as any).db.execute(sel);
+      const res: any = await dbClient.execute(sel);
       const config = res?.rows || res || [];
 
       if (!config.length) {
@@ -110,8 +113,9 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
    */
   async getTerminalConfigByDeviceCode(deviceCode: string): Promise<TerminalConfig | null> {
     try {
+      const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
       const sel = sql`SELECT * FROM terminal_configurations WHERE device_code = ${deviceCode} AND is_active = true LIMIT 1` as any;
-      const res: any = await (this.storage as any).db.execute(sel);
+      const res: any = await dbClient.execute(sel);
       const config = res?.rows || res || [];
 
       if (!config.length) {
@@ -141,6 +145,7 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
       }
 
       // Build dynamic update SQL
+      const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
       const fields: string[] = [];
       const values: any[] = [];
       if (updates.terminalId) { fields.push(`terminal_id = $${fields.length + 1}`); values.push(updates.terminalId); }
@@ -149,7 +154,7 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
       if (typeof updates.isActive === 'boolean') { fields.push(`is_active = $${fields.length + 1}`); values.push(updates.isActive); }
       fields.push(`updated_at = NOW()`);
       const updateSql = `UPDATE terminal_configurations SET ${fields.join(', ')} WHERE location_id = $${fields.length + 1} RETURNING *`;
-      const result: any = await (this.storage as any).db.execute({ text: updateSql, args: [...values, locationId] } as any);
+      const result: any = await dbClient.execute({ text: updateSql, args: [...values, locationId] } as any);
       const rows = result?.rows || result || [];
       return rows[0];
     } catch (error: any) {
@@ -163,8 +168,9 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
    */
   async deactivateTerminalConfig(locationId: string) {
     try {
+      const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
       const deactivateSql = sql`UPDATE terminal_configurations SET is_active = false, updated_at = NOW() WHERE location_id = ${locationId}` as any;
-      await (this.storage as any).db.execute(deactivateSql);
+      await dbClient.execute(deactivateSql);
 
       return true;
     } catch (error: any) {
