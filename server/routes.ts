@@ -213,9 +213,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       if (body.fixed_rate !== undefined || body.fixedRate !== undefined) {
         updateData.fixedRate = body.fixed_rate ?? body.fixedRate;
       }
-      if (body.photo_url !== undefined || body.photoUrl !== undefined) {
-        updateData.photoUrl = body.photo_url ?? body.photoUrl;
-      }
+      // Omit photoUrl to avoid touching a column that may not exist in some deployments
 
       const updated = await storage.updateStaff(id, updateData);
       res.json(updated);
