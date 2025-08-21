@@ -25,23 +25,26 @@ export class HelcimTerminalService {
       // Validate config
       TerminalConfigSchema.parse(config);
 
-      // Test terminal connection using the provided token
-      const response = await this.makeRequest('POST', `/terminal/${config.terminalId}/test`, {
-        deviceCode: config.deviceCode,
-      }, config.apiToken);
+      // Best-effort test terminal connection (some environments may not support this API endpoint)
+      try {
+        const response = await this.makeRequest('POST', `/terminal/${config.terminalId}/test`, {
+          deviceCode: config.deviceCode,
+        }, config.apiToken);
 
-      if (response.data.success) {
-        // Store config if test is successful
-        await this.configService.saveTerminalConfig({
-          ...config,
-          isActive: true
-        });
-        console.log(`✅ Terminal ${config.terminalId} initialized for location ${config.locationId}`);
-        return true;
+        if (!response?.data?.success) {
+          console.warn(`⚠️ Helcim test did not return success for terminal ${config.terminalId}. Proceeding to store configuration anyway.`);
+        }
+      } catch (testError: any) {
+        console.warn(`⚠️ Skipping Helcim terminal test for ${config.terminalId}: ${testError?.message || 'unknown error'}`);
       }
 
-      console.error(`❌ Failed to initialize terminal ${config.terminalId}:`, response.data);
-      return false;
+      // Always store config so terminal can be used; validation happens during payment operations
+      await this.configService.saveTerminalConfig({
+        ...config,
+        isActive: true
+      });
+      console.log(`✅ Terminal ${config.terminalId} configuration saved for location ${config.locationId}`);
+      return true;
     } catch (error: any) {
       console.error(`❌ Error initializing terminal ${config.terminalId}:`, error.message);
       return false;

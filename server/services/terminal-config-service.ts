@@ -31,15 +31,50 @@ export class TerminalConfigService {
       const encryptedToken = await encrypt(config.apiToken);
 
       // Store in database
-      const terminalConfig = await (this.storage as any).db.insert("terminal_configurations").values({
-        terminalId: config.terminalId,
-        locationId: config.locationId,
-        apiToken: encryptedToken,
-        deviceCode: config.deviceCode,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }).returning().execute();
+      let terminalConfig;
+      try {
+        terminalConfig = await (this.storage as any).db.insert("terminal_configurations").values({
+          terminalId: config.terminalId,
+          locationId: config.locationId,
+          apiToken: encryptedToken,
+          deviceCode: config.deviceCode,
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }).returning().execute();
+      } catch (e: any) {
+        // Auto-create table on first use if missing
+        const message = String(e?.message || e);
+        if (message.includes('relation') && message.includes('terminal_configurations')) {
+          console.warn('⚠️ terminal_configurations not found. Creating it now...');
+          const sql = `
+            CREATE TABLE IF NOT EXISTS terminal_configurations (
+              id SERIAL PRIMARY KEY,
+              terminal_id TEXT NOT NULL,
+              location_id TEXT NOT NULL,
+              api_token TEXT NOT NULL,
+              device_code TEXT NOT NULL,
+              is_active BOOLEAN DEFAULT true,
+              created_at TIMESTAMP DEFAULT NOW(),
+              updated_at TIMESTAMP DEFAULT NOW(),
+              UNIQUE(location_id, terminal_id)
+            );
+          `;
+          await (this.storage as any).db.execute(sql as any);
+          // Retry insert
+          terminalConfig = await (this.storage as any).db.insert("terminal_configurations").values({
+            terminalId: config.terminalId,
+            locationId: config.locationId,
+            apiToken: encryptedToken,
+            deviceCode: config.deviceCode,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }).returning().execute();
+        } else {
+          throw e;
+        }
+      }
 
       return terminalConfig[0];
     } catch (error: any) {
