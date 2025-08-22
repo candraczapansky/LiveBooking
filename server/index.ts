@@ -133,12 +133,14 @@ async function findAvailablePort(startPort: number): Promise<number> {
       serveStatic(app);
     }
 
-    // Find an available port. In production, default to 5000 to match Nginx/PM2 configs.
-    const defaultPort = process.env.NODE_ENV === 'production' ? '5000' : '3002';
+    // Determine port: In production (Cloud Run/Replit Deploy), use provided PORT and do not scan.
+    // Only scan for an open port during local development convenience.
+    const isDevelopment = app.get("env") === "development";
+    const defaultPort = isDevelopment ? '3002' : (process.env.PORT || '5000');
     const preferredPort = parseInt(process.env.PORT || defaultPort);
-    const port = await findAvailablePort(preferredPort);
-    
-    if (port !== preferredPort) {
+    const port = isDevelopment ? await findAvailablePort(preferredPort) : preferredPort;
+
+    if (isDevelopment && port !== preferredPort) {
       console.log(`⚠️  Port ${preferredPort} was in use, using port ${port} instead`);
     }
 
@@ -147,7 +149,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
       host: "0.0.0.0",
     }, () => {
       log(`✅ Server running on port ${port}`);
-      if (port !== preferredPort) {
+      if (isDevelopment && port !== preferredPort) {
         log(`📝 Note: Original port ${preferredPort} was busy, using ${port}`);
       }
     });

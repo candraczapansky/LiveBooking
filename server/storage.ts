@@ -744,7 +744,7 @@ export class DatabaseStorage implements IStorage {
       const hairServicesCategory = existingCategories.find(c => c.name === 'Hair Services');
       const facialTreatmentsCategory = existingCategories.find(c => c.name === 'Facial Treatments');
       
-      if (!existingServices.find(s => s.name === 'Women\'s Haircut & Style') && hairServicesCategory) {
+      if (!existingServices.find((s: Service) => s.name === 'Women\'s Haircut & Style') && hairServicesCategory) {
         console.log('Creating Women\'s Haircut & Style service...');
         await this.createService({
           name: 'Women\'s Haircut & Style',
@@ -759,7 +759,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find(s => s.name === 'Color & Highlights') && hairServicesCategory) {
+      if (!existingServices.find((s: Service) => s.name === 'Color & Highlights') && hairServicesCategory) {
         console.log('Creating Color & Highlights service...');
         await this.createService({
           name: 'Color & Highlights',
@@ -774,7 +774,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find(s => s.name === 'Deep Cleansing Facial') && facialTreatmentsCategory) {
+      if (!existingServices.find((s: Service) => s.name === 'Deep Cleansing Facial') && facialTreatmentsCategory) {
         console.log('Creating Deep Cleansing Facial service...');
         await this.createService({
           name: 'Deep Cleansing Facial',
@@ -2356,10 +2356,30 @@ Glo Head Spa`,
 
   // Marketing Campaign operations
   async createMarketingCampaign(campaign: InsertMarketingCampaign): Promise<MarketingCampaign> {
-    // Handle targetClientIds - convert array to JSON string if provided
-    const campaignData = { ...campaign };
-    if (campaignData.targetClientIds && Array.isArray(campaignData.targetClientIds)) {
-      campaignData.targetClientIds = JSON.stringify(campaignData.targetClientIds);
+    // Normalize targetClientIds to Postgres text[] (array of strings)
+    const campaignData: any = { ...campaign };
+    let targetClientIdsArray: string[] | null = null;
+    if (Array.isArray(campaignData.targetClientIds)) {
+      targetClientIdsArray = (campaignData.targetClientIds as any[]).map((v) => String(v));
+    } else if (typeof campaignData.targetClientIds === 'string') {
+      const raw = campaignData.targetClientIds.trim();
+      if (raw.length > 0) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            targetClientIdsArray = parsed.map((v: any) => String(v));
+          }
+        } catch {
+          // If not JSON, attempt to parse simple Postgres array literal like {1,2}
+          if (raw.startsWith('{') && raw.endsWith('}')) {
+            targetClientIdsArray = raw
+              .slice(1, -1)
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0);
+          }
+        }
+      }
     }
     
     const [newCampaign] = await db
@@ -2367,7 +2387,7 @@ Glo Head Spa`,
       .values({
         ...campaignData,
         sendDate: campaign.sendDate ? (typeof campaign.sendDate === 'string' ? new Date(campaign.sendDate) : campaign.sendDate) : null,
-        targetClientIds: typeof campaignData.targetClientIds === 'string' ? campaignData.targetClientIds : null,
+        targetClientIds: targetClientIdsArray ?? null,
       } as any)
       .returning();
     return newCampaign;
@@ -2379,7 +2399,7 @@ Glo Head Spa`,
   }
 
   async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
-    return await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
+    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
   }
 
   async getMarketingCampaigns(): Promise<MarketingCampaign[]> {
@@ -2395,6 +2415,28 @@ Glo Head Spa`,
     }
     if (processedData.sentAt && typeof processedData.sentAt === 'string') {
       processedData.sentAt = new Date(processedData.sentAt);
+    }
+    // Normalize targetClientIds if present
+    if (processedData.targetClientIds !== undefined) {
+      if (Array.isArray(processedData.targetClientIds)) {
+        processedData.targetClientIds = (processedData.targetClientIds as any[]).map((v) => String(v));
+      } else if (typeof processedData.targetClientIds === 'string') {
+        const raw = processedData.targetClientIds.trim();
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            processedData.targetClientIds = parsed.map((v: any) => String(v));
+          }
+        } catch {
+          if (raw.startsWith('{') && raw.endsWith('}')) {
+            processedData.targetClientIds = raw
+              .slice(1, -1)
+              .split(',')
+              .map((s: string) => s.trim())
+              .filter((s: string) => s.length > 0);
+          }
+        }
+      }
     }
 
     const [updatedCampaign] = await db

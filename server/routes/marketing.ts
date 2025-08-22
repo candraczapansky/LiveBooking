@@ -12,14 +12,14 @@ import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
 import { redisCache } from "../utils/redis-cache.js";
-import { insertMarketingCampaignSchema } from "../../shared/schema.js";
+import { insertMarketingCampaignSchema, insertPromoCodeSchema } from "../../shared/schema.js";
 
 // Use the shared schema for campaign creation
 const campaignSchema = insertMarketingCampaignSchema;
 
 export function registerMarketingRoutes(app: Express, storage: IStorage) {
-  // Create marketing campaign
-  app.post("/api/marketing/campaigns", validateRequest(campaignSchema), asyncHandler(async (req: Request, res: Response) => {
+  // Create marketing campaign (support both /marketing/campaigns and /marketing-campaigns)
+  app.post(["/api/marketing/campaigns", "/api/marketing-campaigns"], validateRequest(campaignSchema), asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
     const campaignData = req.body;
 
@@ -32,8 +32,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.status(201).json(newCampaign);
   }));
 
-  // Get all marketing campaigns
-  app.get("/api/marketing/campaigns", asyncHandler(async (req: Request, res: Response) => {
+  // Get all marketing campaigns (support both /marketing/campaigns and /marketing-campaigns)
+  app.get(["/api/marketing/campaigns", "/api/marketing-campaigns"], asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
     const { status, type, page = 1, limit = 10 } = req.query;
 
@@ -61,8 +61,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.json(campaigns);
   }));
 
-  // Get campaign by ID
-  app.get("/api/marketing/campaigns/:id", asyncHandler(async (req: Request, res: Response) => {
+  // Get campaign by ID (support both path variants)
+  app.get(["/api/marketing/campaigns/:id", "/api/marketing-campaigns/:id"], asyncHandler(async (req: Request, res: Response) => {
     const campaignId = parseInt(req.params.id);
     const context = getLogContext(req);
 
@@ -76,8 +76,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.json(campaign);
   }));
 
-  // Update campaign
-  app.put("/api/marketing/campaigns/:id", validateRequest(campaignSchema.partial()), asyncHandler(async (req: Request, res: Response) => {
+  // Update campaign (support both path variants)
+  app.put(["/api/marketing/campaigns/:id", "/api/marketing-campaigns/:id"], validateRequest(campaignSchema.partial()), asyncHandler(async (req: Request, res: Response) => {
     const campaignId = parseInt(req.params.id);
     const context = getLogContext(req);
     const updateData = req.body;
@@ -96,8 +96,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.json(updatedCampaign);
   }));
 
-  // Delete campaign
-  app.delete("/api/marketing/campaigns/:id", asyncHandler(async (req: Request, res: Response) => {
+  // Delete campaign (support both path variants)
+  app.delete(["/api/marketing/campaigns/:id", "/api/marketing-campaigns/:id"], asyncHandler(async (req: Request, res: Response) => {
     const campaignId = parseInt(req.params.id);
     const context = getLogContext(req);
 
@@ -115,8 +115,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.json({ success: true, message: "Marketing campaign deleted successfully" });
   }));
 
-  // Send campaign
-  app.post("/api/marketing/campaigns/:id/send", asyncHandler(async (req: Request, res: Response) => {
+  // Send campaign (support both path variants)
+  app.post(["/api/marketing/campaigns/:id/send", "/api/marketing-campaigns/:id/send"], asyncHandler(async (req: Request, res: Response) => {
     const campaignId = parseInt(req.params.id);
     const context = getLogContext(req);
 
@@ -131,22 +131,45 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       throw new ValidationError("Campaign can only be sent if it's in draft or scheduled status");
     }
 
-    // Get target audience
+    // Get target audience, supporting both legacy and UI labels
     let recipients: any[] = [];
-    switch (campaign.audience) {
-      case 'all':
-        recipients = await storage.getAllUsers();
-        break;
-      case 'clients':
-        recipients = await storage.getUsersByRole('client');
-        break;
-      case 'staff':
-        recipients = await storage.getUsersByRole('staff');
-        break;
-      case 'specific':
-        // Note: targetIds field doesn't exist in current schema, so we'll use all users
-        recipients = await storage.getAllUsers();
-        break;
+    const audience = (campaign.audience || '').toString();
+    if ([
+      'all',
+      'clients',
+      'All Clients',
+      'Regular Clients',
+      'New Clients',
+      'Inactive Clients',
+      'Upcoming Appointments',
+    ].includes(audience)) {
+      recipients = await storage.getUsersByRole('client');
+    } else if (audience === 'staff') {
+      recipients = await storage.getUsersByRole('staff');
+    } else if (audience === 'specific' || audience === 'Specific Clients') {
+      const idsRaw: any = (campaign as any).targetClientIds ?? [];
+      let idStrings: string[] = [];
+      if (Array.isArray(idsRaw)) {
+        idStrings = idsRaw as string[];
+      } else if (typeof idsRaw === 'string') {
+        try {
+          const parsed = JSON.parse(idsRaw);
+          if (Array.isArray(parsed)) {
+            idStrings = parsed.map((v: any) => String(v));
+          }
+        } catch {
+          if (idsRaw.startsWith('{') && idsRaw.endsWith('}')) {
+            idStrings = idsRaw.slice(1, -1).split(',').map((s: string) => s.trim()).filter(Boolean);
+          }
+        }
+      }
+
+      const uniqueIds = Array.from(new Set(idStrings.map((s) => parseInt(s)).filter((n) => !Number.isNaN(n))));
+      const fetched = await Promise.all(uniqueIds.map((id) => storage.getUser(id)));
+      recipients = fetched.filter(Boolean) as any[];
+    } else {
+      // Fallback to clients
+      recipients = await storage.getUsersByRole('client');
     }
 
     let sentCount = 0;
@@ -197,9 +220,9 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       }
     }
 
-    // Update campaign status
+    // Update campaign status to 'sent' for UI consistency
     await storage.updateMarketingCampaign(campaignId, {
-      status: 'completed',
+      status: 'sent',
       sentCount,
       failedCount: errorCount,
     } as any);
@@ -314,6 +337,24 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       sentCount,
       errorCount,
     });
+  }));
+
+  // ===== Promo Codes =====
+  app.get("/api/promo-codes", asyncHandler(async (_req: Request, res: Response) => {
+    const codes = await (storage as any).getAllPromoCodes?.() ?? [];
+    res.json(codes);
+  }));
+
+  app.post("/api/promo-codes", validateRequest(insertPromoCodeSchema), asyncHandler(async (req: Request, res: Response) => {
+    const payload = req.body;
+    const created = await (storage as any).createPromoCode?.(payload);
+    res.status(201).json(created);
+  }));
+
+  // ===== Email Unsubscribes =====
+  app.get("/api/unsubscribes", asyncHandler(async (_req: Request, res: Response) => {
+    const unsubscribes = await (storage as any).getAllEmailUnsubscribes?.() ?? [];
+    res.json(unsubscribes);
   }));
 
   // Send promotional SMS

@@ -271,14 +271,37 @@ const MarketingPage = () => {
     },
   });
 
-  // Fetch campaigns from API
+  // Fetch campaigns from API (fallback to legacy path)
   const { data: campaigns = [], isLoading: campaignsLoading } = useQuery<any[]>({
     queryKey: ['/api/marketing-campaigns'],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/marketing-campaigns');
+        return res.json();
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          const res = await apiRequest('GET', '/api/marketing/campaigns');
+          return res.json();
+        }
+        throw err;
+      }
+    }
   });
 
-  // Fetch promo codes from API
+  // Fetch promo codes from API (gracefully handle missing endpoint)
   const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery<any[]>({
     queryKey: ['/api/promo-codes'],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/promo-codes');
+        return res.json();
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          return [] as any[];
+        }
+        throw err;
+      }
+    }
   });
 
   // Fetch SMS configuration status
@@ -286,9 +309,20 @@ const MarketingPage = () => {
     queryKey: ['/api/sms-config-status'],
   });
 
-  // Fetch opt-outs
+  // Fetch opt-outs (gracefully handle missing endpoint)
   const { data: optOuts = [], isLoading: optOutsLoading } = useQuery<any[]>({
     queryKey: ['/api/unsubscribes'],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/unsubscribes');
+        return res.json();
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          return [] as any[];
+        }
+        throw err;
+      }
+    }
   });
 
   // Create campaign mutation
@@ -315,20 +349,17 @@ const MarketingPage = () => {
         })
       };
       
-      const response = await fetch('/api/marketing-campaigns', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create campaign: ${response.status} ${errorText}`);
+      // Try new path first, then legacy
+      try {
+        const res = await apiRequest('POST', '/api/marketing-campaigns', payload);
+        return res.json();
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          const res = await apiRequest('POST', '/api/marketing/campaigns', payload);
+          return res.json();
+        }
+        throw err;
       }
-      
-      return response.json();
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
@@ -361,19 +392,16 @@ const MarketingPage = () => {
   // Send campaign mutation
   const sendCampaignMutation = useMutation({
     mutationFn: async (campaignId: number) => {
-      const response = await fetch(`/api/marketing-campaigns/${campaignId}/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to send campaign');
+      try {
+        const res = await apiRequest('POST', `/api/marketing-campaigns/${campaignId}/send`);
+        return res.json();
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          const res = await apiRequest('POST', `/api/marketing/campaigns/${campaignId}/send`);
+          return res.json();
+        }
+        throw err;
       }
-      
-      return response.json();
     },
     onSuccess: (data) => {
       // Force immediate refresh of campaign data to update status
@@ -782,6 +810,18 @@ const MarketingPage = () => {
                                 className="w-full sm:w-auto"
                               >
                                 {sendCampaignMutation.isPending ? "Sending..." : "Send"}
+                                <ArrowRight className="h-4 w-4 ml-1" />
+                              </Button>
+                            )}
+                            {campaign.status === "scheduled" && (
+                              <Button 
+                                variant="default" 
+                                size="sm"
+                                onClick={() => handleSendCampaign(campaign.id, campaign.type)}
+                                disabled={sendCampaignMutation.isPending}
+                                className="w-full sm:w-auto"
+                              >
+                                {sendCampaignMutation.isPending ? "Sending..." : "Send Now"}
                                 <ArrowRight className="h-4 w-4 ml-1" />
                               </Button>
                             )}

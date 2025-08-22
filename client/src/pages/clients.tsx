@@ -1191,10 +1191,12 @@ const ClientsPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
+      <div className="hidden lg:block">
+        <SidebarController />
+      </div>
       
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
+        sidebarOpen ? 'lg:ml-64 ml-0' : 'ml-0'
       }`}>
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 md:p-6">
@@ -1282,7 +1284,7 @@ const ClientsPage = () => {
                     </Button>
                     <div>
                       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                        {getFullName(clientDetail?.firstName, clientDetail?.lastName) || 'Client Profile'}
+                        {getFullName(clientDetail?.firstName, clientDetail?.lastName, clientDetail?.username) || 'Client Profile'}
                       </h1>
                       <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                         Client Profile & Payment Methods
@@ -1363,7 +1365,7 @@ const ClientsPage = () => {
                             <div className="flex items-center space-x-3 flex-1 min-w-0">
                               <div className="flex-1 min-w-0">
                                 <div className="font-medium text-base text-gray-900 dark:text-gray-100 truncate">
-                                  {getFullName(client.firstName, client.lastName)}
+                                  {getFullName(client.firstName, client.lastName, (client as any).username)}
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
                                   {client.email}
@@ -1428,7 +1430,7 @@ const ClientsPage = () => {
                             <TableRow key={client.id}>
                               <TableCell>
                                 <div className="font-medium">
-                                  {getFullName(client.firstName, client.lastName)}
+                                  {getFullName(client.firstName, client.lastName, (client as any).username)}
                                 </div>
                               </TableCell>
                               <TableCell>{client.email}</TableCell>
@@ -1495,7 +1497,7 @@ const ClientsPage = () => {
                     <CardTitle>
                       <div>
                         <h3 className="text-xl font-semibold">
-                          {getFullName(clientDetail?.firstName, clientDetail?.lastName) || 'Client'}
+                          {getFullName(clientDetail?.firstName, clientDetail?.lastName, clientDetail?.username) || 'Client'}
                         </h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">
                           Client since {new Date(clientDetail?.createdAt || Date.now()).toLocaleDateString()}
@@ -1612,7 +1614,7 @@ const ClientsPage = () => {
                 {clientDetail && (
                   <ClientAnalytics 
                     clientId={clientDetail.id} 
-                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                   />
                 )}
 
@@ -1620,7 +1622,7 @@ const ClientsPage = () => {
                 {clientDetail && (
                   <ClientCommunication 
                     clientId={clientDetail.id}
-                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                     clientEmail={clientDetail.email}
                     clientPhone={clientDetail.phone}
                   />
@@ -1630,7 +1632,7 @@ const ClientsPage = () => {
                 {clientDetail && (
                   <ClientPaymentMethods 
                     clientId={clientDetail.id} 
-                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || 'Client'}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                   />
                 )}
 
@@ -1641,7 +1643,7 @@ const ClientsPage = () => {
                 {clientDetail && (
                   <ClientFormSubmissions 
                     clientId={clientDetail.id} 
-                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName) || clientDetail.username}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || clientDetail.username}
                   />
                 )}
 
@@ -2346,7 +2348,7 @@ const ClientsPage = () => {
             <AlertDialogDescription>
               This will permanently delete the client{' '}
               <span className="font-semibold">
-                {selectedClient && getFullName(selectedClient.firstName, selectedClient.lastName)}
+                {selectedClient && getFullName(selectedClient.firstName, selectedClient.lastName, (selectedClient as any).username)}
               </span>{' '}
               and all associated data. This action cannot be undone.
             </AlertDialogDescription>

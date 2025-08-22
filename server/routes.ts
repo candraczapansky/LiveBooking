@@ -35,6 +35,7 @@ import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
+import { registerFormsRoutes } from "./routes/forms.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
 
@@ -75,6 +76,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerNotificationRoutes(app, storage);
   registerPaymentRoutes(app, storage);
   registerMarketingRoutes(app, storage);
+  registerFormsRoutes(app, storage);
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));

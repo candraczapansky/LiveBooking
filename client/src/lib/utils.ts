@@ -59,9 +59,8 @@ export function getInitials(firstName?: string, lastName?: string): string {
   return initials;
 }
 
-export function getFullName(firstName?: string, lastName?: string): string {
-  if (!firstName && !lastName) return 'Unknown User';
-  
+export function getFullName(firstName?: string, lastName?: string, username?: string): string {
+  if (!firstName && !lastName) return username || 'Unknown User';
   return [firstName, lastName].filter(Boolean).join(' ');
 }
 
