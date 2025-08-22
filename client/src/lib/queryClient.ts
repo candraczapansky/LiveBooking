@@ -42,6 +42,17 @@ export async function apiRequest(
   // Always use relative URLs
   const fullUrl = url.startsWith('/') ? url : `/${url}`;
 
+  const isPublicRoute = () => {
+    const pathname = window.location?.pathname || '';
+    return (
+      pathname === '/login' ||
+      pathname.startsWith('/forgot-password') ||
+      pathname.startsWith('/reset-password') ||
+      pathname.startsWith('/booking') ||
+      /^\/forms\/[\w-]+/.test(pathname)
+    );
+  };
+
   try {
     const res = await fetch(fullUrl, {
       method,
@@ -56,8 +67,10 @@ export async function apiRequest(
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
-      // Redirect to login
-      window.location.href = '/login';
+      // Avoid redirect loops on public routes (login, password reset, public forms, etc.)
+      if (!isPublicRoute()) {
+        window.location.href = '/login';
+      }
       throw new Error('Authentication required');
     }
 
@@ -88,6 +101,17 @@ export const getQueryFn: <T>(options: {
     // Always use relative URLs
     const fullUrl = (queryKey[0] as string).startsWith('/') ? queryKey[0] as string : `/${queryKey[0]}`;
 
+    const isPublicRoute = () => {
+      const pathname = window.location?.pathname || '';
+      return (
+        pathname === '/login' ||
+        pathname.startsWith('/forgot-password') ||
+        pathname.startsWith('/reset-password') ||
+        pathname.startsWith('/booking') ||
+        /^\/forms\/[\w-]+/.test(pathname)
+      );
+    };
+
     try {
       const res = await fetch(fullUrl, {
         headers,
@@ -104,8 +128,10 @@ export const getQueryFn: <T>(options: {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         
-        // Redirect to login
-        window.location.href = '/login';
+        // Redirect to login unless on a public route
+        if (!isPublicRoute()) {
+          window.location.href = '/login';
+        }
         throw new Error('Authentication required');
       }
 

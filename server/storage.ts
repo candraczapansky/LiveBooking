@@ -2399,7 +2399,7 @@ Glo Head Spa`,
   }
 
   async getAllMarketingCampaigns(): Promise<MarketingCampaign[]> {
-    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.createdAt));
+    return await db.select().from(marketingCampaigns).orderBy(desc(marketingCampaigns.id));
   }
 
   async getMarketingCampaigns(): Promise<MarketingCampaign[]> {

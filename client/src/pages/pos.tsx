@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
+import HelcimPay from "@/components/payment/helcim-pay";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 
 
@@ -429,7 +429,7 @@ export default function PointOfSale() {
           },
           body: JSON.stringify({
             transactionId: result.transactionId,
-            deviceCode: selectedDevice || 'HF1N', // Use selected device or default to HF1N
+            deviceCode: 'HF1N',
             paymentId: null // No specific payment ID for POS transactions
           }),
         });
@@ -665,7 +665,7 @@ export default function PointOfSale() {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="hidden lg:block">
-        <SidebarController />
+        <SidebarController isOpen={true} isMobile={false} />
       </div>
       
       <div className="flex-1 flex flex-col transition-all duration-300">
@@ -1298,18 +1298,7 @@ export default function PointOfSale() {
                         </div>
 
                         <div className="space-y-2">
-                          <CheckoutWithTerminal
-                            locationId={selectedLocation?.id || ''}
-                            amount={getGrandTotal()}
-                            description="POS Transaction"
-                            onPaymentComplete={(result) => {
-                              handlePaymentSuccess(result);
-                              setIsCheckoutOpen(false);
-                            }}
-                            onPaymentError={(error) => {
-                              handlePaymentError(error);
-                            }}
-                          />
+                          {/* Terminal quick access omitted to reduce complexity during HelcimPay.js rollout */}
                           <Button
                             className="w-full"
                             onClick={() => setIsCheckoutOpen(true)}
@@ -1415,6 +1404,8 @@ export default function PointOfSale() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Smart Terminal Payment</label>
                 <SmartTerminalPayment
+                  open={true}
+                  onOpenChange={() => {}}
                   amount={getGrandTotal()}
                   description={`POS Sale - ${cart.length} item${cart.length > 1 ? 's' : ''}`}
                   onSuccess={handleTerminalSuccess}
@@ -1638,16 +1629,21 @@ export default function PointOfSale() {
         </DialogContent>
       </Dialog>
 
-      {/* Helcim Payment Modal */}
-      <HelcimPayJsModal
+      {/* Helcim Pay.js Modal */}
+      <HelcimPay
         open={showHelcimModal}
         onOpenChange={setShowHelcimModal}
-        amount={getSubtotal() + getTax()}
-        tipAmount={tipAmount}
-        clientId={selectedClient?.id}
+        amount={getGrandTotal()}
         description="POS transaction payment"
-        type="pos_payment"
-        onSuccess={handleHelcimSuccess}
+        customerEmail={selectedClient?.email || undefined}
+        customerName={selectedClient?.firstName && selectedClient?.lastName ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient?.username}
+        onSuccess={(data: any) => {
+          const paymentId = data?.payment?.id || data?.payment?.paymentId || data?.payment?.transactionId || data?.id || data?.transactionId;
+          if (!paymentId) {
+            return handleHelcimError('Missing payment ID from Helcim response');
+          }
+          handleHelcimSuccess(String(paymentId));
+        }}
         onError={handleHelcimError}
       />
 

@@ -363,6 +363,7 @@ const MarketingPage = () => {
     },
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
+      queryClient.refetchQueries({ queryKey: ['/api/marketing-campaigns'] });
       setIsCampaignFormOpen(false);
       campaignForm.reset();
       setSelectedClients([]); // Reset selected clients

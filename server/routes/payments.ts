@@ -630,6 +630,113 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     });
   }));
 
+  // POS transactions - create payment + sales history (used by POS UI)
+  app.post("/api/transactions", asyncHandler(async (req: Request, res: Response) => {
+    const body = req.body || {};
+    const {
+      clientId,
+      items = [],
+      subtotal = 0,
+      tax = 0,
+      tipAmount = 0,
+      total = 0,
+      paymentMethod = 'card',
+      description = 'POS Sale',
+      helcimPaymentId,
+      helcimTransactionId,
+      cardLast4,
+      terminalPaymentMethod,
+    } = body;
+
+    // Create payment record
+    const payment = await storage.createPayment({
+      clientId: clientId || 1, // Fallback to default client if not provided
+      amount: subtotal || total,
+      tipAmount: tipAmount || 0,
+      totalAmount: total || (subtotal + tax + (tipAmount || 0)),
+      method: paymentMethod || 'card',
+      status: 'completed',
+      type: 'pos_payment',
+      description,
+      helcimPaymentId: helcimPaymentId || helcimTransactionId || body.paymentId || null,
+      paymentDate: new Date(),
+      processedAt: new Date(),
+      // Optional fields left null: appointmentId, clientMembershipId, notes
+    } as any);
+
+    // Build sales history details
+    const now = new Date();
+    const dayOfWeek = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+    const monthYear = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const quarter = `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1)/3)}`;
+
+    const productItems = (Array.isArray(items) ? items : []).filter((i: any) => i?.type === 'product');
+    const serviceItems = (Array.isArray(items) ? items : []).filter((i: any) => i?.type === 'service');
+
+    const productIds = JSON.stringify(productItems.map((i: any) => i?.item?.id).filter(Boolean));
+    const productNames = JSON.stringify(productItems.map((i: any) => i?.item?.name).filter(Boolean));
+    const productQuantities = JSON.stringify(productItems.map((i: any) => i?.quantity ?? 1));
+    const productUnitPrices = JSON.stringify(productItems.map((i: any) => i?.item?.price ?? 0));
+
+    const serviceIds = JSON.stringify(serviceItems.map((i: any) => i?.item?.id).filter(Boolean));
+    const serviceNames = JSON.stringify(serviceItems.map((i: any) => i?.item?.name).filter(Boolean));
+
+    await storage.createSalesHistory({
+      transactionType: 'pos_sale',
+      transactionDate: now,
+      paymentId: payment.id,
+      totalAmount: payment.totalAmount,
+      paymentMethod: payment.method,
+      paymentStatus: payment.status,
+      
+      clientId: payment.clientId,
+      clientName: null,
+      clientEmail: null,
+      clientPhone: null,
+      
+      staffId: null,
+      staffName: null,
+      
+      appointmentId: null,
+      serviceIds,
+      serviceNames,
+      serviceTotalAmount: serviceItems.reduce((sum: number, i: any) => sum + (i?.total ?? 0), 0),
+      
+      productIds,
+      productNames,
+      productQuantities,
+      productUnitPrices,
+      productTotalAmount: productItems.reduce((sum: number, i: any) => sum + (i?.total ?? 0), 0),
+      
+      membershipId: null,
+      membershipName: null,
+      membershipDuration: null,
+      
+      taxAmount: tax || 0,
+      tipAmount: tipAmount || 0,
+      discountAmount: 0,
+      
+      businessDate: new Date(now.getFullYear(), now.getMonth(), now.getDate()) as any,
+      dayOfWeek,
+      monthYear,
+      quarter,
+      
+      helcimPaymentId: payment.helcimPaymentId || null,
+      
+      createdBy: null,
+      notes: description,
+    } as any);
+
+    return res.json({
+      success: true,
+      transactionId: payment.id,
+      total: payment.totalAmount,
+      paymentMethod: payment.method,
+      cardLast4: cardLast4 || null,
+      terminalPaymentMethod: terminalPaymentMethod || null,
+    });
+  }));
+
   // Legacy create-payment endpoint retained for cash only; card moves to HelcimPay.js
   app.post("/api/create-payment", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
