@@ -639,24 +639,43 @@ CRITICAL FUNCTION CALLING RULES:
   }
 
   private async callOpenAI(systemPrompt: string, userPrompt: string, functions?: any[]): Promise<LLMResponse> {
+    // Route to Responses API for newer models or when explicitly enabled; otherwise use Chat Completions
+    const useResponses = this.shouldUseResponsesAPI();
+    if (useResponses) {
+      const res = await this.callOpenAIResponses(systemPrompt, userPrompt, functions);
+      // If Responses API fails due to model/endpoint mismatch, fall back to Chat Completions
+      if (!res.success && (res.error || '').toLowerCase().includes('unsupported') || (res.error || '').toLowerCase().includes('not found') || (res.error || '').toLowerCase().includes('invalid')) {
+        console.warn('LLM Service: Falling back to Chat Completions after Responses API error');
+        return await this.callOpenAIChatCompletions(systemPrompt, userPrompt, functions);
+      }
+      return res;
+    }
+    return await this.callOpenAIChatCompletions(systemPrompt, userPrompt, functions);
+  }
+
+  private shouldUseResponsesAPI(): boolean {
     try {
-      // Get API key from database first, then fallback to environment variable
+      const envOverride = (process.env.OPENAI_USE_RESPONSES_API || '').toLowerCase();
+      if (envOverride === 'true' || envOverride === '1' || envOverride === 'yes') return true;
+      const model = (this.config.model || '').toLowerCase();
+      // Prefer Responses API for modern models (adjust list as new models appear)
+      const hints = ['gpt-5', 'chatgpt-5', 'chatcpt', 'gpt-4.1', 'gpt-4o', 'omni'];
+      return hints.some(h => model.includes(h));
+    } catch {
+      return false;
+    }
+  }
+
+  private async callOpenAIChatCompletions(systemPrompt: string, userPrompt: string, functions?: any[]): Promise<LLMResponse> {
+    try {
       const apiKey = await this.ensureApiKey();
-      
       if (!apiKey) {
         console.error('LLM Service: OpenAI API key not configured');
-        return {
-          success: false,
-          error: 'OpenAI API key not configured'
-        };
+        return { success: false, error: 'OpenAI API key not configured' };
       }
-      
-      console.log('LLM Service: API key found, proceeding with OpenAI call...');
-
-      console.log('LLM Service: Making OpenAI API call...');
+      console.log('LLM Service: Making Chat Completions API call...');
       console.log('LLM Service: Model:', this.config.model);
       console.log('LLM Service: Max tokens:', this.config.maxTokens);
-
       const requestBody: any = {
         model: this.config.model,
         messages: [
@@ -666,13 +685,10 @@ CRITICAL FUNCTION CALLING RULES:
         max_tokens: this.config.maxTokens,
         temperature: this.config.temperature
       };
-
-      // Add functions if provided
       if (functions && functions.length > 0) {
         requestBody.functions = functions;
         requestBody.function_call = 'auto';
       }
-
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -681,53 +697,131 @@ CRITICAL FUNCTION CALLING RULES:
         },
         body: JSON.stringify(requestBody)
       });
-
-      console.log('LLM Service: Response status:', response.status);
-
+      console.log('LLM Service: Chat Completions status:', response.status);
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('LLM Service: OpenAI API error:', errorData);
-        return {
-          success: false,
-          error: `OpenAI API error: ${errorData.error?.message || response.statusText}`
-        };
+        const errorData = await safeJson(response);
+        console.error('LLM Service: Chat Completions error:', errorData);
+        return { success: false, error: `OpenAI API error: ${errorData?.error?.message || response.statusText}` };
       }
-
       const data = await response.json();
       const message = data.choices?.[0]?.message?.content;
       const functionCall = data.choices?.[0]?.message?.function_call;
-
       if (!message && !functionCall) {
-        console.error('LLM Service: No response generated from OpenAI');
-        return {
-          success: false,
-          error: 'No response generated from OpenAI'
-        };
+        console.error('LLM Service: No response generated from OpenAI (chat completions)');
+        return { success: false, error: 'No response generated from OpenAI' };
       }
-
-      console.log('LLM Service: Successfully generated response');
-      if (message) {
-        console.log('LLM Service: Response preview:', message.substring(0, 100) + '...');
-      }
-      if (functionCall) {
-        console.log('LLM Service: Function call detected:', functionCall.name);
-      }
-
       return {
         success: true,
         message,
-        functionCall: functionCall ? {
-          name: functionCall.name,
-          arguments: JSON.parse(functionCall.arguments)
-        } : undefined
+        functionCall: functionCall ? { name: functionCall.name, arguments: parseJsonSafe(functionCall.arguments) } : undefined
       };
-
     } catch (error: any) {
-      console.error('LLM Service: OpenAI API call failed:', error);
-      return {
-        success: false,
-        error: `OpenAI API call failed: ${error.message}`
+      console.error('LLM Service: Chat Completions call failed:', error);
+      return { success: false, error: `OpenAI API call failed: ${error.message}` };
+    }
+  }
+
+  private async callOpenAIResponses(systemPrompt: string, userPrompt: string, functions?: any[]): Promise<LLMResponse> {
+    try {
+      const apiKey = await this.ensureApiKey();
+      if (!apiKey) {
+        console.error('LLM Service: OpenAI API key not configured');
+        return { success: false, error: 'OpenAI API key not configured' };
+      }
+      console.log('LLM Service: Making Responses API call...');
+      console.log('LLM Service: Model:', this.config.model);
+      console.log('LLM Service: Max tokens:', this.config.maxTokens);
+      const tools = functions && functions.length > 0 ? functions.map((fn: any) => ({
+        type: 'function',
+        function: {
+          name: fn.name,
+          description: fn.description,
+          parameters: fn.parameters
+        }
+      })) : undefined;
+      const requestBody: any = {
+        model: this.config.model,
+        input: [
+          { role: 'system', content: [{ type: 'input_text', text: systemPrompt }] },
+          { role: 'user', content: [{ type: 'input_text', text: userPrompt }] }
+        ],
+        max_output_tokens: this.config.maxTokens,
+        temperature: this.config.temperature
       };
+      if (tools) {
+        requestBody.tools = tools;
+        requestBody.tool_choice = 'auto';
+      }
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(requestBody)
+      });
+      console.log('LLM Service: Responses API status:', response.status);
+      if (!response.ok) {
+        const errorData = await safeJson(response);
+        console.error('LLM Service: Responses API error:', errorData);
+        return { success: false, error: `OpenAI API error: ${errorData?.error?.message || response.statusText}` };
+      }
+      const data = await response.json();
+      const parsed = this.parseResponsesApiOutput(data);
+      if (!parsed.message && !parsed.functionCall) {
+        console.error('LLM Service: No response generated from OpenAI (responses)');
+        return { success: false, error: 'No response generated from OpenAI' };
+      }
+      return { success: true, message: parsed.message, functionCall: parsed.functionCall };
+    } catch (error: any) {
+      console.error('LLM Service: Responses API call failed:', error);
+      return { success: false, error: `OpenAI API call failed: ${error.message}` };
+    }
+  }
+
+  private parseResponsesApiOutput(data: any): { message?: string; functionCall?: { name: string; arguments: any } } {
+    try {
+      // 1) Direct text helper if present
+      if (typeof data?.output_text === 'string' && data.output_text.trim().length > 0) {
+        return { message: data.output_text };
+      }
+      // 2) Inspect output array for messages and tool calls
+      const output = Array.isArray(data?.output) ? data.output : [];
+      let textParts: string[] = [];
+      let toolCall: { name: string; arguments: any } | undefined = undefined;
+      for (const item of output) {
+        // Some variants: item.type === 'message' and item.content is an array
+        const contentArr = Array.isArray(item?.content) ? item.content : [];
+        for (const c of contentArr) {
+          const ctype = (c?.type || '').toLowerCase();
+          if (ctype.includes('text')) {
+            const t = c?.text || c?.value || '';
+            if (typeof t === 'string' && t) textParts.push(t);
+          }
+          if (ctype.includes('tool_call')) {
+            const name = c?.name || c?.tool_name || c?.function?.name;
+            const argsRaw = c?.arguments || c?.function?.arguments;
+            const args = typeof argsRaw === 'string' ? parseJsonSafe(argsRaw) : argsRaw;
+            if (name) toolCall = { name, arguments: args };
+          }
+        }
+        // Some variants might emulate chat.message with tool_calls array
+        const msg = item?.message || item; // fallback
+        const mFuncCalls = msg?.tool_calls || msg?.function_call ? (Array.isArray(msg?.tool_calls) ? msg.tool_calls : [msg.function_call]) : [];
+        for (const tc of mFuncCalls) {
+          const name = tc?.name || tc?.function?.name;
+          const argsRaw = tc?.arguments || tc?.function?.arguments;
+          const args = typeof argsRaw === 'string' ? parseJsonSafe(argsRaw) : argsRaw;
+          if (name && !toolCall) toolCall = { name, arguments: args };
+        }
+        const maybeText = msg?.content || msg?.text;
+        if (typeof maybeText === 'string') textParts.push(maybeText);
+      }
+      const message = textParts.join('\n').trim() || undefined;
+      return { message, functionCall: toolCall };
+    } catch (e) {
+      console.error('LLM Service: Failed to parse Responses API output:', e);
+      return {};
     }
   }
 

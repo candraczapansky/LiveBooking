@@ -265,12 +265,35 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
     LoggerService.info("Creating email template", { ...context, name });
 
-    const template = await (storage as any).createEmailTemplate({
-      name,
-      subject,
-      htmlContent,
-      variables: variables || [],
-    });
+    let template: any;
+    if (typeof (storage as any).createEmailTemplate === 'function') {
+      template = await (storage as any).createEmailTemplate({
+        name,
+        subject,
+        htmlContent,
+        variables: variables || [],
+      });
+    } else {
+      // Fallback: store template in system_config under 'email_templates'
+      const id = `tmpl_${Date.now()}`;
+      const record = {
+        id,
+        name,
+        subject: subject || null,
+        htmlContent,
+        variables: variables || [],
+        createdAt: new Date().toISOString(),
+      } as any;
+      await storage.setSystemConfig({
+        key: `email_template:${id}`,
+        value: JSON.stringify(record),
+        description: `Email template: ${name}`,
+        category: 'email_templates',
+        isEncrypted: false,
+        isActive: true,
+      } as any);
+      template = record;
+    }
 
     LoggerService.info("Email template created", { ...context, templateId: template.id });
 
@@ -283,7 +306,24 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
     LoggerService.debug("Fetching email templates", context);
 
-    const templates = await (storage as any).getEmailTemplates?.() ?? [];
+    let templates: any[] = [];
+    if (typeof (storage as any).getEmailTemplates === 'function') {
+      templates = await (storage as any).getEmailTemplates();
+    } else {
+      // Fallback: read from system_config category 'email_templates'
+      const rows = await storage.getSystemConfigByCategory('email_templates');
+      for (const row of rows) {
+        try {
+          const parsed = JSON.parse((row as any).value || '{}');
+          if (parsed && parsed.id && parsed.name) {
+            templates.push(parsed);
+          }
+        } catch {
+          // ignore
+        }
+      }
+      templates.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    }
 
     LoggerService.info("Email templates fetched", { ...context, count: templates.length });
     res.json(templates);

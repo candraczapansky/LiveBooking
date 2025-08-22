@@ -136,13 +136,9 @@ async function findAvailablePort(startPort: number): Promise<number> {
     // Determine port: In production (Cloud Run/Replit Deploy), use provided PORT and do not scan.
     // Only scan for an open port during local development convenience.
     const isDevelopment = app.get("env") === "development";
-    const defaultPort = isDevelopment ? '3002' : (process.env.PORT || '5000');
-    const preferredPort = parseInt(process.env.PORT || defaultPort);
-    const port = isDevelopment ? await findAvailablePort(preferredPort) : preferredPort;
-
-    if (isDevelopment && port !== preferredPort) {
-      console.log(`⚠️  Port ${preferredPort} was in use, using port ${port} instead`);
-    }
+    // Force a fixed port in development so the frontend and backend share the same origin
+    const preferredPort = parseInt(process.env.PORT || '3002');
+    const port = preferredPort;
 
     server.listen({
       port,

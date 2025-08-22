@@ -36,7 +36,7 @@ const formFormSchema = z.object({
   title: z.string().min(1, "Form title is required"),
   description: z.string().optional(),
   type: z.enum(["intake", "feedback", "booking"]),
-  status: z.enum(["active", "draft", "inactive"]).default("draft"),
+  status: z.enum(["active", "draft", "inactive"]).default("active"),
 });
 
 type FormFormValues = z.infer<typeof formFormSchema>;
@@ -57,7 +57,7 @@ export function FormForm({ open, onOpenChange, formId }: FormFormProps) {
       title: "",
       description: "",
       type: "intake",
-      status: "draft",
+      status: "active",
     },
   });
 
@@ -68,7 +68,7 @@ export function FormForm({ open, onOpenChange, formId }: FormFormProps) {
         title: "",
         description: "",
         type: "intake",
-        status: "draft",
+        status: "active",
       });
     }
   }, [open, form]);

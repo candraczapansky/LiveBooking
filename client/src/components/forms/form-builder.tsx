@@ -85,7 +85,7 @@ class ErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <Dialog open={true} onOpenChange={() => {}}>
-          <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+          <DialogContent className="w-[calc(100vw-2rem)] md:max-w-[90vw] max-w-[1100px] max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader className="flex-shrink-0">
               <DialogTitle>Error in Form Builder</DialogTitle>
             </DialogHeader>
@@ -461,7 +461,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
       title: "",
       description: "",
       type: "intake",
-      status: "draft",
+      status: "active",
     },
   });
 
@@ -495,7 +495,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           title: "",
           description: "",
           type: "intake",
-          status: "draft",
+          status: "active",
         });
         setFields([]);
         console.log("Fields reset to empty array");
@@ -1229,7 +1229,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   if (formId && isLoadingForm) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[calc(100vw-2rem)] md:max-w-[90vw] max-w-[1100px] max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Loading Form...</DialogTitle>
           </DialogHeader>
@@ -1245,7 +1245,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   if (formId && formError) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[calc(100vw-2rem)] md:max-w-[90vw] max-w-[1100px] max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Error Loading Form</DialogTitle>
           </DialogHeader>
@@ -1271,7 +1271,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   return (
     <ErrorBoundary>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[calc(100vw-2rem)] md:max-w-[90vw] max-w-[1100px] max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>{formId ? "Edit Form" : "Form Builder"}</DialogTitle>
             <DialogDescription>
@@ -1281,7 +1281,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex flex-1 min-h-0 gap-4">
+          <div className="flex flex-1 min-h-0 gap-4 overflow-x-hidden">
             {/* Left Sidebar - Field Types */}
             <div className="w-64 border-r border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">

@@ -90,7 +90,7 @@ const PersistentMobileMenu = () => {
     { icon: MapPin, label: "Rooms", href: "/rooms" },
     { icon: Monitor, label: "Devices", href: "/devices" },
     
-    { icon: BarChart3, label: "isights", href: "#", children: [
+    { icon: BarChart3, label: "insights", href: "#", children: [
       { icon: BarChart3, label: "Reports", href: "/reports" },
       { icon: DollarSign, label: "Payroll", href: "/payroll" },
     ]},

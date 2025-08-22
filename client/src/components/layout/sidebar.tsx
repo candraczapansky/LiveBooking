@@ -45,13 +45,15 @@ interface SidebarItemProps {
 }
 
 const SidebarItem = ({ icon, label, href, isActive, isOpen, onClick }: SidebarItemProps) => {
+  const [, navigate] = useLocation();
   return (
     <a 
       href={href}
       onClick={(e) => {
         e.preventDefault();
         onClick();
-        window.location.href = href; // Use window.location for proper page reload
+        // Use client-side navigation to avoid full page reloads and 404s behind proxies
+        navigate(href);
       }}
       className={`
         flex items-center px-4 py-3 text-sm font-medium rounded-lg
@@ -135,7 +137,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
     { icon: <UserCircle className="w-5 h-5" strokeWidth={1.75} />, label: "Staff", href: "/staff" },
     { icon: <Scissors className="w-5 h-5" strokeWidth={1.75} />, label: "services", href: "#" },
     { icon: <ShoppingBag className="w-5 h-5" strokeWidth={1.75} />, label: "Retail", href: "#" },
-    { icon: <BarChart3 className="w-5 h-5" strokeWidth={1.75} />, label: "isights", href: "#" },
+    { icon: <BarChart3 className="w-5 h-5" strokeWidth={1.75} />, label: "insights", href: "#" },
     { icon: <Building2 className="w-5 h-5" strokeWidth={1.75} />, label: "business", href: "#" },
     { icon: <Mail className="w-5 h-5" strokeWidth={1.75} />, label: "SMS & Email", href: "#" },
     { icon: <Phone className="w-5 h-5" strokeWidth={1.75} />, label: "Phone", href: "/phone" },
@@ -492,7 +494,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                   </div>
                 );
               }
-              if (item.label === 'isights') {
+              if (item.label === 'insights') {
                 const isActive = isInInsightsSection;
                 return (
                   <div key={item.label} className="mb-1">

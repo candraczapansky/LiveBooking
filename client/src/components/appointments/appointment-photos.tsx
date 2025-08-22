@@ -98,6 +98,14 @@ export default function AppointmentPhotos({ appointmentId, onPhotosUpdated }: Ap
     setIsLoading(true);
     try {
       const response = await apiRequest('GET', `/api/appointments/${appointmentId}/photos`);
+      const contentType = response.headers.get('content-type') || '';
+      if (!response.ok) {
+        throw new Error(`Failed to load photos (${response.status})`);
+      }
+      if (!contentType.includes('application/json')) {
+        // Avoid JSON parse error if HTML or other content is returned
+        throw new Error('Unexpected response while loading photos');
+      }
       const photos = await response.json();
       setPhotos(photos);
     } catch (error) {

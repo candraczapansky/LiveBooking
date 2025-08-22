@@ -33,7 +33,7 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>("day");
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
@@ -828,14 +828,22 @@ const AppointmentsPage = () => {
           justify-content: center !important;
           border-radius: 0.375rem !important;
         }
+
+        /* Mini calendar: highlight the selected date when in day view */
+        .appointments-mini-calendar[data-mini-mode='day'] .rdp-day[aria-selected='true'] {
+          box-shadow: inset 0 0 0 2px hsl(var(--primary));
+          color: hsl(var(--primary));
+          background: transparent !important;
+          border-radius: 0.375rem;
+        }
       `}</style>
       <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />
       <div className="min-h-screen flex flex-col transition-all duration-300">
         <main className="flex-1 p-3 sm:p-4 md:p-6">
           <div className="max-w-7xl mx-auto flex flex-row gap-3 sm:gap-4 lg:gap-6">
             {/* Left Sidebar: Mini Calendar */}
-            <div className="appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px]">
-              <Card className="p-2 sm:p-3 w-[260px] sm:w-[280px]">
+            <div className="appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px]" data-mini-mode={calendarView}>
+              <Card className={`p-2 sm:p-3 w-[260px] sm:w-[280px] ${calendarView === 'month' ? 'border-2 border-primary ring-2 ring-primary ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900' : ''}`}>
                 <MiniCalendar
                   mode="single"
                   selected={selectedDate}
@@ -843,7 +851,7 @@ const AppointmentsPage = () => {
                     setSelectedDate(date as Date);
                     setCalendarView('day');
                   }}
-                  className="w-full rounded-lg border bg-white dark:bg-gray-900 dark:border-gray-800 shadow-sm"
+                  className={`w-full rounded-lg ${calendarView === 'month' ? 'border-2 border-primary' : 'border dark:border-gray-800'} bg-white dark:bg-gray-900 shadow-sm`}
                   classNames={{
                     months: "space-y-2",
                     month: "space-y-2",
@@ -853,6 +861,12 @@ const AppointmentsPage = () => {
                     head_cell: "text-muted-foreground w-9 text-center",
                     cell: "h-9 w-9 text-center p-0",
                     day: "h-9 w-9 p-0 font-normal",
+                    ...(calendarView === 'day'
+                      ? {
+                          day_selected:
+                            "border-2 border-primary bg-primary/10 text-primary ring-2 ring-primary",
+                        }
+                      : {}),
                   }}
                   numberOfMonths={1}
                   fixedWeeks
@@ -962,7 +976,7 @@ const AppointmentsPage = () => {
                   
                   <div className="w-full">
                     <div
-                      className="appointments-calendar-container overflow-x-auto w-full touch-manipulation"
+                      className="appointments-calendar-container overflow-x-auto w-full touch-manipulation rounded-lg border-2 border-primary"
                       style={{ 
                         minWidth: `${Math.max((filteredResources?.length || 0) * 220, 360)}px`
                       }}

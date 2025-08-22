@@ -27,6 +27,7 @@ import {
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
+import { registerAppointmentPhotoRoutes } from "./routes/appointment-photos.js";
 import { registerServiceRoutes } from "./routes/services.js";
 import { registerProductRoutes } from "./routes/products.js";
 import { registerLocationRoutes } from "./routes/locations.js";
@@ -36,6 +37,9 @@ import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
 import { registerFormsRoutes } from "./routes/forms.js";
+import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
+import { registerLLMRoutes } from "./routes/llm.js";
+import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
 
@@ -68,6 +72,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerAuthRoutes(app, storage);
   registerUserRoutes(app, storage);
   registerAppointmentRoutes(app, storage);
+  // Register appointment photos routes (used by AppointmentPhotos component)
+  registerAppointmentPhotoRoutes(app, storage);
   registerServiceRoutes(app, storage);
   registerProductRoutes(app, storage);
   registerLocationRoutes(app, storage);
@@ -77,6 +83,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerPaymentRoutes(app, storage);
   registerMarketingRoutes(app, storage);
   registerFormsRoutes(app, storage);
+  registerBusinessKnowledgeRoutes(app, storage);
+  registerLLMRoutes(app, storage);
+  registerSmsAutoRespondRoutes(app, storage);
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));
@@ -92,6 +101,37 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error("Error getting staff:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to get staff"
+      });
+    }
+  });
+
+  // Get a single staff member by id (needed by appointment details)
+  app.get("/api/staff/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid staff id" });
+      }
+
+      let staffMember = await storage.getStaff(id);
+      // Fallback: some data paths may pass userId instead of staff.id
+      if (!staffMember && (storage as any).getStaffByUserId) {
+        staffMember = await (storage as any).getStaffByUserId(id);
+      }
+      // Final fallback: search from list
+      if (!staffMember && (storage as any).getAllStaff) {
+        const list = await (storage as any).getAllStaff();
+        staffMember = list.find((s: any) => s?.id === id);
+      }
+
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+      res.json(staffMember);
+    } catch (error) {
+      console.error("Error getting staff member:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get staff member",
       });
     }
   });

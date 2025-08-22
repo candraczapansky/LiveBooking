@@ -467,6 +467,15 @@ export interface IStorage {
   createUserDirectPermission(data: InsertUserDirectPermission): Promise<UserDirectPermission>;
   updateUserDirectPermission(id: number, data: Partial<UserDirectPermission>): Promise<UserDirectPermission>;
   deleteUserDirectPermission(id: number): Promise<void>;
+
+  // Email Templates stored in system_config (category 'email_templates')
+  createEmailTemplate(template: { name: string; subject?: string; htmlContent: string; variables?: any[] }): Promise<{ id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string }>;
+  getEmailTemplates(): Promise<Array<{ id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string }>>;
+
+  // AI Messaging Configuration
+  getAIMessagingConfig(): Promise<AiMessagingConfig | undefined>;
+  setAIMessagingConfig(config: Partial<AiMessagingConfig>): Promise<AiMessagingConfig>;
+  updateAIMessagingStats(stats: Partial<AiMessagingConfig>): Promise<AiMessagingConfig>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3725,8 +3734,7 @@ Glo Head Spa`,
 
   async getSystemConfigByCategory(category: string): Promise<SystemConfig[]> {
     try {
-      // Note: category field doesn't exist in the current schema, so we return all configs
-      const results = await db.select().from(systemConfig);
+      const results = await db.select().from(systemConfig).where(eq(systemConfig.category, category));
       return results;
     } catch (error) {
       console.error('Error getting system config by category:', error);
@@ -4125,6 +4133,93 @@ Glo Head Spa`,
 
   async deleteUserDirectPermission(id: number): Promise<void> {
     await db.delete(userDirectPermissions).where(eq(userDirectPermissions.id, id));
+  }
+
+  // Email Templates stored in system_config (category 'email_templates')
+  async createEmailTemplate(template: { name: string; subject?: string; htmlContent: string; variables?: any[] }): Promise<{ id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string }> {
+    const id = `tmpl_${Date.now()}`;
+    const record = {
+      id,
+      name: template.name,
+      subject: template.subject || null,
+      htmlContent: template.htmlContent,
+      variables: template.variables ?? [],
+      createdAt: new Date().toISOString(),
+    } as any;
+
+    await this.setSystemConfig({
+      key: `email_template:${id}`,
+      value: JSON.stringify(record),
+      description: `Email template: ${template.name}`,
+      category: 'email_templates',
+      isEncrypted: false,
+      isActive: true,
+    } as any);
+
+    return record as { id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string };
+  }
+
+  async getEmailTemplates(): Promise<Array<{ id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string }>> {
+    const rows = await db.select().from(systemConfig).where(eq(systemConfig.category, 'email_templates'));
+    const templates: Array<{ id: string; name: string; subject?: string; htmlContent: string; variables: any[]; createdAt: string }> = [];
+    for (const row of rows) {
+      try {
+        const parsed = JSON.parse(row.value || '{}');
+        if (parsed && parsed.id && parsed.name) {
+          templates.push({
+            id: parsed.id,
+            name: parsed.name,
+            subject: parsed.subject || undefined,
+            htmlContent: parsed.htmlContent || '',
+            variables: parsed.variables || [],
+            createdAt: parsed.createdAt || (row as any).createdAt?.toISOString?.() || new Date().toISOString(),
+          });
+        }
+      } catch {
+        // ignore malformed entries
+      }
+    }
+    templates.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    return templates;
+  }
+
+  // AI Messaging Configuration
+  async getAIMessagingConfig(): Promise<AiMessagingConfig | undefined> {
+    try {
+      const result = await db.select().from(aiMessagingConfig).limit(1);
+      return result[0];
+    } catch (error) {
+      console.error('Error getting AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  async setAIMessagingConfig(config: Partial<AiMessagingConfig>): Promise<AiMessagingConfig> {
+    try {
+      const result = await db
+        .update(aiMessagingConfig)
+        .set({ ...config, updatedAt: new Date() })
+        .where(eq(aiMessagingConfig.id, 1))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error setting AI messaging config:', error);
+      throw error;
+    }
+  }
+
+  async updateAIMessagingStats(stats: Partial<AiMessagingConfig>): Promise<AiMessagingConfig> {
+    try {
+      const result = await db
+        .update(aiMessagingConfig)
+        .set({ ...stats, updatedAt: new Date() })
+        .where(eq(aiMessagingConfig.id, 1))
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error updating AI messaging stats:', error);
+      throw error;
+    }
   }
 }
 

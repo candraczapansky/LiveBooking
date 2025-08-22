@@ -1,0 +1,39 @@
+/* Temporary mapping of Tailwind blue utilities to brand primary to avoid flash */
+:root {
+  /* Backgrounds */
+  --tw-blue-50: hsl(var(--primary) / 0.08);
+  --tw-blue-100: hsl(var(--primary) / 0.12);
+  --tw-blue-200: hsl(var(--primary) / 0.20);
+  --tw-blue-300: hsl(var(--primary) / 0.28);
+  --tw-blue-400: hsl(var(--primary) / 0.36);
+  --tw-blue-500: hsl(var(--primary));
+  --tw-blue-600: hsl(var(--primary));
+  --tw-blue-700: hsl(var(--primary));
+  --tw-blue-800: hsl(var(--primary));
+  --tw-blue-900: hsl(var(--primary) / 0.60);
+}
+
+[class*="bg-blue-"] { background-color: var(--tw-blue-500) !important; }
+[class*="text-blue-"] { color: var(--tw-blue-600) !important; }
+[class*="border-blue-"] { border-color: var(--tw-blue-500) !important; }
+[class*="ring-blue-"] { --tw-ring-color: var(--tw-blue-500) !important; }
+
+/* Specific helpers used in codebase */
+.bg-blue-50 { background-color: var(--tw-blue-50) !important; }
+.bg-blue-100 { background-color: var(--tw-blue-100) !important; }
+.bg-blue-200 { background-color: var(--tw-blue-200) !important; }
+.bg-blue-900 { background-color: var(--tw-blue-900) !important; }
+.text-blue-600 { color: var(--tw-blue-600) !important; }
+.text-blue-700 { color: var(--tw-blue-700) !important; }
+.text-blue-800 { color: var(--tw-blue-800) !important; }
+.text-blue-900 { color: var(--tw-blue-900) !important; }
+.border-blue-200 { border-color: var(--tw-blue-200) !important; }
+.border-blue-300 { border-color: var(--tw-blue-300) !important; }
+.focus\:ring-blue-500:focus { --tw-ring-color: var(--tw-blue-500) !important; }
+.focus\:border-blue-500:focus { border-color: var(--tw-blue-500) !important; }
+.dark .dark\:bg-blue-900 { background-color: var(--tw-blue-900) !important; }
+.dark .dark\:text-blue-400 { color: var(--tw-blue-600) !important; }
+.dark .dark\:text-blue-200 { color: var(--tw-blue-600) !important; }
+.dark .dark\:border-blue-800 { border-color: var(--tw-blue-800) !important; }
+.dark .dark\:bg-blue-900\/20 { background-color: color-mix(in hsl, hsl(var(--primary)), transparent 80%) !important; }
+

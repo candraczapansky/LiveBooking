@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,14 +67,9 @@ const SchedulePage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block fixed inset-y-0 left-0 z-50 w-64">
-        <SidebarController />
-      </div>
-      
-      <div className="lg:pl-64">
-        
+      <div className="">
         <main className="p-3 lg:p-6">
-          <div className="w-full space-y-4 lg:space-y-6">
+          <div className="w-full max-w-screen-2xl mx-auto space-y-4 lg:space-y-6">
             {/* Page Header */}
             <div className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-6 shadow-sm">
               <div className="space-y-3">

@@ -42,11 +42,41 @@ export default function HelcimPay({
 
     try {
       setIsLoading(true);
+      // Ensure Helcim scripts are present if global is not ready in time
+      const ensureScripts = () => {
+        const hasStart = Array.from(document.scripts).some(s => s.src.includes('helcim-pay/services/start.js'));
+        if (!hasStart) {
+          const s = document.createElement('script');
+          s.type = 'text/javascript';
+          s.src = 'https://secure.helcim.app/helcim-pay/services/start.js';
+          document.body.appendChild(s);
+        }
+        const hasLegacy = Array.from(document.scripts).some(s => s.src.includes('js/helcim.js'));
+        if (!hasLegacy) {
+          const s2 = document.createElement('script');
+          s2.type = 'text/javascript';
+          s2.src = 'https://secure.helcim.app/js/helcim.js';
+          document.body.appendChild(s2);
+        }
+      };
+      ensureScripts();
+      // Fetch session token from backend first
+      const initResponse = await apiRequest('POST', '/api/payments/helcim/initialize', {
+        amount,
+        description,
+        customerEmail,
+        customerName,
+      });
+      const initData = await initResponse.json();
+      if (!initResponse.ok || !initData?.success || !initData?.token) {
+        throw new Error(initData?.message || 'Failed to initialize Helcim Pay session');
+      }
 
-      // Initialize Helcim Pay.js
+      // Initialize Helcim Pay.js with session token
       await window.helcimPay.initialize({
         accountId: import.meta.env.VITE_HELCIM_ACCOUNT_ID,
         terminalId: import.meta.env.VITE_HELCIM_TERMINAL_ID,
+        token: initData.token,
         test: process.env.NODE_ENV !== 'production',
       });
 
@@ -59,7 +89,7 @@ export default function HelcimPay({
     } finally {
       setIsLoading(false);
     }
-  }, [isInitialized]);
+  }, [isInitialized, amount, description, customerEmail, customerName]);
 
   useEffect(() => {
     if (open && !isInitialized) {

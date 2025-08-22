@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Edit, Trash2, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { AppLayout } from "@/components/layout/app-layout";
+// Layout handled globally by MainLayout
 
 import { Button } from "@/components/ui/button";
 import {
@@ -81,18 +81,15 @@ export default function RoomsPage() {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
-        </div>
-      </AppLayout>
+      <div className="animate-pulse space-y-4">
+        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+        <div className="h-64 bg-gray-200 rounded"></div>
+      </div>
     );
   }
 
   return (
-    <AppLayout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Room Management</h1>
@@ -187,7 +184,6 @@ export default function RoomsPage() {
         onOpenChange={handleFormClose}
         room={editingRoom}
       />
-      </div>
-    </AppLayout>
+    </div>
   );
 }

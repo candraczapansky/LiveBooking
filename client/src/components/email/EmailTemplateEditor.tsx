@@ -108,9 +108,12 @@ const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEdit
       style={{ height: '100%', minHeight: '600px' }}
     >
       <EmailEditor
+        key={editorHeight}
         ref={emailEditorRef}
         onReady={onReady}
         onLoad={editorLoaded}
+        scriptUrl="https://editor.unlayer.com/embed.js"
+        minHeight={`${Math.max(editorHeight, 600)}px`}
         options={{
           displayMode: 'email',
           locale: 'en',

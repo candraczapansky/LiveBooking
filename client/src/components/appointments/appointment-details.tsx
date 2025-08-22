@@ -91,6 +91,14 @@ const AppointmentDetails = ({
     enabled: !!appointment?.serviceId
   });
 
+  // Compute the amount to charge for this appointment
+  const getAppointmentChargeAmount = () => {
+    const total = Number(appointment?.totalAmount ?? 0);
+    if (total && !Number.isNaN(total) && total > 0) return total;
+    const fallback = Number(service?.price ?? 0);
+    return Number.isNaN(fallback) ? 0 : fallback;
+  };
+
   const { data: staff } = useQuery({
     queryKey: ['/api/staff', appointment?.staffId],
     queryFn: async () => {
@@ -766,7 +774,7 @@ const AppointmentDetails = ({
                         <div className="bg-muted p-4 rounded-lg">
                           <div className="flex justify-between items-center text-lg font-semibold">
                             <span>Total:</span>
-                            <span>${((appointment.totalAmount ?? (appointment.service?.price || 0)) as number).toFixed(2)}</span>
+                            <span>${getAppointmentChargeAmount().toFixed(2)}</span>
                           </div>
                         </div>
                         <div className="flex gap-3">
@@ -787,10 +795,8 @@ const AppointmentDetails = ({
                         <HelcimPayJsModal
                           open={showHelcimModal}
                           onOpenChange={setShowHelcimModal}
-                          amount={(appointment.totalAmount ?? (appointment.service?.price || 0)) as number}
-                          appointmentId={appointment.id}
-                          description={`Card payment for ${appointment.service?.name || 'Appointment'}`}
-                          type="appointment_payment"
+                          amount={getAppointmentChargeAmount()}
+                          description={`Card payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (paymentId: string) => {
                             try {
                               await apiRequest('POST', '/api/confirm-payment', { paymentId, appointmentId: appointment.id });
@@ -824,9 +830,10 @@ const AppointmentDetails = ({
                           </Button>
                         </div>
                         <SmartTerminalPayment
-                          amount={appointment.totalAmount ?? appointment.service?.price ?? 0}
-                          description={`Payment for ${appointment.service?.name || 'Appointment'}`}
-                          onDeviceSelect={setSelectedTerminalDevice}
+                          open={true}
+                          onOpenChange={() => {}}
+                          amount={getAppointmentChargeAmount()}
+                          description={`Payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (result: any) => {
                             try {
                               // First, create a pending payment record - don't mark as completed yet
@@ -838,7 +845,7 @@ const AppointmentDetails = ({
                                 method: 'card',
                                 status: 'pending', // Start as pending until terminal confirms
                                 type: 'appointment_payment',
-                                description: `Terminal payment for ${appointment.service?.name || 'Appointment'}`,
+                                description: `Terminal payment for ${service?.name || 'Appointment'}`,
                                 helcimTransactionId: result.transactionId,
                                 cardLast4: result.cardLast4,
                                 paymentMethod: result.paymentMethod,
@@ -876,7 +883,6 @@ const AppointmentDetails = ({
                               variant: "destructive",
                             });
                           }}
-                          onCancel={() => setShowTerminalPayment(false)}
                         />
                       </div>
                     )}

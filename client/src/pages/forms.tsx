@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const FormsPage = () => {
   useDocumentTitle("Forms | Glo Head Spa");
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewFormOpen, setIsViewFormOpen] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
@@ -72,17 +71,7 @@ const FormsPage = () => {
     },
   });
 
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -138,12 +127,9 @@ const FormsPage = () => {
   if (isLoading) {
     return (
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-        <SidebarController />
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-          sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
-        }`}>
+        <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-            <div className="max-w-7xl mx-auto px-2 sm:px-0">
+            <div className="max-w-screen-2xl mx-auto w-full px-2 sm:px-0">
               <div className="flex items-center justify-center h-64">
                 <div className="text-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100 mx-auto"></div>
@@ -161,12 +147,9 @@ const FormsPage = () => {
   if (error) {
     return (
       <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-        <SidebarController />
-        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-          sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
-        }`}>
+        <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
           <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-            <div className="max-w-7xl mx-auto px-2 sm:px-0">
+            <div className="max-w-screen-2xl mx-auto w-full px-2 sm:px-0">
               <div className="text-center py-12">
                 <div className="mx-auto h-12 w-12 text-red-400">
                   <FileText className="h-12 w-12 text-red-400" />
@@ -193,14 +176,10 @@ const FormsPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? 'md:ml-64 ml-0' : 'ml-0'
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto px-2 sm:px-0">
+          <div className="max-w-screen-2xl mx-auto w-full px-2 sm:px-0">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>

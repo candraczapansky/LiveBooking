@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAuthState } from '@/lib/auth-helper';
+import { useAuth } from '@/contexts/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 
 type Location = {
@@ -46,13 +46,45 @@ export const LocationProvider = ({ children }: LocationProviderProps) => {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   // Fetch locations only when authenticated to avoid 401-driven redirect loops
-  const isAuthed = getAuthState().isAuthenticated;
+  const { isAuthenticated } = useAuth();
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ['/api/locations'],
-    enabled: isAuthed,
+    enabled: isAuthenticated,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnMount: 'always', // Ensure refetch on first mount after login
     refetchOnWindowFocus: true, // Refetch when window gains focus
+    queryFn: async () => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const token = localStorage.getItem('token');
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // Bypass potential 304 cached responses on initial load
+      const res = await fetch(`/api/locations?_ts=${Date.now()}`, {
+        headers,
+        credentials: 'include',
+      });
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        throw new Error('Authentication required');
+      }
+
+      if (!res.ok) {
+        let message = res.statusText;
+        try {
+          const text = await res.text();
+          const json = JSON.parse(text);
+          message = (json.error || json.message || message);
+        } catch {}
+        const error: any = new Error(message);
+        error.response = { status: res.status };
+        throw error;
+      }
+
+      return await res.json();
+    },
   });
 
   // Debug logging

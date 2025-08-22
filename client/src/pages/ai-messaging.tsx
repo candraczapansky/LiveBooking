@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,6 @@ import {
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
-import { useSidebar } from "@/contexts/SidebarContext";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { AIMessagingDialog } from "@/components/llm/ai-messaging-dialog";
 import FAQManagement from "@/components/llm/faq-management";
@@ -36,7 +34,7 @@ import { Input } from "@/components/ui/input";
 export default function AIMessagingPage() {
   const [isAIDialogOpen, setIsAIDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const { isOpen: sidebarOpen } = useSidebar();
+  // Sidebar is handled globally by MainLayout
 
   useDocumentTitle("AI Messaging");
 
@@ -91,14 +89,10 @@ export default function AIMessagingPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        !sidebarOpen ? 'ml-16' : 'ml-64'
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto w-full">
+          <div className="max-w-screen-2xl mx-auto w-full">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">

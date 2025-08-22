@@ -28,16 +28,20 @@ export function securityHeaders() {
     helmet({
       contentSecurityPolicy: {
         directives: {
-          defaultSrc: ["'self'"],
+          defaultSrc: ["'self'", "https:", "data:", "blob:"],
           // Do NOT use 'unsafe-dynamic'. If you later add nonces, consider 'strict-dynamic' in script-src only
           scriptSrc: [
             "'self'",
             "'unsafe-inline'",
+            "'unsafe-eval'",
             // Allow Helcim hosted scripts
             "https://secure.helcim.app",
             "https://*.helcim.app",
             "https://api.helcim.com",
             "https://*.helcim.com",
+            // Allow Unlayer editor
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
           ],
           // Some browsers distinguish between script elements and other script sources
           scriptSrcElem: [
@@ -47,10 +51,12 @@ export function securityHeaders() {
             "https://*.helcim.app",
             "https://api.helcim.com",
             "https://*.helcim.com",
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
           ],
-          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-          imgSrc: ["'self'", "data:", "blob:", "https:"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com"],
+          styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://editor.unlayer.com", "https://*.unlayer.com"],
+          imgSrc: ["'self'", "data:", "blob:", "https:", "https://editor.unlayer.com", "https://*.unlayer.com"],
+          fontSrc: ["'self'", "data:", "https://fonts.gstatic.com", "https://editor.unlayer.com", "https://*.unlayer.com"],
           connectSrc: [
             "'self'",
             "https:",
@@ -60,6 +66,10 @@ export function securityHeaders() {
             "https://*.helcim.com",
             "https://secure.helcim.app",
             "https://*.helcim.app",
+            // Unlayer APIs
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
+            "https://api.unlayer.com",
           ],
           frameSrc: [
             "'self'",
@@ -67,6 +77,24 @@ export function securityHeaders() {
             "https://secure.helcim.app",
             "https://*.helcim.app",
             "https://*.helcim.com",
+            // Unlayer editor iframes
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
+            "blob:",
+          ],
+          // Support workers used by embedded editors
+          workerSrc: [
+            "'self'",
+            "blob:",
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
+          ],
+          // Legacy directive for some browsers
+          childSrc: [
+            "'self'",
+            "https://editor.unlayer.com",
+            "https://*.unlayer.com",
+            "blob:",
           ],
           objectSrc: ["'none'"],
           ...(cspReportUri ? { reportUri: [cspReportUri] } : {}),

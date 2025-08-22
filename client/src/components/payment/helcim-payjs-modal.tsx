@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,71 +32,148 @@ export default function HelcimPayJsModal({
   customerName,
 }: HelcimPayJsModalProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [paymentToken, setPaymentToken] = useState<string | null>(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    if (open && !paymentToken) {
-      // Initialize Helcim payment when modal opens
-      initializePayment();
+  // Provide loose typings for global objects
+  declare global {
+    interface Window {
+      Helcim?: any;
+      helcimPay?: any;
+      appendHelcimPayIframe?: (checkoutToken: string, options?: any) => void;
     }
-  }, [open]);
+  }
 
-  const initializePayment = async () => {
-    try {
-      setIsLoading(true);
-      const response = await apiRequest('POST', '/api/payments/helcim/initialize', {
-        amount,
-        description,
-        customerEmail,
-        customerName,
+  const waitFor = async <T,>(fn: () => T | undefined, timeoutMs = 3000, intervalMs = 100): Promise<T> => {
+    const start = Date.now();
+    return await new Promise<T>((resolve, reject) => {
+      const id = setInterval(() => {
+        try {
+          const value = fn();
+          if (value) {
+            clearInterval(id);
+            resolve(value);
+          } else if (Date.now() - start >= timeoutMs) {
+            clearInterval(id);
+            reject(new Error('Helcim script not loaded'));
+          }
+        } catch (err) {
+          clearInterval(id);
+          reject(err as Error);
+        }
+      }, intervalMs);
+    });
+  };
+
+  // Ensure Helcim scripts are present; inject if missing
+  const ensureHelcimScripts = async () => {
+    // start.js exposes window.helcimPay; helcim.js may add helpers
+    const hasStartScript = Array.from(document.scripts).some(s => s.src.includes('helcim-pay/services/start.js'));
+    if (!hasStartScript) {
+      const s = document.createElement('script');
+      s.type = 'text/javascript';
+      s.src = 'https://secure.helcim.app/helcim-pay/services/start.js';
+      await new Promise<void>((resolve, reject) => {
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Failed loading Helcim start.js'));
+        document.body.appendChild(s);
       });
-      const data = await response.json();
-      setPaymentToken(data.token);
-      
-      // Initialize Helcim.js
-      if (window.Helcim && data.token) {
-        window.Helcim.initialize({
-          token: data.token,
-          environment: process.env.NODE_ENV === 'production' ? 'production' : 'test',
-          onSuccess: handlePaymentSuccess,
-          onError: handlePaymentError,
-          onCancel: handlePaymentCancel,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to initialize payment:', error);
-      handlePaymentError(error);
-    } finally {
-      setIsLoading(false);
+    }
+    const hasLegacyScript = Array.from(document.scripts).some(s => s.src.includes('js/helcim.js'));
+    if (!hasLegacyScript) {
+      const s2 = document.createElement('script');
+      s2.type = 'text/javascript';
+      s2.src = 'https://secure.helcim.app/js/helcim.js';
+      await new Promise<void>((resolve, reject) => {
+        s2.onload = () => resolve();
+        s2.onerror = () => reject(new Error('Failed loading Helcim helcim.js'));
+        document.body.appendChild(s2);
+      });
     }
   };
 
-  const handlePaymentSuccess = async (response: any) => {
-    try {
-      // Verify payment with backend
-      const verifyResponse = await apiRequest('POST', '/api/payments/helcim/verify', {
-        token: paymentToken,
-        transactionId: response.transactionId,
-      });
-      const verifyData = await verifyResponse.json();
-      
-      if (verifyData.success) {
-        toast({
-          title: "Payment Successful",
-          description: "Your payment has been processed successfully.",
+  // Initialize Helcim Pay.js and mount form when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    if (isInitialized) return;
+    (async () => {
+      try {
+        setIsLoading(true);
+        await ensureHelcimScripts();
+
+        // First create a session token on the backend
+        const initResponse = await apiRequest('POST', '/api/payments/helcim/initialize', {
+          amount,
+          description,
+          customerEmail,
+          customerName,
         });
-        onSuccess?.(verifyData);
-      } else {
-        throw new Error('Payment verification failed');
+        const initData = await initResponse.json();
+        if (!initResponse.ok || !initData?.success || !initData?.token) {
+          throw new Error(initData?.message || 'Failed to initialize payment session');
+        }
+        setPaymentToken(initData.token);
+
+        // Wait for Pay.js render helper
+        await waitFor(() => window.appendHelcimPayIframe, 12000, 100);
+
+        // Render the Helcim Pay.js iframe (it handles the entire flow)
+        try {
+          window.appendHelcimPayIframe!(initData.token);
+        } catch (e) {
+          console.warn('appendHelcimPayIframe without options failed, retry with container');
+          const container = document.getElementById('helcim-payment-container');
+          if (container) {
+            // Some implementations accept options with elementId
+            try {
+              window.appendHelcimPayIframe!(initData.token, { elementId: 'helcim-payment-container' });
+            } catch (err) {
+              console.error('appendHelcimPayIframe failed:', err);
+              throw err;
+            }
+          }
+        }
+
+        // Listen for Pay.js postMessage events
+        const key = `helcim-pay-js-${initData.token}`;
+        const handleMessage = (event: MessageEvent<any>) => {
+          try {
+            if (!event?.data || event.data.eventName !== key) return;
+            if (event.data.eventStatus === 'SUCCESS') {
+              toast({ title: 'Payment Successful', description: 'Payment processed successfully.' });
+              onSuccess?.(event.data);
+              onOpenChange(false);
+              window.removeEventListener('message', handleMessage);
+            } else if (event.data.eventStatus === 'ABORTED') {
+              const errMsg = event.data.eventMessage || 'Payment was cancelled.';
+              console.error('Helcim Pay.js aborted:', errMsg);
+              onError?.(new Error(errMsg));
+              onOpenChange(false);
+              window.removeEventListener('message', handleMessage);
+            }
+          } catch {}
+        };
+        window.addEventListener('message', handleMessage);
+
+        setIsInitialized(true);
+      } catch (err: any) {
+        console.error('Failed to initialize Helcim Pay.js:', err);
+        toast({
+          title: 'Payment Unavailable',
+          description: err?.message || 'Could not load the payment form.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Payment verification failed:', error);
-      handlePaymentError(error);
-    } finally {
-      onOpenChange(false);
-      setPaymentToken(null);
-    }
+    })();
+  }, [open, isInitialized, amount, description, customerEmail, customerName]);
+
+  // Pay.js handles submission inside iframe; we only display and listen for result.
+
+  const handlePaymentSuccess = async (_response: any) => {
+    // Not used in Pay.js path; kept for compatibility
   };
 
   const handlePaymentError = (error: any) => {
@@ -108,7 +185,6 @@ export default function HelcimPayJsModal({
     });
     onError?.(error);
     onOpenChange(false);
-    setPaymentToken(null);
   };
 
   const handlePaymentCancel = () => {
@@ -147,7 +223,6 @@ export default function HelcimPayJsModal({
             variant="outline"
             onClick={() => {
               onOpenChange(false);
-              setPaymentToken(null);
             }}
           >
             Cancel

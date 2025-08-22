@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, UserPlus, Search, Briefcase } from "lucide-react";
-import Sidebar from "@/components/layout/sidebar";
+// Sidebar is handled globally by MainLayout
 import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -170,13 +170,8 @@ const StaffPageSimple = () => {
 
   return (
     <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-50 dark:bg-gray-900">
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:block lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:w-64">
-        <Sidebar />
-      </div>
-      
       {/* Main Content */}
-      <div className="lg:pl-64 min-h-screen lg:h-screen flex flex-col">
+      <div className="min-h-screen lg:h-screen flex flex-col">
         {/* Content Area */}
         <div className="flex-1 p-4 sm:p-6 overflow-auto lg:overflow-auto">
           {/* Header Section */}

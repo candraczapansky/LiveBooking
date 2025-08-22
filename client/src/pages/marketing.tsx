@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import EmailTemplateEditor, { EmailTemplateEditorRef } from "@/components/email/EmailTemplateEditor";
 
@@ -618,14 +617,10 @@ const MarketingPage = () => {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
-        <SidebarController />
-      </div>
-      
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className="flex-1 flex flex-col overflow-hidden">
         
         <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-screen-2xl mx-auto w-full">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
               <div>
@@ -1939,17 +1934,50 @@ const MarketingPage = () => {
 
       {/* Email Template Editor Modal */}
       <Dialog open={showEmailEditor} onOpenChange={setShowEmailEditor}>
-        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-[95vh] p-0 overflow-hidden">
+        <DialogContent className="max-w-[100vw] w-[100vw] md:max-w-[1400px] md:w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-hidden">
+          <DialogDescription className="sr-only">Design and preview your marketing email template using the visual editor.</DialogDescription>
           <div className="flex flex-col h-full">
             <div className="flex items-center justify-between p-4 border-b shrink-0">
               <DialogTitle>Email Template Editor</DialogTitle>
-              <Button
-                variant="outline"
-                onClick={() => setShowEmailEditor(false)}
-                className="h-8 w-8 p-0"
-              >
-                ×
-              </Button>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Template name"
+                  className="w-56 hidden sm:block"
+                  value={campaignForm.watch('subject') || ''}
+                  onChange={(e) => campaignForm.setValue('subject', e.target.value)}
+                />
+                <Button
+                  variant="default"
+                  onClick={async () => {
+                    emailEditorRef.current?.exportHtml();
+                    const name = campaignForm.watch('subject') || `Template ${new Date().toLocaleString()}`;
+                    const html = emailTemplateHtml || campaignForm.watch('content') || '';
+                    try {
+                      const res = await apiRequest('POST', '/api/marketing/email-templates', {
+                        name,
+                        subject: name,
+                        htmlContent: html,
+                        variables: [],
+                      });
+                      const saved = await res.json();
+                      toast({ title: 'Template saved', description: `Saved as “${saved.name}”.` });
+                      setShowEmailEditor(false);
+                    } catch (err: any) {
+                      toast({ title: 'Save failed', description: err?.message || 'Unable to save template', variant: 'destructive' });
+                    }
+                  }}
+                  className="min-h-[36px]"
+                >
+                  Save Template
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowEmailEditor(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  ×
+                </Button>
+              </div>
             </div>
             <div className="flex-1 min-h-0">
               <EmailTemplateEditor

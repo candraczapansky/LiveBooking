@@ -82,6 +82,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Apply default colors if no preferences exist
         applyThemeColors('#8b5cf6', false);
         applyTextColors('#111827', '#6b7280');
+        try {
+          localStorage.setItem('customColor', '#8b5cf6');
+          localStorage.setItem('darkMode', 'false');
+          localStorage.setItem('primaryTextColor', '#111827');
+          localStorage.setItem('secondaryTextColor', '#6b7280');
+        } catch {}
         setColorPreferencesApplied(true);
         return;
       }
@@ -92,6 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Apply default colors if preferences are empty
         applyThemeColors('#8b5cf6', false);
         applyTextColors('#111827', '#6b7280');
+        try {
+          localStorage.setItem('customColor', '#8b5cf6');
+          localStorage.setItem('darkMode', 'false');
+          localStorage.setItem('primaryTextColor', '#111827');
+          localStorage.setItem('secondaryTextColor', '#6b7280');
+        } catch {}
         setColorPreferencesApplied(true);
         return;
       }
@@ -112,6 +124,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         applyTextColors('#111827', '#6b7280');
       }
       
+      // Persist loaded preferences for early initialization
+      try {
+        localStorage.setItem('customColor', colorPrefs.primaryColor || '#8b5cf6');
+        localStorage.setItem('darkMode', (colorPrefs.isDarkMode || false).toString());
+        localStorage.setItem('primaryTextColor', colorPrefs.primaryTextColor || '#111827');
+        localStorage.setItem('secondaryTextColor', colorPrefs.secondaryTextColor || '#6b7280');
+        if (colorPrefs.savedBrandColors) {
+          localStorage.setItem('savedBrandColors', String(colorPrefs.savedBrandColors));
+        }
+        if (colorPrefs.savedTextColors) {
+          localStorage.setItem('savedTextColors', String(colorPrefs.savedTextColors));
+        }
+      } catch {}
+      
       setColorPreferencesApplied(true);
       
       // Dispatch event to notify components of color update
@@ -121,6 +147,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Apply default colors on error
       applyThemeColors('#8b5cf6', false);
       applyTextColors('#111827', '#6b7280');
+      try {
+        localStorage.setItem('customColor', '#8b5cf6');
+        localStorage.setItem('darkMode', 'false');
+        localStorage.setItem('primaryTextColor', '#111827');
+        localStorage.setItem('secondaryTextColor', '#6b7280');
+      } catch {}
       setColorPreferencesApplied(true);
     }
   };
@@ -168,6 +200,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       root.classList.remove('dark');
     }
     
+    // Persist for early initialization
+    try {
+      localStorage.setItem('customColor', primaryColor);
+      localStorage.setItem('darkMode', Boolean(isDark).toString());
+    } catch {}
+    
     console.log('Theme colors applied successfully');
   };
 
@@ -207,6 +245,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Apply text color CSS custom properties
     root.style.setProperty('--text-primary', primaryHsl, 'important');
     root.style.setProperty('--text-secondary', secondaryHsl, 'important');
+    
+    // Persist for early initialization
+    try {
+      localStorage.setItem('primaryTextColor', primaryTextColor);
+      localStorage.setItem('secondaryTextColor', secondaryTextColor);
+    } catch {}
     
     console.log('Text colors applied successfully');
   };
