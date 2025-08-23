@@ -56,6 +56,7 @@ const AppointmentDetails = ({
   const [selectedTerminalDevice, setSelectedTerminalDevice] = useState<string>('');
   const [giftCardCode, setGiftCardCode] = useState("");
   const [showHelcimModal, setShowHelcimModal] = useState(false);
+  const [tipAmount, setTipAmount] = useState<number>(0);
 
   // Fetch appointment details
   const { data: appointment, isLoading } = useQuery({
@@ -85,8 +86,7 @@ const AppointmentDetails = ({
     queryKey: ['/api/services', appointment?.serviceId],
     queryFn: async () => {
       if (!appointment?.serviceId) return null;
-      const response = await fetch(`/api/services/${appointment.serviceId}?v=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error('Failed to fetch service');
+      const response = await apiRequest("GET", `/api/services/${appointment.serviceId}?v=${Date.now()}`);
       return response.json();
     },
     enabled: !!appointment?.serviceId
@@ -342,21 +342,11 @@ const AppointmentDetails = ({
       attempts++;
       
       try {
-        // Check terminal payment status
-        const response = await fetch('/api/terminal/confirm-payment', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            transactionId,
-            deviceCode: selectedTerminalDevice // Use the selected terminal device
-          }),
-        });
-
+        // Check terminal payment status using locationId (no device code needed)
+        const response = await fetch(`/api/terminal/payment/${appointment.locationId}/${transactionId}`);
         const result = await response.json();
         
-        if (result.success && result.status === 'completed') {
+        if ((result.success || result.status === 'completed') && result.status === 'completed') {
           clearInterval(pollInterval);
           
           // Use the new complete-payment endpoint to sync with calendar
@@ -368,7 +358,6 @@ const AppointmentDetails = ({
               },
               body: JSON.stringify({
                 transactionId,
-                deviceCode: selectedTerminalDevice, // Use the selected terminal device
                 appointmentId: appointment.id,
                 paymentId
               }),
@@ -694,6 +683,24 @@ const AppointmentDetails = ({
                 {/* Payment Options - Only show if not already paid */}
                 {(appointment.paymentStatus || 'unpaid') !== 'paid' && (
                   <div className="pt-3 space-y-3">
+                    {/* Tip selection shown before choosing payment method */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Tip</div>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-4 gap-2">
+                          {[0, 0.15, 0.18, 0.2].map((p) => (
+                            <Button key={p} variant={tipAmount / (getAppointmentChargeAmount() || 1) === p ? 'default' : 'outline'} size="sm" onClick={() => setTipAmount(Math.round((getAppointmentChargeAmount() * p) * 100) / 100)}>
+                              {p === 0 ? 'No Tip' : `${Math.round(p * 100)}%`}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm">Custom:</span>
+                          <Input type="number" className="h-8 w-28" value={Number.isNaN(tipAmount) ? '' : tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} min="0" step="0.01" />
+                          <span className="ml-auto text-sm">Total: {formatPrice((getAppointmentChargeAmount() || 0) + (tipAmount || 0))}</span>
+                        </div>
+                      </div>
+                    </div>
                     {!showPaymentOptions ? (
                       <Button
                         onClick={() => setShowPaymentOptions(true)}
@@ -702,7 +709,7 @@ const AppointmentDetails = ({
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
                         {getAppointmentChargeAmount() > 0 ? (
-                          <>Pay {formatPrice(getAppointmentChargeAmount())}</>
+                          <>Pay {formatPrice((getAppointmentChargeAmount() || 0) + (tipAmount || 0))}</>
                         ) : (
                           <>Calculating price…</>
                         )}
@@ -803,7 +810,7 @@ const AppointmentDetails = ({
                         <div className="bg-muted p-4 rounded-lg">
                           <div className="flex justify-between items-center text-lg font-semibold">
                             <span>Total:</span>
-                            <span>${(chargeAmount || getAppointmentChargeAmount()).toFixed(2)}</span>
+                            <span>${(((chargeAmount || getAppointmentChargeAmount()) + (tipAmount || 0))).toFixed(2)}</span>
                           </div>
                         </div>
                         <div className="flex gap-3">
@@ -824,13 +831,15 @@ const AppointmentDetails = ({
                         <HelcimPayJsModal
                           open={showHelcimModal}
                           onOpenChange={setShowHelcimModal}
-                          amount={chargeAmount || getAppointmentChargeAmount()}
+                          amount={(chargeAmount || getAppointmentChargeAmount()) + (tipAmount || 0)}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (_response: any) => {
                             try {
                               await apiRequest('PUT', `/api/appointments/${appointment.id}`, {
                                 status: 'completed',
-                                paymentStatus: 'paid'
+                                paymentStatus: 'paid',
+                                tipAmount: tipAmount || 0,
+                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0)
                               });
                             } catch {}
                             setShowHelcimModal(false);
@@ -861,6 +870,8 @@ const AppointmentDetails = ({
                           open={true}
                           onOpenChange={() => {}}
                           amount={chargeAmount || getAppointmentChargeAmount()}
+                          tipAmount={tipAmount}
+                          locationId={appointment.locationId}
                           description={`Payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (result: any) => {
                             try {
@@ -868,8 +879,9 @@ const AppointmentDetails = ({
                               const paymentResponse = await apiRequest("POST", "/api/payments", {
                                 clientId: appointment.clientId,
                                 appointmentId: appointment.id,
-                                amount: appointment.totalAmount ?? appointment.service?.price ?? 0,
-                                totalAmount: appointment.totalAmount ?? appointment.service?.price ?? 0,
+                                amount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0),
+                                tipAmount: tipAmount || 0,
+                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0),
                                 method: 'card',
                                 status: 'pending', // Start as pending until terminal confirms
                                 type: 'appointment_payment',
@@ -885,7 +897,9 @@ const AppointmentDetails = ({
                               // Update appointment status to pending payment - not completed yet
                               await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
                                 paymentStatus: 'pending', // Keep as pending until terminal confirms
-                                status: 'completed' // Service is completed but payment is pending
+                                status: 'completed', // Service is completed but payment is pending
+                                tipAmount: tipAmount || 0,
+                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0)
                               });
 
                               toast({

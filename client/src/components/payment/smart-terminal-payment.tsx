@@ -18,6 +18,8 @@ interface SmartTerminalPaymentProps {
   onSuccess?: (response: any) => void;
   onError?: (error: any) => void;
   description?: string;
+  locationId?: number | string;
+  tipAmount?: number;
 }
 
 export default function SmartTerminalPayment({
@@ -27,6 +29,8 @@ export default function SmartTerminalPayment({
   onSuccess,
   onError,
   description = "Payment",
+  locationId,
+  tipAmount,
 }: SmartTerminalPaymentProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
@@ -40,9 +44,11 @@ export default function SmartTerminalPayment({
       setMessage('Initializing payment terminal...');
 
       // Start the payment process
-      const response = await apiRequest('POST', '/api/payments/terminal/start', {
+      const response = await apiRequest('POST', '/api/terminal/payment/start', {
+        locationId: String(locationId ?? ''),
         amount,
         description,
+        tipAmount: typeof tipAmount === 'number' ? tipAmount : undefined,
       });
       const data = await response.json();
 
@@ -51,7 +57,7 @@ export default function SmartTerminalPayment({
       }
 
       // Poll for payment status
-      await pollPaymentStatus(data.paymentId);
+      await pollPaymentStatus(String(locationId ?? ''), data.paymentId);
 
     } catch (error) {
       console.error('Payment failed:', error);
@@ -61,7 +67,7 @@ export default function SmartTerminalPayment({
     }
   };
 
-  const pollPaymentStatus = async (paymentId: string) => {
+  const pollPaymentStatus = async (locId: string, paymentId: string) => {
     try {
       let attempts = 0;
       const maxAttempts = 60; // 2 minutes with 2-second intervals
@@ -71,7 +77,7 @@ export default function SmartTerminalPayment({
           throw new Error('Payment timed out');
         }
 
-        const response = await apiRequest('GET', `/api/payments/terminal/status/${paymentId}`);
+        const response = await apiRequest('GET', `/api/terminal/payment/${locId}/${paymentId}`);
         const data = await response.json();
 
         if (data.status === 'completed') {

@@ -65,10 +65,13 @@ export class HelcimTerminalService {
     }
 
     try {
+      const totalAmount = Number((amount || 0) + (options.tipAmount || 0));
       const response = await this.makeRequest('POST', `/terminal/${config.terminalId}/payment`, {
         deviceCode: config.deviceCode,
-        amount: amount.toFixed(2),
-        tipAmount: options.tipAmount?.toFixed(2),
+        // Charge the full amount including tip so the terminal processes the correct total
+        amount: totalAmount.toFixed(2),
+        // Keep tipAmount for bookkeeping if the API supports it; harmless if ignored
+        tipAmount: options.tipAmount != null ? Number(options.tipAmount).toFixed(2) : undefined,
         reference: options.reference,
         description: options.description,
       }, config.apiToken);

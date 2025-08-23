@@ -472,8 +472,177 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
   // ===== Email Unsubscribes =====
   app.get("/api/unsubscribes", asyncHandler(async (_req: Request, res: Response) => {
-    const unsubscribes = await (storage as any).getAllEmailUnsubscribes?.() ?? [];
-    res.json(unsubscribes);
+    const emailUnsubs = await (storage as any).getAllEmailUnsubscribes?.() ?? [];
+
+    // Also include SMS opt-outs captured via system_config keys: sms_opt_out:+E164
+    const normalizeDigits = (s: string) => (s || '').replace(/\D/g, '');
+    const equalPhones = (a: string, b: string) => {
+      const da = normalizeDigits(a);
+      const db = normalizeDigits(b);
+      if (!da || !db) return false;
+      // Compare last 10 digits to allow for country code formatting differences
+      return da.slice(-10) === db.slice(-10);
+    };
+
+    const allConfig = await storage.getAllSystemConfig();
+    const smsConfigs = (allConfig || []).filter((c: any) => (c.key || '').startsWith('sms_opt_out:'));
+
+    const smsOptOuts: any[] = [];
+    for (const cfg of smsConfigs) {
+      try {
+        const phone = (cfg.key as string).split(':')[1] || '';
+        let at: string | undefined;
+        try {
+          const parsed = JSON.parse(cfg.value || '{}');
+          if (parsed && parsed.at) at = parsed.at;
+        } catch {
+          // ignore
+        }
+        // Try to find user by exact phone first
+        let user = await (storage as any).getUserByPhone?.(phone);
+        if (!user) {
+          // Fallback: scan all users and match by last 10 digits
+          const users = await storage.getAllUsers();
+          user = users.find((u: any) => u.phone && equalPhones(u.phone, phone));
+        }
+
+        smsOptOuts.push({
+          id: (user?.id ? user.id * 100000 + 1 : Date.now()),
+          userId: user?.id || null,
+          email: user?.email || phone, // display email if available, otherwise phone
+          unsubscribedAt: at || new Date().toISOString(),
+          reason: 'SMS STOP',
+          user: user ? {
+            id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username,
+            phone: user.phone,
+            email: user.email
+          } : { phone }
+        });
+      } catch {
+        // continue
+      }
+    }
+
+    // Include users with all SMS preferences disabled as opted-out (fallback visibility)
+    const clients = await storage.getUsersByRole('client');
+    for (const u of clients as any[]) {
+      const allSmsOff = !u.smsAccountManagement && !u.smsAppointmentReminders && !u.smsPromotions;
+      if (!allSmsOff) continue;
+      // Skip if already present via system_config key
+      const already = smsOptOuts.some((o) => (o.user?.phone && u.phone && equalPhones(o.user.phone, u.phone)));
+      if (already) continue;
+      smsOptOuts.push({
+        id: u.id * 100000 + 2,
+        userId: u.id,
+        email: u.email || (u.phone || 'Unknown'),
+        unsubscribedAt: new Date(u.updatedAt || Date.now()).toISOString(),
+        reason: 'SMS preferences disabled',
+        user: {
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          username: u.username,
+          phone: u.phone,
+          email: u.email
+        }
+      });
+    }
+
+    res.json([...(emailUnsubs as any[]), ...smsOptOuts]);
+  }));
+
+  // Active SMS-capable clients (not opted-out and at least one SMS preference enabled)
+  app.get("/api/marketing/active-sms-clients", asyncHandler(async (_req: Request, res: Response) => {
+    const allUsers = await storage.getUsersByRole('client');
+    const allConfig = await storage.getAllSystemConfig();
+    const smsOptOutKeys = new Set((allConfig || []).filter((c: any) => (c.key || '').startsWith('sms_opt_out:')).map((c: any) => c.key));
+    const isOptedOut = (phone: string | null | undefined) => {
+      if (!phone) return false;
+      const normalized = phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`;
+      const candidates = [
+        `sms_opt_out:${normalized}`,
+        `sms_opt_out:+${phone?.replace(/\D/g, '')}`,
+      ];
+      return candidates.some(k => smsOptOutKeys.has(k));
+    };
+    const active = (allUsers as any[]).filter(u => {
+      const anyPref = !!(u.smsAccountManagement || u.smsAppointmentReminders || u.smsPromotions);
+      return anyPref && !isOptedOut(u.phone);
+    });
+    res.json(active);
+  }));
+
+  // Clients who have not opened any tracked marketing emails (based on recipient open logs if available)
+  app.get("/api/marketing/non-openers", asyncHandler(async (_req: Request, res: Response) => {
+    try {
+      const campaigns = await storage.getAllMarketingCampaigns();
+      const userIdToOpened = new Map<number, boolean>();
+      const userIdSeen = new Set<number>();
+      for (const c of campaigns) {
+        if (!('getMarketingCampaignRecipients' in storage)) continue;
+        const recips = await (storage as any).getMarketingCampaignRecipients(c.id);
+        for (const r of recips as any[]) {
+          if (typeof r.userId === 'number') {
+            userIdSeen.add(r.userId);
+            if (r.openedAt) userIdToOpened.set(r.userId, true);
+          }
+        }
+      }
+      const nonOpenersIds = Array.from(userIdSeen).filter(id => !userIdToOpened.get(id));
+      const users = await Promise.all(nonOpenersIds.map(id => storage.getUser(id)));
+      res.json(users.filter(Boolean));
+    } catch {
+      res.json([]);
+    }
+  }));
+
+  // Admin: Manually set SMS opt-out for a phone number (fallback if webhook didn't deliver STOP)
+  app.post("/api/marketing/opt-out-sms", asyncHandler(async (req: Request, res: Response) => {
+    const phoneRaw = (req.body?.phone || '').toString();
+    const normalize = (p: string) => {
+      const t = (p || '').trim();
+      if (t.startsWith('+')) return t;
+      const d = t.replace(/\D/g, '');
+      if (d.length === 10) return `+1${d}`;
+      return d ? `+${d}` : '';
+    };
+    const phone = normalize(phoneRaw);
+    if (!phone) return res.status(400).json({ error: 'Invalid phone' });
+    const key = `sms_opt_out:${phone}`;
+    const value = JSON.stringify({ optedOut: true, at: new Date().toISOString(), reason: 'manual' });
+    const existing = await storage.getSystemConfig(key);
+    if (existing) await storage.updateSystemConfig(key, value, 'Manual SMS opt-out');
+    else await storage.setSystemConfig({ key, value, description: 'Manual SMS opt-out', isEncrypted: false, isActive: true } as any);
+    // Try to update user flags if user exists
+    const user = await (storage as any).getUserByPhone?.(phone);
+    if (user?.id) {
+      await storage.updateUser(user.id, { smsAccountManagement: false, smsAppointmentReminders: false, smsPromotions: false } as any);
+    }
+    res.json({ success: true });
+  }));
+
+  // Admin: Manually clear SMS opt-out
+  app.post("/api/marketing/opt-in-sms", asyncHandler(async (req: Request, res: Response) => {
+    const phoneRaw = (req.body?.phone || '').toString();
+    const normalize = (p: string) => {
+      const t = (p || '').trim();
+      if (t.startsWith('+')) return t;
+      const d = t.replace(/\D/g, '');
+      if (d.length === 10) return `+1${d}`;
+      return d ? `+${d}` : '';
+    };
+    const phone = normalize(phoneRaw);
+    if (!phone) return res.status(400).json({ error: 'Invalid phone' });
+    const key = `sms_opt_out:${phone}`;
+    await storage.deleteSystemConfig(key);
+    const user = await (storage as any).getUserByPhone?.(phone);
+    if (user?.id) {
+      await storage.updateUser(user.id, { smsAccountManagement: true, smsAppointmentReminders: true, smsPromotions: true } as any);
+    }
+    res.json({ success: true });
   }));
 
   // Send promotional SMS

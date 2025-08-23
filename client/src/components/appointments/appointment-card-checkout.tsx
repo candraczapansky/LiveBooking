@@ -14,6 +14,7 @@ import TipSelection from "./tip-selection";
 interface AppointmentCardCheckoutProps {
   appointment: {
     id: number;
+    clientId?: number;
     clientName: string;
     serviceName: string;
     staffName: string;
@@ -177,7 +178,9 @@ export default function AppointmentCardCheckout({
       // Still try to update appointment status in case payment succeeded on server
       try {
         await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
-          paymentStatus: 'paid'
+          paymentStatus: 'paid',
+          tipAmount,
+          totalAmount
         });
       } catch (updateError) {
         console.error('Failed to update appointment status:', updateError);
@@ -236,6 +239,10 @@ export default function AppointmentCardCheckout({
               <div className="flex justify-between items-center text-lg font-semibold">
                 <span>Service Total:</span>
                 <span>{formatPrice(baseAmount)}</span>
+              </div>
+              <div className="flex justify-between items-center text-sm mt-2">
+                <span>Tip:</span>
+                <span>{formatPrice(tipAmount)}</span>
               </div>
               <Separator className="my-2" />
               <div className="flex justify-between items-center text-xl font-bold">

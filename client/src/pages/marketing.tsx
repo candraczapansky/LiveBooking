@@ -72,6 +72,7 @@ import {
   UserX,
   Clock,
   MailX,
+  Phone,
   Check,
   X,
   Upload
@@ -324,6 +325,32 @@ const MarketingPage = () => {
           return [] as any[];
         }
         throw err;
+      }
+    }
+  });
+
+  // Fetch active SMS clients (not opted-out + any SMS pref true)
+  const { data: activeSmsClients = [], isLoading: activeSmsLoading } = useQuery<any[]>({
+    queryKey: ['/api/marketing/active-sms-clients'],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/marketing/active-sms-clients');
+        return res.json();
+      } catch {
+        return [] as any[];
+      }
+    }
+  });
+
+  // Fetch clients who haven't opened tracked campaign emails
+  const { data: nonOpeners = [], isLoading: nonOpenersLoading } = useQuery<any[]>({
+    queryKey: ['/api/marketing/non-openers'],
+    queryFn: async () => {
+      try {
+        const res = await apiRequest('GET', '/api/marketing/non-openers');
+        return res.json();
+      } catch {
+        return [] as any[];
       }
     }
   });
@@ -672,6 +699,14 @@ const MarketingPage = () => {
                   <UserX className="h-4 w-4 mr-2" />
                   Opt Outs
                 </TabsTrigger>
+                <TabsTrigger value="activeSms" className="flex items-center">
+                  <Phone className="h-4 w-4 mr-2" />
+                  Active SMS
+                </TabsTrigger>
+                <TabsTrigger value="nonOpeners" className="flex items-center">
+                  <MailX className="h-4 w-4 mr-2" />
+                  Non-Openers
+                </TabsTrigger>
               </TabsList>
               
               {/* Campaigns Tab */}
@@ -1005,21 +1040,18 @@ const MarketingPage = () => {
                               <Clock className="h-4 w-4 mr-1" />
                               {new Date(optOut.unsubscribedAt).toLocaleDateString()}
                             </div>
-                            
                             {optOut.reason && (
                               <div className="text-sm">
                                 <span className="font-medium">Reason:</span>{" "}
                                 <span className="text-gray-600 dark:text-gray-400">{optOut.reason}</span>
                               </div>
                             )}
-                            
                             {optOut.campaign?.name && (
                               <div className="text-sm">
                                 <span className="font-medium">Campaign:</span>{" "}
                                 <span className="text-gray-600 dark:text-gray-400">{optOut.campaign.name}</span>
                               </div>
                             )}
-                            
                             {optOut.user?.phone && (
                               <div className="text-sm">
                                 <span className="font-medium">Phone:</span>{" "}
@@ -1049,6 +1081,79 @@ const MarketingPage = () => {
                             </Button>
                           </div>
                         </CardFooter>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Active SMS Tab */}
+              <TabsContent value="activeSms">
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium">Active SMS Clients</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Clients who have not opted out and have at least one SMS preference enabled.
+                  </p>
+                </div>
+                {activeSmsLoading ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                      <p className="mt-4 text-sm text-gray-500">Loading active SMS clients...</p>
+                    </CardContent>
+                  </Card>
+                ) : (activeSmsClients as any[]).length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-sm text-gray-500">No active SMS clients found.</CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {(activeSmsClients as any[]).map((c: any) => (
+                      <Card key={c.id}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg">{c.firstName} {c.lastName}</CardTitle>
+                          <CardDescription>{c.email || 'No email'}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-sm">
+                          <div>Phone: {c.phone || '—'}</div>
+                          <div className="mt-1">SMS Prefs: {['smsAccountManagement','smsAppointmentReminders','smsPromotions'].filter(k => c[k]).length > 0 ? 'Enabled' : 'Disabled'}</div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Non-Openers Tab */}
+              <TabsContent value="nonOpeners">
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium">Non-Openers (Email)</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Clients who have not opened any tracked marketing emails.
+                  </p>
+                </div>
+                {nonOpenersLoading ? (
+                  <Card>
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                      <p className="mt-4 text-sm text-gray-500">Loading non-openers...</p>
+                    </CardContent>
+                  </Card>
+                ) : (nonOpeners as any[]).length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-sm text-gray-500">No non-openers found.</CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {(nonOpeners as any[]).map((c: any) => (
+                      <Card key={c.id}>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-lg">{c.firstName} {c.lastName}</CardTitle>
+                          <CardDescription>{c.email || 'No email'}</CardDescription>
+                        </CardHeader>
+                        <CardContent className="text-sm">
+                          <div>Phone: {c.phone || '—'}</div>
+                        </CardContent>
                       </Card>
                     ))}
                   </div>
@@ -2014,7 +2119,7 @@ const MarketingPage = () => {
                         variables: [],
                       });
                       const saved = await res.json();
-                      toast({ title: 'Template saved', description: `Saved as “${saved.name}”.` });
+                      toast({ title: 'Template saved', description: `Saved as "${saved.name}".` });
                       setShowEmailEditor(false);
                     } catch (err: any) {
                       toast({ title: 'Save failed', description: err?.message || 'Unable to save template', variant: 'destructive' });
