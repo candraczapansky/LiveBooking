@@ -197,7 +197,19 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
         photoUrlForSending = raw;
       } else {
         // Expose a stable public URL that serves the campaign photo
-        photoUrlForSending = getPublicUrl(`/api/marketing-campaigns/${campaignId}/photo`);
+        let candidate = getPublicUrl(`/api/marketing-campaigns/${campaignId}/photo`);
+        const looksLocal = /localhost|127\.0\.0\.1/i.test(candidate);
+        if (looksLocal) {
+          const xfProto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+          const xfHost = (req.headers['x-forwarded-host'] as string) || req.get('host');
+          if (xfHost) {
+            const baseFromReq = `${xfProto}://${xfHost}`;
+            if (!/localhost|127\.0\.0\.1/i.test(baseFromReq)) {
+              candidate = `${baseFromReq}/api/marketing-campaigns/${campaignId}/photo`;
+            }
+          }
+        }
+        photoUrlForSending = candidate;
       }
     }
 

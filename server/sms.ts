@@ -304,7 +304,14 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     
     // For MMS, Twilio requires a publicly accessible media URL
     const isHttpUrl = /^https?:\/\//i.test(photoUrl);
-    const mediaUrls = isHttpUrl ? [photoUrl] : undefined;
+    const urlHost = (() => {
+      try { return isHttpUrl ? new URL(photoUrl).hostname : ''; } catch { return ''; }
+    })();
+    const isLocalHostLike = /^(localhost|127\.|0\.0\.0\.0)$/i.test(urlHost);
+    const isPrivateNetwork = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[0-1])\.)/.test(urlHost);
+    const isHttps = (() => { try { return new URL(photoUrl).protocol === 'https:'; } catch { return false; } })();
+    const shouldAttachMedia = isHttpUrl && isHttps && !isLocalHostLike && !isPrivateNetwork;
+    const mediaUrls = shouldAttachMedia ? [photoUrl] : undefined;
     const messageCreatePayload: any = {
       body: finalMmsMessage,
       from: currentTwilioPhoneNumber,

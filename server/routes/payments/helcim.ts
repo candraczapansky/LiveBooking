@@ -21,6 +21,7 @@ router.post('/initialize', async (req, res) => {
     const payload = {
       amount: Number(amount),
       currency: 'USD',
+      paymentType: 'purchase',
       test: process.env.NODE_ENV !== 'production',
       description: description || 'Payment',
       idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,

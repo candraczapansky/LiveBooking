@@ -87,6 +87,161 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       return res.status(status).json({ error: "Failed to create client", message });
     }
   });
+
+  // Bulk import clients
+  app.post("/api/clients/import", async (req, res) => {
+    try {
+      const body = req.body as any;
+      const clients = Array.isArray(body?.clients) ? body.clients : [];
+
+      if (!Array.isArray(clients) || clients.length === 0) {
+        return res.status(400).json({ error: "Invalid payload: clients array is required" });
+      }
+
+      // Helpers
+      const isValidEmail = (email: string | undefined | null) => {
+        if (!email) return false;
+        const e = String(email).trim();
+        // basic email check
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+      };
+
+      const sanitize = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
+      let imported = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+
+      // Track seen emails within this batch to avoid duplicate inserts in one request
+      const seenEmails = new Set<string>();
+
+      // Preload existing users for quicker duplicate checks (email only)
+      let existingEmails = new Set<string>();
+      try {
+        const allUsers = await storage.getAllUsers();
+        existingEmails = new Set<string>(allUsers.map((u: any) => (u.email || '').toLowerCase()).filter(Boolean));
+      } catch (e) {
+        // If fetching all users fails, continue without pre-cache; rely on DB unique constraints
+      }
+
+      const generateFallbackEmail = (firstName: string, lastName: string, index: number) => {
+        const base = `${(firstName || 'client').toLowerCase()}${(lastName || '')
+          .toLowerCase()}`.replace(/[^a-z0-9]/g, '') || 'client';
+        let candidate = `${base}.${Date.now()}-${index}@placeholder.local`;
+        let counter = 0;
+        while (seenEmails.has(candidate.toLowerCase()) || existingEmails.has(candidate.toLowerCase())) {
+          counter += 1;
+          candidate = `${base}.${Date.now()}-${index}-${counter}@placeholder.local`;
+          if (counter > 50) break;
+        }
+        return candidate;
+      };
+
+      const ensureUniqueUsername = async (base: string) => {
+        let username = base || `client${Date.now()}`;
+        username = username.toLowerCase().replace(/[^a-z0-9]/g, '') || `client${Date.now()}`;
+        let suffix = 0;
+        // eslint-disable-next-line no-constant-condition
+        while (await storage.getUserByUsername(username)) {
+          suffix += 1;
+          if (suffix > 50) {
+            username = `${username}${Date.now()}`;
+            break;
+          }
+          username = `${base}${suffix}`.toLowerCase().replace(/[^a-z0-9]/g, '') || `client${Date.now()}`;
+        }
+        return username;
+      };
+
+      // Process with modest concurrency to handle large imports reliably
+      const CONCURRENCY = 10;
+      let currentIndex = 0;
+
+      async function processOne(raw: any, index: number) {
+        const firstName = sanitize(raw.firstName || raw.FirstName || raw['First name'] || raw['First Name']);
+        const lastName = sanitize(raw.lastName || raw.LastName || raw['Last name'] || raw['Last Name']);
+        const emailRaw = sanitize(raw.email || raw.Email);
+        const phone = sanitize(raw.phone || raw.Phone || raw['Mobile phone'] || raw['Mobile Phone']);
+
+        // Prepare email
+        let email = emailRaw;
+        if (!isValidEmail(email)) {
+          email = generateFallbackEmail(firstName, lastName, index);
+        }
+        const emailLower = email.toLowerCase();
+        if (seenEmails.has(emailLower) || existingEmails.has(emailLower)) {
+          skipped += 1;
+          errors.push(`Duplicate email skipped: ${email}`);
+          return;
+        }
+
+        try {
+          // Build username from email or names
+          const baseFromEmail = (email.split('@')[0] || 'client').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const baseFromName = `${(firstName || 'client').toLowerCase()}${(lastName || '')
+            .toLowerCase()}`.replace(/[^a-z0-9]/g, '');
+          const baseUsername = baseFromEmail || baseFromName || `client${Date.now()}`;
+          const username = await ensureUniqueUsername(baseUsername);
+
+          const tempPassword = `Temp123!${Math.random().toString(36).slice(-4)}`;
+          const hashedPassword = await hashPassword(tempPassword);
+
+          await storage.createUser({
+            username,
+            email,
+            password: hashedPassword,
+            firstName: firstName || null,
+            lastName: lastName || null,
+            role: "client",
+            phone: phone || null,
+            address: null,
+            city: null,
+            state: null,
+            zipCode: null,
+            notes: null,
+            emailAccountManagement: true,
+            emailAppointmentReminders: true,
+            emailPromotions: false,
+            smsAccountManagement: false,
+            smsAppointmentReminders: true,
+            smsPromotions: false,
+          } as any);
+
+          seenEmails.add(emailLower);
+          imported += 1;
+        } catch (err: any) {
+          // Gracefully handle unique constraint violations and other errors
+          const msg = err?.message || 'Unknown error';
+          if (/unique/i.test(msg) || /duplicate/i.test(msg)) {
+            skipped += 1;
+            errors.push(`Duplicate skipped: ${email}`);
+          } else {
+            skipped += 1;
+            errors.push(`Error importing ${email}: ${msg}`);
+          }
+        }
+      }
+
+      async function runBatch() {
+        const workers: Promise<void>[] = [];
+        for (let i = 0; i < CONCURRENCY && currentIndex < clients.length; i += 1) {
+          const idx = currentIndex++;
+          workers.push(processOne(clients[idx], idx));
+        }
+        await Promise.all(workers);
+      }
+
+      while (currentIndex < clients.length) {
+        // eslint-disable-next-line no-await-in-loop
+        await runBatch();
+      }
+
+      return res.json({ imported, skipped, errors });
+    } catch (error: any) {
+      console.error("Error importing clients:", error);
+      return res.status(500).json({ error: "Failed to import clients", message: error?.message || String(error) });
+    }
+  });
   // TEMPORARY: Grant admin permissions to user 72
   app.post("/api/temp/grant-admin-72", async (req, res) => {
     try {

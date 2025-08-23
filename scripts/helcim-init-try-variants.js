@@ -13,9 +13,15 @@ const base = {
 
 const variants = [
 	{ name: 'paymentType=cc', body: { ...base, paymentType: 'cc' } },
+	{ name: 'paymentType=CARD', body: { ...base, paymentType: 'CARD' } },
 	{ name: 'paymentType=card', body: { ...base, paymentType: 'card' } },
+	{ name: 'paymentType=creditcard', body: { ...base, paymentType: 'creditcard' } },
+	{ name: 'paymentType=credit_card', body: { ...base, paymentType: 'credit_card' } },
+	{ name: 'paymentType=payment', body: { ...base, paymentType: 'payment' } },
+	{ name: 'paymentType=purchase', body: { ...base, paymentType: 'purchase' } },
+	{ name: 'paymentType=ach', body: { ...base, paymentType: 'ach' } },
 	{ name: 'no paymentType', body: { ...base } },
-	{ name: 'paymentMethod=card', body: { ...base, paymentMethod: 'card' } },
+	{ name: 'transactionType=purchase', body: { ...base, transactionType: 'purchase' } },
 ];
 
 (async () => {
