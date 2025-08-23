@@ -7,6 +7,68 @@ import { isTwilioConfigured } from "../sms.js";
 export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
   const smsService = SMSAutoRespondService.getInstance(storage);
 
+  // Normalize a phone number to a stable key
+  function normalizePhoneForKey(phone: string): string {
+    try {
+      const trimmed = (phone || '').toString().trim();
+      if (trimmed.startsWith('+')) return trimmed;
+      const digits = trimmed.replace(/\D/g, '');
+      if (digits.length === 10) return `+1${digits}`;
+      if (digits.length > 0) return `+${digits}`;
+    } catch {}
+    return (phone || '').toString();
+  }
+
+  function isStopKeyword(text: string): boolean {
+    const t = (text || '').toString().trim().toUpperCase();
+    return ['STOP', 'STOPALL', 'STOP ALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'].includes(t);
+  }
+
+  function isStartKeyword(text: string): boolean {
+    const t = (text || '').toString().trim().toUpperCase();
+    return ['START', 'UNSTOP', 'YES'].includes(t);
+  }
+
+  async function setSmsOptOut(phone: string): Promise<void> {
+    try {
+      const key = `sms_opt_out:${normalizePhoneForKey(phone)}`;
+      const existing = await storage.getSystemConfig(key);
+      const value = JSON.stringify({ optedOut: true, at: new Date().toISOString() });
+      if (existing) {
+        await storage.updateSystemConfig(key, value, 'Client opted out via STOP keyword');
+      } else {
+        await storage.setSystemConfig({
+          key,
+          value,
+          description: 'Client opted out via STOP keyword',
+          category: 'sms_opt_out',
+          isEncrypted: false,
+          isActive: true,
+        } as any);
+      }
+    } catch {}
+  }
+
+  async function clearSmsOptOut(phone: string): Promise<void> {
+    try {
+      const key = `sms_opt_out:${normalizePhoneForKey(phone)}`;
+      // Prefer deletion to simplify state
+      await storage.deleteSystemConfig(key);
+    } catch {}
+  }
+
+  async function updateUserSmsFlagsByPhone(phone: string, enabled: boolean): Promise<void> {
+    try {
+      const user = await (storage as any).getUserByPhone?.(phone);
+      if (!user || !user.id) return;
+      await storage.updateUser(user.id, {
+        smsAccountManagement: enabled,
+        smsAppointmentReminders: enabled,
+        smsPromotions: enabled,
+      } as any);
+    } catch {}
+  }
+
   function escapeForXml(text: string): string {
     return text
       .replace(/&/g, "&amp;")
@@ -198,6 +260,22 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
 
       console.log('📨 Incoming SMS webhook', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
+      // Handle STOP/START keywords first (compliance and suppression)
+      if (isStopKeyword(body)) {
+        await setSmsOptOut(from);
+        await updateUserSmsFlagsByPhone(from, false);
+        res.set('Content-Type', 'text/xml');
+        const msg = escapeForXml('You are unsubscribed. Reply START to re-subscribe.');
+        return res.send(`<Response><Message>${msg}</Message></Response>`);
+      }
+      if (isStartKeyword(body)) {
+        await clearSmsOptOut(from);
+        await updateUserSmsFlagsByPhone(from, true);
+        res.set('Content-Type', 'text/xml');
+        const msg = escapeForXml('You have been re-subscribed.');
+        return res.send(`<Response><Message>${msg}</Message></Response>`);
+      }
+
       const result = await smsService.processIncomingSMS({
         from,
         to,
@@ -228,6 +306,22 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
       }
 
       console.log('📨 Incoming SMS webhook (alias)', { from, to, bodyPreview: body.slice(0, 80), messageId });
+
+      // Handle STOP/START keywords first (compliance and suppression)
+      if (isStopKeyword(body)) {
+        await setSmsOptOut(from);
+        await updateUserSmsFlagsByPhone(from, false);
+        res.set('Content-Type', 'text/xml');
+        const msg = escapeForXml('You are unsubscribed. Reply START to re-subscribe.');
+        return res.send(`<Response><Message>${msg}</Message></Response>`);
+      }
+      if (isStartKeyword(body)) {
+        await clearSmsOptOut(from);
+        await updateUserSmsFlagsByPhone(from, true);
+        res.set('Content-Type', 'text/xml');
+        const msg = escapeForXml('You have been re-subscribed.');
+        return res.send(`<Response><Message>${msg}</Message></Response>`);
+      }
 
       const result = await smsService.processIncomingSMS({
         from,

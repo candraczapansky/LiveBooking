@@ -55,7 +55,7 @@ export default function AppointmentCheckout({
       // Update appointment status to completed
       await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
         status: 'completed',
-        paymentStatus: 'completed' // Mark as completed without payment
+        paymentStatus: 'paid' // Mark as paid to reflect on calendar (green)
       });
 
       toast({

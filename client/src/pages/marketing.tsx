@@ -1060,7 +1060,7 @@ const MarketingPage = () => {
       </div>
       
       {/* Campaign Form Dialog */}
-      <Dialog open={isCampaignFormOpen} onOpenChange={setIsCampaignFormOpen}>
+      <Dialog open={isCampaignFormOpen} onOpenChange={setIsCampaignFormOpen} modal={false}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Campaign</DialogTitle>
@@ -1194,34 +1194,52 @@ const MarketingPage = () => {
                       {/* Client List */}
                       {showClientSelector && (
                         <div className="border rounded-lg max-h-60 overflow-y-auto bg-white dark:bg-gray-800">
-                          {allClients
-                            .filter((client) => {
+                          {clientSearchQuery.trim().length < 2 ? (
+                            <div className="p-3 text-sm text-gray-500 dark:text-gray-400">
+                              Type at least 2 characters to search clients.
+                            </div>
+                          ) : (
+                            (() => {
                               const searchTerm = clientSearchQuery.toLowerCase();
-                              const fullName = `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase();
-                              const email = (client.email || '').toLowerCase();
-                              return fullName.includes(searchTerm) || email.includes(searchTerm);
-                            })
-                            .filter((client) => !selectedClients.some(selected => selected.id === client.id))
-                            .map((client) => (
-                              <div
-                                key={client.id}
-                                className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0"
-                                onClick={() => {
-                                  setSelectedClients(prev => [...prev, client]);
-                                  setClientSearchQuery("");
-                                }}
-                              >
-                                <div>
-                                  <div className="font-medium">
-                                    {client.firstName} {client.lastName}
+                              const matches = allClients
+                                .filter((client) => {
+                                  const fullName = `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase();
+                                  const email = (client.email || '').toLowerCase();
+                                  return fullName.includes(searchTerm) || email.includes(searchTerm);
+                                })
+                                .filter((client) => !selectedClients.some((selected) => selected.id === client.id))
+                                .slice(0, 50);
+
+                              if (matches.length === 0) {
+                                return (
+                                  <div className="p-3 text-sm text-gray-500 dark:text-gray-400">
+                                    No matching clients found.
                                   </div>
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {client.email}
+                                );
+                              }
+
+                              return matches.map((client) => (
+                                <div
+                                  key={client.id}
+                                  className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-b-0"
+                                  onClick={() => {
+                                    setSelectedClients((prev) => [...prev, client]);
+                                    setClientSearchQuery("");
+                                  }}
+                                >
+                                  <div>
+                                    <div className="font-medium">
+                                      {client.firstName} {client.lastName}
+                                    </div>
+                                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                                      {client.email}
+                                    </div>
                                   </div>
+                                  <Check size={16} className="text-gray-400" />
                                 </div>
-                                <Check size={16} className="text-gray-400" />
-                              </div>
-                            ))}
+                              ));
+                            })()
+                          )}
                         </div>
                       )}
                       

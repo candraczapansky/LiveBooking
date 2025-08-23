@@ -153,6 +153,10 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         return username;
       };
 
+      // Pre-compute a single temporary password hash to avoid hashing 20k+ times
+      const defaultTempPassword = `Temp123!${Math.random().toString(36).slice(-4)}`;
+      const defaultHashedPassword = await hashPassword(defaultTempPassword);
+
       // Process with modest concurrency to handle large imports reliably
       const CONCURRENCY = 10;
       let currentIndex = 0;
@@ -183,13 +187,10 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
           const baseUsername = baseFromEmail || baseFromName || `client${Date.now()}`;
           const username = await ensureUniqueUsername(baseUsername);
 
-          const tempPassword = `Temp123!${Math.random().toString(36).slice(-4)}`;
-          const hashedPassword = await hashPassword(tempPassword);
-
           await storage.createUser({
             username,
             email,
-            password: hashedPassword,
+            password: defaultHashedPassword,
             firstName: firstName || null,
             lastName: lastName || null,
             role: "client",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -133,6 +133,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { selectedLocation } = useLocation();
+  const [debouncedClientSearch, setDebouncedClientSearch] = useState("");
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setDebouncedClientSearch(clientSearchValue.trim());
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [clientSearchValue]);
   
   // Form setup
   const form = useForm<AppointmentFormValues>({
@@ -167,9 +175,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   // Fetch staff schedules for time slot filtering
   const { data: schedules = [] } = useQuery({
-    queryKey: ['/api/schedules'],
+    queryKey: ['/api/schedules', selectedLocation?.id],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/schedules");
+      const url = selectedLocation?.id ? `/api/schedules?locationId=${selectedLocation.id}` : "/api/schedules";
+      const response = await apiRequest("GET", url);
       return response.json();
     },
     enabled: open,
@@ -177,9 +186,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   // Get staff
   const { data: staff, isLoading: isLoadingStaff } = useQuery({
-    queryKey: ['/api/staff'],
+    queryKey: ['/api/staff', selectedLocation?.id],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/staff");
+      const url = selectedLocation?.id ? `/api/staff?locationId=${selectedLocation.id}` : "/api/staff";
+      const response = await apiRequest("GET", url);
       return response.json();
     },
     enabled: open
@@ -187,20 +197,20 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   
   // Get clients
   const { data: clients, isLoading: isLoadingClients, refetch: refetchClients } = useQuery({
-    queryKey: ['/api/users?role=client', clientSearchValue],
+    queryKey: ['/api/users?role=client', debouncedClientSearch],
     queryFn: async () => {
-      const searchParam = clientSearchValue.trim() ? `&search=${encodeURIComponent(clientSearchValue.trim())}` : '';
+      const searchParam = debouncedClientSearch ? `&search=${encodeURIComponent(debouncedClientSearch)}` : '';
       const response = await apiRequest("GET", `/api/users?role=client${searchParam}`);
       const data = await response.json();
       console.log('📋 Fetched clients:', {
         count: data?.length,
-        searchTerm: clientSearchValue,
+        searchTerm: debouncedClientSearch,
         firstClient: data?.[0],
         sampleClients: data?.slice(0, 3)
       });
       return data;
     },
-    enabled: open,
+    enabled: open && (debouncedClientSearch.length >= 2 || !!appointmentId),
     staleTime: 0, // Always fetch fresh data
     refetchOnWindowFocus: true // Refetch when window gains focus
   });
@@ -261,6 +271,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     }
 
     // Only show slots that are within schedule and do not overlap with any existing appointment
+    // Pre-compute staff appointments for selected day to reduce per-slot work
+    const staffAppointments = (appointments as any[] || [])
+      .filter((appointment: any) => appointment.staffId === parseInt(selectedStaffId))
+      .filter((appointment: any) => {
+        const aptDate = new Date(appointment.startTime);
+        return aptDate.toDateString() === selectedFormDate.toDateString();
+      })
+      .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
     const filteredSlots = allTimeSlots.filter(slot => {
       // Check if time is within staff schedule
       const isWithinSchedule = staffSchedules.some((schedule: any) => 
@@ -279,30 +298,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                            (selectedService.bufferTimeAfter || 0);
       const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
 
-      // Get all existing appointments for this staff on this day, sorted by start time
-      const staffAppointments = (appointments as any[] || [])
-        .filter((appointment: any) => {
-          // Debug: Log staffId comparison
-          const match = appointment.staffId === parseInt(selectedStaffId);
-          if (!match) {
-    
-          }
-          return match;
-        })
-        .filter((appointment: any) => {
-          const aptDate = new Date(appointment.startTime);
-          const match = aptDate.toDateString() === selectedFormDate.toDateString();
-          if (!match) {
-    
-          }
-          return match;
-        })
-        .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-    
-
-      // DEBUG LOGGING
-      console.log('Checking slot:', slot.label, 'for staff:', selectedStaffId, 'on', appointmentStart.toDateString());
-      console.log('Staff appointments for this day:', staffAppointments.map(a => ({start: a.startTime, end: a.endTime})));
+      /* staffAppointments precomputed above */
 
       // Check if this slot fits between existing appointments
       for (let i = 0; i < staffAppointments.length; i++) {
@@ -312,7 +308,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         const existingEnd = new Date(apt.endTime);
         // If the new appointment overlaps with any existing one, exclude it
         if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
-          console.log('Excluding slot', slot.label, 'because it overlaps with', existingStart.toLocaleTimeString(), '-', existingEnd.toLocaleTimeString());
           return false;
         }
       }
@@ -321,7 +316,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     return filteredSlots;
   };
 
-  const availableTimeSlots = getAvailableTimeSlots();
+  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointments, appointmentId]);
   
   const endTime = selectedService && startTimeString ? (() => {
     const [hours, minutes] = startTimeString.split(':').map(Number);
@@ -384,20 +379,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   // Force refresh client data when dialog opens
   useEffect(() => {
-    if (open) {
-      console.log("Appointment form opened - refreshing client data");
-      // Clear cache and refetch immediately
-      queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+    if (open && (debouncedClientSearch.length >= 2 || !!appointmentId)) {
+      console.log("Appointment form opened - fetching client data for current context");
       refetchClients();
     }
-  }, [open, refetchClients, queryClient]);
+  }, [open, debouncedClientSearch, appointmentId, refetchClients]);
 
   // Debug clients data whenever it changes
   useEffect(() => {
     if (clients) {
       console.log("Clients data updated in appointment form:", clients.length, "clients");
-      console.log("Client names:", clients.map((c: any) => `${c.firstName} ${c.lastName} (ID: ${c.id})`));
     }
   }, [clients]);
 

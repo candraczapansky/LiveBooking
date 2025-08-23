@@ -85,7 +85,7 @@ const AppointmentDetails = ({
     queryKey: ['/api/services', appointment?.serviceId],
     queryFn: async () => {
       if (!appointment?.serviceId) return null;
-      const response = await fetch(`/api/services/${appointment.serviceId}`);
+      const response = await fetch(`/api/services/${appointment.serviceId}?v=${Date.now()}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to fetch service');
       return response.json();
     },
@@ -118,8 +118,12 @@ const AppointmentDetails = ({
   const getAppointmentChargeAmount = () => {
     const total = Number((appointment as any)?.totalAmount ?? 0);
     if (!Number.isNaN(total) && total > 0) return total;
+    const fromAppointmentService = Number((appointment as any)?.service?.price ?? 0);
+    if (!Number.isNaN(fromAppointmentService) && fromAppointmentService > 0) return fromAppointmentService;
     const fallback = Number((service as any)?.price ?? 0);
-    return Number.isNaN(fallback) ? 0 : fallback;
+    if (!Number.isNaN(fallback) && fallback > 0) return fallback;
+    const fromAmount = Number((appointment as any)?.amount ?? 0);
+    return Number.isNaN(fromAmount) ? 0 : fromAmount;
   };
 
   // Freeze amount when card payment UI is shown (must be after queries exist)
@@ -547,8 +551,8 @@ const AppointmentDetails = ({
             <Badge className={getStatusColor(appointment.status || 'pending')}>
               {(appointment.status || 'pending').charAt(0).toUpperCase() + (appointment.status || 'pending').slice(1)}
             </Badge>
-            <Badge className={getPaymentStatusColor(appointment.paymentStatus || 'pending')}>
-              {(appointment.paymentStatus || 'pending').charAt(0).toUpperCase() + (appointment.paymentStatus || 'pending').slice(1)}
+            <Badge className={getPaymentStatusColor(appointment.paymentStatus || 'unpaid')}>
+              {(appointment.paymentStatus || 'unpaid').charAt(0).toUpperCase() + (appointment.paymentStatus || 'unpaid').slice(1)}
             </Badge>
           </div>
 
@@ -684,11 +688,11 @@ const AppointmentDetails = ({
                   <span className="font-medium">Amount:</span> {formatPrice(getAppointmentChargeAmount())}
                 </p>
                 <p className="text-sm">
-                  <span className="font-medium">Status:</span> {appointment.paymentStatus || 'pending'}
+                  <span className="font-medium">Status:</span> {appointment.paymentStatus || 'unpaid'}
                 </p>
                 
                 {/* Payment Options - Only show if not already paid */}
-                {(appointment.paymentStatus || 'pending') !== 'paid' && (
+                {(appointment.paymentStatus || 'unpaid') !== 'paid' && (
                   <div className="pt-3 space-y-3">
                     {!showPaymentOptions ? (
                       <Button
@@ -822,12 +826,11 @@ const AppointmentDetails = ({
                           onOpenChange={setShowHelcimModal}
                           amount={chargeAmount || getAppointmentChargeAmount()}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
-                          onSuccess={async (paymentId: string) => {
+                          onSuccess={async (_response: any) => {
                             try {
-                              await apiRequest('POST', '/api/confirm-payment', { paymentId, appointmentId: appointment.id });
-                              await apiRequest('PUT', `/api/appointments/${appointment.id}`, { 
+                              await apiRequest('PUT', `/api/appointments/${appointment.id}`, {
                                 status: 'completed',
-                                paymentStatus: 'paid' 
+                                paymentStatus: 'paid'
                               });
                             } catch {}
                             setShowHelcimModal(false);

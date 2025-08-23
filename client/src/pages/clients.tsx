@@ -126,6 +126,11 @@ const ClientsPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -193,40 +198,24 @@ const ClientsPage = () => {
     }
   }, [location]);
 
-  const { data: clients, isLoading } = useQuery({
-    queryKey: ['/api/users?role=client', refreshTrigger],
+  const shouldSearch = debouncedQuery.length >= 2;
+  const { data: clientsData, isLoading } = useQuery({
+    queryKey: ['/api/users', 'search', debouncedQuery],
     queryFn: async () => {
-      console.log('Fetching client list...');
-      const response = await apiRequest("GET", "/api/users?role=client");
+      console.log('Fetching client search...', debouncedQuery);
+      const response = await apiRequest("GET", `/api/users?search=${encodeURIComponent(debouncedQuery)}`);
       const data = await response.json();
-      console.log('Client list fetched:', { count: data.length, recentClients: data.slice(-3) });
-      
-      // Debug: Check if phone numbers are in the API response
-      if (data.length > 0) {
-        const sampleClient = data[0];
-        console.log('Sample client from API:', {
-          id: sampleClient.id,
-          firstName: sampleClient.firstName,
-          lastName: sampleClient.lastName,
-          phone: sampleClient.phone,
-          phoneType: typeof sampleClient.phone,
-          phoneLength: sampleClient.phone?.length,
-          hasPhone: !!sampleClient.phone
-        });
-        
-        // Check how many clients have phone numbers
-        const clientsWithPhones = data.filter((c: any) => c.phone && c.phone.trim() !== '');
-        console.log('Total clients with phones:', clientsWithPhones.length, 'out of', data.length);
-      }
-      
+      console.log('Client search fetched:', { count: data.length, sample: data.slice(0, 3) });
       return data;
     },
-    staleTime: 0, // Always consider data stale
-    refetchOnWindowFocus: true, // Refetch when window gains focus
-    refetchOnMount: true, // Refetch when component mounts
-    refetchOnReconnect: true, // Refetch when reconnecting
-    gcTime: 0 // Don't cache data in garbage collection
+    enabled: shouldSearch,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+    gcTime: 0
   });
+  const clients = clientsData ?? [];
 
   const addForm = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -1030,14 +1019,15 @@ const ClientsPage = () => {
     });
   };
 
-  // Enhanced filtering logic
+  // Enhanced filtering logic (client-side filter on search results)
   const filteredClients = clients?.filter((client: Client) => {
     // Basic search filter
-    const matchesSearch = 
-      client.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      client.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (client.firstName && client.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (client.lastName && client.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q ||
+      client.username.toLowerCase().includes(q) ||
+      client.email.toLowerCase().includes(q) ||
+      (client.firstName && client.firstName.toLowerCase().includes(q)) ||
+      (client.lastName && client.lastName.toLowerCase().includes(q)) ||
       (client.phone && client.phone.includes(searchQuery));
 
     if (!matchesSearch) return false;
@@ -1321,7 +1311,11 @@ const ClientsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-6">
-                {isLoading ? (
+                {!shouldSearch ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    Type at least 2 characters to search clients.
+                  </div>
+                ) : isLoading ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>

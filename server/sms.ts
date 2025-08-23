@@ -152,6 +152,38 @@ function ensureSmsCompliance(message: string): string {
   return `${base}${base.length ? '\n\n' : ''}${SMS_COMPLIANCE_TEXT}`;
 }
 
+// Normalize a phone number to a stable key format for opt-out checks (prefer E.164)
+function normalizePhoneForKey(phone: string): string {
+  try {
+    const trimmed = (phone || '').toString().trim();
+    if (trimmed.startsWith('+')) return trimmed;
+    const digitsOnly = trimmed.replace(/\D/g, '');
+    if (digitsOnly.length === 10) return `+1${digitsOnly}`; // assume US
+    if (digitsOnly.length > 0) return `+${digitsOnly}`; // fallback international
+  } catch {}
+  return (phone || '').toString();
+}
+
+// Check if a phone number is globally opted out via system configuration
+async function isPhoneGloballyOptedOut(phone: string): Promise<boolean> {
+  try {
+    if (!storage) return false; // gracefully skip if DB unavailable
+    const key = `sms_opt_out:${normalizePhoneForKey(phone)}`;
+    const cfg = await storage.getSystemConfig(key);
+    if (!cfg || !cfg.value) return false;
+    const raw = (cfg.value || '').toString();
+    if (raw === 'true') return true;
+    try {
+      const parsed = JSON.parse(raw);
+      return !!parsed?.optedOut;
+    } catch {
+      return raw.toLowerCase() === 'yes' || raw.toLowerCase() === 'opted_out';
+    }
+  } catch {
+    return false;
+  }
+}
+
 export async function sendSMS(to: string, message: string, photoUrl?: string): Promise<SMSResult> {
   // If photo is provided, send as MMS
   if (photoUrl) {
@@ -165,6 +197,14 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
 
   // Ensure compliance text is appended
   const finalMessage = ensureSmsCompliance(message);
+
+  // Enforce global SMS opt-out suppression
+  if (await isPhoneGloballyOptedOut(to)) {
+    return {
+      success: false,
+      error: 'Recipient has opted out of SMS communications.'
+    };
+  }
 
   // In development mode, simulate SMS sending for test numbers only
   if (process.env.NODE_ENV === 'development') {
@@ -242,12 +282,16 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     await initializeTwilioClient();
   }
 
-  // Build MMS message and append compliance text at the very end
-  let baseMmsMessage = message;
-  if (photoUrl) {
-    baseMmsMessage += '\n\n[Photo attached - sent as MMS]';
+  // Build MMS message and append compliance text at the very end (no bracketed note)
+  const finalMmsMessage = ensureSmsCompliance(message);
+
+  // Enforce global SMS opt-out suppression
+  if (await isPhoneGloballyOptedOut(to)) {
+    return {
+      success: false,
+      error: 'Recipient has opted out of SMS communications.'
+    };
   }
-  const finalMmsMessage = ensureSmsCompliance(baseMmsMessage);
 
   // In development mode, simulate MMS sending for test numbers only
   if (process.env.NODE_ENV === 'development') {
