@@ -831,10 +831,39 @@ const AppointmentsPage = () => {
 
         /* Mini calendar: highlight the selected date when in day view */
         .appointments-mini-calendar[data-mini-mode='day'] .rdp-day[aria-selected='true'] {
-          box-shadow: inset 0 0 0 2px hsl(var(--primary));
-          color: hsl(var(--primary));
+          border: 2px solid hsl(var(--primary)) !important;
+          box-shadow: inset 0 0 0 1px hsl(var(--primary));
+          color: hsl(var(--primary)) !important;
           background: transparent !important;
-          border-radius: 0.375rem;
+          border-radius: 0.375rem !important;
+        }
+
+        /* Fallback for DayPicker's selected class */
+        .appointments-mini-calendar[data-mini-mode='day'] .rdp-day_selected {
+          border: 2px solid hsl(var(--primary)) !important;
+          color: hsl(var(--primary)) !important;
+          background: transparent !important;
+          border-radius: 0.375rem !important;
+          box-sizing: border-box !important;
+        }
+
+        /* Force highlight if library uses button[aria-pressed] internally */
+        .appointments-mini-calendar[data-mini-mode='day'] .rdp-day[aria-pressed='true'] {
+          border: 2px solid hsl(var(--primary)) !important;
+          color: hsl(var(--primary)) !important;
+          background: transparent !important;
+          border-radius: 0.375rem !important;
+          box-sizing: border-box !important;
+        }
+      `}</style>
+      <style>{`
+        /* Mini calendar: strong selected-day border via custom modifier */
+        .appointments-mini-calendar .mini-selected {
+          border: 2px solid hsl(var(--primary)) !important;
+          color: hsl(var(--primary)) !important;
+          background: transparent !important;
+          border-radius: 0.375rem !important;
+          box-sizing: border-box !important;
         }
       `}</style>
       <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />
@@ -845,13 +874,17 @@ const AppointmentsPage = () => {
             <div className="appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px]" data-mini-mode={calendarView}>
               <Card className={`p-2 sm:p-3 w-[260px] sm:w-[280px] ${calendarView === 'month' ? 'border-2 border-primary ring-2 ring-primary ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900' : ''}`}>
                 <MiniCalendar
+                  key={`mini-${calendarView}-${selectedDate ? selectedDate.toISOString().slice(0,10) : 'no-date'}`}
                   mode="single"
-                  selected={selectedDate}
+                  selected={calendarView === 'day' && selectedDate ? new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()) : undefined}
+                  month={selectedDate || new Date()}
+                  modifiers={calendarView === 'day' && selectedDate ? { miniSelected: new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate()) } : undefined}
+                  modifiersClassNames={calendarView === 'day' ? { miniSelected: 'mini-selected' } : undefined}
                   onSelect={(date) => {
                     setSelectedDate(date as Date);
                     setCalendarView('day');
                   }}
-                  className={`w-full rounded-lg ${calendarView === 'month' ? 'border-2 border-primary' : 'border dark:border-gray-800'} bg-white dark:bg-gray-900 shadow-sm`}
+                  className={`w-full rounded-lg ${calendarView === 'month' ? 'border-2 border-primary' : 'border dark:border-gray-800'} bg-white dark:bg-gray-900 shadow-sm ${calendarView === 'day' ? 'rdp-day-selected-enhanced' : ''}`}
                   classNames={{
                     months: "space-y-2",
                     month: "space-y-2",

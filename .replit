@@ -1,5 +1,5 @@
 modules = ["nodejs-20", "postgresql-16", "python-3.11", "web"]
-run = "npm run start-clean"
+run = "PORT=5000 npm run dev"
 hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
 
 [nix]
@@ -94,5 +94,5 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "PORT=5000 npm run dev"
 waitForPort = 5000

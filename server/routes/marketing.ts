@@ -11,11 +11,25 @@ import LoggerService, { getLogContext } from "../utils/logger.js";
 import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { getPublicUrl } from "../utils/url.js";
 import { redisCache } from "../utils/redis-cache.js";
 import { insertMarketingCampaignSchema, insertPromoCodeSchema } from "../../shared/schema.js";
 
 // Use the shared schema for campaign creation
 const campaignSchema = insertMarketingCampaignSchema;
+
+// Append required SMS marketing compliance text if missing
+const SMS_MARKETING_COMPLIANCE_TEXT = "Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.";
+
+function ensureSmsMarketingCompliance(message: string): string {
+  const base = (message ?? '').toString().trim();
+  // Heuristic: if the message already includes a STOP opt-out phrase, don't append again
+  const hasStopOptOut = /\b(reply|text)\s+stop\b/i.test(base) || /\bstop\b.*\b(unsubscribe|opt\s*out)\b/i.test(base);
+  if (hasStopOptOut) {
+    return base;
+  }
+  return `${base}${base.length ? ' ' : ''}${SMS_MARKETING_COMPLIANCE_TEXT}`;
+}
 
 export function registerMarketingRoutes(app: Express, storage: IStorage) {
   // Create marketing campaign (support both /marketing/campaigns and /marketing-campaigns)
@@ -175,6 +189,18 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     let sentCount = 0;
     let errorCount = 0;
 
+    // Prepare media URL for MMS if applicable
+    let photoUrlForSending: string | undefined = undefined;
+    if (campaign.type === 'sms' && campaign.photoUrl) {
+      const raw = campaign.photoUrl.toString();
+      if (/^https?:\/\//i.test(raw)) {
+        photoUrlForSending = raw;
+      } else {
+        // Expose a stable public URL that serves the campaign photo
+        photoUrlForSending = getPublicUrl(`/api/marketing-campaigns/${campaignId}/photo`);
+      }
+    }
+
     // Send campaign based on type
     for (const recipient of recipients) {
       try {
@@ -192,7 +218,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
         if (campaign.type === 'sms') {
           if (recipient.phone && recipient.smsPromotions) {
-            await sendSMS(recipient.phone, campaign.content, campaign.photoUrl || undefined);
+            const smsContent = ensureSmsMarketingCompliance(campaign.content);
+            await sendSMS(recipient.phone, smsContent, photoUrlForSending);
             sentCount++;
           }
         }
@@ -236,6 +263,46 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       errorCount,
       totalRecipients: recipients.length,
     });
+  }));
+
+  // Serve campaign photo as a public image (support both path variants)
+  app.get(["/api/marketing/campaigns/:id/photo", "/api/marketing-campaigns/:id/photo"], asyncHandler(async (req: Request, res: Response) => {
+    const campaignId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.debug("Serving marketing campaign photo", { ...context, campaignId });
+
+    const campaign = await storage.getMarketingCampaign(campaignId);
+    if (!campaign || !campaign.photoUrl) {
+      throw new NotFoundError("Marketing campaign photo not found");
+    }
+
+    try {
+      const value = (campaign.photoUrl as unknown as string) || '';
+      if (/^https?:\/\//i.test(value)) {
+        // If already a URL, redirect for simplicity
+        res.redirect(302, value);
+        return;
+      }
+
+      // Expect a data URL: data:<mime>;base64,<data>
+      const match = /^data:([^;]+);base64,(.*)$/i.exec(value);
+      if (!match) {
+        throw new ValidationError("Invalid campaign photo format");
+      }
+      const mimeType = match[1];
+      const base64Data = match[2];
+      const buffer = Buffer.from(base64Data, 'base64');
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', buffer.length.toString());
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.setHeader('Content-Disposition', 'inline');
+      res.status(200).end(buffer);
+    } catch (err) {
+      LoggerService.error("Error serving campaign photo", { ...context, campaignId }, err as Error);
+      throw new ValidationError("Failed to serve campaign photo");
+    }
   }));
 
   // Get campaign statistics
@@ -414,7 +481,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
           continue;
         }
 
-        await sendSMS(recipient.phone, message);
+        const smsContent = ensureSmsMarketingCompliance(message);
+        await sendSMS(recipient.phone, smsContent);
         sentCount++;
         LoggerService.logCommunication("sms", "promotional_sent", { ...context, userId: recipientId });
 

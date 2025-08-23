@@ -39,8 +39,12 @@ export async function apiRequest(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Always use relative URLs
-  const fullUrl = url.startsWith('/') ? url : `/${url}`;
+  // Use same-origin by default; avoid forcing a specific port to prevent CORS issues
+  const apiBase = '';
+
+  // Always use relative URLs, optionally prefix with apiBase if set
+  const rel = url.startsWith('/') ? url : `/${url}`;
+  const fullUrl = apiBase ? `${apiBase}${rel}` : rel;
 
   const isPublicRoute = () => {
     const pathname = window.location?.pathname || '';
@@ -98,8 +102,12 @@ export const getQueryFn: <T>(options: {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Always use relative URLs
-    const fullUrl = (queryKey[0] as string).startsWith('/') ? queryKey[0] as string : `/${queryKey[0]}`;
+    // Use same-origin by default; avoid forcing a specific port to prevent CORS issues
+    const apiBase = '';
+
+    // Always use relative URLs, optionally prefix with apiBase if set
+    const rel = (queryKey[0] as string).startsWith('/') ? (queryKey[0] as string) : `/${queryKey[0]}`;
+    const fullUrl = apiBase ? `${apiBase}${rel}` : rel;
 
     const isPublicRoute = () => {
       const pathname = window.location?.pathname || '';

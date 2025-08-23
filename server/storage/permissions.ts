@@ -1,7 +1,7 @@
 import { db } from "../db.js";
 import { sql } from "drizzle-orm";
 import { eq } from "drizzle-orm";
-import { permissions, permissionGroups, permissionGroupMappings, userPermissionGroups } from "@shared/schema.js";
+import { permissions, permissionGroups, permissionGroupMappings, userPermissionGroups } from "../../shared/schema.js";
 
 export class PermissionsStorage {
   async getAllPermissions() {

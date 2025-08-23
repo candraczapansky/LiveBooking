@@ -3,7 +3,6 @@ import fs from "fs";
 import path from "path";
 import { createServer as createViteServer, createLogger } from "vite";
 import { type Server } from "http";
-import viteConfig from "../vite.config.js";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -20,6 +19,20 @@ export function log(message: string, source = "express") {
 }
 
 export async function setupVite(app: Express, server: Server) {
+  // Dynamically load Vite config only in development to avoid requiring it in production builds
+  let userViteConfig: any = {};
+  try {
+    const tsConfigPath = path.resolve(import.meta.dirname, "..", "vite.config.ts");
+    const jsConfigPath = path.resolve(import.meta.dirname, "..", "vite.config.js");
+    try {
+      userViteConfig = (await import(tsConfigPath)).default;
+    } catch (_e) {
+      userViteConfig = (await import(jsConfigPath)).default;
+    }
+  } catch (_e) {
+    // If config cannot be loaded, proceed with defaults
+    userViteConfig = {};
+  }
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -27,7 +40,7 @@ export async function setupVite(app: Express, server: Server) {
   };
 
   const vite = await createViteServer({
-    ...viteConfig,
+    ...userViteConfig,
     configFile: false,
     customLogger: {
       ...viteLogger,

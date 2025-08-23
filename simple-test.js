@@ -13,7 +13,7 @@ fetch('https://api.helcim.com/v1/payment/purchase', {
     currency: 'USD',
     test: true,
     paymentMethod: {
-      paymentType: 'credit_card',
+      paymentType: 'cc',
       creditCard: {
         cardNumber: '5454545454545454',
         expiryMonth: '12',

@@ -516,7 +516,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     }
     
     // Check commission rate based on commission type
-    if (data.commissionType === 'commission' && (data.commissionRate <= 0 || data.commissionRate > 100)) {
+    if (data.commissionType === 'commission' && (data.commissionRate < 0 || data.commissionRate > 100)) {
       validationErrors.push("Commission rate must be between 0 and 100%");
     }
     

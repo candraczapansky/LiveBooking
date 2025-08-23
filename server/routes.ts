@@ -42,6 +42,7 @@ import { registerLLMRoutes } from "./routes/llm.js";
 import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
+import { CheckSoftwareService } from "./check-software-service.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -67,6 +68,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   
   // Initialize Email Auto-Respond Service
   const autoRespondService = new AutoRespondService(storage);
+  
+  // Initialize Check Software Service (for payroll checks)
+  const checkSoftwareService = new CheckSoftwareService(storage);
 
   // Register all route modules
   registerAuthRoutes(app, storage);
@@ -405,6 +409,186 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error("Error deleting schedule:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to delete schedule",
+      });
+    }
+  });
+
+  // ----------------------
+  // Payroll-related routes
+  // ----------------------
+
+  // Staff earnings (with optional date range filtering)
+  app.get("/api/staff-earnings", async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, staffId } = req.query as Record<string, string | undefined>;
+
+      const all = await storage.getAllStaffEarnings();
+
+      const filtered = all.filter((e: any) => {
+        if (staffId && String(e.staffId) !== String(staffId)) return false;
+        const d = e.earningsDate ? new Date(e.earningsDate) : undefined;
+        if (!d) return false;
+        if (startDate && d < new Date(startDate)) return false;
+        if (endDate && d > new Date(endDate)) return false;
+        return true;
+      });
+
+      res.json(filtered);
+    } catch (error) {
+      console.error("Error getting staff earnings:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get staff earnings",
+      });
+    }
+  });
+
+  // Payroll history - list by optional staffId and/or date range
+  app.get("/api/payroll-history", async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate, staffId } = req.query as Record<string, string | undefined>;
+
+      const start = startDate ? new Date(startDate) : undefined;
+      const end = endDate ? new Date(endDate) : undefined;
+
+      let histories: any[] = [];
+
+      if (staffId) {
+        histories = await storage.getPayrollHistoryByStaff(parseInt(staffId));
+      } else {
+        // Aggregate across all staff when not specified
+        const staffList = await storage.getAllStaff();
+        const results = await Promise.all(
+          staffList.map((s: any) => storage.getPayrollHistoryByStaff(s.id))
+        );
+        histories = results.flat();
+      }
+
+      if (start || end) {
+        histories = histories.filter((h: any) => {
+          const ps = h.periodStart ? new Date(h.periodStart) : undefined;
+          const pe = h.periodEnd ? new Date(h.periodEnd) : undefined;
+          if (!ps || !pe) return false;
+          if (start && pe < start) return false; // ends before start
+          if (end && ps > end) return false; // starts after end
+          return true;
+        });
+      }
+
+      res.json(histories);
+    } catch (error) {
+      console.error("Error getting payroll history:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get payroll history",
+      });
+    }
+  });
+
+  // Process payroll for a staff member within a period
+  app.post("/api/payroll/process", async (req: Request, res: Response) => {
+    try {
+      const { staffId, periodStart, periodEnd, periodType } = req.body || {};
+      if (!staffId || !periodStart || !periodEnd) {
+        return res.status(400).json({ error: "staffId, periodStart, and periodEnd are required" });
+      }
+
+      const staffMember = await storage.getStaff(parseInt(staffId));
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Gather earnings within the specified period
+      const allEarnings = await storage.getAllStaffEarnings();
+      const start = new Date(periodStart);
+      const end = new Date(periodEnd);
+      const earnings = allEarnings.filter((e: any) => {
+        return (
+          e.staffId === parseInt(staffId) &&
+          e.earningsDate && new Date(e.earningsDate) >= start && new Date(e.earningsDate) <= end
+        );
+      });
+
+      const totalServices = earnings.length;
+      const totalRevenue = earnings.reduce((sum: number, e: any) => sum + (e.servicePrice || 0), 0);
+      const totalCommission = earnings.reduce((sum: number, e: any) => sum + (e.earningsAmount || 0), 0);
+      const totalHourlyPay = 0; // Not tracked separately here
+      const totalFixedPay = 0; // Not tracked separately here
+      const totalEarnings = totalCommission + totalHourlyPay + totalFixedPay;
+
+      const record = await storage.createPayrollHistory({
+        staffId: parseInt(staffId),
+        periodStart: start,
+        periodEnd: end,
+        periodType: periodType || "monthly",
+        totalHours: 0,
+        totalServices,
+        totalRevenue,
+        totalCommission,
+        totalHourlyPay,
+        totalFixedPay,
+        totalEarnings,
+        commissionType: staffMember.commissionType,
+        baseCommissionRate: staffMember.commissionRate ?? null,
+        hourlyRate: staffMember.hourlyRate ?? null,
+        fixedRate: staffMember.fixedRate ?? null,
+        earningsBreakdown: JSON.stringify({ totalCommission, totalHourlyPay, totalServices, totalRevenue }),
+        timeEntriesData: JSON.stringify([]),
+        appointmentsData: JSON.stringify([]),
+        payrollStatus: "generated",
+        notes: undefined,
+      } as any);
+
+      res.json({ success: true, payroll: record });
+    } catch (error) {
+      console.error("Error processing payroll:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to process payroll",
+      });
+    }
+  });
+
+  // Check software: list checks
+  app.get("/api/check-software/checks", async (req: Request, res: Response) => {
+    try {
+      const { staffId, status } = req.query as Record<string, string | undefined>;
+      const checks = await storage.getPayrollChecks(
+        staffId ? parseInt(staffId) : undefined,
+        status
+      );
+      res.json(checks);
+    } catch (error) {
+      console.error("Error getting payroll checks:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get payroll checks",
+      });
+    }
+  });
+
+  // Check software: issue a payroll check
+  app.post("/api/check-software/issue-check", async (req: Request, res: Response) => {
+    try {
+      const { payrollHistoryId, checkData } = req.body || {};
+      if (!payrollHistoryId || !checkData) {
+        return res.status(400).json({ error: "payrollHistoryId and checkData are required" });
+      }
+
+      // Normalize date fields
+      const normalized = {
+        ...checkData,
+        checkDate: checkData.checkDate ? new Date(checkData.checkDate) : new Date(),
+        payrollPeriod: checkData.payrollPeriod
+          ? {
+              startDate: new Date(checkData.payrollPeriod.startDate),
+              endDate: new Date(checkData.payrollPeriod.endDate),
+            }
+          : undefined,
+      };
+
+      const result = await checkSoftwareService.issuePayrollCheck(parseInt(payrollHistoryId), normalized);
+      res.json(result);
+    } catch (error) {
+      console.error("Error issuing payroll check:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to issue payroll check",
       });
     }
   });

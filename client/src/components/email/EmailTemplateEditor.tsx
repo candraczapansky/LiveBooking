@@ -115,13 +115,23 @@ const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEdit
         scriptUrl="https://editor.unlayer.com/embed.js"
         minHeight={`${Math.max(editorHeight, 600)}px`}
         options={{
-          displayMode: 'email',
+          displayMode: 'web',
           locale: 'en',
+          appearance: {
+            theme: 'modern_light',
+            panels: {
+              tools: { dock: 'left' }
+            }
+          },
           features: {
             preview: true,
             imageEditor: true,
             undoRedo: true,
             stockImages: true
+          },
+          editor: {
+            // Encourage full width canvas
+            designMode: true
           },
           tools: {
             image: {

@@ -30,6 +30,18 @@ import {
   Shield
 } from 'lucide-react';
 
+// Normalize any known misspellings at render time
+const normalizeLabel = (label: string) => {
+  if (!label) return label;
+  return label.replace(/\bisights\b/gi, 'insights');
+};
+
+// Capitalize words for display without affecting logic checks
+const formatDisplayLabel = (label: string) => {
+  const normalized = normalizeLabel(label || "");
+  return normalized.replace(/\b([a-z])(\w*)/g, (_: any, first: string, rest: string) => first.toUpperCase() + rest);
+};
+
 interface SidebarProps {
   isOpen: boolean;
   isMobile: boolean;
@@ -70,7 +82,7 @@ const SidebarItem = ({ icon, label, href, isActive, isOpen, onClick }: SidebarIt
       `}>
         {icon}
       </span>
-      <span className="ml-3">{label}</span>
+      <span className="ml-3">{formatDisplayLabel(label)}</span>
     </a>
   );
 };
@@ -163,7 +175,8 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
         <div className="flex flex-col h-full">
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
-            {menuItems.map((item) => {
+            {menuItems.map((originalItem) => {
+              const item = { ...originalItem, label: normalizeLabel(originalItem.label) };
               if (item.label === 'Staff') {
                 const isActive = isInStaffSection;
                 return (
@@ -186,7 +199,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isStaffExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -242,7 +255,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isClientsExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -318,7 +331,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isCommsExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -384,7 +397,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isRetailExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -450,7 +463,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isServicesExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -516,7 +529,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                       `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isInsightsExpanded ? 'rotate-180' : 'rotate-0'}`}
@@ -572,7 +585,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                      `}>
                         {item.icon}
                       </span>
-                      <span className="ml-3">{item.label}</span>
+                      <span className="ml-3">{formatDisplayLabel(item.label)}</span>
                       <span className="ml-auto text-gray-500 dark:text-gray-400">
                         <ChevronDown
                           className={`w-5 h-5 transition-transform duration-200 ${isBusinessExpanded ? 'rotate-180' : 'rotate-0'}`}

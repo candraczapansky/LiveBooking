@@ -19,7 +19,7 @@ async function testHelcimDirectly() {
     currency: 'USD',
     test: true, // Enable test mode
     paymentMethod: {
-      paymentType: 'credit_card',
+      paymentType: 'cc',
       creditCard: {
         cardHolderName: 'Test User',
         cardNumber: '5454545454545454', // Test Mastercard

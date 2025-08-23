@@ -1,6 +1,34 @@
 import { IStorage } from "./storage.js";
 import { config, DatabaseConfig } from "./config.js";
 
+// Minimal JSON helpers used in error handling and tool argument parsing
+function parseJsonSafe(input: any): any {
+  try {
+    if (typeof input === 'string') {
+      return JSON.parse(input);
+    }
+    return input;
+  } catch (_e) {
+    return input;
+  }
+}
+
+async function safeJson(response: any): Promise<any> {
+  try {
+    // Some responses may not be JSON; fall back to text
+    const cloned = response?.clone ? response.clone() : response;
+    return await cloned.json();
+  } catch (_e) {
+    try {
+      const cloned = response?.clone ? response.clone() : response;
+      const text = await cloned.text();
+      return { raw: text };
+    } catch (_e2) {
+      return null;
+    }
+  }
+}
+
 interface LLMConfig {
   apiKey?: string;
   model?: string;

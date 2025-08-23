@@ -139,6 +139,19 @@ function isValidPhoneNumber(phone: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+// Always append compliance text to the end of outbound SMS/MMS
+const SMS_COMPLIANCE_TEXT = "Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.";
+
+function ensureSmsCompliance(message: string): string {
+  const base = (message ?? '').toString().trim();
+  // Avoid duplicating if an opt-out is already present
+  const hasOptOut = /\b(reply|text)\s+stop\b/i.test(base) || /\bstop\b.*\b(unsubscribe|opt\s*out)\b/i.test(base);
+  if (hasOptOut) {
+    return base;
+  }
+  return `${base}${base.length ? '\n\n' : ''}${SMS_COMPLIANCE_TEXT}`;
+}
+
 export async function sendSMS(to: string, message: string, photoUrl?: string): Promise<SMSResult> {
   // If photo is provided, send as MMS
   if (photoUrl) {
@@ -149,6 +162,9 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
   if (!twilioClient) {
     await initializeTwilioClient();
   }
+
+  // Ensure compliance text is appended
+  const finalMessage = ensureSmsCompliance(message);
 
   // In development mode, simulate SMS sending for test numbers only
   if (process.env.NODE_ENV === 'development') {
@@ -162,14 +178,14 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
                         to.includes('15551234567');
     if (isTestNumber) {
       console.log('DEVELOPMENT MODE: Simulating SMS send to:', to);
-      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Message:', finalMessage);
       return {
         success: true,
         messageId: `dev_${Date.now()}`
       };
     } else {
       console.log('DEVELOPMENT MODE: Sending REAL SMS to:', to);
-      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Message:', finalMessage);
     }
   }
 
@@ -202,7 +218,7 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
     const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
     
     const messageResponse = await twilioClient.messages.create({
-      body: message,
+      body: finalMessage,
       from: currentTwilioPhoneNumber,
       to: formattedTo,
     });
@@ -226,6 +242,13 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     await initializeTwilioClient();
   }
 
+  // Build MMS message and append compliance text at the very end
+  let baseMmsMessage = message;
+  if (photoUrl) {
+    baseMmsMessage += '\n\n[Photo attached - sent as MMS]';
+  }
+  const finalMmsMessage = ensureSmsCompliance(baseMmsMessage);
+
   // In development mode, simulate MMS sending for test numbers only
   if (process.env.NODE_ENV === 'development') {
     const isTestNumber = to.includes('1234567890') || 
@@ -238,7 +261,7 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
                         to.includes('15551234567');
     if (isTestNumber) {
       console.log('DEVELOPMENT MODE: Simulating MMS send to:', to);
-      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Message:', finalMmsMessage);
       console.log('DEVELOPMENT MODE: Photo URL:', photoUrl);
       return {
         success: true,
@@ -246,7 +269,7 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
       };
     } else {
       console.log('DEVELOPMENT MODE: Sending REAL MMS to:', to);
-      console.log('DEVELOPMENT MODE: Message:', message);
+      console.log('DEVELOPMENT MODE: Message:', finalMmsMessage);
       console.log('DEVELOPMENT MODE: Photo URL:', photoUrl);
     }
   }
@@ -279,25 +302,19 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     // Ensure phone number has country code
     const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
     
-    // For MMS, we need to provide media URLs
-    // Since we're storing photos as base64 data URLs, we need to handle this properly
-    // For now, we'll send as a regular SMS with a note about the photo
-    // In a production environment, you'd want to upload the image to a CDN and use the URL
-    
-    let mmsMessage = message;
-    if (photoUrl) {
-      mmsMessage += '\n\n[Photo attached - sent as MMS]';
-    }
-    
-    const messageResponse = await twilioClient.messages.create({
-      body: mmsMessage,
+    // For MMS, Twilio requires a publicly accessible media URL
+    const isHttpUrl = /^https?:\/\//i.test(photoUrl);
+    const mediaUrls = isHttpUrl ? [photoUrl] : undefined;
+    const messageCreatePayload: any = {
+      body: finalMmsMessage,
       from: currentTwilioPhoneNumber,
       to: formattedTo,
-      // Note: To send actual MMS with media, you would need to:
-      // 1. Upload the image to a publicly accessible URL (CDN)
-      // 2. Use the media parameter: media: [imageUrl]
-      // For now, we'll send as enhanced SMS
-    });
+    };
+    if (mediaUrls) {
+      // Twilio v5 SDK uses 'mediaUrl' array for MMS
+      messageCreatePayload.mediaUrl = mediaUrls;
+    }
+    const messageResponse = await twilioClient.messages.create(messageCreatePayload);
 
     return {
       success: true,

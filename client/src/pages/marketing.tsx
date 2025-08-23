@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import "@/styles/components.css";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import EmailTemplateEditor, { EmailTemplateEditorRef } from "@/components/email/EmailTemplateEditor";
 
@@ -30,6 +32,8 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogPortal,
+  DialogOverlay,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -340,6 +344,7 @@ const MarketingPage = () => {
         audience: campaignData.audience,
         subject: campaignData.type === 'email' ? campaignData.subject : undefined,
         content: campaignData.content,
+        photoUrl: campaignData.type === 'sms' ? (campaignData.photoUrl || undefined) : undefined,
         sendDate: sendDate,
         status: sendDate ? 'scheduled' : 'draft',
         // Include selected client IDs for specific clients audience
@@ -1932,13 +1937,13 @@ const MarketingPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Email Template Editor Modal */}
-      <Dialog open={showEmailEditor} onOpenChange={setShowEmailEditor}>
-        <DialogContent className="max-w-[100vw] w-[100vw] md:max-w-[1400px] md:w-[95vw] max-h-[95vh] h-[95vh] p-0 overflow-hidden">
-          <DialogDescription className="sr-only">Design and preview your marketing email template using the visual editor.</DialogDescription>
-          <div className="flex flex-col h-full">
+      {/* Email Template Editor Fullscreen Overlay (Portal) */}
+      {showEmailEditor && createPortal(
+        <div className="fixed inset-0 z-[100]">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setShowEmailEditor(false)} />
+          <div className="relative inset-0 h-screen w-screen bg-background flex flex-col">
             <div className="flex items-center justify-between p-4 border-b shrink-0">
-              <DialogTitle>Email Template Editor</DialogTitle>
+              <h2 className="text-lg font-semibold">Email Template Editor</h2>
               <div className="flex items-center gap-2">
                 <Input
                   placeholder="Template name"
@@ -1946,6 +1951,37 @@ const MarketingPage = () => {
                   value={campaignForm.watch('subject') || ''}
                   onChange={(e) => campaignForm.setValue('subject', e.target.value)}
                 />
+                <Button
+                  variant="default"
+                  disabled={createCampaignMutation.isPending || sendCampaignMutation.isPending}
+                  onClick={async () => {
+                    // Ensure latest HTML from editor
+                    emailEditorRef.current?.exportHtml();
+                    const audience = campaignForm.watch('audience');
+                    const subject = campaignForm.watch('subject');
+                    const html = emailTemplateHtml || campaignForm.watch('content') || '';
+                    if (!audience) {
+                      toast({ title: 'Select audience', description: 'Please choose an audience in the campaign form before sending.', variant: 'destructive' });
+                      return;
+                    }
+                    if (!subject || subject.trim() === '') {
+                      toast({ title: 'Subject required', description: 'Enter a subject line before sending.', variant: 'destructive' });
+                      return;
+                    }
+                    try {
+                      campaignForm.setValue('content', html);
+                      // Create campaign as email and mark sendNow=true. onSuccess will trigger actual send.
+                      const values = { ...campaignForm.getValues(), type: 'email' as const, sendNow: true };
+                      await createCampaignMutation.mutateAsync(values as any);
+                      setShowEmailEditor(false);
+                    } catch (err: any) {
+                      toast({ title: 'Send failed', description: err?.message || 'Unable to send campaign', variant: 'destructive' });
+                    }
+                  }}
+                  className="min-h-[36px]"
+                >
+                  Save & Send Now
+                </Button>
                 <Button
                   variant="default"
                   onClick={async () => {
@@ -2000,7 +2036,6 @@ const MarketingPage = () => {
               </Button>
               <Button
                 onClick={() => {
-                  // Export the current design and HTML from the editor before closing
                   emailEditorRef.current?.exportHtml();
                   setShowEmailEditor(false);
                   toast({
@@ -2013,8 +2048,9 @@ const MarketingPage = () => {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

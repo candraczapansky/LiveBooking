@@ -109,6 +109,14 @@ const PersistentMobileMenu = () => {
 
   // Add admin-only menu items
   const navigationItems = [...baseNavigationItems];
+  const normalizeLabel = (label: string) => {
+    if (!label) return label;
+    return label.replace(/\bisights\b/gi, 'insights');
+  };
+  const formatDisplayLabel = (label: string) => {
+    const normalized = normalizeLabel(label || "");
+    return normalized.replace(/\b([a-z])(\w*)/g, (_: any, first: string, rest: string) => first.toUpperCase() + rest);
+  };
   if (currentUser?.role === 'admin') {
     navigationItems.splice(-1, 0, { icon: Shield, label: "Permissions", href: "/permissions" });
   }
@@ -277,7 +285,7 @@ const PersistentMobileMenu = () => {
                             }`}
                           >
                             <IconComponent className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.75} />
-                            <span className="truncate flex-1">{item.label}</span>
+                            <span className="truncate flex-1">{formatDisplayLabel(item.label)}</span>
                             <ChevronDown className={`w-5 h-5 ml-2 transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} strokeWidth={1.75} />
                             <ChevronDown className={`w-5 h-5 ml-2 transition-transform ${open ? 'rotate-180' : 'rotate-0'}`} strokeWidth={1.75} />
                           </button>
@@ -296,7 +304,7 @@ const PersistentMobileMenu = () => {
                                     }`}
                                   >
                                     <ChildIcon className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.75} />
-                                    <span className="truncate flex-1">{child.label}</span>
+                                    <span className="truncate flex-1">{formatDisplayLabel(child.label)}</span>
                                   </Link>
                                 );
                               })}
@@ -321,11 +329,7 @@ const PersistentMobileMenu = () => {
                           className="w-5 h-5 mr-3 flex-shrink-0" 
                           strokeWidth={1.75}
                         />
-                        <span 
-                          className="truncate flex-1"
-                        >
-                          {item.label}
-                        </span>
+                        <span className="truncate flex-1">{formatDisplayLabel(item.label)}</span>
                         {isActive && (
                           <div className="w-2 h-2 bg-white rounded-full ml-2 flex-shrink-0"></div>
                         )}

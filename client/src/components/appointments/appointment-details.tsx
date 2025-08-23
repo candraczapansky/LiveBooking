@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ const AppointmentDetails = ({
   const [location, setLocation] = useLocation();
   const [isProcessingCashPayment, setIsProcessingCashPayment] = useState(false);
   const [isProcessingCardPayment, setIsProcessingCardPayment] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState<number>(0);
   const [isProcessingGiftCardPayment, setIsProcessingGiftCardPayment] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [showCardPayment, setShowCardPayment] = useState(false);
@@ -91,14 +92,6 @@ const AppointmentDetails = ({
     enabled: !!appointment?.serviceId
   });
 
-  // Compute the amount to charge for this appointment
-  const getAppointmentChargeAmount = () => {
-    const total = Number(appointment?.totalAmount ?? 0);
-    if (total && !Number.isNaN(total) && total > 0) return total;
-    const fallback = Number(service?.price ?? 0);
-    return Number.isNaN(fallback) ? 0 : fallback;
-  };
-
   const { data: staff } = useQuery({
     queryKey: ['/api/staff', appointment?.staffId],
     queryFn: async () => {
@@ -120,6 +113,26 @@ const AppointmentDetails = ({
     },
     enabled: !!staff?.userId
   });
+
+  // Compute the amount to charge for this appointment
+  const getAppointmentChargeAmount = () => {
+    const total = Number((appointment as any)?.totalAmount ?? 0);
+    if (!Number.isNaN(total) && total > 0) return total;
+    const fallback = Number((service as any)?.price ?? 0);
+    return Number.isNaN(fallback) ? 0 : fallback;
+  };
+
+  // Freeze amount when card payment UI is shown (must be after queries exist)
+  useEffect(() => {
+    if (showCardPayment) {
+      const amt = getAppointmentChargeAmount();
+      if (amt && amt > 0) {
+        setChargeAmount(amt);
+      }
+    } else {
+      setChargeAmount(0);
+    }
+  }, [showCardPayment, (appointment as any)?.totalAmount, (service as any)?.price]);
 
   // Update notes mutation
   const updateNotesMutation = useMutation({
@@ -283,8 +296,15 @@ const AppointmentDetails = ({
   };
 
   const handleCardPayment = () => {
-    // Show the card payment form
+    // Freeze the amount and open Helcim modal immediately
+    const amt = getAppointmentChargeAmount();
+    console.log('[CardPayment] Freezing chargeAmount =', amt, {
+      totalAmount: (appointment as any)?.totalAmount,
+      servicePrice: (service as any)?.price
+    });
+    setChargeAmount(amt);
     setShowCardPayment(true);
+    setShowHelcimModal(true);
   };
 
   const handleCardPaymentSuccess = () => {
@@ -661,7 +681,7 @@ const AppointmentDetails = ({
               </div>
               <div className="space-y-2">
                 <p className="text-sm">
-                  <span className="font-medium">Amount:</span> {formatPrice(appointment.totalAmount || service?.price || 0)}
+                  <span className="font-medium">Amount:</span> {formatPrice(getAppointmentChargeAmount())}
                 </p>
                 <p className="text-sm">
                   <span className="font-medium">Status:</span> {appointment.paymentStatus || 'pending'}
@@ -674,9 +694,14 @@ const AppointmentDetails = ({
                       <Button
                         onClick={() => setShowPaymentOptions(true)}
                         className="w-full bg-green-600 hover:bg-green-700"
+                        disabled={getAppointmentChargeAmount() <= 0}
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
-                        Pay {formatPrice(appointment.totalAmount || service?.price || 0)}
+                        {getAppointmentChargeAmount() > 0 ? (
+                          <>Pay {formatPrice(getAppointmentChargeAmount())}</>
+                        ) : (
+                          <>Calculating price…</>
+                        )}
                       </Button>
                     ) : (
                       <div className="space-y-3">
@@ -774,7 +799,7 @@ const AppointmentDetails = ({
                         <div className="bg-muted p-4 rounded-lg">
                           <div className="flex justify-between items-center text-lg font-semibold">
                             <span>Total:</span>
-                            <span>${getAppointmentChargeAmount().toFixed(2)}</span>
+                            <span>${(chargeAmount || getAppointmentChargeAmount()).toFixed(2)}</span>
                           </div>
                         </div>
                         <div className="flex gap-3">
@@ -795,7 +820,7 @@ const AppointmentDetails = ({
                         <HelcimPayJsModal
                           open={showHelcimModal}
                           onOpenChange={setShowHelcimModal}
-                          amount={getAppointmentChargeAmount()}
+                          amount={chargeAmount || getAppointmentChargeAmount()}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (paymentId: string) => {
                             try {
@@ -832,7 +857,7 @@ const AppointmentDetails = ({
                         <SmartTerminalPayment
                           open={true}
                           onOpenChange={() => {}}
-                          amount={getAppointmentChargeAmount()}
+                          amount={chargeAmount || getAppointmentChargeAmount()}
                           description={`Payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (result: any) => {
                             try {

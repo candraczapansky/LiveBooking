@@ -42,7 +42,7 @@ interface Staff {
   commissionRate?: number;
   hourlyRate?: number;
   fixedRate?: number;
-  user: {
+  user?: {
     firstName: string;
     lastName: string;
     email: string;
@@ -106,6 +106,13 @@ interface StaffEarnings {
   earningsDate: string;
 }
 
+interface UserBrief {
+  id: number;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
 const PayrollPage: React.FC = () => {
   useDocumentTitle("Payroll | Glo Head Spa");
   const { user } = useContext(AuthContext);
@@ -160,6 +167,23 @@ const PayrollPage: React.FC = () => {
     }
   });
 
+  // Fetch users to map staff.userId to names (server /api/staff does not include nested user)
+  const { data: users = [] } = useQuery<UserBrief[]>({
+    queryKey: ['/api/users'],
+  });
+
+  const getStaffName = (s: Staff | undefined) => {
+    if (!s) return '';
+    if (s.user && (s.user.firstName || s.user.lastName)) {
+      return `${s.user.firstName || ''} ${s.user.lastName || ''}`.trim();
+    }
+    const user = users.find(u => u.id === s.userId);
+    if (user && (user.firstName || user.lastName)) {
+      return `${user.firstName || ''} ${user.lastName || ''}`.trim();
+    }
+    return `Staff ${s.id}`;
+  };
+
   // Fetch payroll history
   const { data: payrollHistory = [], isLoading: payrollLoading, error: payrollError } = useQuery({
     queryKey: ['payroll-history', dateRange.start, dateRange.end, selectedStaff],
@@ -184,9 +208,14 @@ const PayrollPage: React.FC = () => {
   const { data: payrollChecks = [] } = useQuery({
     queryKey: ['payroll-checks'],
     queryFn: async () => {
-      const response = await fetch('/api/check-software/checks');
-      if (!response.ok) throw new Error('Failed to fetch payroll checks');
-      return response.json();
+      try {
+        const response = await fetch('/api/check-software/checks');
+        if (!response.ok) throw new Error('Failed to fetch payroll checks');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching payroll checks:', error);
+        return [];
+      }
     }
   });
 
@@ -194,13 +223,18 @@ const PayrollPage: React.FC = () => {
   const { data: staffEarnings = [] } = useQuery({
     queryKey: ['staff-earnings', dateRange.start, dateRange.end],
     queryFn: async () => {
-      const params = new URLSearchParams({
-        startDate: dateRange.start.toISOString(),
-        endDate: dateRange.end.toISOString()
-      });
-      const response = await fetch(`/api/staff-earnings?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch staff earnings');
-      return response.json();
+      try {
+        const params = new URLSearchParams({
+          startDate: dateRange.start.toISOString(),
+          endDate: dateRange.end.toISOString()
+        });
+        const response = await fetch(`/api/staff-earnings?${params}`);
+        if (!response.ok) throw new Error('Failed to fetch staff earnings');
+        return response.json();
+      } catch (error) {
+        console.error('Error fetching staff earnings:', error);
+        return [];
+      }
     }
   });
 
@@ -246,6 +280,7 @@ const PayrollPage: React.FC = () => {
 
       const staffMember = staff.find((s: Staff) => s.id === payroll.staffId);
       if (!staffMember) throw new Error('Staff member not found');
+      const staffDisplayName = getStaffName(staffMember);
 
       const response = await fetch('/api/check-software/issue-check', {
         method: 'POST',
@@ -254,7 +289,7 @@ const PayrollPage: React.FC = () => {
           payrollHistoryId,
           checkData: {
             staffId: payroll.staffId,
-            staffName: `${staffMember.user.firstName} ${staffMember.user.lastName}`,
+            staffName: staffDisplayName,
             checkAmount: payroll.totalEarnings,
             checkDate: new Date().toISOString().split('T')[0],
             payrollPeriod: {
@@ -466,7 +501,7 @@ const PayrollPage: React.FC = () => {
                   <SelectItem value="all">All Staff</SelectItem>
                   {staff.map((s: Staff) => (
                     <SelectItem key={s.id} value={s.id.toString()}>
-                      {s.user.firstName} {s.user.lastName}
+                      {getStaffName(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -522,33 +557,33 @@ const PayrollPage: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-medium text-gray-900">
-                                {staffMember ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : `Staff ${payroll.staffId}`}
+                                {getStaffName(staffMember)}
                               </h4>
                               <Badge className={getStatusColor(payroll.payrollStatus)}>
                                 {payroll.payrollStatus}
                               </Badge>
                               <span className="text-lg font-semibold">
-                                ${payroll.totalEarnings.toFixed(2)}
+                                ${Number(payroll.totalEarnings ?? 0).toFixed(2)}
                               </span>
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
                               <div>
-                                <span className="font-medium">Period:</span> {format(new Date(payroll.periodStart), 'MMM dd')} - {format(new Date(payroll.periodEnd), 'MMM dd, yyyy')}
+                                <span className="font-medium">Period:</span> {payroll.periodStart ? format(new Date(payroll.periodStart), 'MMM dd') : '-'} - {payroll.periodEnd ? format(new Date(payroll.periodEnd), 'MMM dd, yyyy') : '-'}
                               </div>
                               <div>
-                                <span className="font-medium">Hours:</span> {payroll.totalHours.toFixed(1)}
+                                <span className="font-medium">Hours:</span> {Number(payroll.totalHours ?? 0).toFixed(1)}
                               </div>
                               <div>
                                 <span className="font-medium">Services:</span> {payroll.totalServices}
                               </div>
                               <div>
-                                <span className="font-medium">Revenue:</span> ${payroll.totalRevenue.toFixed(2)}
+                                <span className="font-medium">Revenue:</span> ${Number(payroll.totalRevenue ?? 0).toFixed(2)}
                               </div>
                             </div>
                             
                             <div className="mt-2 text-xs text-gray-500">
-                              Created: {format(new Date(payroll.createdAt), 'MMM dd, yyyy HH:mm')}
+                              Created: {payroll.createdAt ? format(new Date(payroll.createdAt), 'MMM dd, yyyy HH:mm') : '-'}
                               {payroll.paidDate && ` | Paid: ${format(new Date(payroll.paidDate), 'MMM dd, yyyy')}`}
                             </div>
                           </div>
@@ -615,13 +650,13 @@ const PayrollPage: React.FC = () => {
                                 {check.status}
                               </Badge>
                               <span className="text-lg font-semibold">
-                                ${check.checkAmount.toFixed(2)}
+                                ${Number(check.checkAmount ?? 0).toFixed(2)}
                               </span>
                             </div>
                             
                             <p className="text-gray-600 text-sm">
-                              {staffMember ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : `Staff ${check.staffId}`} | 
-                              Date: {format(new Date(check.checkDate), 'MMM dd, yyyy')}
+                              {getStaffName(staffMember)} | 
+                              Date: {check.checkDate ? format(new Date(check.checkDate), 'MMM dd, yyyy') : '-'}
                             </p>
                             
                             {check.issueDate && (
@@ -677,17 +712,17 @@ const PayrollPage: React.FC = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <h4 className="font-medium text-gray-900">
-                                {staffMember ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : `Staff ${earning.staffId}`}
+                                {getStaffName(staffMember)}
                               </h4>
                               <Badge variant="outline">{earning.rateType}</Badge>
                               <span className="text-lg font-semibold">
-                                ${earning.earningsAmount.toFixed(2)}
+                                ${Number(earning.earningsAmount ?? 0).toFixed(2)}
                               </span>
                             </div>
                             
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
                               <div>
-                                <span className="font-medium">Service Price:</span> ${earning.servicePrice.toFixed(2)}
+                                <span className="font-medium">Service Price:</span> ${Number(earning.servicePrice ?? 0).toFixed(2)}
                               </div>
                               <div>
                                 <span className="font-medium">Rate Used:</span> {earning.rateUsed}%
@@ -696,7 +731,7 @@ const PayrollPage: React.FC = () => {
                                 <span className="font-medium">Custom Rate:</span> {earning.isCustomRate ? 'Yes' : 'No'}
                               </div>
                               <div>
-                                <span className="font-medium">Date:</span> {format(new Date(earning.earningsDate), 'MMM dd, yyyy')}
+                                <span className="font-medium">Date:</span> {earning.earningsDate ? format(new Date(earning.earningsDate), 'MMM dd, yyyy') : '-'}
                               </div>
                             </div>
                           </div>

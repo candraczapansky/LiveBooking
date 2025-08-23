@@ -2,9 +2,19 @@ import type { Express, Request, Response } from "express";
 import type { IStorage } from "../storage.js";
 import { z } from "zod";
 import { SMSAutoRespondService } from "../sms-auto-respond-service.js";
+import { isTwilioConfigured } from "../sms.js";
 
 export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
   const smsService = SMSAutoRespondService.getInstance(storage);
+
+  function escapeForXml(text: string): string {
+    return text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
+  }
 
   // Health
   app.get('/api/sms-auto-respond/health', async (_req: Request, res: Response) => {
@@ -186,7 +196,9 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.status(400).send('Missing parameters');
       }
 
-      await smsService.processIncomingSMS({
+      console.log('📨 Incoming SMS webhook', { from, to, bodyPreview: body.slice(0, 80), messageId });
+
+      const result = await smsService.processIncomingSMS({
         from,
         to,
         body,
@@ -194,9 +206,10 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         messageId
       });
 
-      // We send our own SMS replies via API; return minimal TwiML response
+      // Always provide an immediate TwiML acknowledgement so the sender sees a reply instantly.
       res.set('Content-Type', 'text/xml');
-      res.send('<Response></Response>');
+      const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+      return res.send(`<Response><Message>${ack}</Message></Response>`);
     } catch (err: any) {
       res.status(500).send('<Response></Response>');
     }
@@ -214,7 +227,9 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.status(400).send('<Response></Response>');
       }
 
-      await smsService.processIncomingSMS({
+      console.log('📨 Incoming SMS webhook (alias)', { from, to, bodyPreview: body.slice(0, 80), messageId });
+
+      const result = await smsService.processIncomingSMS({
         from,
         to,
         body,
@@ -223,7 +238,8 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
       });
 
       res.set('Content-Type', 'text/xml');
-      res.send('<Response></Response>');
+      const ack = escapeForXml('Thanks! We\'ll text you shortly.');
+      return res.send(`<Response><Message>${ack}</Message></Response>`);
     } catch {
       res.status(500).send('<Response></Response>');
     }
