@@ -763,9 +763,106 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
   
   const { data: detailData, isLoading } = useQuery({
     queryKey: [`/api/payroll/${staffId}/detailed`, month.toISOString()],
-    queryFn: () => 
-      fetch(`/api/payroll/${staffId}/detailed?month=${month.toISOString()}`)
-        .then(res => res.json())
+    queryFn: async () => {
+      // Try server endpoint first
+      try {
+        const r = await fetch(`/api/payroll/${staffId}/detailed?month=${month.toISOString()}`);
+        if (r.ok) {
+          return await r.json();
+        }
+      } catch {}
+
+      // Fallback: compute locally from existing APIs so View Details still works
+      const [staffRes, userRes, svcRes, apptRes, payRes, staffSvcRes] = await Promise.all([
+        fetch('/api/staff'),
+        fetch('/api/users'),
+        fetch('/api/services'),
+        fetch('/api/appointments'),
+        fetch('/api/payments'),
+        fetch('/api/staff-services'),
+      ]);
+
+      const [staffList, users, services, appointments, payments, staffServices] = await Promise.all([
+        staffRes.json(),
+        userRes.json(),
+        svcRes.json(),
+        apptRes.json(),
+        payRes.json(),
+        staffSvcRes.json(),
+      ]);
+
+      const start = new Date(month.getFullYear(), month.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const staffMember: any = (staffList || []).find((s: any) => s.id === staffId) || {};
+      const user = (users || []).find((u: any) => u.id === staffMember.userId);
+      const staffName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown';
+
+      const appts = (appointments || []).filter((a: any) => a.staffId === staffId && new Date(a.startTime) >= start && new Date(a.startTime) <= end);
+
+      let totalRevenue = 0;
+      let totalCommission = 0;
+      const rows = appts.map((apt: any) => {
+        const service = (services || []).find((s: any) => s.id === apt.serviceId);
+        const client = (users || []).find((u: any) => u.id === apt.clientId);
+        const payment = (payments || []).find((p: any) => p.appointmentId === apt.id && p.status === 'completed');
+        const baseAmount = payment?.amount ?? (payment ? Math.max((payment.totalAmount || 0) - (payment.tipAmount || 0), 0) : undefined);
+        const servicePrice = baseAmount !== undefined ? baseAmount : (service?.price || 0);
+
+        const assignment = (staffServices || []).find((ss: any) => ss.staffId === staffId && ss.serviceId === (service?.id || 0));
+        let commissionRate = assignment?.customCommissionRate;
+        if (commissionRate !== undefined && commissionRate !== null) {
+          commissionRate = commissionRate > 1 ? commissionRate / 100 : commissionRate;
+        } else {
+          commissionRate = staffMember.commissionRate ?? 0;
+        }
+
+        let commissionAmount = 0;
+        switch (staffMember.commissionType) {
+          case 'commission':
+            commissionAmount = servicePrice * (commissionRate || 0);
+            break;
+          case 'fixed':
+            commissionAmount = staffMember.fixedRate || 0;
+            break;
+          case 'hourly_plus_commission':
+            commissionAmount = servicePrice * (commissionRate || 0);
+            break;
+          default:
+            commissionAmount = 0;
+        }
+
+        totalRevenue += servicePrice;
+        totalCommission += commissionAmount;
+
+        return {
+          appointmentId: apt.id,
+          date: apt.startTime,
+          clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() : 'Unknown',
+          serviceName: service?.name || 'Service',
+          duration: service?.duration || 60,
+          servicePrice,
+          commissionRate,
+          commissionAmount,
+          paymentStatus: apt.paymentStatus || 'unpaid',
+        };
+      });
+
+      return {
+        staffName,
+        title: staffMember.title,
+        commissionType: staffMember.commissionType,
+        baseCommissionRate: staffMember.commissionRate ?? 0,
+        hourlyRate: staffMember.hourlyRate ?? null,
+        summary: {
+          totalAppointments: rows.length,
+          totalRevenue,
+          totalCommission,
+          averageCommissionPerService: rows.length > 0 ? (totalCommission / rows.length) : 0,
+        },
+        appointments: rows,
+      };
+    }
   });
 
   console.log('DetailedPayrollView data:', detailData, 'isLoading:', isLoading);

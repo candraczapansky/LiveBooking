@@ -94,8 +94,12 @@ const Login = () => {
         throw new Error("Invalid response format from server");
       }
       
-      // Navigate to dashboard
-      navigate("/dashboard");
+      // Navigate to dashboard (hard navigation to ensure clean app init after login)
+      try {
+        window.location.assign("/dashboard");
+      } catch {
+        navigate("/dashboard");
+      }
       
     } catch (error: any) {
       console.error("Login error:", error);
