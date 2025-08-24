@@ -19,6 +19,9 @@ interface HelcimPayJsModalProps {
   description?: string;
   customerEmail?: string;
   customerName?: string;
+  appointmentId?: number;
+  clientId?: number;
+  tipAmount?: number;
 }
 
 export default function HelcimPayJsModal({
@@ -30,6 +33,9 @@ export default function HelcimPayJsModal({
   description = "Payment",
   customerEmail,
   customerName,
+  appointmentId,
+  clientId,
+  tipAmount,
 }: HelcimPayJsModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -137,11 +143,34 @@ export default function HelcimPayJsModal({
 
         // Listen for Pay.js postMessage events
         const key = `helcim-pay-js-${initData.token}`;
-        const handleMessage = (event: MessageEvent<any>) => {
+        const handleMessage = async (event: MessageEvent<any>) => {
           try {
             if (!event?.data || event.data.eventName !== key) return;
             if (event.data.eventStatus === 'SUCCESS') {
               toast({ title: 'Payment Successful', description: 'Payment processed successfully.' });
+              try {
+                // Create a completed payment record for Pay.js and update appointment
+                const paymentRes = await apiRequest('POST', '/api/payments', {
+                  clientId: clientId,
+                  appointmentId: appointmentId,
+                  amount: amount,
+                  tipAmount: tipAmount || 0,
+                  totalAmount: amount,
+                  method: 'card',
+                  status: 'completed',
+                  type: 'appointment_payment',
+                  description: description,
+                  helcimPaymentId: event?.data?.transactionId || event?.data?.paymentId,
+                  paymentDate: new Date(),
+                });
+                const payment = await paymentRes.json();
+                if (appointmentId) {
+                  await apiRequest('POST', '/api/confirm-payment', {
+                    paymentId: payment.id,
+                    appointmentId,
+                  });
+                }
+              } catch {}
               onSuccess?.(event.data);
               onOpenChange(false);
               window.removeEventListener('message', handleMessage);

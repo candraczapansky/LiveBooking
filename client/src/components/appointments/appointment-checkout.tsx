@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -45,6 +46,7 @@ export default function AppointmentCheckout({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Calculate base amount
   const baseAmount = appointment.totalAmount || (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
@@ -52,16 +54,31 @@ export default function AppointmentCheckout({
   const handleCompleteAppointment = async () => {
     setIsProcessing(true);
     try {
-      // Update appointment status to completed
+      // Record a cash payment and create staff earnings, then mark appointment complete
+      await apiRequest("POST", "/api/confirm-cash-payment", {
+        appointmentId: appointment.id,
+        amount: baseAmount,
+        notes: 'Completed via calendar checkout'
+      });
+
+      // Ensure appointment is marked completed for calendar views
       await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
         status: 'completed',
-        paymentStatus: 'paid' // Mark as paid to reflect on calendar (green)
+        paymentStatus: 'paid',
+        totalAmount: baseAmount
       });
 
       toast({
         title: "Appointment Completed",
         description: `Appointment for ${appointment.serviceName} has been marked as completed.`,
       });
+
+      // Invalidate related data so payroll/report pages reflect immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
 
       setIsSuccess(true);
       setTimeout(() => {

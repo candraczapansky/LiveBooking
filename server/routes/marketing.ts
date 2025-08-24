@@ -485,12 +485,14 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     };
 
     const allConfig = await storage.getAllSystemConfig();
-    const smsConfigs = (allConfig || []).filter((c: any) => (c.key || '').startsWith('sms_opt_out:'));
+    const smsConfigs = (allConfig || []).filter((c: any) => (c.key || '').toLowerCase().includes('sms') && (c.key || '').toLowerCase().includes('opt') && (c.key || '').toLowerCase().includes('out'));
 
     const smsOptOuts: any[] = [];
     for (const cfg of smsConfigs) {
       try {
-        const phone = (cfg.key as string).split(':')[1] || '';
+        // Handle keys like sms_opt_out:+E164, sms-opt-out:+E164, phone_opt_out:+E164
+        const parts = (cfg.key as string).split(':');
+        const phone = parts.length > 1 ? parts.slice(1).join(':') : '';
         let at: string | undefined;
         try {
           const parsed = JSON.parse(cfg.value || '{}');
@@ -551,22 +553,39 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       });
     }
 
-    res.json([...(emailUnsubs as any[]), ...smsOptOuts]);
+    // De-duplicate by userId or contact
+    const merged = [...(emailUnsubs as any[]), ...smsOptOuts];
+    const seen = new Set<string>();
+    const dedup = merged.filter((item: any) => {
+      const key = item.userId ? `u:${item.userId}` : `c:${item.email || item.user?.phone || item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    res.json(dedup);
   }));
 
   // Active SMS-capable clients (not opted-out and at least one SMS preference enabled)
   app.get("/api/marketing/active-sms-clients", asyncHandler(async (_req: Request, res: Response) => {
     const allUsers = await storage.getUsersByRole('client');
     const allConfig = await storage.getAllSystemConfig();
-    const smsOptOutKeys = new Set((allConfig || []).filter((c: any) => (c.key || '').startsWith('sms_opt_out:')).map((c: any) => c.key));
+    const smsOptOutKeys = new Set(
+      (allConfig || [])
+        .filter((c: any) => (c.key || '').toLowerCase().includes('sms') && (c.key || '').toLowerCase().includes('opt') && (c.key || '').toLowerCase().includes('out'))
+        .map((c: any) => c.key)
+    );
     const isOptedOut = (phone: string | null | undefined) => {
       if (!phone) return false;
       const normalized = phone.startsWith('+') ? phone : `+${phone.replace(/\D/g, '')}`;
-      const candidates = [
-        `sms_opt_out:${normalized}`,
-        `sms_opt_out:+${phone?.replace(/\D/g, '')}`,
-      ];
-      return candidates.some(k => smsOptOutKeys.has(k));
+      // Match any key that ends with the normalized or raw last-10
+      const last10 = phone.replace(/\D/g, '').slice(-10);
+      for (const key of smsOptOutKeys) {
+        const lower = key.toLowerCase();
+        if (lower.endsWith(normalized.toLowerCase()) || lower.endsWith(`+${last10}`) || lower.endsWith(last10)) {
+          return true;
+        }
+      }
+      return false;
     };
     const active = (allUsers as any[]).filter(u => {
       const anyPref = !!(u.smsAccountManagement || u.smsAppointmentReminders || u.smsPromotions);
@@ -617,7 +636,12 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     if (existing) await storage.updateSystemConfig(key, value, 'Manual SMS opt-out');
     else await storage.setSystemConfig({ key, value, description: 'Manual SMS opt-out', isEncrypted: false, isActive: true } as any);
     // Try to update user flags if user exists
-    const user = await (storage as any).getUserByPhone?.(phone);
+    let user = await (storage as any).getUserByPhone?.(phone);
+    if (!user) {
+      const last10 = phone.replace(/\D/g, '').slice(-10);
+      const users = await storage.getUsersByRole('client');
+      user = (users as any[]).find(u => (u.phone || '').replace(/\D/g, '').slice(-10) === last10);
+    }
     if (user?.id) {
       await storage.updateUser(user.id, { smsAccountManagement: false, smsAppointmentReminders: false, smsPromotions: false } as any);
     }
@@ -638,11 +662,38 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     if (!phone) return res.status(400).json({ error: 'Invalid phone' });
     const key = `sms_opt_out:${phone}`;
     await storage.deleteSystemConfig(key);
-    const user = await (storage as any).getUserByPhone?.(phone);
+    let user = await (storage as any).getUserByPhone?.(phone);
+    if (!user) {
+      const last10 = phone.replace(/\D/g, '').slice(-10);
+      const users = await storage.getUsersByRole('client');
+      user = (users as any[]).find(u => (u.phone || '').replace(/\D/g, '').slice(-10) === last10);
+    }
     if (user?.id) {
       await storage.updateUser(user.id, { smsAccountManagement: true, smsAppointmentReminders: true, smsPromotions: true } as any);
     }
     res.json({ success: true });
+  }));
+
+  // GET aliases for manual quick toggle (convenience)
+  app.get("/api/marketing/opt-out-sms", asyncHandler(async (req: Request, res: Response) => {
+    (req as any).body = { phone: req.query.phone };
+    // Reuse POST handler logic
+    // @ts-ignore
+    return (app as any)._router.handle(req, res, () => {},);
+  }));
+
+  app.get("/api/marketing/opt-in-sms", asyncHandler(async (req: Request, res: Response) => {
+    (req as any).body = { phone: req.query.phone };
+    // Reuse POST handler logic
+    // @ts-ignore
+    return (app as any)._router.handle(req, res, () => {},);
+  }));
+
+  // Debug: list raw sms opt-out config keys
+  app.get("/api/marketing/debug/sms-opt-outs", asyncHandler(async (_req: Request, res: Response) => {
+    const rows = await storage.getAllSystemConfig();
+    const keys = (rows || []).filter((c: any) => (c.key || '').toLowerCase().includes('sms') && (c.key || '').toLowerCase().includes('opt') && (c.key || '').toLowerCase().includes('out'));
+    res.json(keys);
   }));
 
   // Send promotional SMS

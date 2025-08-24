@@ -179,7 +179,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         const service = services.find((s) => s.id === apt.serviceId);
         if (!service) return;
 
-        const serviceRevenue = service.price;
+        // Prefer actual paid base amount (excluding tips) when available
+        const payment = payments?.find(p => p.appointmentId === apt.id && p.status === 'completed');
+        const baseAmount = payment?.amount ?? (payment ? Math.max((payment.totalAmount || 0) - (payment.tipAmount || 0), 0) : undefined);
+        const serviceRevenue = baseAmount !== undefined ? baseAmount : service.price;
         totalRevenue += serviceRevenue;
 
         // Find staff service assignment for custom rates
@@ -234,8 +237,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             appointmentEarnings = 0;
         }
 
-        // Find payment for this appointment
-        const payment = payments?.find(p => p.appointmentId === apt.id);
+        // Add tips (not included in commission calculations)
         if (payment) {
           totalTips += payment.tipAmount;
         }

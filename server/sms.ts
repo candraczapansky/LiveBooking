@@ -184,6 +184,42 @@ async function isPhoneGloballyOptedOut(phone: string): Promise<boolean> {
   }
 }
 
+// Mark phone as opted-out based on Twilio 21610 or other indicators
+async function markPhoneOptedOut(phone: string, reason: string = 'twilio_block_21610'): Promise<void> {
+  try {
+    if (!storage) return;
+    const normalized = normalizePhoneForKey(phone);
+    const key = `sms_opt_out:${normalized}`;
+    const value = JSON.stringify({ optedOut: true, at: new Date().toISOString(), reason });
+    const existing = await storage.getSystemConfig(key);
+    if (existing) {
+      await storage.updateSystemConfig(key, value, 'Auto SMS opt-out');
+    } else {
+      await storage.setSystemConfig({ key, value, description: 'Auto SMS opt-out', isEncrypted: false, isActive: true } as any);
+    }
+    // Update user flags if user can be matched
+    try {
+      let user = await (storage as any).getUserByPhone?.(normalized);
+      if (!user) {
+        const last10 = normalized.replace(/\D/g, '').slice(-10);
+        const users = await storage.getUsersByRole('client');
+        user = (users as any[]).find((u: any) => (u.phone || '').replace(/\D/g, '').slice(-10) === last10);
+      }
+      if (user?.id) {
+        await storage.updateUser(user.id, {
+          smsAccountManagement: false,
+          smsAppointmentReminders: false,
+          smsPromotions: false,
+        } as any);
+      }
+    } catch {
+      // ignore
+    }
+  } catch {
+    // ignore
+  }
+}
+
 export async function sendSMS(to: string, message: string, photoUrl?: string): Promise<SMSResult> {
   // If photo is provided, send as MMS
   if (photoUrl) {
@@ -269,6 +305,11 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
     };
   } catch (error: any) {
     console.error('SMS sending error:', error);
+    const code = error?.code || error?.status || error?.moreInfo || '';
+    const messageText = (error?.message || '').toString();
+    if (String(code) === '21610' || /21610/.test(messageText)) {
+      await markPhoneOptedOut(to, 'twilio_block_21610');
+    }
     return {
       success: false,
       error: error.message || 'Failed to send SMS'
@@ -373,6 +414,11 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     };
   } catch (error: any) {
     console.error('MMS sending error:', error);
+    const code = error?.code || error?.status || error?.moreInfo || '';
+    const messageText = (error?.message || '').toString();
+    if (String(code) === '21610' || /21610/.test(messageText)) {
+      await markPhoneOptedOut(to, 'twilio_block_21610');
+    }
     return {
       success: false,
       error: error.message || 'Failed to send MMS'

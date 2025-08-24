@@ -215,7 +215,23 @@ const ClientsPage = () => {
     refetchOnReconnect: true,
     gcTime: 0
   });
-  const clients = clientsData ?? [];
+  // Load all clients when not searching
+  const { data: allClientsData, isLoading: isLoadingAll } = useQuery({
+    queryKey: ['/api/users?role=client', refreshTrigger],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/users?role=client");
+      const data = await response.json();
+      return data;
+    },
+    enabled: !shouldSearch,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    refetchOnReconnect: true,
+    gcTime: 0
+  });
+  const clients = (shouldSearch ? clientsData : allClientsData) ?? [];
+  const isLoadingCombined = shouldSearch ? isLoading : isLoadingAll;
 
   const addForm = useForm<ClientFormValues>({
     resolver: zodResolver(clientFormSchema),
@@ -1311,11 +1327,7 @@ const ClientsPage = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-6">
-                {!shouldSearch ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    Type at least 2 characters to search clients.
-                  </div>
-                ) : isLoading ? (
+                {isLoadingCombined ? (
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>

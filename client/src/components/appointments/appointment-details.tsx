@@ -283,6 +283,11 @@ const AppointmentDetails = ({
 
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      // Refresh payroll/reporting immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
       
       toast({
         title: "Cash Payment Recorded",
@@ -833,6 +838,9 @@ const AppointmentDetails = ({
                           onOpenChange={setShowHelcimModal}
                           amount={(chargeAmount || getAppointmentChargeAmount()) + (tipAmount || 0)}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
+                          appointmentId={appointment.id}
+                          clientId={appointment.clientId}
+                          tipAmount={tipAmount}
                           onSuccess={async (_response: any) => {
                             try {
                               await apiRequest('PUT', `/api/appointments/${appointment.id}`, {
@@ -847,6 +855,11 @@ const AppointmentDetails = ({
                             setShowPaymentOptions(false);
                             queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
                             queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+                            // Also refresh payroll-related data immediately
+                            queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+                            queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+                            queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+                            queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
                           }}
                           onError={() => setShowHelcimModal(false)}
                         />

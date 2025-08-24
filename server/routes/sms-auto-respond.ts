@@ -59,7 +59,16 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
 
   async function updateUserSmsFlagsByPhone(phone: string, enabled: boolean): Promise<void> {
     try {
-      const user = await (storage as any).getUserByPhone?.(phone);
+      let user = await (storage as any).getUserByPhone?.(phone);
+      if (!user) {
+        // Fallback: try to match by last 10 digits
+        const digits = (phone || '').replace(/\D/g, '');
+        if (digits.length >= 10) {
+          const last10 = digits.slice(-10);
+          const all = await storage.getAllUsers();
+          user = (all as any[]).find(u => (u.phone || '').replace(/\D/g, '').slice(-10) === last10);
+        }
+      }
       if (!user || !user.id) return;
       await storage.updateUser(user.id, {
         smsAccountManagement: enabled,
@@ -294,7 +303,18 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
   });
 
   // Aliases for common Twilio webhook paths (backward compatibility)
-  app.post(['/sms', '/sms/webhook', '/api/sms/webhook'], async (req: Request, res: Response) => {
+  app.post([
+    '/sms',
+    '/sms/webhook',
+    '/api/sms/webhook',
+    '/incoming-sms',
+    '/message',
+    '/messages',
+    '/sms/incoming',
+    '/webhooks/sms',
+    '/api/twilio/sms',
+    '/api/twilio/inbound'
+  ], async (req: Request, res: Response) => {
     try {
       const from = (req.body.From || req.body.from || '').toString();
       const to = (req.body.To || req.body.to || '').toString();

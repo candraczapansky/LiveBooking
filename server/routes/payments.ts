@@ -215,6 +215,9 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       totalAmount: amount,
     });
 
+    // Create sales history for reports
+    await createSalesHistoryRecord(storage, payment, 'appointment');
+
     // Create staff earnings record for payroll
     try {
       const service = await storage.getService(appointment.serviceId);
@@ -386,6 +389,9 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       paymentStatus: 'paid',
       totalAmount: amount,
     });
+
+    // Create sales history for reports
+    await createSalesHistoryRecord(storage, payment, 'appointment');
 
     // Create staff earnings record for payroll
     try {
@@ -919,6 +925,11 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
         });
         // Don't fail the payment confirmation if earnings creation fails
       }
+    }
+
+    // Create sales history for reports (appointment payments)
+    if (appointmentId) {
+      await createSalesHistoryRecord(storage, updatedPayment, 'appointment');
     }
 
     LoggerService.logPayment("payment_confirmed", payment.amount, { ...context, paymentId });

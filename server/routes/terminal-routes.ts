@@ -161,6 +161,83 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
                 status: 'completed',
                 processedAt: new Date(),
               });
+
+              // Attempt to create staff earnings for payroll
+              try {
+                const payment = await (storage as any).getPayment(numericPaymentId);
+                if (payment?.appointmentId) {
+                  const appt = await storage.getAppointment(payment.appointmentId);
+                  if (appt) {
+                    const service = await storage.getService(appt.serviceId);
+                    const staffMember = await storage.getStaff(appt.staffId);
+                    if (service && staffMember) {
+                      let earningsAmount = 0;
+                      let rateType = 'commission';
+                      let rateUsed = 0;
+                      let calculationDetails = '';
+                      switch (staffMember.commissionType) {
+                        case 'commission': {
+                          const commissionRate = staffMember.commissionRate || 0;
+                          earningsAmount = service.price * commissionRate;
+                          rateUsed = commissionRate;
+                          calculationDetails = JSON.stringify({ type: 'commission', servicePrice: service.price, commissionRate, earnings: earningsAmount });
+                          break;
+                        }
+                        case 'hourly': {
+                          const hourlyRate = staffMember.hourlyRate || 0;
+                          const serviceDuration = service.duration || 60;
+                          const hours = serviceDuration / 60;
+                          earningsAmount = hourlyRate * hours;
+                          rateType = 'hourly';
+                          rateUsed = hourlyRate;
+                          calculationDetails = JSON.stringify({ type: 'hourly', servicePrice: service.price, hourlyRate, serviceDuration, hours, earnings: earningsAmount });
+                          break;
+                        }
+                        case 'fixed': {
+                          const fixedRate = staffMember.fixedRate || 0;
+                          earningsAmount = fixedRate;
+                          rateType = 'fixed';
+                          rateUsed = fixedRate;
+                          calculationDetails = JSON.stringify({ type: 'fixed', servicePrice: service.price, fixedRate, earnings: earningsAmount });
+                          break;
+                        }
+                        case 'hourly_plus_commission': {
+                          const hourlyRate = staffMember.hourlyRate || 0;
+                          const commissionRate = staffMember.commissionRate || 0;
+                          const serviceDuration = service.duration || 60;
+                          const hours = serviceDuration / 60;
+                          const hourlyPortion = hourlyRate * hours;
+                          const commissionPortion = service.price * commissionRate;
+                          earningsAmount = hourlyPortion + commissionPortion;
+                          rateType = 'hourly_plus_commission';
+                          rateUsed = hourlyRate;
+                          calculationDetails = JSON.stringify({ type: 'hourly_plus_commission', servicePrice: service.price, hourlyRate, commissionRate, serviceDuration, hours, hourlyPortion, commissionPortion, earnings: earningsAmount });
+                          break;
+                        }
+                        default:
+                          earningsAmount = 0;
+                          calculationDetails = JSON.stringify({ type: 'unknown', servicePrice: service.price, earnings: 0 });
+                      }
+
+                      if (earningsAmount > 0) {
+                        await (storage as any).createStaffEarnings({
+                          staffId: appt.staffId,
+                          appointmentId: appt.id,
+                          serviceId: appt.serviceId,
+                          paymentId: numericPaymentId,
+                          earningsAmount,
+                          rateType,
+                          rateUsed,
+                          isCustomRate: false,
+                          servicePrice: service.price,
+                          calculationDetails,
+                          earningsDate: new Date(),
+                        });
+                      }
+                    }
+                  }
+                }
+              } catch {}
             }
           }
 

@@ -417,6 +417,126 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Payroll-related routes
   // ----------------------
 
+  // Detailed payroll view for a single staff member and month
+  app.get("/api/payroll/:staffId/detailed", async (req: Request, res: Response) => {
+    try {
+      const staffId = parseInt(req.params.staffId);
+      if (Number.isNaN(staffId)) {
+        return res.status(400).json({ error: "Invalid staffId" });
+      }
+
+      const monthParam = (req.query.month as string) || new Date().toISOString();
+      const monthDate = new Date(monthParam);
+      const start = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1, 0, 0, 0, 0);
+      const end = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0, 23, 59, 59, 999);
+
+      const staffMember = await storage.getStaff(staffId);
+      if (!staffMember) {
+        return res.status(404).json({ error: "Staff member not found" });
+      }
+
+      // Load related info up front
+      const [user, appts, allPayments] = await Promise.all([
+        storage.getUser(staffMember.userId),
+        storage.getAppointmentsByStaffAndDateRange(staffId, start, end),
+        storage.getAllPayments(),
+      ]);
+
+      const staffName = user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() : "Unknown";
+
+      // Build appointment-level rows
+      const detailedAppointments: any[] = [];
+      let totalRevenue = 0;
+      let totalCommission = 0;
+
+      for (const apt of appts) {
+        try {
+          const [service, client] = await Promise.all([
+            storage.getService(apt.serviceId),
+            storage.getUser(apt.clientId || 0),
+          ]);
+
+          if (!service) continue;
+
+          // Prefer paid base amount from payment records; exclude tips from revenue
+          const payment = allPayments.find((p: any) => p.appointmentId === apt.id && p.status === 'completed');
+          const baseAmount = payment?.amount ?? (payment ? Math.max((payment.totalAmount || 0) - (payment.tipAmount || 0), 0) : undefined);
+          const servicePrice = baseAmount !== undefined ? baseAmount : (service.price || 0);
+
+          // Check for a custom commission for this staff+service
+          const assignment = await storage.getStaffServiceAssignment(staffId, service.id);
+          let commissionRate = assignment?.customCommissionRate;
+          if (commissionRate !== undefined && commissionRate !== null) {
+            // Interpret customCommissionRate as a percentage value if it's > 1 (e.g., 20 => 0.20)
+            commissionRate = commissionRate > 1 ? commissionRate / 100 : commissionRate;
+          } else {
+            commissionRate = staffMember.commissionRate ?? 0;
+          }
+
+          let commissionAmount = 0;
+          switch (staffMember.commissionType) {
+            case 'commission': {
+              commissionAmount = servicePrice * (commissionRate || 0);
+              break;
+            }
+            case 'hourly': {
+              commissionAmount = 0; // hourly handled elsewhere in UI
+              break;
+            }
+            case 'fixed': {
+              commissionAmount = staffMember.fixedRate || 0;
+              break;
+            }
+            case 'hourly_plus_commission': {
+              commissionAmount = servicePrice * (commissionRate || 0);
+              break;
+            }
+            default:
+              commissionAmount = 0;
+          }
+
+          totalRevenue += servicePrice;
+          totalCommission += commissionAmount;
+
+          detailedAppointments.push({
+            appointmentId: apt.id,
+            date: apt.startTime,
+            clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() : 'Unknown',
+            serviceName: service.name,
+            duration: service.duration || 60,
+            servicePrice,
+            commissionRate,
+            commissionAmount,
+            paymentStatus: apt.paymentStatus || 'unpaid',
+          });
+        } catch (e) {
+          // Skip problematic appointment but continue building the report
+          continue;
+        }
+      }
+
+      const summary = {
+        totalAppointments: detailedAppointments.length,
+        totalRevenue,
+        totalCommission,
+        averageCommissionPerService: detailedAppointments.length > 0 ? (totalCommission / detailedAppointments.length) : 0,
+      };
+
+      return res.json({
+        staffName,
+        title: staffMember.title,
+        commissionType: staffMember.commissionType,
+        baseCommissionRate: staffMember.commissionRate ?? 0,
+        hourlyRate: staffMember.hourlyRate ?? null,
+        summary,
+        appointments: detailedAppointments,
+      });
+    } catch (error) {
+      console.error("Error generating detailed payroll view:", error);
+      return res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load payroll details" });
+    }
+  });
+
   // Staff earnings (with optional date range filtering)
   app.get("/api/staff-earnings", async (req: Request, res: Response) => {
     try {
