@@ -26,14 +26,16 @@ export const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center min-w-0">
-            <button
+            <Button
               onClick={toggleSidebar}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary"
+              variant="outline"
+              size="icon"
+              className="rounded-lg"
               aria-label={isOpen ? "Close menu" : "Open menu"}
               aria-expanded={isOpen}
             >
               <Menu className="h-6 w-6" strokeWidth={2} data-hamburger="true" />
-            </button>
+            </Button>
             <div className="lg:hidden ml-3 truncate">
               <Link href="/dashboard" className="truncate hover:opacity-80 transition-opacity cursor-pointer">
                 <BusinessBrand size="md" className="text-primary" showName={false} />

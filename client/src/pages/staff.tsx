@@ -267,6 +267,28 @@ const StaffPage = () => {
     sendLoginLinkMutation.mutate(email);
   };
 
+  // Fallback: fetch email by userId if not present in staff list
+  const handleSendLoginLinkFor = async (staffMember: StaffMember) => {
+    try {
+      const existingEmail = staffMember.user?.email;
+      if (existingEmail) {
+        sendLoginLinkMutation.mutate(existingEmail);
+        return;
+      }
+      if (staffMember.userId) {
+        const res = await apiRequest('GET', `/api/users/${staffMember.userId}`);
+        const user = await res.json();
+        if (user?.email) {
+          sendLoginLinkMutation.mutate(user.email);
+          return;
+        }
+      }
+      toast({ title: 'Email required', description: 'This staff member does not have an email on file.', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Error', description: 'Failed to retrieve staff email. Please try again.', variant: 'destructive' });
+    }
+  };
+
   const filteredStaff = staff?.filter((staffMember: StaffMember) =>
     staffMember.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -423,11 +445,11 @@ const StaffPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleSendLoginLink(staffMember.user?.email)}
+                              onClick={() => handleSendLoginLinkFor(staffMember)}
                               className="h-7 w-7 p-0"
                               title="Create Login / Send Login Link"
                               aria-label="Create Login / Send Login Link"
-                              disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                              disabled={sendLoginLinkMutation.isPending}
                             >
                               <Key className="h-3 w-3" />
                             </Button>
@@ -464,9 +486,9 @@ const StaffPage = () => {
                           )}
                           <div className="pt-2">
                             <Button
-                              variant="outline"
-                              onClick={() => handleSendLoginLink(staffMember.user?.email)}
-                              disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                              variant="default"
+                              onClick={() => handleSendLoginLinkFor(staffMember)}
+                              disabled={sendLoginLinkMutation.isPending}
                               className="h-8 px-3 text-xs"
                             >
                               {sendLoginLinkMutation.isPending ? 'Sending…' : 'Create Login / Send Login Link'}

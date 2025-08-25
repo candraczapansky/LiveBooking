@@ -817,7 +817,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
   console.log('DetailedPayrollView rendering for staffId:', staffId);
   
   const { data: detailData, isLoading } = useQuery({
-    queryKey: ["/api/payroll/detailed-local", staffId, month.toISOString()],
+    queryKey: ["/api/payroll/detailed-local", String(staffId), month.toISOString()],
     queryFn: async () => {
       // Compute locally from current APIs to ensure latest commission rate is used
       const [staffRes, userRes, svcRes, apptRes, payRes, staffSvcRes] = await Promise.all([
@@ -826,7 +826,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         fetch('/api/services'),
         fetch('/api/appointments'),
         fetch('/api/payments'),
-        fetch('/api/staff-services'),
+        fetch('/api/staff-services?staffId=' + encodeURIComponent(String(staffId))),
       ]);
 
       const [staffList, users, services, appointments, payments, staffServices] = await Promise.all([
@@ -869,14 +869,20 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         }, 0);
         const servicePrice = baseAmountSum > 0 ? baseAmountSum : (service?.price || 0);
 
-        // Optional per-service custom rate; if present, use it (normalized), otherwise use base rate
+        // Optional per-service custom commission rate; if present, use it (normalized), otherwise base rate
         let effectiveRate = baseRate;
-        const assignment = (staffServices || []).find((ss: any) => ss.staffId === staffId && ss.serviceId === (service?.id || 0));
-        if (assignment && assignment.customCommissionRate !== null && assignment.customCommissionRate !== undefined) {
-          let custom = Number(assignment.customCommissionRate);
-          if (custom > 1) custom = custom / 100;
-          if (!Number.isNaN(custom)) {
-            effectiveRate = custom;
+        const assignment = (staffServices || []).find((ss: any) => (
+          (ss.staffId === staffId || ss.staff_id === staffId) &&
+          (ss.serviceId === serviceId || ss.service_id === serviceId)
+        ));
+        if (assignment) {
+          const custom = assignment.customCommissionRate ?? assignment.custom_commission_rate;
+          if (custom !== null && custom !== undefined) {
+            let customNum = Number(custom);
+            if (customNum > 1) customNum = customNum / 100;
+            if (!Number.isNaN(customNum)) {
+              effectiveRate = customNum;
+            }
           }
         }
 
@@ -1049,7 +1055,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
                     <TableCell>{appointment.serviceName}</TableCell>
                     <TableCell>{appointment.duration} min</TableCell>
                     <TableCell>{formatCurrency(appointment.servicePrice)}</TableCell>
-                    <TableCell>{(detailData.baseCommissionRate * 100).toFixed(1)}%</TableCell>
+                    <TableCell>{(appointment.commissionRate * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-semibold text-green-600">
                       {formatCurrency(appointment.commissionAmount)}
                     </TableCell>

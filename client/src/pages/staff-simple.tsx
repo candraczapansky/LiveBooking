@@ -190,6 +190,27 @@ const StaffPageSimple = () => {
     sendLoginLinkMutation.mutate(email);
   };
 
+  // Fallback: fetch email by userId if not present in staff list
+  const handleSendLoginLinkFor = async (staffMember: StaffMember) => {
+    try {
+      if (staffMember.user?.email) {
+        sendLoginLinkMutation.mutate(staffMember.user.email);
+        return;
+      }
+      if (staffMember.userId) {
+        const res = await apiRequest("GET", `/api/users/${staffMember.userId}`);
+        const user = await res.json();
+        if (user?.email) {
+          sendLoginLinkMutation.mutate(user.email);
+          return;
+        }
+      }
+      toast({ title: "Email required", description: "This staff member does not have an email on file.", variant: "destructive" });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to retrieve staff email. Please try again.", variant: "destructive" });
+    }
+  };
+
   const filteredStaff = Array.isArray(staff) ? staff.filter((staffMember: StaffMember) =>
     getFullName(staffMember.user?.firstName, staffMember.user?.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -305,9 +326,9 @@ const StaffPageSimple = () => {
                     {/* Create Login / Send Password Link */}
                     <div className="w-full mt-2 flex gap-2">
                       <Button
-                        variant="secondary"
-                        onClick={() => handleSendLoginLink(staffMember.user?.email)}
-                        disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                        variant="default"
+                        onClick={() => handleSendLoginLinkFor(staffMember)}
+                        disabled={sendLoginLinkMutation.isPending}
                         className="h-12 flex-1 text-base font-medium"
                         title="Create Login / Send Login Link"
                         aria-label="Create Login / Send Login Link"
@@ -316,8 +337,8 @@ const StaffPageSimple = () => {
                       </Button>
                       <Button
                         variant="outline"
-                        onClick={() => handleSendLoginLink(staffMember.user?.email)}
-                        disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                        onClick={() => handleSendLoginLinkFor(staffMember)}
+                        disabled={sendLoginLinkMutation.isPending}
                         className="h-12 px-4"
                         title="Create Login / Send Login Link"
                         aria-label="Create Login / Send Login Link"

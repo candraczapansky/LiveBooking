@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect, useCallback, useRef } from "react";
 
 import { X, Menu, LayoutDashboard, Calendar, CalendarDays, Users, UserCircle, Scissors, Package, DollarSign, MapPin, Monitor, CreditCard, BarChart3, Megaphone, Zap, Settings, LogOut, Gift, Phone, FileText, Bot, StickyNote, Shield, ChevronDown, ShoppingBag, Building2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -197,13 +198,15 @@ const PersistentMobileMenu = () => {
     <>
       {/* Menu Button */}
       <div className="fixed bottom-4 right-4 z-40 lg:hidden">
-        <button 
+        <Button 
           onClick={toggleMenu}
-          className="flex items-center justify-center w-12 h-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer shadow-md hover:shadow-lg transition-shadow"
+          variant="outline"
+          size="icon"
+          className="w-12 h-12 rounded-lg shadow-md hover:shadow-lg"
           aria-label="Toggle mobile menu"
         >
-          <Menu className="w-6 h-6 text-gray-700 dark:text-gray-300" strokeWidth={2} />
-        </button>
+          <Menu className="w-6 h-6" strokeWidth={2} />
+        </Button>
       </div>
 
       {/* Menu Overlay */}

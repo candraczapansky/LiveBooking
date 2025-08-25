@@ -178,13 +178,13 @@ export default function DevicesPage() {
                       </div>
                       <div className="flex gap-2">
                         <Button
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
                           onClick={() => handleEdit(device)}
-                          className="h-10 w-10 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          className="h-10 w-10 p-0"
                           title="Edit device"
                         >
-                          <Edit className="h-4 w-4 text-blue-600" />
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"

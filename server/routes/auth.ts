@@ -290,8 +290,10 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         });
       }
 
-      // Generate reset token
-      const resetToken = require('crypto').randomBytes(32).toString('hex');
+      // Generate reset token without require/import to avoid ESM issues
+      const resetToken = (globalThis as any).crypto && typeof (globalThis as any).crypto.randomUUID === 'function'
+        ? (globalThis as any).crypto.randomUUID().replace(/-/g, '')
+        : Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
       const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       // Store reset token in database
