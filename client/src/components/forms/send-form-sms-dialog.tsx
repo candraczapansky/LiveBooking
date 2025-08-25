@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -71,19 +71,33 @@ export function SendFormSMSDialog({
     },
   });
 
-  // Fetch clients
-  const { data: clients = [] } = useQuery({
-    queryKey: ["/api/users?role=client"],
+  // Debounced client search to avoid locking up UI
+  const [clientSearch, setClientSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(clientSearch.trim()), 300);
+    return () => clearTimeout(handle);
+  }, [clientSearch]);
+
+  // Fetch clients lazily only when searching and sendMethod is client
+  const { data: clients = [], isFetching: isSearchingClients } = useQuery({
+    queryKey: ["/api/users?role=client", debouncedSearch],
     queryFn: async () => {
-      const response = await fetch("/api/users?role=client");
+      const qs = debouncedSearch && debouncedSearch.length >= 2
+        ? `&search=${encodeURIComponent(debouncedSearch)}`
+        : "";
+      const response = await fetch(`/api/users?role=client${qs}`);
       if (!response.ok) throw new Error("Failed to fetch clients");
       return response.json();
     },
-    enabled: open,
+    enabled: open && sendMethod === "client" && debouncedSearch.length >= 2,
+    staleTime: 30_000,
   });
 
-  // Filter clients with phone numbers
-  const clientsWithPhone = clients.filter((client: any) => client.phone);
+  // Only clients with phone numbers, limited to prevent heavy render
+  const clientsWithPhone = (clients || []).filter((client: any) => client.phone);
+  const limitedClients = clientsWithPhone.slice(0, 50);
 
   // Send SMS mutation
   const sendSMSMutation = useMutation({
@@ -199,39 +213,57 @@ export function SendFormSMSDialog({
             />
 
             {sendMethod === "client" && (
-              <FormField
-                control={form.control}
-                name="clientId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Select Client</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose a client" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {clientsWithPhone.length === 0 ? (
-                          <SelectItem value="no-clients" disabled>
-                            No clients with phone numbers found
-                          </SelectItem>
-                        ) : (
-                          clientsWithPhone.map((client: any) => (
-                            <SelectItem key={client.id} value={client.id.toString()}>
-                              <div className="flex flex-col">
-                                <span>{client.firstName} {client.lastName}</span>
-                                <span className="text-xs text-gray-500">{client.phone}</span>
-                              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>Search Client</Label>
+                  <Input
+                    placeholder="Type at least 2 characters to search clients"
+                    value={clientSearch}
+                    onChange={(e) => setClientSearch(e.target.value)}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="clientId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Select Client</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a client" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {debouncedSearch.length < 2 ? (
+                            <SelectItem value="_hint" disabled>
+                              Type at least 2 characters to search
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                          ) : isSearchingClients ? (
+                            <SelectItem value="_loading" disabled>
+                              Searching...
+                            </SelectItem>
+                          ) : limitedClients.length === 0 ? (
+                            <SelectItem value="_none" disabled>
+                              No clients found
+                            </SelectItem>
+                          ) : (
+                            limitedClients.map((client: any) => (
+                              <SelectItem key={client.id} value={client.id.toString()}>
+                                <div className="flex flex-col">
+                                  <span>{client.firstName} {client.lastName}</span>
+                                  <span className="text-xs text-gray-500">{client.phone}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
             )}
 
             {sendMethod === "phone" && (

@@ -13,7 +13,7 @@ const TerminalConfigSchema = z.object({
 type TerminalConfig = z.infer<typeof TerminalConfigSchema>;
 
 // In-memory session store for invoice-based fallbacks
-const sessionStore: Map<string, { startedAt: number; locationId: string; deviceCode: string }> = new Map();
+const sessionStore: Map<string, { startedAt: number; locationId: string; deviceCode: string; totalAmount: number; invoiceNumber: string; description?: string }> = new Map();
 
 export class HelcimTerminalService {
   private readonly baseUrl = 'https://api.helcim.com/v2';
@@ -72,6 +72,9 @@ export class HelcimTerminalService {
         startedAt: Date.now(),
         locationId,
         deviceCode: config.deviceCode,
+        totalAmount: Number(totalAmount.toFixed(2)),
+        invoiceNumber,
+        description: options.description,
       });
 
       const response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, config.apiToken);
@@ -135,17 +138,43 @@ export class HelcimTerminalService {
     try {
       // If paymentId looks like our invoice-based session, try to resolve via Helcim by invoiceNumber
       if (typeof paymentId === 'string' && paymentId.startsWith('POS-')) {
+        const session = sessionStore.get(paymentId);
         try {
           // Attempt device-level lookup by invoiceNumber if supported
-          const deviceQuery = await this.makeRequest(
-            'GET',
-            `/devices/${config.deviceCode}/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
-            undefined,
-            config.apiToken
-          );
-          const d = (deviceQuery?.data as any) || {};
-          const list = Array.isArray(d) ? d : (Array.isArray(d?.transactions) ? d.transactions : []);
-          const match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+          // 1) Try with query param (if API supports it)
+          let match: any | undefined;
+          try {
+            const deviceQuery = await this.makeRequest(
+              'GET',
+              `/devices/${config.deviceCode}/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
+              undefined,
+              config.apiToken
+            );
+            const d = (deviceQuery?.data as any) || {};
+            const list = Array.isArray(d) ? d : (Array.isArray(d?.transactions) ? d.transactions : []);
+            match = list.find((t: any) => (
+              t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId
+            ));
+          } catch {}
+
+          // 2) If not supported, fetch recent device transactions and search
+          if (!match) {
+            const recentQuery = await this.makeRequest(
+              'GET',
+              `/devices/${config.deviceCode}/transactions`,
+              undefined,
+              config.apiToken
+            );
+            const rd = (recentQuery?.data as any) || {};
+            const rlist = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
+            match = rlist.find((t: any) => {
+              const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || '';
+              const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
+              const sameInvoice = inv === paymentId;
+              const sameAmount = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
+              return sameInvoice && sameAmount;
+            });
+          }
           if (match) {
             const st = String(match.status || match.result || '').toLowerCase();
             if (['approved', 'captured', 'completed', 'success', 'succeeded'].includes(st)) {
@@ -162,15 +191,30 @@ export class HelcimTerminalService {
         try {
           const merchantToken = process.env.HELCIM_API_TOKEN;
           if (merchantToken) {
-            const merchantQuery = await this.makeRequest(
-              'GET',
-              `/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
-              undefined,
-              merchantToken
-            );
-            const m = (merchantQuery?.data as any) || {};
-            const list = Array.isArray(m) ? m : (Array.isArray(m?.transactions) ? m.transactions : []);
-            const match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+            let match: any | undefined;
+            try {
+              const merchantQuery = await this.makeRequest(
+                'GET',
+                `/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
+                undefined,
+                merchantToken
+              );
+              const m = (merchantQuery?.data as any) || {};
+              const list = Array.isArray(m) ? m : (Array.isArray(m?.transactions) ? m.transactions : []);
+              match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+            } catch {}
+            if (!match) {
+              const recentMerchant = await this.makeRequest('GET', `/transactions`, undefined, merchantToken);
+              const md = (recentMerchant?.data as any) || {};
+              const mlist = Array.isArray(md) ? md : (Array.isArray(md?.transactions) ? md.transactions : []);
+              match = mlist.find((t: any) => {
+                const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || '';
+                const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
+                const sameInvoice = inv === paymentId;
+                const sameAmount = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
+                return sameInvoice && sameAmount;
+              });
+            }
             if (match) {
               const st = String(match.status || match.result || '').toLowerCase();
               if (['approved', 'captured', 'completed', 'success', 'succeeded'].includes(st)) {

@@ -43,6 +43,7 @@ import { registerFormsRoutes } from "./routes/forms.js";
 import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
 import { registerLLMRoutes } from "./routes/llm.js";
 import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
+import { registerMembershipRoutes } from "./routes/memberships.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
 import { CheckSoftwareService } from "./check-software-service.js";
@@ -94,6 +95,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
+  // Memberships
+  registerMembershipRoutes(app, storage);
   // Notes
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
