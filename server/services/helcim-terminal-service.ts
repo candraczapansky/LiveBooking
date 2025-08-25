@@ -127,6 +127,35 @@ export class HelcimTerminalService {
         return { ...data, transactionId: pid, paymentId: pid, invoiceNumber };
       }
 
+      // Early resolve: briefly poll device transactions to locate the transaction id by invoice
+      try {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          try {
+            const recentQuery = await this.makeRequest(
+              'GET',
+              `/devices/${config.deviceCode}/transactions`,
+              undefined,
+              config.apiToken
+            );
+            const rd = (recentQuery?.data as any) || {};
+            const list = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
+            const match = list.find((t: any) => {
+              const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || '';
+              return inv === invoiceNumber;
+            });
+            if (match) {
+              const pid = match.id || match.transactionId;
+              if (pid) {
+                try { console.log('⚡ Found transactionId after purchase', { invoiceNumber, transactionId: pid }); } catch {}
+                return { transactionId: pid, paymentId: pid, invoiceNumber, status: 'pending' };
+              }
+            }
+          } catch {}
+          // wait 500ms before next attempt
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      } catch {}
+
       // As a last resort, return the invoiceNumber so the client can correlate while we poll
       return { invoiceNumber, status: 'pending' };
     } catch (error: any) {
@@ -474,6 +503,22 @@ export class HelcimTerminalService {
             } catch {}
           }
         }
+      }
+
+      // If Helcim omitted invoiceNumber but our sessions include an entry whose transactionId matches, backfill invoiceNumber
+      if (!invoiceNumber && transactionId) {
+        try {
+          let matchedInvoiceFromSession: string | null = null;
+          sessionStore.forEach((value, key) => {
+            // Heuristic: invoice numbers are POS-* in our flow; prefer the newest session
+            if (!matchedInvoiceFromSession && key && typeof key === 'string') {
+              matchedInvoiceFromSession = key;
+            }
+          });
+          if (matchedInvoiceFromSession) {
+            invoiceNumber = matchedInvoiceFromSession;
+          }
+        } catch {}
       }
 
       // Cache under both keys so polling by either id can resolve

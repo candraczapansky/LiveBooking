@@ -265,15 +265,9 @@ export class MarketingCampaignService {
           unsubscribeUrl: `${baseUrl}/api/email-marketing/unsubscribe/${user.id}`
         };
 
-        // If the content looks like a full HTML document from the editor, send it raw with only an unsubscribe footer
-        const looksLikeFullHtml = /<!DOCTYPE|<html|<body/i.test(editorHtml);
-        const subject = campaign.subject || campaign.name;
-        const html = looksLikeFullHtml
-          ? generateRawMarketingEmailHTML(editorHtml, templateData.unsubscribeUrl)
-          : generateEmailHTML(marketingCampaignTemplate, templateData, subject);
-        const text = looksLikeFullHtml
-          ? htmlToText(html)
-          : generateEmailText(marketingCampaignTemplate, templateData);
+        // Always send raw editor content for marketing emails with only an unsubscribe footer
+        const html = generateRawMarketingEmailHTML(editorHtml, templateData.unsubscribeUrl);
+        const text = htmlToText(html);
 
         const emailSent = await sendEmail({
           to: user.email,

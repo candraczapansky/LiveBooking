@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -34,6 +34,7 @@ export default function SmartTerminalPaymentDialog({
   const [message, setMessage] = useState('');
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+  const paymentIdRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   // Cleanup polling on unmount or dialog close
@@ -55,6 +56,7 @@ export default function SmartTerminalPaymentDialog({
       setStatus('idle');
       setMessage('');
       setPaymentId(null);
+      paymentIdRef.current = null;
     }
   }, [open]);
 
@@ -77,12 +79,18 @@ export default function SmartTerminalPaymentDialog({
         throw new Error(result.message || 'Failed to start payment');
       }
 
-      setPaymentId(result.paymentId);
+      const pid: string = result.transactionId || result.paymentId;
+      setPaymentId(pid);
+      paymentIdRef.current = pid;
       setStatus('processing');
       setMessage('Payment initiated. Please follow instructions on terminal.');
 
       // Start polling for status
-      const interval = setInterval(() => checkPaymentStatus(result.paymentId), 2000);
+      const interval = setInterval(() => {
+        if (paymentIdRef.current) {
+          checkPaymentStatus(paymentIdRef.current);
+        }
+      }, 2000);
       setPollingInterval(interval);
 
     } catch (error: any) {
@@ -97,6 +105,12 @@ export default function SmartTerminalPaymentDialog({
     try {
       const response = await apiRequest('GET', `/api/terminal/payment/${locationId}/${pid}`);
       const result = await response.json();
+
+      // If server reveals a more specific transactionId, switch to it
+      if (result?.transactionId && result.transactionId !== paymentIdRef.current) {
+        setPaymentId(result.transactionId);
+        paymentIdRef.current = result.transactionId;
+      }
 
       if (result.status === 'completed') {
         handlePaymentSuccess(result);

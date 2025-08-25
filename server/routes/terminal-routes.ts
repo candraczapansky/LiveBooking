@@ -103,6 +103,15 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
+    // Avoid intermediate proxies/browser returning 304 by disabling caching for polling endpoint
+    try {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+      // Also ensure a unique ETag per response so conditional requests don't 304
+      res.setHeader('ETag', `"poll-${Date.now()}-${paymentId}"`);
+    } catch {}
     
     // Fast-path: webhook cache. If pending, attempt refresh via transactionId
     try {
@@ -321,7 +330,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       // Some gateways nest the event under data or event
       const maybe = payload?.data || payload?.event || payload;
       try {
-        console.log('📥 Terminal webhook raw', { payload });
+        console.log('📥 Terminal webhook raw', { headers: (req as any).headers, payload });
         console.log('📥 Terminal webhook maybe', { maybe });
       } catch {}
       // Map common Helcim fields to our cache format

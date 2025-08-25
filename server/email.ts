@@ -278,11 +278,9 @@ export function createMarketingCampaignEmail(
       `${baseUrl}/api/email-marketing/unsubscribe/0`
   };
 
-  const looksLikeFullHtml = /<!DOCTYPE|<html|<body/i.test(content || '');
-  const html = looksLikeFullHtml
-    ? generateRawMarketingEmailHTML(content, templateData.unsubscribeUrl)
-    : generateEmailHTML(marketingCampaignTemplate, templateData, subject);
-  const text = looksLikeFullHtml ? htmlToText(html) : generateEmailText(marketingCampaignTemplate, templateData);
+  // Always send raw editor content for marketing emails with only an unsubscribe footer
+  const html = generateRawMarketingEmailHTML(content, templateData.unsubscribeUrl);
+  const text = htmlToText(html);
 
   return {
     to: clientEmail,

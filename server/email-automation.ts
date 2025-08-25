@@ -5,7 +5,9 @@ import {
   followUpTemplate,
   birthdayTemplate,
   generateEmailHTML,
-  generateEmailText
+  generateEmailText,
+  generateRawMarketingEmailHTML,
+  htmlToText
 } from './email-templates.js';
 import type { IStorage } from './storage.js';
 import { addHours, addDays, isAfter, format } from 'date-fns';
@@ -448,21 +450,24 @@ export class EmailAutomationService {
       }
 
       try {
+        const baseUrl = process.env.CUSTOM_DOMAIN || 'http://localhost:5000';
+        const editorHtml = (campaign.htmlContent || campaign.content || '').toString();
         const templateData = {
           clientName: `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Valued Client',
           clientEmail: client.email,
           campaignTitle: campaign.name,
           campaignSubtitle: campaign.subject || '',
-          campaignContent: campaign.htmlContent || campaign.content,
+          campaignContent: editorHtml,
           ctaButton: campaign.ctaButton,
           ctaUrl: campaign.ctaUrl,
           specialOffer: campaign.specialOffer,
           promoCode: campaign.promoCode,
-          unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${client.id}`
+          unsubscribeUrl: `${baseUrl}/api/email-marketing/unsubscribe/${client.id}`
         };
 
-        const html = generateEmailHTML(require('./email-templates').marketingCampaignTemplate, templateData, campaign.subject || campaign.name);
-        const text = generateEmailText(require('./email-templates').marketingCampaignTemplate, templateData);
+        // Always send raw editor content for marketing emails with only an unsubscribe footer
+        const html = generateRawMarketingEmailHTML(editorHtml, templateData.unsubscribeUrl);
+        const text = htmlToText(html);
 
         await sendEmail({
           to: client.email,
