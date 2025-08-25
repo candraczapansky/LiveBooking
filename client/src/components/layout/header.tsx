@@ -21,6 +21,10 @@ export const Header = () => {
   const { user, logout } = useContext(AuthContext);
   const { isOpen, toggleSidebar } = useSidebar();
 
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/reset-password')) {
+    return null;
+  }
+
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-[60] sticky top-0">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

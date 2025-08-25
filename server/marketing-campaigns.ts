@@ -365,11 +365,13 @@ export class MarketingCampaignService {
     }
 
     const seen = new Set<number>();
+    const isSpecificAudience = (campaign.audience || '').toString().toLowerCase().includes('specific');
     for (const r of recipients || []) {
       const userId = r?.id;
       if (!userId || seen.has(userId)) continue;
       seen.add(userId);
-      if (!r.phone || !r.smsPromotions) continue;
+      const hasConsent = !!r.smsPromotions || isSpecificAudience;
+      if (!r.phone || !hasConsent) continue;
       await this.storage.createMarketingCampaignRecipient({
         campaignId: campaign.id,
         userId,
@@ -395,10 +397,12 @@ export class MarketingCampaignService {
 
     // Send sequentially to avoid bursts; small gap for safety
     const perMessageDelayMs = parseInt(process.env.SMS_DRIP_PER_MESSAGE_DELAY_MS || '1000', 10);
+    const isSpecificAudience = (campaign.audience || '').toString().toLowerCase().includes('specific');
     for (const rec of batch) {
       try {
         const user = await this.storage.getUser((rec as any).userId);
-        if (!user || !user.phone || !user.smsPromotions) {
+        const hasConsent = !!user?.smsPromotions || isSpecificAudience;
+        if (!user || !user.phone || !hasConsent) {
           await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
           failedCount++;
           continue;

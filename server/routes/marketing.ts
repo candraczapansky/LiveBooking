@@ -250,12 +250,14 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     }
 
     if (campaign.type === 'sms') {
+      const isSpecificAudience = (campaign.audience || '').toString().toLowerCase().includes('specific');
       // Queue recipients for drip sending instead of blasting at once
       const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
       const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
       let queued = 0;
       for (const recipient of recipients) {
-        if (!(recipient.phone && recipient.smsPromotions)) continue;
+        const hasConsent = !!recipient.smsPromotions || isSpecificAudience;
+        if (!(recipient.phone && hasConsent)) continue;
         if (existingByUser.has(recipient.id)) continue;
         await (storage as any).createMarketingCampaignRecipient?.({
           campaignId,
@@ -284,7 +286,8 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
         for (const rec of pendingBatch) {
           try {
             const user = await storage.getUser((rec as any).userId);
-            if (!user || !user.phone || !user.smsPromotions) {
+            const hasConsent = !!user?.smsPromotions || isSpecificAudience;
+            if (!user || !user.phone || !hasConsent) {
               await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
               immediateFailed++;
               continue;

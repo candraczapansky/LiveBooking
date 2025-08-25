@@ -369,6 +369,11 @@ const ClientsPage = () => {
     onSuccess: () => {
       // Invalidate and refetch to get updated list
       queryClient.invalidateQueries({ queryKey: ['/api/users?role=client', refreshTrigger] });
+      // Also refresh any user search/list caches so deleted clients disappear immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users', 'search'] });
+      queryClient.refetchQueries({ queryKey: ['/api/users'] });
+      queryClient.refetchQueries({ queryKey: ['/api/users?role=client', refreshTrigger] });
       
       toast({
         title: "Success",
@@ -1331,17 +1336,21 @@ const ClientsPage = () => {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>
+                ) : (!shouldSearch) ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    {(() => {
+                      console.log('Rendering initial state (no search)');
+                      return null;
+                    })()}
+                    Type at least 2 characters to search clients.
+                  </div>
                 ) : filteredClients?.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     {(() => {
-                      console.log('Rendering empty state:', {
-                        filteredClientsLength: filteredClients?.length,
-                        searchQuery,
-                        hasClients: !!filteredClients
-                      });
+                      console.log('Rendering empty search results state');
                       return null;
                     })()}
-                    No clients found. {searchQuery ? 'Try a different search term.' : 'Add your first client!'}
+                    No clients found. Try a different search term.
                   </div>
                 ) : (
                   <>

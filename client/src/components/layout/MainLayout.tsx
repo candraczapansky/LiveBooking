@@ -12,7 +12,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isOpen, isMobile } = useSidebar();
   const [location] = useLocation();
   const { isAuthenticated } = useAuth();
-  const hideChrome = !isAuthenticated && (location === '/login' || location === '/');
+  const hideChrome = (!isAuthenticated && (location === '/login' || location === '/')) || location.startsWith('/reset-password');
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">

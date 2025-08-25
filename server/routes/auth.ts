@@ -303,8 +303,18 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
           resetTokenExpiry,
         });
 
-        // Build reset link
-        const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+        // Build reset link using robust fallbacks
+        const replitDomain = process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : undefined;
+        const requestOrigin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+        const defaultDomain = 'https://gloupheadspa.app';
+        const baseUrl = (process.env.FRONTEND_URL
+          || process.env.CUSTOM_DOMAIN
+          || replitDomain
+          || requestOrigin
+          || defaultDomain).replace(/\/$/, '');
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
         // Try to send email; if it fails for any reason, fall back to success response
         try {

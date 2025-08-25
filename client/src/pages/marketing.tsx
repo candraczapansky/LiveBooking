@@ -1280,7 +1280,7 @@ const MarketingPage = () => {
                               className="flex items-center gap-2 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-3 py-1 rounded-full text-sm"
                             >
                               <span>
-                                {client.firstName} {client.lastName} ({client.email})
+                                {client.firstName} {client.lastName} ({client.email}{client.phone ? ` · ${client.phone}` : ''})
                               </span>
                               <button
                                 type="button"
@@ -1297,7 +1297,7 @@ const MarketingPage = () => {
                       {/* Client Search and Selection */}
                       <div className="relative">
                         <Input
-                          placeholder="Search clients by name or email..."
+                          placeholder="Search clients by name, email, or phone..."
                           value={clientSearchQuery}
                           onFocus={() => setShowClientSelector(true)}
                           onChange={(e) => {
@@ -1329,7 +1329,10 @@ const MarketingPage = () => {
                                 .filter((client) => {
                                   const fullName = `${client.firstName || ''} ${client.lastName || ''}`.toLowerCase();
                                   const email = (client.email || '').toLowerCase();
-                                  return fullName.includes(searchTerm) || email.includes(searchTerm);
+                                  const phone = (client.phone || '').replace(/\D/g, '');
+                                  const phoneSearch = searchTerm.replace(/\D/g, '');
+                                  const phoneMatch = phoneSearch.length >= 3 && phone.includes(phoneSearch);
+                                  return fullName.includes(searchTerm) || email.includes(searchTerm) || phoneMatch;
                                 })
                                 .filter((client) => !selectedClients.some((selected) => selected.id === client.id))
                                 .slice(0, 50);
@@ -1356,7 +1359,8 @@ const MarketingPage = () => {
                                       {client.firstName} {client.lastName}
                                     </div>
                                     <div className="text-sm text-gray-500 dark:text-gray-400">
-                                      {client.email}
+                                      {client.email || 'No email'}
+                                      {client.phone ? ` · ${client.phone}` : ''}
                                     </div>
                                   </div>
                                   <Check size={16} className="text-gray-400" />

@@ -139,6 +139,24 @@ function isValidPhoneNumber(phone: string): boolean {
   return digits.length >= 7 && digits.length <= 15;
 }
 
+// Normalize a phone number into E.164 format where possible
+function formatToE164(phone: string): string {
+  try {
+    const trimmed = (phone || '').toString().trim();
+    if (trimmed.startsWith('+')) return trimmed;
+    const digits = trimmed.replace(/\D/g, '');
+    if (!digits) return trimmed;
+    // US: 10 digits => +1XXXXXXXXXX
+    if (digits.length === 10) return `+1${digits}`;
+    // US with leading 1: 11 digits starting with 1 => +1XXXXXXXXXX
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+    // Fallback international: prefix '+'
+    return `+${digits}`;
+  } catch {
+    return phone;
+  }
+}
+
 // Always append compliance text to the end of outbound SMS/MMS
 const SMS_COMPLIANCE_TEXT = "Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.";
 
@@ -290,8 +308,8 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
   }
 
   try {
-    // Ensure phone number has country code
-    const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+    // Ensure phone number has country code (robust formatting)
+    const formattedTo = formatToE164(to);
     
     const messageResponse = await twilioClient.messages.create({
       body: finalMessage,
@@ -384,8 +402,8 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
   }
 
   try {
-    // Ensure phone number has country code
-    const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+    // Ensure phone number has country code (robust formatting)
+    const formattedTo = formatToE164(to);
     
     // For MMS, Twilio requires a publicly accessible media URL
     const isHttpUrl = /^https?:\/\//i.test(photoUrl);

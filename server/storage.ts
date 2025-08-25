@@ -882,6 +882,7 @@ Glo Head Spa`,
       .from(users)
       .where(
         or(
+          sql`LOWER(${users.username}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${users.firstName}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${users.lastName}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${users.email}) LIKE LOWER(${searchTerm})`,
@@ -938,8 +939,8 @@ Glo Head Spa`,
         }
       }
       
-      // Handle phone numbers - only generate placeholder if phone is empty or null
-      const processedData = { ...userData };
+      // Handle phone numbers carefully: do not overwrite when not provided
+      const processedData: any = { ...userData };
       console.log('Phone number received:', processedData.phone);
       console.log('Phone number type:', typeof processedData.phone);
       console.log('Phone number length:', processedData.phone?.length);
@@ -947,13 +948,14 @@ Glo Head Spa`,
       console.log('Phone number is null:', processedData.phone === null);
       console.log('Phone number is undefined:', processedData.phone === undefined);
       
-      if (processedData.phone === '' || processedData.phone === null || processedData.phone === undefined) {
-        // Generate a unique placeholder phone number
-        const timestamp = Date.now();
-        const randomSuffix = Math.random().toString(36).substring(2, 8);
-        const processId = process.pid || Math.floor(Math.random() * 10000);
-        processedData.phone = `555-000-${timestamp.toString().slice(-4)}-${processId.toString().slice(-4)}`;
-        console.log('Generated placeholder phone for update:', processedData.phone);
+      if (processedData.phone === undefined) {
+        // Do not touch the phone field if it was not provided in the update payload
+        delete processedData.phone;
+        console.log('Phone not provided in update; preserving existing value.');
+      } else if (processedData.phone === '' || processedData.phone === null) {
+        // Explicitly clear phone when empty or null is sent
+        processedData.phone = null;
+        console.log('Clearing phone number (set to null).');
       } else {
         // Keep the provided phone number as-is
         console.log('Using provided phone number:', processedData.phone);
@@ -1048,13 +1050,12 @@ Glo Head Spa`,
         throw new Error(`Cannot delete user - has ${relatedSavedGiftCards.length} associated saved gift cards. Please delete or reassign gift cards first.`);
       }
       
-      // Check for related user permission groups
+      // Handle related user permission groups by removing mappings instead of blocking deletion
       const relatedUserPermissionGroups = await db.select().from(userPermissionGroups).where(eq(userPermissionGroups.userId, id));
       console.log(`DatabaseStorage: Found ${relatedUserPermissionGroups.length} related user permission groups for user ${id}`);
-      
       if (relatedUserPermissionGroups.length > 0) {
-        console.log(`DatabaseStorage: Cannot delete user ${id} - has ${relatedUserPermissionGroups.length} user permission groups`);
-        throw new Error(`Cannot delete user - has ${relatedUserPermissionGroups.length} associated user permission groups. Please delete or reassign permission groups first.`);
+        console.log(`DatabaseStorage: Auto-removing ${relatedUserPermissionGroups.length} user permission group mappings for user ${id} before deletion`);
+        await db.delete(userPermissionGroups).where(eq(userPermissionGroups.userId, id));
       }
       
       // Check for related user direct permissions

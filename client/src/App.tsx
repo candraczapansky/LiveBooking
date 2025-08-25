@@ -128,6 +128,21 @@ function Router() {
 export default function App() {
   // Check if we're on a public form route
   const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
+  // Always treat reset-password as a standalone public page (no MainLayout/header)
+  const isResetPasswordRoute = window.location.pathname.startsWith('/reset-password');
+
+  if (isResetPasswordRoute) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Suspense fallback={<PageLoading />}>
+            <ResetPassword />
+          </Suspense>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   // For public form routes, render without AuthProvider to avoid user data fetching
   if (isPublicFormRoute) {
