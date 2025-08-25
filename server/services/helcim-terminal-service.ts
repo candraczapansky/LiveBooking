@@ -12,6 +12,9 @@ const TerminalConfigSchema = z.object({
 
 type TerminalConfig = z.infer<typeof TerminalConfigSchema>;
 
+// In-memory session store for invoice-based fallbacks
+const sessionStore: Map<string, { startedAt: number; locationId: string; deviceCode: string }> = new Map();
+
 export class HelcimTerminalService {
   private readonly baseUrl = 'https://api.helcim.com/v2';
 
@@ -64,6 +67,13 @@ export class HelcimTerminalService {
         description: options.description,
       } as any;
 
+      // Track session by invoice number in case Helcim does not return a transaction id
+      sessionStore.set(invoiceNumber, {
+        startedAt: Date.now(),
+        locationId,
+        deviceCode: config.deviceCode,
+      });
+
       const response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, config.apiToken);
       try {
         console.log('📤 Helcim purchase response debug', {
@@ -95,17 +105,18 @@ export class HelcimTerminalService {
       if (locationHeader && typeof locationHeader === 'string') {
         const parts = locationHeader.split('/').filter(Boolean);
         const transactionId = parts[parts.length - 1];
-        return { transactionId, paymentId: transactionId, status: 'pending' };
+        return { transactionId, paymentId: transactionId, invoiceNumber, status: 'pending' };
       }
 
       // Fallback: if API returns JSON with an id
       const data = response.data || {};
       if ((data as any).transactionId || (data as any).id) {
         const pid = (data as any).transactionId || (data as any).id;
-        return { ...data, transactionId: pid, paymentId: pid };
+        return { ...data, transactionId: pid, paymentId: pid, invoiceNumber };
       }
 
-      return { status: 'pending' };
+      // As a last resort, return the invoiceNumber so the client can correlate while we poll
+      return { invoiceNumber, status: 'pending' };
     } catch (error: any) {
       console.error(`❌ Error starting payment on terminal ${config.terminalId}:`, error.message);
       throw error;
@@ -122,6 +133,60 @@ export class HelcimTerminalService {
     }
 
     try {
+      // If paymentId looks like our invoice-based session, try to resolve via Helcim by invoiceNumber
+      if (typeof paymentId === 'string' && paymentId.startsWith('POS-')) {
+        try {
+          // Attempt device-level lookup by invoiceNumber if supported
+          const deviceQuery = await this.makeRequest(
+            'GET',
+            `/devices/${config.deviceCode}/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
+            undefined,
+            config.apiToken
+          );
+          const d = (deviceQuery?.data as any) || {};
+          const list = Array.isArray(d) ? d : (Array.isArray(d?.transactions) ? d.transactions : []);
+          const match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+          if (match) {
+            const st = String(match.status || match.result || '').toLowerCase();
+            if (['approved', 'captured', 'completed', 'success', 'succeeded'].includes(st)) {
+              return { status: 'completed', transactionId: match.id || match.transactionId || paymentId, last4: match.last4 } as any;
+            }
+            if (['declined', 'failed', 'canceled', 'cancelled'].includes(st)) {
+              return { status: 'failed', transactionId: match.id || match.transactionId || paymentId } as any;
+            }
+            return { status: 'pending', message: 'Processing payment...' } as any;
+          }
+        } catch {}
+
+        // Optional merchant-level lookup (requires HELCIM_API_TOKEN)
+        try {
+          const merchantToken = process.env.HELCIM_API_TOKEN;
+          if (merchantToken) {
+            const merchantQuery = await this.makeRequest(
+              'GET',
+              `/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
+              undefined,
+              merchantToken
+            );
+            const m = (merchantQuery?.data as any) || {};
+            const list = Array.isArray(m) ? m : (Array.isArray(m?.transactions) ? m.transactions : []);
+            const match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+            if (match) {
+              const st = String(match.status || match.result || '').toLowerCase();
+              if (['approved', 'captured', 'completed', 'success', 'succeeded'].includes(st)) {
+                return { status: 'completed', transactionId: match.id || match.transactionId || paymentId, last4: match.last4 } as any;
+              }
+              if (['declined', 'failed', 'canceled', 'cancelled'].includes(st)) {
+                return { status: 'failed', transactionId: match.id || match.transactionId || paymentId } as any;
+              }
+            }
+          }
+        } catch {}
+
+        // If not found yet, remain pending until device exposes a transaction id
+        return { status: 'pending', message: 'Awaiting terminal status...' } as any;
+      }
+
       const response = await this.makeRequest('GET', `/devices/${config.deviceCode}/transactions/${paymentId}`, undefined, config.apiToken);
       return response.data;
     } catch (error: any) {

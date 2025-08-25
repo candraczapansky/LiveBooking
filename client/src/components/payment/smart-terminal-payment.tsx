@@ -58,13 +58,18 @@ export default function SmartTerminalPayment({
 
       // Derive a payment identifier from multiple possible fields
       const pid = (data?.paymentId) || (data?.transactionId) || (data?.id) || (data?.invoiceNumber);
+      const sessionId = data?.invoiceNumber || pid;
 
       // Poll for payment status only if we have an identifier
       if (pid) {
         await pollPaymentStatus(String(locationId ?? ''), String(pid));
       } else {
-        // No id yet; keep UI in processing and let a subsequent attempt continue
-        setMessage('Waiting for terminal to acknowledge transaction...');
+        // No id yet; keep UI in processing and use invoice-based session to unblock later
+        if (sessionId) {
+          await pollPaymentStatus(String(locationId ?? ''), String(sessionId));
+        } else {
+          setMessage('Waiting for terminal to acknowledge transaction...');
+        }
       }
 
     } catch (error) {

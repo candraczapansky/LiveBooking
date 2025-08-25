@@ -78,6 +78,7 @@ router.post('/payment/start', async (req, res) => {
       success: true,
       paymentId: pid,
       transactionId: (result as any).transactionId || pid,
+      invoiceNumber: (result as any).invoiceNumber || pid,
       status: (result as any).status || 'pending'
     });
   } catch (error: any) {

@@ -71,6 +71,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const [, setLocation] = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [usernamePreviewSeed] = useState<string>(() => Date.now().toString().slice(-4));
 
   const form = useForm<StaffFormValues>({
     resolver: zodResolver(staffFormSchema),
@@ -110,7 +111,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
     enabled: !!staffId && open,
   });
 
-  // Once we know the staff record (for userId), fetch the related user
+  // Once we know the staff record (for userId), fetch the related user (optional fallback)
   const { data: staffUser } = useQuery({
     queryKey: ['staff-user', (staffData as any)?.userId],
     enabled: open && !!staffId && !!(staffData as any)?.userId,
@@ -131,7 +132,26 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
         : staffQueryData;
       setStaffData(staffFromList);
       
-      // Load user's permission groups
+      // Build base form values directly from staff list (includes nested user)
+      const baseFormData = {
+        title: staffFromList?.title || "",
+        bio: staffFromList?.bio || "",
+        commissionRate: staffFromList?.commissionType === 'commission' 
+          ? (staffFromList?.commissionRate || 0) * 100  // percent for form
+          : 0,
+        hourlyRate: staffFromList?.hourlyRate || 0,
+        fixedSalary: staffFromList?.fixedRate || 0,
+        commissionType: staffFromList?.commissionType || "commission",
+        firstName: staffFromList?.user?.firstName || "",
+        lastName: staffFromList?.user?.lastName || "",
+        email: staffFromList?.user?.email || "",
+        phone: staffFromList?.user?.phone || "",
+        photo: staffFromList?.photoUrl || "",
+        permissionGroups: [],
+      } as any;
+      form.reset(baseFormData);
+
+      // Load user's permission groups (don't reset the entire form, only set the groups)
       const loadUserPermissions = async () => {
         try {
           const userId = staffFromList?.userId;
@@ -142,46 +162,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
             const groupIds = (userPermissions?.data?.groups || [])
               .map((g: any) => g.id)
               .filter(Boolean);
-            
-            const formData = {
-              title: staffFromList?.title || "",
-              bio: staffFromList?.bio || "",
-              commissionRate: staffFromList?.commissionType === 'commission' 
-                ? (staffFromList?.commissionRate || 0) * 100  // Convert from decimal to percentage for form
-                : 0,
-              hourlyRate: staffFromList?.hourlyRate || 0,
-              fixedSalary: staffFromList?.fixedRate || 0,
-              commissionType: staffFromList?.commissionType || "commission",
-              firstName: "",
-              lastName: "",
-              email: "",
-              phone: "",
-              photo: staffFromList?.photoUrl || "",
-              permissionGroups: groupIds,
-            };
-            console.log("Form data being set:", formData);
-            form.reset(formData);
+            form.setValue('permissionGroups', groupIds, { shouldDirty: false, shouldTouch: true });
           }
         } catch (error) {
           console.error("Failed to load user permission groups:", error);
-          // Set form data without permission groups if loading fails
-          const formData = {
-            title: staffFromList?.title || "",
-            bio: staffFromList?.bio || "",
-            commissionRate: staffFromList?.commissionType === 'commission' 
-              ? (staffFromList?.commissionRate || 0) * 100
-              : 0,
-            hourlyRate: staffFromList?.hourlyRate || 0,
-            fixedSalary: staffFromList?.fixedRate || 0,
-            commissionType: staffFromList?.commissionType || "commission",
-            firstName: "",
-            lastName: "",
-            email: "",
-            phone: "",
-            photo: staffFromList?.photoUrl || "",
-            permissionGroups: [],
-          };
-          form.reset(formData);
+          form.setValue('permissionGroups', [], { shouldDirty: false, shouldTouch: true });
         }
       };
       
@@ -939,6 +924,36 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                     </FormItem>
                   )}
                 />
+              )}
+            </div>
+
+            {/* Username display / preview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {staffId ? (
+                <FormItem>
+                  <FormLabel>Username</FormLabel>
+                  <FormControl>
+                    <Input value={(staffUser as any)?.username || ''} readOnly disabled placeholder="—" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              ) : (
+                (() => {
+                  const first = (form.watch('firstName') || '').toString();
+                  const last = (form.watch('lastName') || '').toString();
+                  const base = (first + last).toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const proposed = base ? `${base}${usernamePreviewSeed}` : '';
+                  return (
+                    <FormItem>
+                      <FormLabel>Proposed Username</FormLabel>
+                      <FormControl>
+                        <Input value={proposed} readOnly disabled placeholder="Enter first and last name to preview" />
+                      </FormControl>
+                      <div className="text-xs text-gray-500">Final username may include digits to ensure uniqueness.</div>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                })()
               )}
             </div>
 

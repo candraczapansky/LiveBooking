@@ -25,6 +25,7 @@ type StaffMember = {
   photoUrl?: string;
   user: {
     id: number;
+    username?: string;
     firstName?: string;
     lastName?: string;
     email: string;
@@ -386,6 +387,9 @@ const StaffPageSimple = () => {
                         </p>
                         <p className="text-sm text-gray-500 break-all">
                           {staffMember.user?.email}
+                        </p>
+                        <p className="text-xs text-gray-500 break-all">
+                          Username: {staffMember.user?.username || '-'}
                         </p>
                         <div>
                           <div className="text-xs text-gray-500 mb-0.5">Default Pay</div>

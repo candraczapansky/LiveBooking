@@ -260,17 +260,17 @@ export async function sendSMS(to: string, message: string, photoUrl?: string): P
     };
   }
 
-  // In development mode, simulate SMS sending for test numbers only
+  // In development mode, simulate SMS sending ONLY for explicit test numbers
   if (process.env.NODE_ENV === 'development') {
-    const isTestNumber = to.includes('1234567890') || 
-                        to.includes('test') || 
-                        to.includes('demo') || 
-                        to.includes('555-555-') || 
-                        to.includes('5555') || 
-                        to.includes('+15551234567') ||
-                        to.includes('5551234567') ||
-                        to.includes('15551234567');
-    if (isTestNumber) {
+    const digitsOnly = (to || '').replace(/\D/g, '');
+    const lowerTo = (to || '').toLowerCase();
+    const isExplicitTestNumber =
+      lowerTo.includes('test') ||
+      lowerTo.includes('demo') ||
+      digitsOnly === '1234567890' ||
+      digitsOnly === '15551234567' ||
+      digitsOnly === '5551234567';
+    if (isExplicitTestNumber) {
       console.log('DEVELOPMENT MODE: Simulating SMS send to:', to);
       console.log('DEVELOPMENT MODE: Message:', finalMessage);
       return {
@@ -352,17 +352,17 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
     };
   }
 
-  // In development mode, simulate MMS sending for test numbers only
+  // In development mode, simulate MMS sending ONLY for explicit test numbers
   if (process.env.NODE_ENV === 'development') {
-    const isTestNumber = to.includes('1234567890') || 
-                        to.includes('test') || 
-                        to.includes('demo') || 
-                        to.includes('555-555-') || 
-                        to.includes('5555') || 
-                        to.includes('+15551234567') ||
-                        to.includes('5551234567') ||
-                        to.includes('15551234567');
-    if (isTestNumber) {
+    const digitsOnly = (to || '').replace(/\D/g, '');
+    const lowerTo = (to || '').toLowerCase();
+    const isExplicitTestNumber =
+      lowerTo.includes('test') ||
+      lowerTo.includes('demo') ||
+      digitsOnly === '1234567890' ||
+      digitsOnly === '15551234567' ||
+      digitsOnly === '5551234567';
+    if (isExplicitTestNumber) {
       console.log('DEVELOPMENT MODE: Simulating MMS send to:', to);
       console.log('DEVELOPMENT MODE: Message:', finalMmsMessage);
       console.log('DEVELOPMENT MODE: Photo URL:', photoUrl);

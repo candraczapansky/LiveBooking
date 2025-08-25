@@ -37,6 +37,8 @@ import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
+import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerFormsRoutes } from "./routes/forms.js";
 import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
 import { registerLLMRoutes } from "./routes/llm.js";
@@ -92,6 +94,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
+  // Notes
+  registerNoteTemplateRoutes(app, storage);
+  registerNoteHistoryRoutes(app, storage);
   registerReportRoutes(app, storage);
   // Register external API routes (health, services, staff availability, webhook)
   registerExternalRoutes(app, storage);
@@ -122,6 +127,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           user: u
             ? {
                 id: u.id,
+                username: u.username,
                 firstName: u.firstName,
                 lastName: u.lastName,
                 email: u.email,

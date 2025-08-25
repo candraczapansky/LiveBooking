@@ -51,6 +51,7 @@ type StaffMember = {
   photoUrl?: string;
   user: {
     id: number;
+    username?: string;
     firstName?: string;
     lastName?: string;
     email: string;
@@ -471,6 +472,12 @@ const StaffPage = () => {
                         </div>
                         
                         <div className="mt-2 space-y-1">
+                          <div className="text-xs">
+                            <span className="text-gray-500 dark:text-gray-400">Username:</span>
+                            <span className="ml-1 text-gray-700 dark:text-gray-300 text-xs break-all">
+                              {staffMember.user?.username || '-'}
+                            </span>
+                          </div>
                           <div className="text-xs">
                             <span className="text-gray-500 dark:text-gray-400">Email:</span>
                             <span className="ml-1 text-gray-700 dark:text-gray-300 text-xs break-all">
