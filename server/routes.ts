@@ -36,6 +36,7 @@ import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
+import { registerReportRoutes } from "./routes/reports.js";
 import { registerFormsRoutes } from "./routes/forms.js";
 import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
 import { registerLLMRoutes } from "./routes/llm.js";
@@ -90,6 +91,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
+  registerReportRoutes(app, storage);
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));
@@ -100,7 +102,33 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.get("/api/staff", async (req: Request, res: Response) => {
     try {
       const staff = await storage.getAllStaff();
-      res.json(staff);
+
+      // Enrich staff with linked user info so the client can access email/phone
+      let users: any[] = [];
+      try {
+        users = await storage.getAllUsers();
+      } catch (e) {
+        users = [];
+      }
+      const usersById = new Map<number, any>(users.map((u: any) => [u.id, u]));
+
+      const enriched = staff.map((s: any) => {
+        const u = usersById.get(s.userId);
+        return {
+          ...s,
+          user: u
+            ? {
+                id: u.id,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                email: u.email,
+                phone: u.phone,
+              }
+            : undefined,
+        };
+      });
+
+      res.json(enriched);
     } catch (error) {
       console.error("Error getting staff:", error);
       res.status(500).json({

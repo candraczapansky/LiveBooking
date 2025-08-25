@@ -125,10 +125,11 @@ const getReportDescription = (reportId: string) => {
 // Helper function to calculate date range
 const getDateRange = (timePeriod: string, customStartDate?: string, customEndDate?: string) => {
   if (timePeriod === "custom" && customStartDate && customEndDate) {
-    const startDate = new Date(customStartDate);
-    const endDate = new Date(customEndDate);
-    // Set end date to end of day (23:59:59.999) to include all transactions from that day
-    endDate.setHours(23, 59, 59, 999);
+    // Parse YYYY-MM-DD as local dates to avoid UTC shifting the day back
+    const [sy, sm, sd] = customStartDate.split('-').map(Number);
+    const [ey, em, ed] = customEndDate.split('-').map(Number);
+    const startDate = new Date(sy, (sm || 1) - 1, sd || 1, 0, 0, 0, 0);
+    const endDate = new Date(ey, (em || 1) - 1, ed || 1, 23, 59, 59, 999);
     return { startDate, endDate };
   }
   
@@ -230,16 +231,18 @@ const AppointmentsReport = ({ timePeriod, customStartDate, customEndDate }: {
   });
 
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  const normalizedStart = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0));
+  const normalizedEnd = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999));
   
   // Filter appointments by date range
   const periodAppointments = (appointments as any[]).filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
-    return aptDate >= startDate && aptDate <= endDate;
+    return aptDate >= normalizedStart && aptDate <= normalizedEnd;
   });
 
   const periodCancelled = (cancelledAppointments as any[]).filter((apt: any) => {
     const aptDate = new Date(apt.startTime);
-    return aptDate >= startDate && aptDate <= endDate;
+    return aptDate >= normalizedStart && aptDate <= normalizedEnd;
   });
 
   // Calculate metrics
@@ -683,7 +686,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
   // Filter sales by date range, completed status, and location
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
-    const dateFilter = saleDate >= startDate && saleDate <= endDate;
+    const dateFilter = saleDate >= normalizedStart && saleDate <= normalizedEnd;
     const statusFilter = (sale.paymentStatus === "completed" || sale.payment_status === "completed");
     
     // Location filtering - for appointment sales, check the appointment's location
@@ -1142,6 +1145,8 @@ const ClientsReport = ({ timePeriod, customStartDate, customEndDate }: {
   });
 
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
   
   const clients = (users as any[]).filter((user: any) => user.role === "client");
   
@@ -1685,6 +1690,8 @@ const ServicesReport = ({ timePeriod, customStartDate, customEndDate }: {
   });
 
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
 
   // Filter appointments and payments by date range
   const filteredAppointments = (appointments as any[]).filter((apt: any) => {
@@ -2139,6 +2146,8 @@ const StaffReport = ({ timePeriod, customStartDate, customEndDate }: {
 
   // Date range
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
 
   // --- Metrics Calculation ---
   const staffMetrics = staff.map((staffMember: any) => {

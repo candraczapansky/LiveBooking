@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Edit, Trash2, UserPlus, Search, Briefcase } from "lucide-react";
+import { Edit, Trash2, UserPlus, Search, Briefcase, Key } from "lucide-react";
 // Sidebar is handled globally by MainLayout
 import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -161,6 +161,35 @@ const StaffPageSimple = () => {
     }
   };
 
+  // Send password setup link for staff login
+  const sendLoginLinkMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/auth/password-reset", { email });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Login link sent",
+        description: data?.message || "If the email exists, a password setup link has been sent.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to send login link",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSendLoginLink = (email?: string) => {
+    if (!email) {
+      toast({ title: "Email required", description: "This staff member does not have an email on file.", variant: "destructive" });
+      return;
+    }
+    sendLoginLinkMutation.mutate(email);
+  };
+
   const filteredStaff = Array.isArray(staff) ? staff.filter((staffMember: StaffMember) =>
     getFullName(staffMember.user?.firstName, staffMember.user?.lastName).toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -270,6 +299,30 @@ const StaffPageSimple = () => {
                       >
                         <Trash2 className="w-5 h-5 mr-2" />
                         Delete
+                      </Button>
+                    </div>
+
+                    {/* Create Login / Send Password Link */}
+                    <div className="w-full mt-2 flex gap-2">
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleSendLoginLink(staffMember.user?.email)}
+                        disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                        className="h-12 flex-1 text-base font-medium"
+                        title="Create Login / Send Login Link"
+                        aria-label="Create Login / Send Login Link"
+                      >
+                        {sendLoginLinkMutation.isPending ? "Sending…" : "Create Login / Send Login Link"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleSendLoginLink(staffMember.user?.email)}
+                        disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                        className="h-12 px-4"
+                        title="Create Login / Send Login Link"
+                        aria-label="Create Login / Send Login Link"
+                      >
+                        <Key className="w-5 h-5" />
                       </Button>
                     </div>
                   </div>

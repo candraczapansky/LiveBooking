@@ -214,67 +214,75 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     }
 
     // Send campaign based on type
-    for (const recipient of recipients) {
-      try {
-        if (campaign.type === 'email') {
-          if (recipient.email && recipient.emailPromotions) {
-            await sendEmail({
-              to: recipient.email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-              subject: campaign.subject || 'Glo Head Spa - Special Offer',
-              html: campaign.content,
-            });
-            sentCount++;
-          }
-        }
-
-        if (campaign.type === 'sms') {
-          if (recipient.phone && recipient.smsPromotions) {
-            const smsContent = ensureSmsMarketingCompliance(campaign.content);
-            await sendSMS(recipient.phone, smsContent, photoUrlForSending);
-            sentCount++;
-          }
-        }
-
-        // Track campaign send
-        await (storage as any).createCampaignSend?.({
+    if (campaign.type === 'email') {
+      // Queue recipients for email drip sending (like SMS)
+      const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
+      const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
+      let queued = 0;
+      for (const recipient of recipients) {
+        if (!(recipient.email && recipient.emailPromotions)) continue;
+        if (existingByUser.has(recipient.id)) continue;
+        await (storage as any).createMarketingCampaignRecipient?.({
           campaignId,
-          recipientId: recipient.id,
-          type: campaign.type,
-          status: 'sent',
+          userId: recipient.id,
+          status: 'pending',
         });
-
-      } catch (error) {
-        errorCount++;
-        LoggerService.error("Campaign send error", { ...context, recipientId: recipient.id }, error as Error);
-        
-        // Track failed send
-        await (storage as any).createCampaignSend?.({
-          campaignId,
-          recipientId: recipient.id,
-          type: campaign.type,
-          status: 'failed',
-          error: (error as Error).message,
-        });
+        queued++;
       }
+
+      await storage.updateMarketingCampaign(campaignId, {
+        status: 'sending',
+        sentCount: (campaign.sentCount || 0),
+        failedCount: (campaign.failedCount || 0),
+        sendDate: new Date(),
+      } as any);
+
+      LoggerService.info("Marketing campaign queued for EMAIL drip", { ...context, campaignId, queued });
+
+      return res.json({
+        success: true,
+        message: "Campaign queued for email drip sending",
+        queuedCount: queued,
+        totalRecipients: recipients.length,
+        batchSize: parseInt(process.env.EMAIL_DRIP_BATCH_SIZE || '50', 10),
+        batchIntervalMinutes: 10,
+      });
     }
 
-    // Update campaign status to 'sent' for UI consistency
-    await storage.updateMarketingCampaign(campaignId, {
-      status: 'sent',
-      sentCount,
-      failedCount: errorCount,
-    } as any);
+    if (campaign.type === 'sms') {
+      // Queue recipients for drip sending instead of blasting at once
+      const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
+      const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
+      let queued = 0;
+      for (const recipient of recipients) {
+        if (!(recipient.phone && recipient.smsPromotions)) continue;
+        if (existingByUser.has(recipient.id)) continue;
+        await (storage as any).createMarketingCampaignRecipient?.({
+          campaignId,
+          userId: recipient.id,
+          status: 'pending',
+        });
+        queued++;
+      }
 
-    LoggerService.info("Marketing campaign sent", { ...context, campaignId, sentCount, errorCount });
+      await storage.updateMarketingCampaign(campaignId, {
+        status: 'sending',
+        sentCount: (campaign.sentCount || 0),
+        failedCount: (campaign.failedCount || 0),
+        sendDate: new Date(),
+      } as any);
 
-    res.json({
-      success: true,
-      message: "Campaign sent successfully",
-      sentCount,
-      errorCount,
-      totalRecipients: recipients.length,
-    });
+      LoggerService.info("Marketing campaign queued for SMS drip", { ...context, campaignId, queued });
+
+      return res.json({
+        success: true,
+        message: "Campaign queued for SMS drip sending",
+        queuedCount: queued,
+        totalRecipients: recipients.length,
+        batchSize: parseInt(process.env.SMS_DRIP_BATCH_SIZE || '100', 10),
+        batchIntervalMinutes: 10,
+      });
+    }
   }));
 
   // Serve campaign photo as a public image (support both path variants)

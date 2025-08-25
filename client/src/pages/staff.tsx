@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { UserPlus, Search, Edit, Trash2, Scissors } from "lucide-react";
+import { UserPlus, Search, Edit, Trash2, Scissors, Key } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -238,6 +238,35 @@ const StaffPage = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  // Send password setup link for staff login
+  const sendLoginLinkMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest('POST', '/api/auth/password-reset', { email });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: 'Login link sent',
+        description: data?.message || 'If the email exists, a password setup link has been sent.',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error?.message || 'Failed to send login link',
+        variant: 'destructive',
+      });
+    }
+  });
+
+  const handleSendLoginLink = (email?: string) => {
+    if (!email) {
+      toast({ title: 'Email required', description: 'This staff member does not have an email on file.', variant: 'destructive' });
+      return;
+    }
+    sendLoginLinkMutation.mutate(email);
+  };
+
   const filteredStaff = staff?.filter((staffMember: StaffMember) =>
     staffMember.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -394,6 +423,17 @@ const StaffPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
+                              onClick={() => handleSendLoginLink(staffMember.user?.email)}
+                              className="h-7 w-7 p-0"
+                              title="Create Login / Send Login Link"
+                              aria-label="Create Login / Send Login Link"
+                              disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                            >
+                              <Key className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
                               onClick={() => openDeleteDialog(staffMember)}
                               className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
                             >
@@ -422,6 +462,16 @@ const StaffPage = () => {
                               </p>
                             </div>
                           )}
+                          <div className="pt-2">
+                            <Button
+                              variant="outline"
+                              onClick={() => handleSendLoginLink(staffMember.user?.email)}
+                              disabled={!staffMember.user?.email || sendLoginLinkMutation.isPending}
+                              className="h-8 px-3 text-xs"
+                            >
+                              {sendLoginLinkMutation.isPending ? 'Sending…' : 'Create Login / Send Login Link'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>

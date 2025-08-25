@@ -1,4 +1,6 @@
 import { sendEmail } from './email.js';
+import { sendSMS } from './sms.js';
+import { getPublicUrl } from './utils/url.js';
 import { marketingCampaignTemplate, generateEmailHTML, generateEmailText } from './email-templates.js';
 import type { IStorage } from './storage.js';
 import { addDays, format } from 'date-fns';
@@ -100,14 +102,25 @@ export class MarketingCampaignService {
 
     try {
       const campaigns = await this.storage.getMarketingCampaigns();
-      const scheduledCampaigns = campaigns.filter(campaign => 
+      const now = new Date();
+      const dueScheduled = campaigns.filter(campaign => 
         campaign.status === 'scheduled' && 
         campaign.sendDate && 
-        new Date() >= new Date(campaign.sendDate)
+        now >= new Date(campaign.sendDate)
+      );
+      const inProgress = campaigns.filter(campaign => 
+        campaign.status === 'sending'
       );
 
-      for (const campaign of scheduledCampaigns) {
-        await this.sendCampaign(campaign);
+      // Process due scheduled first, then any in-progress drips
+      const toProcess = [...dueScheduled, ...inProgress];
+      for (const campaign of toProcess) {
+        if (campaign.type === 'sms') {
+          await this.processSmsDrip(campaign as any);
+        } else {
+          // Process email campaigns via drip as well
+          await this.processEmailDrip(campaign as any);
+        }
       }
     } catch (error) {
       console.error('Error processing marketing campaigns:', error);
@@ -121,108 +134,28 @@ export class MarketingCampaignService {
     console.log(`📢 Sending campaign: ${campaign.name}`);
 
     try {
-      // Get target audience
-      const recipients = await this.getTargetAudience(campaign.audience);
-      
-      let sentCount = 0;
-      let deliveredCount = 0;
-      let failedCount = 0;
-      let openedCount = 0;
-      let clickedCount = 0;
-      let unsubscribedCount = 0;
-
-      // Update campaign status to sending
-      await this.storage.updateMarketingCampaign(campaign.id, {
-        status: 'sending'
-      });
-
-      // Send emails in batches to avoid rate limits
-      const batchSize = 50;
-      for (let i = 0; i < recipients.length; i += batchSize) {
-        const batch = recipients.slice(i, i + batchSize);
-        
-        const batchPromises = batch.map(async (recipient) => {
-          if (!recipient.email || !recipient.emailPromotions) {
-            return { success: false, reason: 'no_email_or_preferences' };
-          }
-
-          try {
-            const templateData = {
-              clientName: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || 'Valued Client',
-              clientEmail: recipient.email,
-              campaignTitle: campaign.name,
-              campaignSubtitle: campaign.subject || '',
-              campaignContent: campaign.htmlContent || campaign.content,
-              // optional campaign CTA fields may not exist in DB schema
-              ctaButton: (campaign as any).ctaButton,
-              ctaUrl: (campaign as any).ctaUrl,
-              specialOffer: (campaign as any).specialOffer,
-              promoCode: (campaign as any).promoCode,
-              unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${recipient.id}`
-            };
-
-            const html = generateEmailHTML(marketingCampaignTemplate, templateData, campaign.subject || campaign.name);
-            const text = generateEmailText(marketingCampaignTemplate, templateData);
-
-            const emailSent = await sendEmail({
-              to: recipient.email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-              subject: campaign.subject || campaign.name,
-              html,
-              text
-            });
-
-            if (emailSent) {
-              deliveredCount++;
-              return { success: true };
-            } else {
-              failedCount++;
-              return { success: false, reason: 'send_failed' };
-            }
-          } catch (error) {
-            console.error(`Failed to send campaign email to ${recipient.email}:`, error);
-            failedCount++;
-            return { success: false, reason: 'error' };
-          }
-        });
-
-        const results = await Promise.all(batchPromises);
-        sentCount += results.filter(r => r.success).length;
-
-        // Add delay between batches to avoid rate limits
-        if (i + batchSize < recipients.length) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+      // For SMS campaigns, use drip processing and return batch stats
+      if (campaign.type === 'sms') {
+        const { sentCount, failedCount, totalRecipients } = await this.processSmsDrip(campaign);
+        return {
+          totalRecipients,
+          sentCount,
+          deliveredCount: sentCount,
+          failedCount,
+          openedCount: 0,
+          clickedCount: 0,
+          unsubscribedCount: 0,
+          openRate: 0,
+          clickRate: 0,
+          unsubscribeRate: 0,
+        };
       }
 
-      // Calculate statistics
-      const stats: CampaignStats = {
-        totalRecipients: recipients.length,
-        sentCount,
-        deliveredCount,
-        failedCount,
-        openedCount,
-        clickedCount,
-        unsubscribedCount,
-        openRate: deliveredCount > 0 ? (openedCount / deliveredCount) * 100 : 0,
-        clickRate: deliveredCount > 0 ? (clickedCount / deliveredCount) * 100 : 0,
-        unsubscribeRate: deliveredCount > 0 ? (unsubscribedCount / deliveredCount) * 100 : 0
-      };
-
-      // Update campaign with final statistics
-      await this.storage.updateMarketingCampaign(campaign.id, {
-        status: 'sent',
-        sentCount,
-        deliveredCount,
-        failedCount,
-        openedCount,
-        clickedCount,
-        unsubscribedCount,
-        sentAt: new Date()
-      });
-
-      console.log(`✅ Campaign "${campaign.name}" completed:`, stats);
+      // For email campaigns, process via drip as well
+      const stats = await this.processEmailDrip(campaign);
       return stats;
+
+      // Unreachable for email since we return above, keep for type safety
 
     } catch (error) {
       console.error(`❌ Error sending campaign "${campaign.name}":`, error);
@@ -234,6 +167,279 @@ export class MarketingCampaignService {
 
       throw error;
     }
+  }
+
+  /**
+   * Ensure recipients are created for an EMAIL campaign (pending status)
+   */
+  private async seedEmailRecipientsIfNeeded(campaign: CampaignData): Promise<void> {
+    const existing = await this.storage.getMarketingCampaignRecipients(campaign.id);
+    if (existing && existing.length > 0) {
+      return;
+    }
+    let recipients: any[] = [];
+    try {
+      // Prefer storage helper if available to respect audience logic
+      // @ts-ignore
+      if (typeof this.storage.getUsersByAudience === 'function') {
+        // Parse targetClientIds when audience is specific
+        let ids: number[] | undefined;
+        const raw: any = (campaign as any).targetClientIds ?? undefined;
+        if (Array.isArray(raw)) {
+          ids = raw.map((v: any) => parseInt(String(v))).filter((n: number) => !Number.isNaN(n));
+        } else if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) ids = parsed.map((v: any) => parseInt(String(v))).filter((n: number) => !Number.isNaN(n));
+          } catch {
+            if (raw.startsWith('{') && raw.endsWith('}')) {
+              ids = raw
+                .slice(1, -1)
+                .split(',')
+                .map((s: string) => parseInt(s.trim()))
+                .filter((n: number) => !Number.isNaN(n));
+            }
+          }
+        }
+        // @ts-ignore
+        recipients = await this.storage.getUsersByAudience(campaign.audience, ids);
+      }
+    } catch {
+      // Fallback: all clients
+      // @ts-ignore
+      recipients = await this.storage.getUsersByRole?.('client');
+    }
+
+    const seen = new Set<number>();
+    for (const r of recipients || []) {
+      const userId = r?.id;
+      if (!userId || seen.has(userId)) continue;
+      seen.add(userId);
+      if (!r.email || !r.emailPromotions) continue;
+      await this.storage.createMarketingCampaignRecipient({
+        campaignId: campaign.id,
+        userId,
+        status: 'pending',
+      } as any);
+    }
+  }
+
+  /**
+   * Process one EMAIL drip batch for a campaign
+   */
+  private async processEmailDrip(campaign: CampaignData): Promise<CampaignStats> {
+    // Seed recipients on first run
+    await this.seedEmailRecipientsIfNeeded(campaign);
+
+    const allRecipients = await this.storage.getMarketingCampaignRecipients(campaign.id);
+    const pending = (allRecipients || []).filter(r => (r as any).status === 'pending');
+    const batchSize = parseInt(process.env.EMAIL_DRIP_BATCH_SIZE || '50', 10);
+    const batch = pending.slice(0, Math.max(0, batchSize));
+
+    let sentCount = 0;
+    let deliveredCount = 0;
+    let failedCount = 0;
+
+    const perMessageDelayMs = parseInt(process.env.EMAIL_DRIP_PER_MESSAGE_DELAY_MS || '250', 10);
+    for (const rec of batch) {
+      try {
+        const user = await this.storage.getUser((rec as any).userId);
+        if (!user || !user.email || !user.emailPromotions) {
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'no_email_or_pref' } as any);
+          failedCount++;
+          continue;
+        }
+
+        const templateData = {
+          clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Valued Client',
+          clientEmail: user.email,
+          campaignTitle: campaign.name,
+          campaignSubtitle: campaign.subject || '',
+          campaignContent: campaign.htmlContent || campaign.content,
+          ctaButton: (campaign as any).ctaButton,
+          ctaUrl: (campaign as any).ctaUrl,
+          specialOffer: (campaign as any).specialOffer,
+          promoCode: (campaign as any).promoCode,
+          unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${user.id}`
+        };
+
+        const html = generateEmailHTML(marketingCampaignTemplate, templateData, campaign.subject || campaign.name);
+        const text = generateEmailText(marketingCampaignTemplate, templateData);
+
+        const emailSent = await sendEmail({
+          to: user.email,
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+          subject: campaign.subject || campaign.name,
+          html,
+          text
+        });
+
+        if (emailSent) {
+          sentCount++;
+          deliveredCount++;
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
+        } else {
+          failedCount++;
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'send_failed' } as any);
+        }
+      } catch (err: any) {
+        failedCount++;
+        await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: err?.message || 'error' } as any);
+      }
+      // Brief delay between messages to control throughput
+      await new Promise(resolve => setTimeout(resolve, perMessageDelayMs));
+    }
+
+    const remainingPending = (await this.storage.getMarketingCampaignRecipients(campaign.id)).filter(r => (r as any).status === 'pending');
+
+    // Update campaign counters and status
+    const newSent = (campaign.sentCount || 0) + sentCount;
+    const newDelivered = (campaign.deliveredCount || 0) + deliveredCount;
+    const newFailed = (campaign.failedCount || 0) + failedCount;
+    const update: any = { 
+      status: remainingPending.length > 0 ? 'sending' : 'sent', 
+      sentCount: newSent, 
+      deliveredCount: newDelivered,
+      failedCount: newFailed 
+    };
+    if (update.status === 'sent') {
+      update.sentAt = new Date();
+    }
+    await this.storage.updateMarketingCampaign(campaign.id, update);
+
+    const stats: CampaignStats = {
+      totalRecipients: (allRecipients || []).length,
+      sentCount: newSent,
+      deliveredCount: newDelivered,
+      failedCount: newFailed,
+      openedCount: campaign.openedCount || 0,
+      clickedCount: campaign.clickedCount || 0,
+      unsubscribedCount: campaign.unsubscribedCount || 0,
+      openRate: newDelivered > 0 ? ((campaign.openedCount || 0) / newDelivered) * 100 : 0,
+      clickRate: newDelivered > 0 ? ((campaign.clickedCount || 0) / newDelivered) * 100 : 0,
+      unsubscribeRate: newDelivered > 0 ? ((campaign.unsubscribedCount || 0) / newDelivered) * 100 : 0,
+    };
+
+    return stats;
+  }
+
+  /**
+   * Ensure recipients are created for an SMS campaign (pending status)
+   */
+  private async seedSmsRecipientsIfNeeded(campaign: CampaignData): Promise<void> {
+    const existing = await this.storage.getMarketingCampaignRecipients(campaign.id);
+    if (existing && existing.length > 0) {
+      return;
+    }
+    let recipients: any[] = [];
+    try {
+      // Prefer storage helper if available to respect audience logic
+      // @ts-ignore
+      if (typeof this.storage.getUsersByAudience === 'function') {
+        // Parse targetClientIds when audience is specific
+        let ids: number[] | undefined;
+        const raw: any = (campaign as any).targetClientIds ?? undefined;
+        if (Array.isArray(raw)) {
+          ids = raw.map((v: any) => parseInt(String(v))).filter((n: number) => !Number.isNaN(n));
+        } else if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) ids = parsed.map((v: any) => parseInt(String(v))).filter((n: number) => !Number.isNaN(n));
+          } catch {
+            if (raw.startsWith('{') && raw.endsWith('}')) {
+              ids = raw
+                .slice(1, -1)
+                .split(',')
+                .map((s: string) => parseInt(s.trim()))
+                .filter((n: number) => !Number.isNaN(n));
+            }
+          }
+        }
+        // @ts-ignore
+        recipients = await this.storage.getUsersByAudience(campaign.audience, ids);
+      }
+    } catch {
+      // Fallback: all clients
+      // @ts-ignore
+      recipients = await this.storage.getUsersByRole?.('client');
+    }
+
+    const seen = new Set<number>();
+    for (const r of recipients || []) {
+      const userId = r?.id;
+      if (!userId || seen.has(userId)) continue;
+      seen.add(userId);
+      if (!r.phone || !r.smsPromotions) continue;
+      await this.storage.createMarketingCampaignRecipient({
+        campaignId: campaign.id,
+        userId,
+        status: 'pending',
+      } as any);
+    }
+  }
+
+  /**
+   * Process one SMS drip batch for a campaign. Sends up to configured batch size.
+   */
+  private async processSmsDrip(campaign: CampaignData): Promise<{ totalRecipients: number; sentCount: number; failedCount: number; }> {
+    // Seed recipients on first run
+    await this.seedSmsRecipientsIfNeeded(campaign);
+
+    const allRecipients = await this.storage.getMarketingCampaignRecipients(campaign.id);
+    const pending = (allRecipients || []).filter(r => (r as any).status === 'pending');
+    const batchSize = parseInt(process.env.SMS_DRIP_BATCH_SIZE || '100', 10);
+    const batch = pending.slice(0, Math.max(0, batchSize));
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    // Send sequentially to avoid bursts; small gap for safety
+    const perMessageDelayMs = parseInt(process.env.SMS_DRIP_PER_MESSAGE_DELAY_MS || '1000', 10);
+    for (const rec of batch) {
+      try {
+        const user = await this.storage.getUser((rec as any).userId);
+        if (!user || !user.phone || !user.smsPromotions) {
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
+          failedCount++;
+          continue;
+        }
+
+        // Use campaign.content for SMS body; attach public media URL when media exists
+        const mediaUrl = (campaign as any).photoUrl
+          ? getPublicUrl(`/api/marketing-campaigns/${campaign.id}/photo`)
+          : undefined;
+        const result = await sendSMS(
+          user.phone,
+          (campaign.content || '').toString(),
+          mediaUrl
+        );
+        if (result.success) {
+          sentCount++;
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
+        } else {
+          failedCount++;
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: result.error || 'send_failed' } as any);
+        }
+      } catch (err: any) {
+        failedCount++;
+        await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: err?.message || 'error' } as any);
+      }
+      // Brief delay between messages to control throughput (default 1s)
+      await new Promise(resolve => setTimeout(resolve, perMessageDelayMs));
+    }
+
+    const remainingPending = (await this.storage.getMarketingCampaignRecipients(campaign.id)).filter(r => (r as any).status === 'pending');
+
+    // Update campaign counters and status
+    const newSent = (campaign.sentCount || 0) + sentCount;
+    const newFailed = (campaign.failedCount || 0) + failedCount;
+    const update: any = { status: remainingPending.length > 0 ? 'sending' : 'sent', sentCount: newSent, failedCount: newFailed };
+    if (update.status === 'sent') {
+      update.sentAt = new Date();
+    }
+    await this.storage.updateMarketingCampaign(campaign.id, update);
+
+    return { totalRecipients: (allRecipients || []).length, sentCount, failedCount };
   }
 
   /**

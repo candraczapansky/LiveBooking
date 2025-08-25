@@ -1165,7 +1165,15 @@ const MarketingPage = () => {
       </div>
       
       {/* Campaign Form Dialog */}
-      <Dialog open={isCampaignFormOpen} onOpenChange={setIsCampaignFormOpen} modal={false}>
+      <Dialog 
+        open={isCampaignFormOpen} 
+        onOpenChange={(open) => {
+          // Prevent the campaign dialog from closing due to outside clicks while the email editor overlay is open
+          if (showEmailEditor && !open) return;
+          setIsCampaignFormOpen(open);
+        }} 
+        modal={false}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Campaign</DialogTitle>
@@ -1466,7 +1474,7 @@ const MarketingPage = () => {
                     render={({ field }) => (
                       <FormItem>
                         <div className="flex items-center justify-between">
-                          <FormLabel>Photo (Optional)</FormLabel>
+                          <FormLabel>Photo/Video (Optional)</FormLabel>
                           <Button
                             type="button"
                             variant="ghost"
@@ -1488,11 +1496,19 @@ const MarketingPage = () => {
                           <div className="space-y-3">
                             {field.value ? (
                               <div className="relative">
-                                <img
-                                  src={field.value}
-                                  alt="Campaign photo"
-                                  className="w-full h-32 object-cover rounded-md border"
-                                />
+                                {typeof field.value === 'string' && field.value.startsWith('data:video/') ? (
+                                  <video
+                                    src={field.value}
+                                    className="w-full h-32 object-cover rounded-md border"
+                                    controls
+                                  />
+                                ) : (
+                                  <img
+                                    src={field.value}
+                                    alt="Campaign media"
+                                    className="w-full h-32 object-cover rounded-md border"
+                                  />
+                                )}
                                 <Button
                                   type="button"
                                   variant="destructive"
@@ -1514,23 +1530,25 @@ const MarketingPage = () => {
                                   Choose Photo
                                 </Button>
                                 <p className="text-xs text-gray-500 mt-2">
-                                  JPEG, PNG, GIF up to 5MB
+                                  JPEG, PNG, GIF, MOV up to 5MB
                                 </p>
                               </div>
                             )}
                             <input
                               id="sms-photo-upload"
                               type="file"
-                              accept="image/*"
+                              accept="image/*,video/quicktime"
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
                                   // Validate file type
-                                  if (!file.type.startsWith('image/')) {
+                                  const isImage = file.type.startsWith('image/');
+                                  const isMov = file.type === 'video/quicktime';
+                                  if (!isImage && !isMov) {
                                     toast({
                                       title: "Invalid file type",
-                                      description: "Please select an image file (JPEG, PNG, GIF, etc.)",
+                                      description: "Please select an image (JPEG, PNG, GIF) or MOV video",
                                       variant: "destructive",
                                     });
                                     return;
@@ -1581,12 +1599,20 @@ const MarketingPage = () => {
                       <div className="space-y-3">
                         {campaignForm.watch("photoUrl") && (
                           <div className="text-center">
-                            <img
-                              src={campaignForm.watch("photoUrl")}
-                              alt="Preview"
-                              className="w-32 h-32 object-cover rounded-md border mx-auto"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">Photo will be sent as MMS</p>
+                            {typeof campaignForm.watch("photoUrl") === 'string' && campaignForm.watch("photoUrl")!.startsWith('data:video/') ? (
+                              <video
+                                src={campaignForm.watch("photoUrl")!}
+                                className="w-32 h-32 object-cover rounded-md border mx-auto"
+                                controls
+                              />
+                            ) : (
+                              <img
+                                src={campaignForm.watch("photoUrl")!}
+                                alt="Preview"
+                                className="w-32 h-32 object-cover rounded-md border mx-auto"
+                              />
+                            )}
+                            <p className="text-xs text-gray-500 mt-1">Media will be sent as MMS</p>
                           </div>
                         )}
                         {campaignForm.watch("content") && (
@@ -2062,7 +2088,11 @@ const MarketingPage = () => {
 
       {/* Email Template Editor Fullscreen Overlay (Portal) */}
       {showEmailEditor && createPortal(
-        <div className="fixed inset-0 z-[100]">
+        <div 
+          className="fixed inset-0 z-[100]"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div className="absolute inset-0 bg-black/70" onClick={() => setShowEmailEditor(false)} />
           <div className="relative inset-0 h-screen w-screen bg-background flex flex-col">
             <div className="flex items-center justify-between p-4 border-b shrink-0">

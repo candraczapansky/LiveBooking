@@ -1,15 +1,16 @@
-import React, { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+// import { Separator } from "@/components/ui/separator";
 import { CalendarIcon, DollarSignIcon, TrendingUpIcon, UsersIcon, RefreshCw, Save, Loader2, ArrowLeft, Eye, Download } from "lucide-react";
-import { format, startOfMonth, endOfMonth, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 
 interface PayrollReportProps {
   timePeriod: string;
@@ -86,7 +87,28 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
   const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
   const [detailStaffId, setDetailStaffId] = useState<number | null>(null);
   const { toast } = useToast();
+  const detailContainerRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
+  const { businessSettings } = useBusinessSettings();
+  const businessTz = businessSettings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  const formatYmdInTimeZone = (date: Date) => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: businessTz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(date);
+    } catch {
+      return format(date, 'yyyy-MM-dd');
+    }
+  };
+
+  const parseLocalYmd = (ymd: string) => {
+    const [y, m, d] = ymd.split('-').map(Number);
+    return new Date(y, (m || 1) - 1, d || 1, 0, 0, 0, 0);
+  };
 
   // Fetch all required data
   const { data: staff, isLoading: staffLoading } = useQuery<StaffMember[]>({
@@ -140,23 +162,45 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     let rangeEnd: Date;
 
     if (timePeriod === 'custom' && customStartDate && customEndDate) {
-      // Parse dates in local timezone to avoid UTC conversion issues
-      const [startYear, startMonth, startDay] = customStartDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = customEndDate.split('-').map(Number);
-      
-      rangeStart = startOfDay(new Date(startYear, startMonth - 1, startDay));
-      rangeEnd = endOfDay(new Date(endYear, endMonth - 1, endDay));
+      // Use business timezone to parse start/end so they align with what the user picked
+      const parseYmdInTz = (ymd: string) => {
+        const [y, m, d] = ymd.split('-').map(Number);
+        // Build a date in the business timezone via toLocaleString round-trip
+        const dt = new Date(Date.UTC(y, (m || 1) - 1, d || 1, 12, 0, 0));
+        // move to local Date at 00:00 and 23:59:59.999 for that tz day
+        const start = new Date(dt.toLocaleString('en-US', { timeZone: businessTz }));
+        start.setHours(0,0,0,0);
+        const end = new Date(start);
+        end.setHours(23,59,59,999);
+        return { start, end };
+      };
+      const s = parseYmdInTz(customStartDate);
+      const e = parseYmdInTz(customEndDate);
+      rangeStart = s.start;
+      rangeEnd = e.end;
     } else {
       // Use month selection as fallback
       rangeStart = startOfMonth(selectedMonth);
       rangeEnd = endOfMonth(selectedMonth);
     }
 
-    // Filter appointments for the selected date range and paid status only
-    const filteredAppointments = appointments.filter((apt) => {
-      const aptDate = new Date(apt.startTime);
-      return isWithinInterval(aptDate, { start: rangeStart, end: rangeEnd }) && 
-             apt.paymentStatus === 'paid';
+    // Compare by ISO date strings (YYYY-MM-DD) to avoid any timezone off-by-one
+    const startStr = formatYmdInTimeZone(rangeStart);
+    const endStr = formatYmdInTimeZone(rangeEnd);
+
+    // Filter appointments for the selected date range and those that have at least one completed payment
+    const hasCompletedPayment = (appointmentId: number) => {
+      return (payments || []).some((p: any) => (p.appointmentId || p.appointment_id) === appointmentId && (p.status === 'completed' || p.paymentStatus === 'completed'));
+    };
+    const filteredAppointments = appointments.filter((apt: any) => {
+      const startTime = apt.startTime || apt.start_time;
+      const aptDateObj = typeof startTime === 'string' ? new Date(startTime) : new Date(startTime);
+      const aptStr = formatYmdInTimeZone(aptDateObj);
+      return (
+        aptStr >= startStr &&
+        aptStr <= endStr &&
+        hasCompletedPayment(apt.id)
+      );
     });
 
     return staff.map((staffMember) => {
@@ -175,14 +219,18 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       const totalServices = staffAppointments.length;
 
       // Calculate earnings for each appointment
-      staffAppointments.forEach((apt) => {
-        const service = services.find((s) => s.id === apt.serviceId);
+      staffAppointments.forEach((apt: any) => {
+        const serviceId = apt.serviceId || apt.service_id;
+        const service = services.find((s) => s.id === serviceId);
         if (!service) return;
 
-        // Prefer actual paid base amount (excluding tips) when available
-        const payment = payments?.find(p => p.appointmentId === apt.id && p.status === 'completed');
-        const baseAmount = payment?.amount ?? (payment ? Math.max((payment.totalAmount || 0) - (payment.tipAmount || 0), 0) : undefined);
-        const serviceRevenue = baseAmount !== undefined ? baseAmount : service.price;
+        // Sum all completed payments for the appointment (exclude tips from base revenue)
+        const appointmentPayments = (payments || []).filter((p: any) => (p.appointmentId || p.appointment_id) === apt.id && (p.status === 'completed' || p.paymentStatus === 'completed'));
+        const baseAmountSum = appointmentPayments.reduce((sum: number, p: any) => {
+          const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
+          return sum + (base || 0);
+        }, 0);
+        const serviceRevenue = baseAmountSum > 0 ? baseAmountSum : service.price;
         totalRevenue += serviceRevenue;
 
         // Find staff service assignment for custom rates
@@ -194,15 +242,13 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
 
         switch (staffMember.commissionType) {
           case 'commission': {
-            // Use custom commission rate if available, otherwise use default
+            // Prefer custom commission rate for this staff+service if defined; otherwise use staff base rate
             let commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
-            
-            // Convert percentage to decimal if it's a custom rate
+            // Convert custom percentage values (e.g., 40 => 0.40)
             if (staffService?.customCommissionRate !== undefined && staffService?.customCommissionRate !== null) {
-              commissionRate = commissionRate / 100;
+              commissionRate = commissionRate > 1 ? commissionRate / 100 : commissionRate;
             }
-            
-            appointmentEarnings = serviceRevenue * commissionRate;
+            appointmentEarnings = serviceRevenue * (commissionRate || 0);
             break;
           }
           case 'hourly': {
@@ -219,15 +265,16 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             break;
           }
           case 'hourly_plus_commission': {
-            // Calculate both hourly and commission
+            // Calculate both hourly and commission (commission prefers custom per-service rate)
             const hourlyRate = staffService?.customRate ?? staffMember.hourlyRate ?? 0;
             const serviceDuration = service.duration || 60;
             const hours = serviceDuration / 60;
             const hourlyPortion = hourlyRate * hours;
-            
-            let commissionRate = staffMember.commissionRate ?? 0;
-            const commissionPortion = serviceRevenue * commissionRate;
-            
+            let commissionRate = staffService?.customCommissionRate ?? staffMember.commissionRate ?? 0;
+            if (staffService?.customCommissionRate !== undefined && staffService?.customCommissionRate !== null) {
+              commissionRate = commissionRate > 1 ? commissionRate / 100 : commissionRate;
+            }
+            const commissionPortion = serviceRevenue * (commissionRate || 0);
             appointmentEarnings = hourlyPortion + commissionPortion;
             totalHours += hours;
             totalHourlyPay += hourlyPortion;
@@ -238,8 +285,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         }
 
         // Add tips (not included in commission calculations)
-        if (payment) {
-          totalTips += payment.tipAmount;
+        if (appointmentPayments.length > 0) {
+          totalTips += appointmentPayments.reduce((sum: number, p: any) => sum + (p.tipAmount || 0), 0);
         }
 
         totalCommission += appointmentEarnings;
@@ -482,6 +529,12 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     }).format(amount);
   };
 
+  useEffect(() => {
+    if (detailStaffId && detailContainerRef.current) {
+      detailContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [detailStaffId]);
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -497,15 +550,17 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     <div className="space-y-6">
       {/* Detailed Payroll View - Moved to Top for Visibility */}
       {detailStaffId && (
-        <DetailedPayrollView 
-          staffId={detailStaffId}
-          month={selectedMonth}
-          onBack={() => {
-            console.log('Going back to summary view');
-            setViewMode('summary');
-            setDetailStaffId(null);
-          }}
-        />
+        <div ref={detailContainerRef}>
+          <DetailedPayrollView 
+            staffId={detailStaffId}
+            month={selectedMonth}
+            onBack={() => {
+              console.log('Going back to summary view');
+              setViewMode('summary');
+              setDetailStaffId(null);
+            }}
+          />
+        </div>
       )}
 
       {/* Header Controls */}
@@ -514,7 +569,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
           <h2 className="text-2xl font-bold tracking-tight">Payroll Report</h2>
           <p className="text-muted-foreground">
             {timePeriod === 'custom' && customStartDate && customEndDate ? (
-              `Track staff earnings and commission from ${format(new Date(customStartDate), 'MMM dd, yyyy')} to ${format(new Date(customEndDate), 'MMM dd, yyyy')}`
+              `Track staff earnings and commission from ${formatYmdInTimeZone(parseLocalYmd(customStartDate))} to ${formatYmdInTimeZone(parseLocalYmd(customEndDate))}`
             ) : (
               `Track staff earnings and commission for ${format(selectedMonth, 'MMMM yyyy')}`
             )}
@@ -762,17 +817,9 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
   console.log('DetailedPayrollView rendering for staffId:', staffId);
   
   const { data: detailData, isLoading } = useQuery({
-    queryKey: [`/api/payroll/${staffId}/detailed`, month.toISOString()],
+    queryKey: ["/api/payroll/detailed-local", staffId, month.toISOString()],
     queryFn: async () => {
-      // Try server endpoint first
-      try {
-        const r = await fetch(`/api/payroll/${staffId}/detailed?month=${month.toISOString()}`);
-        if (r.ok) {
-          return await r.json();
-        }
-      } catch {}
-
-      // Fallback: compute locally from existing APIs so View Details still works
+      // Compute locally from current APIs to ensure latest commission rate is used
       const [staffRes, userRes, svcRes, apptRes, payRes, staffSvcRes] = await Promise.all([
         fetch('/api/staff'),
         fetch('/api/users'),
@@ -795,38 +842,54 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
       const end = new Date(month.getFullYear(), month.getMonth() + 1, 0, 23, 59, 59, 999);
 
       const staffMember: any = (staffList || []).find((s: any) => s.id === staffId) || {};
+      // Normalize base commission rate; accept either 0.2 or 20 as input
+      let baseRate = Number(staffMember.commissionRate ?? 0);
+      if (baseRate > 1) baseRate = baseRate / 100;
+
       const user = (users || []).find((u: any) => u.id === staffMember.userId);
       const staffName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown';
 
-      const appts = (appointments || []).filter((a: any) => a.staffId === staffId && new Date(a.startTime) >= start && new Date(a.startTime) <= end);
+      const appts = (appointments || []).filter((a: any) => {
+        const aStaffId = a.staffId ?? a.staff_id;
+        const aStart = new Date(a.startTime ?? a.start_time);
+        return aStaffId === staffId && aStart >= start && aStart <= end;
+      });
 
       let totalRevenue = 0;
       let totalCommission = 0;
       const rows = appts.map((apt: any) => {
-        const service = (services || []).find((s: any) => s.id === apt.serviceId);
-        const client = (users || []).find((u: any) => u.id === apt.clientId);
-        const payment = (payments || []).find((p: any) => p.appointmentId === apt.id && p.status === 'completed');
-        const baseAmount = payment?.amount ?? (payment ? Math.max((payment.totalAmount || 0) - (payment.tipAmount || 0), 0) : undefined);
-        const servicePrice = baseAmount !== undefined ? baseAmount : (service?.price || 0);
+        const serviceId = apt.serviceId ?? apt.service_id;
+        const service = (services || []).find((s: any) => s.id === serviceId);
+        const clientId = apt.clientId ?? apt.client_id;
+        const client = (users || []).find((u: any) => u.id === clientId);
+        const appointmentPayments = (payments || []).filter((p: any) => (p.appointmentId || p.appointment_id) === apt.id && (p.status === 'completed' || p.paymentStatus === 'completed'));
+        const baseAmountSum = appointmentPayments.reduce((sum: number, p: any) => {
+          const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
+          return sum + (base || 0);
+        }, 0);
+        const servicePrice = baseAmountSum > 0 ? baseAmountSum : (service?.price || 0);
 
+        // Optional per-service custom rate; if present, use it (normalized), otherwise use base rate
+        let effectiveRate = baseRate;
         const assignment = (staffServices || []).find((ss: any) => ss.staffId === staffId && ss.serviceId === (service?.id || 0));
-        let commissionRate = assignment?.customCommissionRate;
-        if (commissionRate !== undefined && commissionRate !== null) {
-          commissionRate = commissionRate > 1 ? commissionRate / 100 : commissionRate;
-        } else {
-          commissionRate = staffMember.commissionRate ?? 0;
+        if (assignment && assignment.customCommissionRate !== null && assignment.customCommissionRate !== undefined) {
+          let custom = Number(assignment.customCommissionRate);
+          if (custom > 1) custom = custom / 100;
+          if (!Number.isNaN(custom)) {
+            effectiveRate = custom;
+          }
         }
 
         let commissionAmount = 0;
         switch (staffMember.commissionType) {
           case 'commission':
-            commissionAmount = servicePrice * (commissionRate || 0);
+            commissionAmount = servicePrice * effectiveRate;
             break;
           case 'fixed':
             commissionAmount = staffMember.fixedRate || 0;
             break;
           case 'hourly_plus_commission':
-            commissionAmount = servicePrice * (commissionRate || 0);
+            commissionAmount = servicePrice * effectiveRate;
             break;
           default:
             commissionAmount = 0;
@@ -837,14 +900,14 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
 
         return {
           appointmentId: apt.id,
-          date: apt.startTime,
+          date: apt.startTime ?? apt.start_time,
           clientName: client ? `${client.firstName || ''} ${client.lastName || ''}`.trim() : 'Unknown',
           serviceName: service?.name || 'Service',
           duration: service?.duration || 60,
           servicePrice,
-          commissionRate,
+          commissionRate: effectiveRate,
           commissionAmount,
-          paymentStatus: apt.paymentStatus || 'unpaid',
+          paymentStatus: (appointmentPayments.length > 0 ? 'paid' : (apt.paymentStatus || 'unpaid')),
         };
       });
 
@@ -852,7 +915,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         staffName,
         title: staffMember.title,
         commissionType: staffMember.commissionType,
-        baseCommissionRate: staffMember.commissionRate ?? 0,
+        baseCommissionRate: baseRate,
         hourlyRate: staffMember.hourlyRate ?? null,
         summary: {
           totalAppointments: rows.length,
@@ -986,7 +1049,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
                     <TableCell>{appointment.serviceName}</TableCell>
                     <TableCell>{appointment.duration} min</TableCell>
                     <TableCell>{formatCurrency(appointment.servicePrice)}</TableCell>
-                    <TableCell>{(appointment.commissionRate * 100)}%</TableCell>
+                    <TableCell>{(detailData.baseCommissionRate * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-semibold text-green-600">
                       {formatCurrency(appointment.commissionAmount)}
                     </TableCell>
@@ -1001,152 +1064,6 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
             </Table>
           </div>
         </div>
-      </CardContent>
-    </Card>
-  );
-
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Summary
-          </Button>
-          <div>
-            <CardTitle>Detailed Payroll Report</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {detailData?.staffName} - {format(month, 'MMMM yyyy')}
-            </p>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {detailData && (
-          <>
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Services</p>
-                      <p className="text-2xl font-bold">{detailData.summary.totalAppointments}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Revenue</p>
-                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.totalRevenue)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Total Commission</p>
-                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.totalCommission)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-2">
-                    <UsersIcon className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Avg Per Service</p>
-                      <p className="text-2xl font-bold">{formatCurrency(detailData.summary.averageCommissionPerService)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Staff Info */}
-            <div className="mb-6 p-4 bg-muted/50 rounded-lg">
-              <h3 className="font-semibold mb-2">Staff Information</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Title:</span>
-                  <p className="font-medium">{detailData.title}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Commission Type:</span>
-                  <p className="font-medium">{detailData.commissionType.replace('_', ' ')}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Base Commission Rate:</span>
-                  <p className="font-medium">{(detailData.baseCommissionRate * 100).toFixed(1)}%</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Hourly Rate:</span>
-                  <p className="font-medium">{detailData.hourlyRate ? formatCurrency(detailData.hourlyRate) : 'N/A'}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Individual Appointments Table */}
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead className="text-right">Service Price</TableHead>
-                    <TableHead className="text-right">Commission Rate</TableHead>
-                    <TableHead className="text-right">Commission Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detailData.appointments.map((appointment: any) => (
-                    <TableRow key={appointment.appointmentId}>
-                      <TableCell>
-                        {format(new Date(appointment.date), 'MMM dd, yyyy')}
-                      </TableCell>
-                      <TableCell>{appointment.clientName}</TableCell>
-                      <TableCell>{appointment.serviceName}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(appointment.servicePrice)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {(appointment.commissionRate * 100).toFixed(1)}%
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(appointment.commissionAmount)}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={appointment.paymentStatus === 'paid' ? 'default' : 'secondary'}>
-                          {appointment.paymentStatus}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-
-            {detailData.appointments.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No paid appointments found for this period.
-              </div>
-            )}
-          </>
-        )}
       </CardContent>
     </Card>
   );
