@@ -71,10 +71,10 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         notes: (data as any).notes ?? null,
         emailAccountManagement: data.emailAccountManagement ?? true,
         emailAppointmentReminders: data.emailAppointmentReminders ?? true,
-        emailPromotions: data.emailPromotions ?? false,
+        emailPromotions: data.emailPromotions ?? true,
         smsAccountManagement: data.smsAccountManagement ?? false,
         smsAppointmentReminders: data.smsAppointmentReminders ?? true,
-        smsPromotions: data.smsPromotions ?? false,
+        smsPromotions: data.smsPromotions ?? true,
       } as any);
 
       const { password, ...safeUser } = newUser as any;
@@ -202,10 +202,10 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
             notes: null,
             emailAccountManagement: true,
             emailAppointmentReminders: true,
-            emailPromotions: false,
-            smsAccountManagement: false,
+            emailPromotions: true,
+            smsAccountManagement: true,
             smsAppointmentReminders: true,
-            smsPromotions: false,
+            smsPromotions: true,
           } as any);
 
           seenEmails.add(emailLower);

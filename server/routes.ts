@@ -44,6 +44,7 @@ import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
 import { CheckSoftwareService } from "./check-software-service.js";
+import { registerExternalRoutes } from "./external-api.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -92,6 +93,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
   registerReportRoutes(app, storage);
+  // Register external API routes (health, services, staff availability, webhook)
+  registerExternalRoutes(app, storage);
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));

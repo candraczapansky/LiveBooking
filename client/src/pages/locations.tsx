@@ -63,6 +63,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import TerminalManagement from "@/components/payment/terminal-management";
 
 type Location = {
   id: number;
@@ -416,8 +417,8 @@ const LocationsPage = () => {
                       });
                     }
                   }}
-                  variant="outline"
-                  className="w-full sm:w-auto hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
+                  variant="brandOutline"
+                  className="w-full sm:w-auto"
                 >
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Refresh Auth
@@ -428,7 +429,8 @@ const LocationsPage = () => {
                     form.reset();
                     setIsFormOpen(true);
                   }}
-                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  variant="brandOutline"
+                  className="w-full sm:w-auto"
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Location
@@ -465,6 +467,8 @@ const LocationsPage = () => {
                         form.reset();
                         setIsFormOpen(true);
                       }}
+                      variant="outline"
+                      className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
                     >
                       <PlusCircle className="h-4 w-4 mr-2" />
                       Add Location
@@ -472,9 +476,9 @@ const LocationsPage = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch">
                   {locations.map((location) => (
-                  <Card key={location.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
+                  <Card key={location.id} className="h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
                     <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -498,7 +502,7 @@ const LocationsPage = () => {
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pb-4 px-6">
+                    <CardContent className="pb-4 px-6 flex-1">
                       <div className="space-y-4">
                         {location.phone && location.phone.trim() !== "" ? (
                           <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -521,6 +525,8 @@ const LocationsPage = () => {
                             />
                             <Button
                               size="sm"
+                              variant="outline"
+                              className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
                               disabled={!((inlineEdits[location.id]?.phone ?? "").trim()) || updateInlineFieldsMutation.isPending}
                               onClick={() => {
                                 const phoneVal = (inlineEdits[location.id]?.phone ?? "").trim();
@@ -554,6 +560,8 @@ const LocationsPage = () => {
                             />
                             <Button
                               size="sm"
+                              variant="outline"
+                              className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
                               disabled={!((inlineEdits[location.id]?.email ?? "").trim()) || updateInlineFieldsMutation.isPending}
                               onClick={() => {
                                 const emailVal = (inlineEdits[location.id]?.email ?? "").trim();
@@ -576,10 +584,13 @@ const LocationsPage = () => {
                             <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span> {location.description}
                           </div>
                         )}
+
+                        {/* Helcim Terminal Management for this location */}
+                        <TerminalManagement locationId={String(location.id)} />
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <CardFooter className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 pt-4 border-t border-gray-200 dark:border-gray-700 mt-auto">
                       <div className="flex flex-col w-full gap-2">
                         <Button
                           variant="ghost"
@@ -838,6 +849,8 @@ const LocationsPage = () => {
                 </Button>
                 <Button 
                   type="submit" 
+                  variant="outline"
+                  className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
                   disabled={createLocationMutation.isPending || updateLocationMutation.isPending}
                 >
                   {createLocationMutation.isPending || updateLocationMutation.isPending 

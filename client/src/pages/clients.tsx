@@ -56,7 +56,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { NoteInput } from "@/components/ui/note-input";
 
-import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download, Upload, FileText } from "lucide-react";
+import { PlusCircle, Search, Edit, Trash2, MoreHorizontal, Calendar, ArrowLeft, CreditCard, ChevronDown, ChevronRight, Download, Upload, FileText, Users } from "lucide-react";
 import { 
   DropdownMenu,
   DropdownMenuContent,
@@ -112,10 +112,10 @@ const clientFormSchema = z.object({
   notes: z.string().optional(),
   emailAccountManagement: z.boolean().default(true),
   emailAppointmentReminders: z.boolean().default(true),
-  emailPromotions: z.boolean().default(false),
-  smsAccountManagement: z.boolean().default(false),
+  emailPromotions: z.boolean().default(true),
+  smsAccountManagement: z.boolean().default(true),
   smsAppointmentReminders: z.boolean().default(true),
-  smsPromotions: z.boolean().default(false),
+  smsPromotions: z.boolean().default(true),
 });
 
 type ClientFormValues = z.infer<typeof clientFormSchema>;
@@ -138,6 +138,7 @@ const ClientsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
+  const [showAllClients, setShowAllClients] = useState(false);
 
   const [location] = useLocation();
   
@@ -198,7 +199,7 @@ const ClientsPage = () => {
     }
   }, [location]);
 
-  const shouldSearch = debouncedQuery.length >= 2;
+  const shouldSearch = debouncedQuery.length >= 2 && !showAllClients;
   const { data: clientsData, isLoading } = useQuery({
     queryKey: ['/api/users', 'search', debouncedQuery],
     queryFn: async () => {
@@ -223,14 +224,14 @@ const ClientsPage = () => {
       const data = await response.json();
       return data;
     },
-    enabled: false,
+    enabled: !shouldSearch,
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchOnReconnect: true,
     gcTime: 0
   });
-  const clients = (shouldSearch ? clientsData : allClientsData) ?? [];
+  const clients = (shouldSearch ? (clientsData ?? []) : (allClientsData ?? []));
   const isLoadingCombined = shouldSearch ? isLoading : isLoadingAll;
 
   const addForm = useForm<ClientFormValues>({
@@ -247,10 +248,10 @@ const ClientsPage = () => {
       notes: "",
       emailAccountManagement: true,
       emailAppointmentReminders: true,
-      emailPromotions: false,
-      smsAccountManagement: false,
+      emailPromotions: true,
+      smsAccountManagement: true,
       smsAppointmentReminders: true,
-      smsPromotions: false,
+      smsPromotions: true,
     },
   });
 
@@ -268,10 +269,10 @@ const ClientsPage = () => {
       notes: "",
       emailAccountManagement: true,
       emailAppointmentReminders: true,
-      emailPromotions: false,
-      smsAccountManagement: false,
+      emailPromotions: true,
+      smsAccountManagement: true,
       smsAppointmentReminders: true,
-      smsPromotions: false,
+      smsPromotions: true,
     },
   });
 
@@ -1220,7 +1221,7 @@ const ClientsPage = () => {
                   {/* Enhanced Search & Filters */}
                   <ClientSearchFilters
                     searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
+                    onSearchChange={(v: string) => { setShowAllClients(false); setSearchQuery(v); }}
                     filters={filters}
                     onFiltersChange={setFilters}
                     onClearFilters={() => setFilters({
@@ -1248,6 +1249,25 @@ const ClientsPage = () => {
                     
                     {/* Secondary actions - side by side on mobile */}
                     <div className="grid grid-cols-2 gap-3 sm:flex sm:gap-2 sm:justify-start">
+                      <Button
+                        variant="default"
+                        onClick={async () => { 
+                          setViewMode('list'); 
+                          setClientDetail(null); 
+                          setShowAllClients(true);
+                          setSearchQuery("");
+                          // ensure all-clients query runs and table refreshes
+                          await queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+                          await queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+                        }}
+                        className="h-12 sm:h-10 text-base sm:text-sm sm:w-auto"
+                        size="default"
+                        type="button"
+                        title="Show all clients"
+                      >
+                        <Users className="h-5 w-5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                        <span>View All</span>
+                      </Button>
                       <Button
                         variant="outline"
                         onClick={handleExportClients}
@@ -1336,14 +1356,18 @@ const ClientsPage = () => {
                   <div className="flex justify-center py-8">
                     <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
                   </div>
-                ) : (!shouldSearch) ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    {(() => {
-                      console.log('Rendering initial state (no search)');
-                      return null;
-                    })()}
-                    Type at least 2 characters to search clients.
-                  </div>
+                ) : (!shouldSearch && !showAllClients) ? (
+                  showAllClients ? (
+                    <></>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      {(() => {
+                        console.log('Rendering initial state (no search)');
+                        return null;
+                      })()}
+                      Type at least 2 characters to search clients.
+                    </div>
+                  )
                 ) : filteredClients?.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                     {(() => {

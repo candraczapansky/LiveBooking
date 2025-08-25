@@ -56,8 +56,16 @@ export default function SmartTerminalPayment({
         throw new Error(data.message || 'Failed to start payment');
       }
 
-      // Poll for payment status
-      await pollPaymentStatus(String(locationId ?? ''), data.paymentId);
+      // Derive a payment identifier from multiple possible fields
+      const pid = (data?.paymentId) || (data?.transactionId) || (data?.id) || (data?.invoiceNumber);
+
+      // Poll for payment status only if we have an identifier
+      if (pid) {
+        await pollPaymentStatus(String(locationId ?? ''), String(pid));
+      } else {
+        // No id yet; keep UI in processing and let a subsequent attempt continue
+        setMessage('Waiting for terminal to acknowledge transaction...');
+      }
 
     } catch (error) {
       console.error('Payment failed:', error);
@@ -116,13 +124,21 @@ export default function SmartTerminalPayment({
     }, 2000);
   };
 
+  const stringifyError = (err: any): string => {
+    if (!err) return 'Unknown error';
+    if (typeof err === 'string') return err;
+    if (err instanceof Error) return err.message || 'Error';
+    if (typeof err === 'object') return (err.message || err.error || JSON.stringify(err));
+    return String(err);
+  };
+
   const handlePaymentError = (error: any) => {
     toast({
       title: "Payment Failed",
-      description: "There was an error processing your payment. Please try again.",
+      description: stringifyError(error) || "There was an error processing your payment. Please try again.",
       variant: "destructive",
     });
-    onError?.(error);
+    onError?.(stringifyError(error));
     setTimeout(() => {
       onOpenChange(false);
       setStatus('idle');

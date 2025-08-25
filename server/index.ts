@@ -20,6 +20,7 @@ app.use((req, res, next) => {
   // Allow common local dev and any Replit-hosted origin (with or without port)
   const isAllowed = !!origin && (
     origin.includes('.replit.dev') ||
+    origin.includes('.replit.app') ||
     origin.startsWith('http://localhost') ||
     origin.startsWith('http://127.0.0.1') ||
     origin.startsWith('http://0.0.0.0')
@@ -30,7 +31,7 @@ app.use((req, res, next) => {
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-API-Key');
   res.header('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {

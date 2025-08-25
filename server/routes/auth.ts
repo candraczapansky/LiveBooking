@@ -156,6 +156,10 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         firstName: sanitizedData.firstName,
         lastName: sanitizedData.lastName,
         role: "client",
+        emailPromotions: true,
+        smsAccountManagement: true,
+        smsAppointmentReminders: true,
+        smsPromotions: true,
       });
 
       // Generate JWT token

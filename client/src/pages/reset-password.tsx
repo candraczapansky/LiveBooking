@@ -29,6 +29,7 @@ const ResetPassword = () => {
   const [resetComplete, setResetComplete] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [validToken, setValidToken] = useState<boolean | null>(null);
+  const loginUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/login';
 
   const form = useForm<ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
@@ -37,6 +38,19 @@ const ResetPassword = () => {
       confirmPassword: "",
     },
   });
+
+  // After successful reset, auto-redirect to login as a failsafe
+  useEffect(() => {
+    if (resetComplete) {
+      const timer = setTimeout(() => {
+        try {
+          const base = typeof window !== 'undefined' ? window.location.origin : '';
+          window.location.replace(base + '/login');
+        } catch {}
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [resetComplete]);
 
   // Extract token from URL parameters
   useEffect(() => {
@@ -75,7 +89,7 @@ const ResetPassword = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to reset password");
+        throw new Error(data.message || data.error || "Failed to reset password");
       }
 
       setResetComplete(true);
@@ -83,6 +97,10 @@ const ResetPassword = () => {
         title: "Success",
         description: "Your password has been reset successfully!",
       });
+      try {
+        window.location.replace(loginUrl);
+        return;
+      } catch {}
 
     } catch (error: any) {
       console.error("Reset password error:", error);
@@ -163,12 +181,33 @@ const ResetPassword = () => {
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   You can now log in with your new password.
                 </p>
-                <Button
-                  onClick={() => navigate("/login")}
-                  className="w-full"
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  If nothing happens, refresh this page to go to the Login screen.
+                </p>
+                <a
+                  href={loginUrl}
+                  onClick={(e) => {
+                    try {
+                      // Force hard navigation for reliability on mobile browsers
+                      e.preventDefault();
+                      window.location.replace(loginUrl);
+                    } catch {
+                      // If anything blocks JS, the href still works
+                    }
+                  }}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full bg-[#ff8d8f] text-primary-foreground hover:bg-primary/90"
                 >
                   Continue to Login
-                </Button>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try { window.location.assign(loginUrl); } catch {}
+                  }}
+                  className="mt-2 w-full text-xs text-gray-600 underline"
+                >
+                  If the button doesn’t work, tap here
+                </button>
               </div>
             </CardContent>
           </Card>

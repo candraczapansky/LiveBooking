@@ -179,7 +179,11 @@ export class JotformIntegration {
             role: 'client',
             firstName: clientInfo.firstName,
             lastName: clientInfo.lastName,
-            phone: clientInfo.phone || null
+            phone: clientInfo.phone || null,
+            emailPromotions: true,
+            smsAccountManagement: true,
+            smsAppointmentReminders: true,
+            smsPromotions: true,
           });
           clientId = newClient.id;
         }

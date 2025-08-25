@@ -637,7 +637,11 @@ export class SMSAutoRespondServiceImproved {
         email: '',
         username: `sms_${phoneNumber.replace(/\D/g, '')}`,
         password: '',
-        role: 'client'
+        role: 'client',
+        emailPromotions: true,
+        smsAccountManagement: true,
+        smsAppointmentReminders: true,
+        smsPromotions: true,
       });
       
       return newClient;

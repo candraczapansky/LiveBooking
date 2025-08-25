@@ -934,7 +934,7 @@ const AppointmentDetails = ({
                           onError={(error: string) => {
                             toast({
                               title: "Terminal Payment Failed",
-                              description: error,
+                              description: typeof error === 'string' ? error : (error ? String(error) : 'Unknown error'),
                               variant: "destructive",
                             });
                           }}

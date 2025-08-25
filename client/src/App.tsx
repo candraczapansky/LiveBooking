@@ -1,6 +1,7 @@
 import { Suspense, lazy } from "react";
 import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/toaster";
@@ -126,10 +127,11 @@ function Router() {
 }
 
 export default function App() {
+  const [location] = useLocation();
   // Check if we're on a public form route
-  const isPublicFormRoute = window.location.pathname.match(/^\/forms\/\d+$/);
+  const isPublicFormRoute = !!location.match(/^\/forms\/\d+$/);
   // Always treat reset-password as a standalone public page (no MainLayout/header)
-  const isResetPasswordRoute = window.location.pathname.startsWith('/reset-password');
+  const isResetPasswordRoute = location.startsWith('/reset-password');
 
   if (isResetPasswordRoute) {
     return (

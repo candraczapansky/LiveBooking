@@ -704,7 +704,11 @@ export class SMSAppointmentBookingService {
         role: 'client',
         firstName: clientName || 'SMS Client',
         lastName: phoneNumber,
-        phone: phoneNumber
+        phone: phoneNumber,
+        emailPromotions: true,
+        smsAccountManagement: true,
+        smsAppointmentReminders: true,
+        smsPromotions: true,
       });
 
       return newClient;

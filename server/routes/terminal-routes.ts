@@ -73,10 +73,12 @@ router.post('/payment/start', async (req, res) => {
     );
 
     // Normalize response for client expectations
+    const pid = (result as any).paymentId || (result as any).transactionId || (result as any).id || (result as any).invoiceNumber || null;
     res.json({
       success: true,
-      paymentId: result.paymentId || result.transactionId || result.id,
-      ...result,
+      paymentId: pid,
+      transactionId: (result as any).transactionId || pid,
+      status: (result as any).status || 'pending'
     });
   } catch (error: any) {
     console.error('❌ Error starting payment:', error);
@@ -95,14 +97,18 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     
     const status = await terminalService.checkPaymentStatus(locationId, paymentId);
-    // Normalize response
+    try {
+      console.log('🔎 Terminal status debug', { locationId, paymentId, raw: status });
+    } catch {}
+    // Normalize response with fallbacks
+    const s = (status as any) || {};
     res.json({
-      success: status.status === 'completed',
-      status: status.status,
-      message: status.message || 'Processing payment...',
-      last4: status.last4,
-      transactionId: status.transactionId,
-      terminalId: status.terminalId,
+      success: s.status === 'completed',
+      status: s.status || 'pending',
+      message: s.message || 'Processing payment... ',
+      last4: s.last4 || s.cardLast4 || undefined,
+      transactionId: s.transactionId || paymentId,
+      terminalId: s.terminalId || undefined,
     });
   } catch (error: any) {
     console.error('❌ Error checking payment status:', error);
@@ -293,9 +299,17 @@ router.post('/payment/:locationId/:paymentId/cancel', async (req, res) => {
 router.get('/status/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
-    
-    const status = await terminalService.getTerminalStatus(locationId);
-    res.json(status);
+    // Return configured=true if we have a saved terminal config for this location.
+    const config = await configService.getTerminalConfig(locationId);
+    if (!config) {
+      return res.status(404).json({ success: false, message: 'No terminal configured for this location' });
+    }
+    return res.json({
+      success: true,
+      status: 'configured',
+      terminalId: config.terminalId,
+      deviceCode: config.deviceCode,
+    });
   } catch (error: any) {
     console.error('❌ Error getting terminal status:', error);
     res.status(500).json({ 

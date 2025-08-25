@@ -275,6 +275,103 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
     }
   });
 
+  // Appointments listing endpoint (requires auth)
+  app.get("/api/external/appointments", validateApiKey, async (req, res) => {
+    try {
+      const { startDate, endDate, staffId, locationId, status } = req.query;
+
+      // Load enriched appointments (includes linked service and staff.user info)
+      let appointments = await storage.getAllAppointments();
+
+      // Filter by staff
+      if (staffId) {
+        const sid = parseInt(staffId as string);
+        if (!Number.isNaN(sid)) {
+          appointments = appointments.filter((a: any) => a.staffId === sid);
+        }
+      }
+
+      // Filter by location
+      if (locationId) {
+        const lid = parseInt(locationId as string);
+        if (!Number.isNaN(lid)) {
+          appointments = appointments.filter((a: any) => a.locationId === lid);
+        }
+      }
+
+      // Filter by status
+      if (status) {
+        const st = String(status);
+        appointments = appointments.filter((a: any) => a.status === st);
+      }
+
+      // Filter by date range (defaults to upcoming 30 days)
+      let start: Date | undefined;
+      let end: Date | undefined;
+      if (startDate || endDate) {
+        start = startDate ? new Date(startDate as string) : undefined;
+        end = endDate ? new Date(endDate as string) : undefined;
+      } else {
+        start = new Date();
+        end = new Date();
+        end.setDate(end.getDate() + 30);
+      }
+
+      if (start || end) {
+        appointments = appointments.filter((a: any) => {
+          const s = new Date(a.startTime);
+          const e = new Date(a.endTime);
+          if (start && e < start) return false;
+          if (end && s > end) return false;
+          return true;
+        });
+      }
+
+      // Shape data for external clients
+      const data = appointments.map((apt: any) => ({
+        id: apt.id,
+        startTime: apt.startTime,
+        endTime: apt.endTime,
+        status: apt.status,
+        paymentStatus: apt.paymentStatus,
+        staffId: apt.staffId,
+        clientId: apt.clientId,
+        serviceId: apt.serviceId,
+        notes: apt.notes || null,
+        service: apt.service ? {
+          id: apt.service.id,
+          name: apt.service.name,
+          color: apt.service.color,
+          duration: apt.service.duration,
+          price: apt.service.price,
+        } : null,
+        staff: apt.staff ? {
+          id: apt.staff.id,
+          title: apt.staff.title,
+          user: apt.staff.user ? {
+            firstName: apt.staff.user.firstName,
+            lastName: apt.staff.user.lastName,
+            email: apt.staff.user.email,
+          } : null,
+        } : null,
+      }));
+
+      return res.json({
+        success: true,
+        data,
+        count: data.length,
+        timestamp: new Date().toISOString(),
+        filters: { startDate, endDate, staffId, locationId, status },
+      });
+    } catch (error: any) {
+      console.error('Error fetching external appointments:', error);
+      res.status(500).json({
+        error: "Failed to fetch appointments",
+        details: error.message,
+      });
+    }
+  });
+
   // Service categories endpoint (optional auth)
   app.get("/api/external/service-categories", optionalApiKey, async (req, res) => {
     try {
@@ -375,7 +472,11 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
             address: clientInfo.address || null,
             city: clientInfo.city || null,
             state: clientInfo.state || null,
-            zipCode: clientInfo.zipCode || null
+            zipCode: clientInfo.zipCode || null,
+            emailPromotions: true,
+            smsAccountManagement: true,
+            smsAppointmentReminders: true,
+            smsPromotions: true,
           });
           finalClientId = newClient.id;
           console.log('Created new client from webhook:', newClient);

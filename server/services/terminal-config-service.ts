@@ -31,16 +31,23 @@ export class TerminalConfigService {
       // Encrypt the API token before storing
       const encryptedToken = await encrypt(config.apiToken);
 
-      // Store in database
+      // Store in database with upsert to allow re-initialization
       let terminalConfig;
       try {
         const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
-        const insertSql = sql`INSERT INTO terminal_configurations (
-          terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
-        ) VALUES (
-          ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
-        ) RETURNING *` as any;
-        const result: any = await dbClient.execute(insertSql);
+        const upsertSql = sql`INSERT INTO terminal_configurations (
+            terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
+          ) VALUES (
+            ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
+          )
+          ON CONFLICT (location_id, terminal_id)
+          DO UPDATE SET
+            api_token = EXCLUDED.api_token,
+            device_code = EXCLUDED.device_code,
+            is_active = true,
+            updated_at = NOW()
+          RETURNING *` as any;
+        const result: any = await dbClient.execute(upsertSql);
         terminalConfig = result?.rows || result;
       } catch (e: any) {
         // Auto-create table on first use if missing
@@ -62,12 +69,19 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
 );`;
           await dbClient.execute(createSql as any);
           // Retry insert
-          const retrySql = sql`INSERT INTO terminal_configurations (
-            terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
-          ) VALUES (
-            ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
-          ) RETURNING *` as any;
-          const retryResult: any = await dbClient.execute(retrySql);
+          const retryUpsert = sql`INSERT INTO terminal_configurations (
+              terminal_id, location_id, api_token, device_code, is_active, created_at, updated_at
+            ) VALUES (
+              ${config.terminalId}, ${config.locationId}, ${encryptedToken}, ${config.deviceCode}, true, NOW(), NOW()
+            )
+            ON CONFLICT (location_id, terminal_id)
+            DO UPDATE SET
+              api_token = EXCLUDED.api_token,
+              device_code = EXCLUDED.device_code,
+              is_active = true,
+              updated_at = NOW()
+            RETURNING *` as any;
+          const retryResult: any = await dbClient.execute(retryUpsert);
           terminalConfig = retryResult?.rows || retryResult;
         } else {
           throw e;
@@ -95,14 +109,41 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
         return null;
       }
 
-      // Decrypt the API token
-      const decryptedToken = await decrypt(config[0].apiToken);
+      // Decrypt and map to expected camelCase fields
+      const row: any = config[0];
+      const decryptedToken = await decrypt(row.api_token);
 
       return {
-        ...config[0],
+        terminalId: String(row.terminal_id ?? row.terminalId ?? ''),
+        deviceCode: String(row.device_code ?? row.deviceCode ?? ''),
+        locationId: String(row.location_id ?? row.locationId ?? ''),
         apiToken: decryptedToken,
-      };
+      } as any;
     } catch (error: any) {
+      const message = String(error?.message || error);
+      if (message.includes('relation') && message.includes('terminal_configurations')) {
+        // Auto-create table if it doesn't exist, then return null (no config yet)
+        try {
+          console.warn('⚠️ terminal_configurations not found during read. Creating it now...');
+          const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
+          const createSql = `
+CREATE TABLE IF NOT EXISTS terminal_configurations (
+  id SERIAL PRIMARY KEY,
+  terminal_id TEXT NOT NULL,
+  location_id TEXT NOT NULL,
+  api_token TEXT NOT NULL,
+  device_code TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(location_id, terminal_id)
+);`;
+          await dbClient.execute(createSql as any);
+          return null;
+        } catch (createErr) {
+          console.error('❌ Failed to auto-create terminal_configurations table:', createErr);
+        }
+      }
       console.error('❌ Error getting terminal configuration:', error);
       throw error;
     }
@@ -122,13 +163,41 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
         return null;
       }
 
-      const decryptedToken = await decrypt(config[0].apiToken);
+      // Decrypt and map to expected camelCase fields
+      const row: any = config[0];
+      const decryptedToken = await decrypt(row.api_token);
 
       return {
-        ...config[0],
+        terminalId: String(row.terminal_id ?? row.terminalId ?? ''),
+        deviceCode: String(row.device_code ?? row.deviceCode ?? ''),
+        locationId: String(row.location_id ?? row.locationId ?? ''),
         apiToken: decryptedToken,
       } as TerminalConfig;
     } catch (error: any) {
+      const message = String(error?.message || error);
+      if (message.includes('relation') && message.includes('terminal_configurations')) {
+        // Auto-create table if it doesn't exist, then return null (no config yet)
+        try {
+          console.warn('⚠️ terminal_configurations not found during read by device code. Creating it now...');
+          const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
+          const createSql = `
+CREATE TABLE IF NOT EXISTS terminal_configurations (
+  id SERIAL PRIMARY KEY,
+  terminal_id TEXT NOT NULL,
+  location_id TEXT NOT NULL,
+  api_token TEXT NOT NULL,
+  device_code TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(location_id, terminal_id)
+);`;
+          await dbClient.execute(createSql as any);
+          return null;
+        } catch (createErr) {
+          console.error('❌ Failed to auto-create terminal_configurations table:', createErr);
+        }
+      }
       console.error('❌ Error getting terminal configuration by device code:', error);
       throw error;
     }
@@ -156,7 +225,16 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
       const updateSql = `UPDATE terminal_configurations SET ${fields.join(', ')} WHERE location_id = $${fields.length + 1} RETURNING *`;
       const result: any = await dbClient.execute({ text: updateSql, args: [...values, locationId] } as any);
       const rows = result?.rows || result || [];
-      return rows[0];
+      const row: any = rows[0];
+      if (!row) return row;
+      // Map to camelCase if present
+      return {
+        terminalId: String(row.terminal_id ?? row.terminalId ?? ''),
+        deviceCode: String(row.device_code ?? row.deviceCode ?? ''),
+        locationId: String(row.location_id ?? row.locationId ?? ''),
+        apiToken: String(row.api_token ?? row.apiToken ?? ''),
+        isActive: Boolean(row.is_active ?? row.isActive ?? true),
+      } as any;
     } catch (error: any) {
       console.error('❌ Error updating terminal configuration:', error);
       throw error;

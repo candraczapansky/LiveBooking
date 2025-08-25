@@ -14,6 +14,8 @@ const buttonVariants = cva(
           "bg-transparent text-destructive border border-destructive hover:bg-[hsla(var(--destructive),0.1)]",
         outline:
           "border border-input bg-background hover:bg-[hsla(var(--button-outline-hover),var(--button-outline-hover-opacity,0.1))] hover:text-accent-foreground",
+        brandOutline:
+          "bg-transparent !bg-none text-[hsl(var(--primary))] border border-[hsl(var(--primary))] hover:bg-[hsla(var(--primary),0.1)] hover:text-[hsl(var(--primary))]",
         secondary:
           "bg-transparent text-secondary border border-secondary hover:bg-[hsla(var(--secondary),0.1)]",
         ghost: "hover:bg-accent hover:text-accent-foreground",
