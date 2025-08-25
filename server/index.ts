@@ -141,6 +141,7 @@ async function findAvailablePort(startPort: number): Promise<number> {
     // require binding to the exact PORT they provide.
     const preferredPort = parseInt(process.env.PORT || '3002');
     let port = preferredPort;
+    let hasRetriedDueToPortConflict = false;
 
     if (isDevelopment && !process.env.PORT) {
       try {
@@ -162,8 +163,21 @@ async function findAvailablePort(startPort: number): Promise<number> {
     });
 
     // Handle server errors gracefully
-    server.on('error', (err: any) => {
+    server.on('error', async (err: any) => {
       if (err.code === 'EADDRINUSE') {
+        if (isDevelopment && !hasRetriedDueToPortConflict) {
+          try {
+            hasRetriedDueToPortConflict = true;
+            const newPort = await findAvailablePort(port + 1);
+            server.listen({ port: newPort, host: '0.0.0.0' }, () => {
+              log(`⚠️  Port ${port} was in use, switched to port ${newPort}`);
+              port = newPort;
+            });
+            return;
+          } catch (scanErr) {
+            console.error('❌ Could not find a free port after conflict:', scanErr);
+          }
+        }
         console.error(`❌ Port ${port} is already in use. Please try again.`);
         process.exit(1);
       } else {

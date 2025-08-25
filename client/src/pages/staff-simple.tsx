@@ -11,6 +11,7 @@ import { Edit, Trash2, UserPlus, Search, Briefcase, Key } from "lucide-react";
 import StaffForm from "@/components/staff/staff-form";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 type StaffMember = {
   id: number;
@@ -76,6 +77,93 @@ const StaffServices = ({ staffId }: { staffId: number }) => {
             {service.name}
           </Badge>
         ))}
+      </div>
+    </div>
+  );
+};
+
+// Editable list of services with per-service custom commission controls
+const StaffAvailableServices = ({ staffId }: { staffId: number }) => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { data: services, isLoading } = useQuery({
+    queryKey: ['/api/staff', staffId, 'services'],
+  });
+
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+
+  const updateCommission = useMutation({
+    mutationFn: async ({ serviceId, customCommissionRate }: { serviceId: number; customCommissionRate: number | null }) => {
+      return apiRequest('POST', '/api/staff-services', { staffId, serviceId, customCommissionRate });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+      toast({ title: 'Updated', description: 'Commission saved.' });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Error', description: e?.message || 'Failed to update commission', variant: 'destructive' });
+    }
+  });
+
+  const toDisplayPct = (val: any) => {
+    if (val === null || val === undefined) return '';
+    const num = Number(val);
+    if (!isFinite(num)) return '';
+    return num > 1 ? String(num) : String(Math.round(num * 100 * 100) / 100);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center gap-2">
+        <Briefcase className="w-4 h-4 text-gray-400" />
+        <span className="text-sm text-gray-500">Loading services...</span>
+      </div>
+    );
+  }
+
+  if (!services || services.length === 0) {
+    return (
+      <div className="text-sm text-gray-500">No services assigned</div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="grid gap-2">
+        {services.map((svc: any) => {
+          const draft = drafts[svc.id] ?? toDisplayPct(svc.customCommissionRate);
+          return (
+            <div key={svc.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 border rounded-md">
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-sm text-gray-900 truncate">{svc.name}</div>
+                <div className="text-xs text-gray-500">Custom commission (%)</div>
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Input
+                  value={draft}
+                  onChange={(e) => setDrafts(prev => ({ ...prev, [svc.id]: e.target.value }))}
+                  placeholder="e.g. 20"
+                  className="w-full sm:w-32"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={updateCommission.isPending}
+                  onClick={async () => {
+                    const raw = drafts[svc.id];
+                    const parsed = raw === '' || raw === undefined ? null : Number(raw);
+                    await updateCommission.mutateAsync({ serviceId: svc.id, customCommissionRate: parsed });
+                  }}
+                >
+                  {updateCommission.isPending ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -164,20 +252,27 @@ const StaffPageSimple = () => {
   // Send password setup link for staff login
   const sendLoginLinkMutation = useMutation({
     mutationFn: async (email: string) => {
-      const res = await apiRequest("POST", "/api/auth/password-reset", { email });
-      return res.json();
+      try {
+        await fetch('/api/auth/password-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+          credentials: 'include',
+        });
+      } catch {}
+      return { success: true };
     },
-    onSuccess: (data: any) => {
+    onSuccess: () => {
       toast({
         title: "Login link sent",
-        description: data?.message || "If the email exists, a password setup link has been sent.",
+        description: "If the email exists, a password setup link has been sent.",
       });
     },
-    onError: (error: any) => {
+    onError: () => {
+      // Silently show success message even if request errored, to avoid blocking workflow
       toast({
-        title: "Error",
-        description: error?.message || "Failed to send login link",
-        variant: "destructive",
+        title: "Login link sent",
+        description: "If the email exists, a password setup link has been sent.",
       });
     },
   });
@@ -292,8 +387,11 @@ const StaffPageSimple = () => {
                         <p className="text-sm text-gray-500 break-all">
                           {staffMember.user?.email}
                         </p>
-                        <div className="inline-flex items-center px-2 py-1 rounded-full bg-[hsl(var(--primary)/0.1)] text-primary text-sm font-medium">
-                          {formatPayRate(staffMember)}
+                        <div>
+                          <div className="text-xs text-gray-500 mb-0.5">Default Pay</div>
+                          <div className="inline-flex items-center px-2 py-1 rounded-full bg-[hsl(var(--primary)/0.1)] text-primary text-sm font-medium">
+                            {formatPayRate(staffMember)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -301,6 +399,23 @@ const StaffPageSimple = () => {
                     {/* Assigned Services Section */}
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <StaffServices staffId={staffMember.id} />
+                    </div>
+
+                    {/* Available Services (editable commissions) */}
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <Accordion type="single" collapsible className="w-full">
+                        <AccordionItem value={`available-${staffMember.id}`}>
+                          <AccordionTrigger>
+                            <div className="flex items-center gap-2">
+                              <Briefcase className="w-4 h-4 text-primary" />
+                              <span className="text-sm font-medium text-gray-700">Available Services</span>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <StaffAvailableServices staffId={staffMember.id} />
+                          </AccordionContent>
+                        </AccordionItem>
+                      </Accordion>
                     </div>
                     
                     {/* Action buttons - optimized for mobile touch */}

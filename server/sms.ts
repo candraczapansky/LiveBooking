@@ -115,7 +115,7 @@ function isValidPhoneNumber(phone: string): boolean {
   }
   
   // Check for placeholder patterns (common test numbers)
-  if (phone.includes('555-555-') || phone.includes('5555') ||
+  if (phone.includes('555-555-') ||
       phone.match(/\d{3}-?\d{3}-?[Xx]{4}/)) {
     return false;
   }
@@ -427,34 +427,24 @@ export async function sendMMS(to: string, message: string, photoUrl: string): Pr
 }
 
 export async function isTwilioConfigured(): Promise<boolean> {
-  // Ensure Twilio client is initialized
+  // Ensure Twilio client is initialized (validates Account SID format)
   if (!twilioClient) {
     await initializeTwilioClient();
   }
-  
-  // Check if we have a Twilio client initialized
-  if (twilioClient) {
-    return true;
-  }
-  
-  // Check environment variables
-  if (envAccountSid && envAuthToken && envTwilioPhoneNumber) {
-    return true;
-  }
-  
-  // Check database configuration
+
+  // Determine current phone number from env or DB
+  let currentTwilioPhoneNumber = envTwilioPhoneNumber;
   if (dbConfig) {
     try {
-      const dbAccountSid = await dbConfig.getConfig('twilio_account_sid');
-      const dbAuthToken = await dbConfig.getConfig('twilio_auth_token');
       const dbPhoneNumber = await dbConfig.getConfig('twilio_phone_number');
-      
-      return !!(dbAccountSid && dbAuthToken && dbPhoneNumber);
+      if (dbPhoneNumber) {
+        currentTwilioPhoneNumber = dbPhoneNumber;
+      }
     } catch (error) {
-      console.error('Error checking database Twilio configuration:', error);
-      return false;
+      console.error('Error checking database Twilio phone number:', error);
     }
   }
-  
-  return false;
+
+  // Configuration is considered valid only when both a client and phone number are available
+  return !!(twilioClient && currentTwilioPhoneNumber);
 }

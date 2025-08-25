@@ -223,7 +223,7 @@ const ClientsPage = () => {
       const data = await response.json();
       return data;
     },
-    enabled: !shouldSearch,
+    enabled: false,
     staleTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,

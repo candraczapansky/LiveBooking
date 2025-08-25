@@ -197,7 +197,7 @@ const SimpleMobileMenu = () => {
           onClick={toggleMenu}
           variant="outline"
           size="icon"
-          className="w-12 h-12 rounded-lg shadow-md hover:shadow-lg"
+          className="w-12 h-12 rounded-lg shadow-md hover:shadow-lg text-gray-700 dark:text-gray-300"
           aria-label="Toggle mobile menu"
         >
           <Menu className="w-6 h-6" strokeWidth={2} />

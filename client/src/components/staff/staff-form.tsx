@@ -245,6 +245,9 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   });
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
+  const [customCommissionPct, setCustomCommissionPct] = useState<string>("");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
+  const [bulkCustomCommissionPct, setBulkCustomCommissionPct] = useState<string>("");
 
   const createStaffMutation = useMutation({
     mutationFn: async (data: StaffFormValues) => {
@@ -1049,7 +1052,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 )}
 
                 {/* Add service */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
                     <SelectTrigger>
                       <SelectValue placeholder={(allServices || []).length === 0 ? 'No services available' : 'Select a service'} />
@@ -1066,6 +1069,14 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                       )}
                     </SelectContent>
                   </Select>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Custom commission % (optional)"
+                    value={customCommissionPct}
+                    onChange={(e) => setCustomCommissionPct(e.target.value)}
+                  />
                   <Button
                     type="button"
                     variant="outline"
@@ -1076,8 +1087,11 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                         return;
                       }
                       try {
-                        await apiRequest('POST', '/api/staff-services', { staffId, serviceId: idNum });
+                        const cc = customCommissionPct.trim();
+                        const ccNum = cc === "" ? null : Number(cc);
+                        await apiRequest('POST', '/api/staff-services', { staffId, serviceId: idNum, customCommissionRate: isNaN(ccNum as any) ? null : ccNum });
                         setSelectedServiceId("");
+                        setCustomCommissionPct("");
                         queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
                       } catch (e) {}
                     }}
@@ -1085,6 +1099,112 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                   >
                     Add Service
                   </Button>
+                </div>
+
+                {/* Add multiple services at once */}
+                <div className="space-y-2 mt-4">
+                  <h4 className="text-sm font-medium text-gray-700">Add Multiple Services</h4>
+                  {(() => {
+                    const currentAssignedIds = new Set(((assignedServices || []) as any[]).map((s: any) => s.id));
+                    const available = ((allServices || []) as any[]).filter((svc: any) => !currentAssignedIds.has(svc.id));
+                    if (available.length === 0) {
+                      return (
+                        <div className="text-sm text-gray-500">All available services are already assigned.</div>
+                      );
+                    }
+                    return (
+                      <>
+                        <div className="grid gap-2 max-h-56 overflow-auto pr-1">
+                          {available.map((svc: any) => {
+                            const isSelected = selectedServiceIds.includes(svc.id);
+                            return (
+                              <div
+                                key={svc.id}
+                                role="checkbox"
+                                aria-checked={isSelected}
+                                tabIndex={0}
+                                className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                                  isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setSelectedServiceIds(prev => (
+                                    prev.includes(svc.id)
+                                      ? prev.filter(id => id !== svc.id)
+                                      : [...prev, svc.id]
+                                  ));
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setSelectedServiceIds(prev => (
+                                      prev.includes(svc.id)
+                                        ? prev.filter(id => id !== svc.id)
+                                        : [...prev, svc.id]
+                                    ));
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="mt-0.5 h-4 w-4 flex items-center justify-center">
+                                    {isSelected ? (
+                                      <CheckCircle className="h-4 w-4 text-blue-600" />
+                                    ) : (
+                                      <span className="inline-block h-4 w-4 border border-gray-300 rounded" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-medium text-sm text-gray-900">{svc.name}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="pt-1 flex flex-col gap-2">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Custom commission % for selected (optional)"
+                              value={bulkCustomCommissionPct}
+                              onChange={(e) => setBulkCustomCommissionPct(e.target.value)}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9"
+                            disabled={selectedServiceIds.length === 0}
+                            onClick={async () => {
+                              if (!staffId || selectedServiceIds.length === 0) return;
+                              try {
+                                const cc = bulkCustomCommissionPct.trim();
+                                const ccNum = cc === "" ? null : Number(cc);
+                                for (const id of selectedServiceIds) {
+                                  try {
+                                    await apiRequest('POST', '/api/staff-services', { staffId, serviceId: id, customCommissionRate: isNaN(ccNum as any) ? null : ccNum });
+                                  } catch (err) {
+                                    // continue on individual failure
+                                  }
+                                }
+                                setSelectedServiceIds([]);
+                                setBulkCustomCommissionPct("");
+                                queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
+                              } catch (e) {}
+                            }}
+                          >
+                            {selectedServiceIds.length === 0 ? 'Add Selected Services' : `Add ${selectedServiceIds.length} Selected`}
+                          </Button>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             )}

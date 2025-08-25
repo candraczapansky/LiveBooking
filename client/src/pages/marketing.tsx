@@ -85,7 +85,7 @@ type Campaign = {
   id: number;
   name: string;
   type: 'email' | 'sms';
-  status: 'draft' | 'scheduled' | 'sent' | 'failed';
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
   audience: string;
   subject?: string;
   content: string;
@@ -439,9 +439,18 @@ const MarketingPage = () => {
       // Force immediate refresh of campaign data to update status
       queryClient.invalidateQueries({ queryKey: ['/api/marketing-campaigns'] });
       queryClient.refetchQueries({ queryKey: ['/api/marketing-campaigns'] });
+      const queuedCount = (data && (data.queuedCount ?? data.results?.queuedCount)) ?? undefined;
+      const totalRecipients = (data && (data.totalRecipients ?? data.results?.totalRecipients)) ?? undefined;
+      const sentCount = (data && data.results?.sentCount) ?? undefined;
+      let description = data?.message || 'Campaign queued for sending';
+      if (typeof queuedCount === 'number' && typeof totalRecipients === 'number') {
+        description = `Queued ${queuedCount} of ${totalRecipients} recipients for sending`;
+      } else if (typeof sentCount === 'number') {
+        description = `Sent to ${sentCount} recipients`;
+      }
       toast({
-        title: "Campaign sent",
-        description: `Campaign sent to ${data.results?.sentCount || 0} recipients`,
+        title: "Campaign queued",
+        description,
       });
     },
     onError: (error: any) => {
@@ -752,6 +761,8 @@ const MarketingPage = () => {
                                   ? "Sent" 
                                   : campaign.status === "scheduled" 
                                   ? "Scheduled" 
+                                  : campaign.status === "sending"
+                                  ? "Sending"
                                   : "Draft"}
                               </Badge>
                               <CardTitle className="text-lg">{campaign.name}</CardTitle>
@@ -1739,6 +1750,8 @@ const MarketingPage = () => {
                             ? "Sent" 
                             : viewCampaign.status === "scheduled" 
                             ? "Scheduled" 
+                            : viewCampaign.status === "sending"
+                            ? "Sending"
                             : "Draft"}
                         </Badge>
                       </div>

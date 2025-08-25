@@ -71,14 +71,14 @@ const SidebarItem = ({ icon, label, href, isActive, isOpen, onClick }: SidebarIt
         flex items-center px-4 py-3 text-sm font-medium rounded-lg
         transition-all duration-200
         ${isActive
-          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+          ? 'border-2 border-primary text-primary bg-transparent'
           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
         }
       `}
     >
       <span className={`
         flex-shrink-0 transition-transform duration-200
-        ${isActive ? 'text-white' : 'text-primary'}
+        text-primary
       `}>
         {icon}
       </span>
@@ -171,6 +171,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
         transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full w-0'}
         bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+        overflow-x-hidden
       `}>
         <div className="flex flex-col h-full">
           {/* Navigation */}
@@ -188,14 +189,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>
@@ -244,14 +245,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>
@@ -320,14 +321,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>
@@ -386,14 +387,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>
@@ -452,14 +453,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>
@@ -518,14 +519,14 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                         w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg
                         transition-all duration-200
                         ${isActive
-                          ? (isOpen ? 'bg-primary text-white' : 'text-primary')
+                          ? 'border-2 border-primary text-primary bg-transparent'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
                         }
                       `}
                     >
                       <span className={`
                         flex-shrink-0 transition-transform duration-200
-                        ${isActive ? 'text-white' : 'text-primary'}
+                        text-primary
                       `}>
                         {item.icon}
                       </span>

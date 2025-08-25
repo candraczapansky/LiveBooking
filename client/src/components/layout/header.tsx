@@ -30,11 +30,11 @@ export const Header = () => {
               onClick={toggleSidebar}
               variant="outline"
               size="icon"
-              className="rounded-lg"
+              className="rounded-lg text-gray-700 dark:text-gray-300"
               aria-label={isOpen ? "Close menu" : "Open menu"}
               aria-expanded={isOpen}
             >
-              <Menu className="h-6 w-6" strokeWidth={2} data-hamburger="true" />
+              <Menu className="h-6 w-6" strokeWidth={2} />
             </Button>
             <div className="lg:hidden ml-3 truncate">
               <Link href="/dashboard" className="truncate hover:opacity-80 transition-opacity cursor-pointer">

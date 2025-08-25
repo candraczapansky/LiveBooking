@@ -433,7 +433,8 @@ export class MarketingCampaignService {
     // Update campaign counters and status
     const newSent = (campaign.sentCount || 0) + sentCount;
     const newFailed = (campaign.failedCount || 0) + failedCount;
-    const update: any = { status: remainingPending.length > 0 ? 'sending' : 'sent', sentCount: newSent, failedCount: newFailed };
+    const newDelivered = (campaign.deliveredCount || 0) + sentCount;
+    const update: any = { status: remainingPending.length > 0 ? 'sending' : 'sent', sentCount: newSent, deliveredCount: newDelivered, failedCount: newFailed };
     if (update.status === 'sent') {
       update.sentAt = new Date();
     }

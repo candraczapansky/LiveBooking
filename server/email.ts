@@ -1,4 +1,3 @@
-import { MailService } from '@sendgrid/mail';
 import { 
   appointmentConfirmationTemplate, 
   appointmentReminderTemplate, 
@@ -10,16 +9,7 @@ import {
 } from './email-templates.js';
 import Handlebars from 'handlebars';
 
-let mailService: MailService | null = null;
-
-// Initialize SendGrid with environment variable (fallback)
-if (process.env.SENDGRID_API_KEY) {
-  mailService = new MailService();
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('SendGrid initialized with environment API key');
-} else {
-  console.log('SendGrid API key not found in environment. Email functionality will be disabled.');
-}
+// SendGrid is loaded dynamically when needed to avoid ESM/CJS interop issues in some runtimes
 
 interface EmailParams {
   to: string | string[];
@@ -108,9 +98,10 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       return await sendEmailFallback(params);
     }
     
-    // Create mail service with current API key
-    const currentMailService = new MailService();
-    currentMailService.setApiKey(apiKey);
+    // Dynamically import SendGrid to avoid build-time ESM/CJS issues
+    const sgMailModule = await import('@sendgrid/mail');
+    const sgMail = sgMailModule.default;
+    sgMail.setApiKey(apiKey);
     
     // Determine the final from email
     let finalFromEmail = fromEmail || params.from;
@@ -153,7 +144,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     console.log('  - API Key loaded:', !!process.env.SENDGRID_API_KEY);
     console.log('  - From email verified:', isVerifiedSender(finalFromEmail));
     
-    const response = await currentMailService.send(msg);
+    const response = await sgMail.send(msg);
     console.log('✅ SENDEMAIL - Email sent successfully to:', params.to);
     console.log('  - SendGrid response status:', response[0]?.statusCode);
     console.log('  - Message ID:', response[0]?.headers?.['x-message-id']);

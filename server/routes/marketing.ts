@@ -274,11 +274,67 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
       LoggerService.info("Marketing campaign queued for SMS drip", { ...context, campaignId, queued });
 
+      // Process a small immediate batch to provide real-time feedback
+      let immediateSent = 0;
+      let immediateFailed = 0;
+      try {
+        const immediateBatchSize = parseInt(process.env.SMS_DRIP_IMMEDIATE_BATCH_SIZE || '10', 10);
+        const allAfterQueue = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
+        const pendingBatch = (allAfterQueue as any[]).filter(r => (r as any).status === 'pending').slice(0, Math.max(0, immediateBatchSize));
+        for (const rec of pendingBatch) {
+          try {
+            const user = await storage.getUser((rec as any).userId);
+            if (!user || !user.phone || !user.smsPromotions) {
+              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
+              immediateFailed++;
+              continue;
+            }
+            const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
+            const sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
+            if (sendResult.success) {
+              immediateSent++;
+              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
+            } else {
+              immediateFailed++;
+              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: sendResult.error || 'send_failed' } as any);
+            }
+          } catch (err: any) {
+            immediateFailed++;
+            try {
+              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: err?.message || 'error' } as any);
+            } catch {}
+          }
+        }
+
+        // Refresh campaign and update counters/status
+        const fresh = await storage.getMarketingCampaign(campaignId);
+        if (fresh) {
+          const allRecips = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
+          const remainingPending = (allRecips as any[]).filter(r => (r as any).status === 'pending').length;
+          const update: any = {
+            status: remainingPending > 0 ? 'sending' : 'sent',
+            sentCount: (fresh.sentCount || 0) + immediateSent,
+            deliveredCount: (fresh.deliveredCount || 0) + immediateSent,
+            failedCount: (fresh.failedCount || 0) + immediateFailed,
+          };
+          if (update.status === 'sent') {
+            update.sentAt = new Date();
+          }
+          await storage.updateMarketingCampaign(campaignId, update);
+        }
+      } catch (kickErr) {
+        LoggerService.error("Immediate SMS batch processing error", { ...context, campaignId }, kickErr as Error);
+      }
+
       return res.json({
         success: true,
-        message: "Campaign queued for SMS drip sending",
+        message: immediateSent > 0 ? "Campaign started sending" : "Campaign queued for SMS drip sending",
         queuedCount: queued,
         totalRecipients: recipients.length,
+        results: {
+          sentCount: immediateSent,
+          failedCount: immediateFailed,
+        },
         batchSize: parseInt(process.env.SMS_DRIP_BATCH_SIZE || '100', 10),
         batchIntervalMinutes: 10,
       });
@@ -855,6 +911,64 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
     res.json(updatedCampaign);
   }));
+
+  // Send a test SMS for a specific campaign to a specific number (POST and GET alias)
+  const testSmsHandler = asyncHandler(async (req: Request, res: Response) => {
+    const campaignId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.info("Sending test SMS for campaign", { ...context, campaignId });
+
+    const campaign = await storage.getMarketingCampaign(campaignId);
+    if (!campaign) {
+      throw new NotFoundError("Marketing campaign");
+    }
+    if (campaign.type !== 'sms') {
+      throw new ValidationError("Test SMS is only available for SMS campaigns");
+    }
+
+    const toRaw = (req.body?.to || req.query?.to || '').toString().trim();
+    if (!toRaw) {
+      throw new ValidationError("Missing 'to' phone number");
+    }
+
+    // Prepare media URL for MMS if applicable
+    let photoUrlForSending: string | undefined = undefined;
+    if (campaign.photoUrl) {
+      const raw = campaign.photoUrl.toString();
+      if (/^https?:\/\//i.test(raw)) {
+        photoUrlForSending = raw;
+      } else {
+        let candidate = getPublicUrl(`/api/marketing-campaigns/${campaignId}/photo`);
+        const looksLocal = /localhost|127\.0\.0\.1/i.test(candidate);
+        if (looksLocal) {
+          const xfProto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+          const xfHost = (req.headers['x-forwarded-host'] as string) || req.get('host');
+          if (xfHost) {
+            const baseFromReq = `${xfProto}://${xfHost}`;
+            if (!/localhost|127\.0\.0\.1/i.test(baseFromReq)) {
+              candidate = `${baseFromReq}/api/marketing-campaigns/${campaignId}/photo`;
+            }
+          }
+        }
+        photoUrlForSending = candidate;
+      }
+    }
+
+    const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
+    const result = await sendSMS(toRaw, smsContent, photoUrlForSending);
+
+    if (result.success) {
+      LoggerService.info("Test SMS sent", { ...context, campaignId, to: toRaw });
+      return res.json({ success: true, message: 'Test SMS sent', to: toRaw, messageId: result.messageId });
+    } else {
+      LoggerService.error("Test SMS failed", { ...context, campaignId, to: toRaw, error: result.error });
+      return res.status(400).json({ success: false, error: result.error || 'Failed to send test SMS' });
+    }
+  });
+
+  app.post(["/api/marketing/campaigns/:id/test-sms", "/api/marketing-campaigns/:id/test-sms"], testSmsHandler);
+  app.get(["/api/marketing/campaigns/:id/test-sms", "/api/marketing-campaigns/:id/test-sms"], testSmsHandler);
 
   // Get SMS configuration status
   app.get("/api/sms-config-status", asyncHandler(async (req: Request, res: Response) => {
