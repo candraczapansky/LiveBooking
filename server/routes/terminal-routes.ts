@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HelcimTerminalService } from '../services/helcim-terminal-service.js';
 import type { IStorage } from '../storage.js';
 import { TerminalConfigService } from '../services/terminal-config-service.js';
+import { log } from '../vite.js';
 
 // Factory to create router with storage dependency
 export default function createTerminalRoutes(storage: IStorage) {
@@ -32,6 +33,8 @@ const PaymentRequestSchema = z.object({
  */
   router.post('/initialize', async (req, res) => {
     try {
+      try { console.log('🟢 POST /api/terminal/initialize', { body: req.body }); } catch {}
+      try { log('🟢 POST /api/terminal/initialize'); } catch {}
       const data = InitializeTerminalSchema.parse(req.body);
 
       const success = await terminalService.initializeTerminal({
@@ -60,6 +63,8 @@ const PaymentRequestSchema = z.object({
  */
 router.post('/payment/start', async (req, res) => {
   try {
+    try { console.log('🟢 POST /api/terminal/payment/start', { body: req.body }); } catch {}
+    try { log('🟢 POST /api/terminal/payment/start'); } catch {}
     const data = PaymentRequestSchema.parse(req.body);
     
     const result = await terminalService.startPayment(
@@ -96,7 +101,34 @@ router.post('/payment/start', async (req, res) => {
 router.get('/payment/:locationId/:paymentId', async (req, res) => {
   try {
     const { locationId, paymentId } = req.params;
+    try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
+    try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
     
+    // Fast-path: webhook cache. If pending, attempt refresh via transactionId
+    try {
+      const cached: any = (terminalService as any).checkWebhookCache?.(paymentId);
+      if (cached) {
+        if (cached.status !== 'completed' && cached.transactionId) {
+          try {
+            const refreshed = await terminalService.checkPaymentStatus(locationId, String(cached.transactionId));
+            const r = (refreshed as any) || {};
+            return res.json({
+              success: r.status === 'completed',
+              status: r.status || cached.status,
+              last4: r.last4 || cached.last4,
+              transactionId: r.transactionId || cached.transactionId,
+            });
+          } catch {}
+        }
+        return res.json({
+          success: cached.status === 'completed',
+          status: cached.status,
+          last4: cached.last4,
+          transactionId: cached.transactionId || paymentId,
+        });
+      }
+    } catch {}
+
     const status = await terminalService.checkPaymentStatus(locationId, paymentId);
     try {
       console.log('🔎 Terminal status debug', { locationId, paymentId, raw: status });
@@ -150,6 +182,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
 
   router.post('/complete-payment', async (req, res) => {
     try {
+      try { console.log('🟢 POST /api/terminal/complete-payment', { body: req.body }); } catch {}
       const { transactionId, appointmentId, paymentId } = req.body || {};
       if (!transactionId) {
         return res.status(400).json({ success: false, message: 'transactionId is required' });
@@ -276,6 +309,36 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     }
   });
 
+  // Helcim webhook endpoint (configure in Helcim dashboard)
+  router.post('/webhook', async (req, res) => {
+    try {
+      try { log('🟢 POST /api/terminal/webhook'); } catch {}
+      // Accept JSON, or Helcim-form-urlencoded payloads
+      let payload = (req as any).body || {};
+      if (!payload || Object.keys(payload).length === 0 && (req as any).rawBody) {
+        try { payload = JSON.parse((req as any).rawBody); } catch {}
+      }
+      // Some gateways nest the event under data or event
+      const maybe = payload?.data || payload?.event || payload;
+      try {
+        console.log('📥 Terminal webhook raw', { payload });
+        console.log('📥 Terminal webhook maybe', { maybe });
+      } catch {}
+      // Map common Helcim fields to our cache format
+      const normalized = {
+        invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
+        transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId,
+        last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
+        status: maybe?.status || maybe?.result || maybe?.outcome,
+      };
+      await (terminalService as any).handleWebhook(normalized);
+      return res.json({ received: true });
+    } catch (error: any) {
+      console.error('❌ Error handling terminal webhook:', error);
+      return res.status(400).json({ received: false });
+    }
+  });
+
 /**
  * Cancel a payment
  */
@@ -300,6 +363,8 @@ router.post('/payment/:locationId/:paymentId/cancel', async (req, res) => {
 router.get('/status/:locationId', async (req, res) => {
   try {
     const { locationId } = req.params;
+    try { console.log('🟢 GET /api/terminal/status/:locationId', { locationId }); } catch {}
+    try { log('🟢 GET /api/terminal/status/:locationId'); } catch {}
     // Return configured=true if we have a saved terminal config for this location.
     const config = await configService.getTerminalConfig(locationId);
     if (!config) {

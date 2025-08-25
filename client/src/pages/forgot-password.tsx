@@ -34,10 +34,11 @@ const ForgotPassword = () => {
   const handleSubmit = async (values: ForgotPasswordValues) => {
     setIsLoading(true);
     try {
-      const response = await fetch("/api/forgot-password", {
+      const response = await fetch("/api/auth/password-reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
+        credentials: 'include',
       });
 
       const data = await response.json();

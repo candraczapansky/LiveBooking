@@ -8,7 +8,9 @@ import {
   followUpTemplate,
   birthdayTemplate,
   generateEmailHTML,
-  generateEmailText
+  generateEmailText,
+  generateRawMarketingEmailHTML,
+  htmlToText
 } from '../email-templates.js';
 import type { IStorage } from '../storage.js';
 import { addDays, format } from 'date-fns';
@@ -328,8 +330,11 @@ router.post('/send-template', async (req, res) => {
       ...data
     };
 
-    const html = generateEmailHTML(template, templateData, subject || defaultSubject);
-    const text = generateEmailText(template, templateData);
+    const contentLooksFull = !!(data && typeof data === 'object' && typeof (data as any).content === 'string' && /<!DOCTYPE|<html|<body/i.test((data as any).content));
+    const html = contentLooksFull
+      ? generateRawMarketingEmailHTML((data as any).content, (data as any).unsubscribeUrl || '#')
+      : generateEmailHTML(template, templateData, subject || defaultSubject);
+    const text = contentLooksFull ? htmlToText(html) : generateEmailText(template, templateData);
 
     const emailSent = await sendEmail({
       to: recipientEmail,

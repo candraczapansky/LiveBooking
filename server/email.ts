@@ -5,7 +5,9 @@ import {
   birthdayTemplate,
   marketingCampaignTemplate,
   generateEmailHTML,
-  generateEmailText
+  generateEmailText,
+  generateRawMarketingEmailHTML,
+  htmlToText
 } from './email-templates.js';
 import Handlebars from 'handlebars';
 
@@ -276,8 +278,11 @@ export function createMarketingCampaignEmail(
       `${baseUrl}/api/email-marketing/unsubscribe/0`
   };
 
-  const html = generateEmailHTML(marketingCampaignTemplate, templateData, subject);
-  const text = generateEmailText(marketingCampaignTemplate, templateData);
+  const looksLikeFullHtml = /<!DOCTYPE|<html|<body/i.test(content || '');
+  const html = looksLikeFullHtml
+    ? generateRawMarketingEmailHTML(content, templateData.unsubscribeUrl)
+    : generateEmailHTML(marketingCampaignTemplate, templateData, subject);
+  const text = looksLikeFullHtml ? htmlToText(html) : generateEmailText(marketingCampaignTemplate, templateData);
 
   return {
     to: clientEmail,

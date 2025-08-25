@@ -19,7 +19,7 @@ import { insertMarketingCampaignSchema, insertPromoCodeSchema } from "../../shar
 const campaignSchema = insertMarketingCampaignSchema;
 
 // Append required SMS marketing compliance text if missing
-const SMS_MARKETING_COMPLIANCE_TEXT = "Reply STOP to opt out. Reply HELP for help. Msg & data rates may apply.";
+const SMS_MARKETING_COMPLIANCE_TEXT = "reply STOP to opt out. Call 918-932-5396 for HELP. Msg & data rates may apply.";
 
 function ensureSmsMarketingCompliance(message: string): string {
   const base = (message ?? '').toString().trim();
@@ -498,6 +498,20 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
           // Using basic message for now until email templates are implemented
           emailContent = message.replace(/\{\{name\}\}/g, recipient.firstName || recipient.username || 'Valued Client');
         }
+
+        // Append a minimal unsubscribe footer for compliance
+        try {
+          const baseUrl = (process.env.CUSTOM_DOMAIN as string) || `${req.protocol}://${req.get('host')}`;
+          const unsubscribeUrl = `${baseUrl}/api/email-marketing/unsubscribe/${recipient.id}`;
+          const compliance = `\n<div style="font-size:12px; color:#666; text-align:center; margin:16px 0;">You are receiving this because you opted in to emails from us. <a href="${unsubscribeUrl}" style="color:#667eea; text-decoration:underline;">Unsubscribe</a></div>`;
+          if (/<\/body>/i.test(emailContent)) {
+            emailContent = emailContent.replace(/<\/body>/i, `${compliance}</body>`);
+          } else if (/<\/html>/i.test(emailContent)) {
+            emailContent = emailContent.replace(/<\/html>/i, `${compliance}</html>`);
+          } else {
+            emailContent = `${emailContent}${compliance}`;
+          }
+        } catch {}
 
         await sendEmail({
           to: recipient.email,

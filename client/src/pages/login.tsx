@@ -272,6 +272,7 @@ const Login = () => {
                       variant="ghost"
                       onClick={() => navigate("/forgot-password")}
                       className="text-xs text-primary hover:text-primary/80 h-8"
+                      type="button"
                     >
                       Reset via Email
                     </Button>
@@ -279,6 +280,7 @@ const Login = () => {
                       variant="ghost"
                       onClick={() => navigate("/forgot-password-sms")}
                       className="text-xs text-primary hover:text-primary/80 h-8"
+                      type="button"
                     >
                       Reset via SMS
                     </Button>

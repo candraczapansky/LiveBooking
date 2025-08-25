@@ -1,7 +1,7 @@
 import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
 import { getPublicUrl } from './utils/url.js';
-import { marketingCampaignTemplate, generateEmailHTML, generateEmailText } from './email-templates.js';
+import { marketingCampaignTemplate, generateEmailHTML, generateEmailText, generateRawMarketingEmailHTML, htmlToText } from './email-templates.js';
 import type { IStorage } from './storage.js';
 import { addDays, format } from 'date-fns';
 
@@ -250,21 +250,30 @@ export class MarketingCampaignService {
           continue;
         }
 
+        const baseUrl = process.env.CUSTOM_DOMAIN || 'http://localhost:5000';
+        const editorHtml = (campaign.htmlContent || campaign.content || '').toString();
         const templateData = {
           clientName: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Valued Client',
           clientEmail: user.email,
           campaignTitle: campaign.name,
           campaignSubtitle: campaign.subject || '',
-          campaignContent: campaign.htmlContent || campaign.content,
+          campaignContent: editorHtml,
           ctaButton: (campaign as any).ctaButton,
           ctaUrl: (campaign as any).ctaUrl,
           specialOffer: (campaign as any).specialOffer,
           promoCode: (campaign as any).promoCode,
-          unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${user.id}`
+          unsubscribeUrl: `${baseUrl}/api/email-marketing/unsubscribe/${user.id}`
         };
 
-        const html = generateEmailHTML(marketingCampaignTemplate, templateData, campaign.subject || campaign.name);
-        const text = generateEmailText(marketingCampaignTemplate, templateData);
+        // If the content looks like a full HTML document from the editor, send it raw with only an unsubscribe footer
+        const looksLikeFullHtml = /<!DOCTYPE|<html|<body/i.test(editorHtml);
+        const subject = campaign.subject || campaign.name;
+        const html = looksLikeFullHtml
+          ? generateRawMarketingEmailHTML(editorHtml, templateData.unsubscribeUrl)
+          : generateEmailHTML(marketingCampaignTemplate, templateData, subject);
+        const text = looksLikeFullHtml
+          ? htmlToText(html)
+          : generateEmailText(marketingCampaignTemplate, templateData);
 
         const emailSent = await sendEmail({
           to: user.email,

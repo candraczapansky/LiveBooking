@@ -332,3 +332,35 @@ export function generateEmailText(template: HandlebarsTemplateDelegate, data: an
     .replace(/\s+/g, ' ')
     .trim();
 } 
+
+// Generate a raw marketing email using ONLY the provided editor HTML plus a minimal unsubscribe footer
+// This bypasses the base template wrapper and any default headers/footers
+export function generateRawMarketingEmailHTML(editorHtml: string, unsubscribeUrl: string): string {
+  const base = (editorHtml || '').toString();
+  const compliance = `\n<div style="font-size:12px; color:#666; text-align:center; margin:16px 0;">
+    You are receiving this because you opted in to emails from us.
+    <a href="${unsubscribeUrl}" style="color:#667eea; text-decoration:underline;">Unsubscribe</a>
+  </div>`;
+
+  // If the editor provided a full HTML document, inject compliance before </body> or </html>
+  if (/<\/body>/i.test(base)) {
+    return base.replace(/<\/body>/i, `${compliance}</body>`);
+  }
+  if (/<\/html>/i.test(base)) {
+    return base.replace(/<\/html>/i, `${compliance}</html>`);
+  }
+  // Otherwise, append compliance at the end
+  return `${base}${compliance}`;
+}
+
+// Convert arbitrary HTML to plain text (used for raw marketing emails)
+export function htmlToText(html: string): string {
+  const raw = (html || '').toString();
+  return raw
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}

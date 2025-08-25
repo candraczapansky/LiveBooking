@@ -267,6 +267,15 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
         return res.status(400).send('Missing parameters');
       }
 
+      // Disconnect specific number from AI SMS responder
+      try {
+        const toDigits = to.replace(/\D/g, '').slice(-10);
+        if (toDigits === '9187277348') {
+          res.set('Content-Type', 'text/xml');
+          return res.send('<Response></Response>');
+        }
+      } catch {}
+
       console.log('📨 Incoming SMS webhook', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
       // Handle STOP/START keywords first (compliance and suppression)
@@ -324,6 +333,15 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
       if (!from || !to || !body) {
         return res.status(400).send('<Response></Response>');
       }
+
+      // Disconnect specific number from AI SMS responder
+      try {
+        const toDigits = to.replace(/\D/g, '').slice(-10);
+        if (toDigits === '9187277348') {
+          res.set('Content-Type', 'text/xml');
+          return res.send('<Response></Response>');
+        }
+      } catch {}
 
       console.log('📨 Incoming SMS webhook (alias)', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
