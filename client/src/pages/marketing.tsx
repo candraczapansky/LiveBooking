@@ -292,6 +292,18 @@ const MarketingPage = () => {
     }
   });
 
+  // Periodically refresh campaigns while any are actively sending
+  const hasSendingCampaigns = (campaigns as any[]).some((c: any) => c.status === 'sending');
+  useEffect(() => {
+    if (!hasSendingCampaigns) return;
+    const interval = setInterval(() => {
+      try {
+        queryClient.refetchQueries({ queryKey: ['/api/marketing-campaigns'] });
+      } catch {}
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [hasSendingCampaigns]);
+
   // Fetch promo codes from API (gracefully handle missing endpoint)
   const { data: promoCodes = [], isLoading: promoCodesLoading } = useQuery<any[]>({
     queryKey: ['/api/promo-codes'],
@@ -354,6 +366,10 @@ const MarketingPage = () => {
       }
     }
   });
+
+  // Derived opt-in counts
+  const emailOptInCount = (allClients as any[]).filter((u: any) => !!u.email && u.emailPromotions === true).length;
+  const smsOptInCount = (activeSmsClients as any[]).length;
 
   // Create campaign mutation
   const createCampaignMutation = useMutation({
@@ -693,6 +709,20 @@ const MarketingPage = () => {
               </div>
             </div>
             
+            {/* Opt-In Summary */}
+            <div className="mb-4 flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <span>Email opt-in:</span>
+                <span className="font-medium">{emailOptInCount}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                <span>SMS opt-in:</span>
+                <span className="font-medium">{smsOptInCount}</span>
+              </div>
+            </div>
+
             {/* Marketing Tabs */}
             <Tabs defaultValue="campaigns" value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="mb-6">
@@ -808,6 +838,14 @@ const MarketingPage = () => {
                               <div className="text-center p-2 bg-muted rounded">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Open Rate</span>
                                 <p className="font-medium">{campaign.openRate}%</p>
+                              </div>
+                            </div>
+                          )}
+                          {campaign.status === "sending" && (
+                            <div className="mt-4 grid grid-cols-1 gap-4">
+                              <div className="text-center p-2 bg-muted rounded">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">Sent so far</span>
+                                <p className="font-medium">{campaign.sentCount ?? 0}</p>
                               </div>
                             </div>
                           )}

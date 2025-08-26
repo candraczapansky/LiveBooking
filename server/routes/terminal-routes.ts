@@ -103,14 +103,20 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
+    // Force bypass of conditional requests to prevent 304 during active polling
+    try {
+      delete (req as any).headers['if-none-match'];
+      delete (req as any).headers['if-modified-since'];
+    } catch {}
     // Avoid intermediate proxies/browser returning 304 by disabling caching for polling endpoint
     try {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
-      // Also ensure a unique ETag per response so conditional requests don't 304
-      res.setHeader('ETag', `"poll-${Date.now()}-${paymentId}"`);
+      // Ensure conditional validators are not present
+      try { res.removeHeader('ETag'); } catch {}
+      try { res.removeHeader('Last-Modified'); } catch {}
     } catch {}
     
     // Fast-path: webhook cache. If pending, attempt refresh via transactionId
@@ -144,7 +150,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     } catch {}
     // Normalize response with fallbacks
     const s = (status as any) || {};
-    res.json({
+    res.status(200).json({
       success: s.status === 'completed',
       status: s.status || 'pending',
       message: s.message || 'Processing payment... ',
@@ -335,16 +341,37 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       } catch {}
       // Map common Helcim fields to our cache format
       const normalized = {
+        // Helcim docs: cardTransaction webhook can be { id, type: 'cardTransaction' }
+        // We map id->transactionId and enrich later in service
         invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
         transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId,
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
       };
+      // Best-effort: if only {id,type} is provided, log clearly
+      try {
+        if (normalized.transactionId && !normalized.status && !normalized.invoiceNumber) {
+          console.log('ℹ️ Minimal webhook received; will enrich by id', normalized);
+        }
+      } catch {}
       await (terminalService as any).handleWebhook(normalized);
       return res.json({ received: true });
     } catch (error: any) {
       console.error('❌ Error handling terminal webhook:', error);
       return res.status(400).json({ received: false });
+    }
+  });
+
+  // Lightweight debug endpoint to inspect recent terminal sessions and webhooks
+  router.get('/debug/snapshot', async (req, res) => {
+    try {
+      try {
+        res.setHeader('Cache-Control', 'no-store');
+      } catch {}
+      const snapshot = (terminalService as any).debugSnapshot?.() || { sessions: [], webhooks: [] };
+      return res.json(snapshot);
+    } catch (e: any) {
+      return res.status(500).json({ error: e?.message || 'Failed to load debug snapshot' });
     }
   });
 

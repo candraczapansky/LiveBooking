@@ -205,6 +205,7 @@ export class HelcimTerminalService {
             );
             const rd = (recentQuery?.data as any) || {};
             const rlist = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
+            // Prefer exact invoice match
             match = rlist.find((t: any) => {
               const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || '';
               const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
@@ -212,6 +213,24 @@ export class HelcimTerminalService {
               const sameAmount = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
               return sameInvoice && sameAmount;
             });
+            // Fallback: if no invoice match found, try best by recent time + amount proximity
+            if (!match && session) {
+              try {
+                const windowMs = 10 * 60 * 1000; // 10 minutes
+                const candidates = rlist
+                  .filter((t: any) => {
+                    const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
+                    const createdAt = new Date(t?.createdAt || t?.created_at || t?.timestamp || Date.now());
+                    const timeOk = Math.abs(createdAt.getTime() - session.startedAt) <= windowMs;
+                    const amountOk = Math.abs(amt - session.totalAmount) < 0.01;
+                    return timeOk && amountOk;
+                  })
+                  .sort((a: any, b: any) => new Date(b?.createdAt || b?.timestamp || 0).getTime() - new Date(a?.createdAt || a?.timestamp || 0).getTime());
+                if (candidates.length > 0) {
+                  match = candidates[0];
+                }
+              } catch {}
+            }
           }
           if (match) {
             const st = String(match.status || match.result || '').toLowerCase();
@@ -245,6 +264,7 @@ export class HelcimTerminalService {
               const recentMerchant = await this.makeRequest('GET', `/transactions`, undefined, merchantToken);
               const md = (recentMerchant?.data as any) || {};
               const mlist = Array.isArray(md) ? md : (Array.isArray(md?.transactions) ? md.transactions : []);
+              // Prefer invoice match first
               match = mlist.find((t: any) => {
                 const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || '';
                 const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
@@ -252,6 +272,24 @@ export class HelcimTerminalService {
                 const sameAmount = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
                 return sameInvoice && sameAmount;
               });
+              // Fallback by recent time + amount if invoice missing at merchant level
+              if (!match && session) {
+                try {
+                  const windowMs = 10 * 60 * 1000;
+                  const candidates = mlist
+                    .filter((t: any) => {
+                      const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
+                      const createdAt = new Date(t?.createdAt || t?.created_at || t?.timestamp || Date.now());
+                      const timeOk = Math.abs(createdAt.getTime() - session.startedAt) <= windowMs;
+                      const amountOk = Math.abs(amt - session.totalAmount) < 0.01;
+                      return timeOk && amountOk;
+                    })
+                    .sort((a: any, b: any) => new Date(b?.createdAt || b?.timestamp || 0).getTime() - new Date(a?.createdAt || a?.timestamp || 0).getTime());
+                  if (candidates.length > 0) {
+                    match = candidates[0];
+                  }
+                } catch {}
+              }
             }
             if (match) {
               const st = String(match.status || match.result || '').toLowerCase();
@@ -466,6 +504,24 @@ export class HelcimTerminalService {
               }
             }
           } catch {
+            // Try cardTransactions by id with device-level token (some environments allow this)
+            try {
+              const config2 = await this.configService.getTerminalConfig(session.locationId);
+              if (config2) {
+                const ctx2 = await this.makeRequest('GET', `/cardTransactions/${transactionId}`, undefined, config2.apiToken);
+                const cd2: any = ctx2?.data || {};
+                const st2 = String(cd2.status || cd2.result || cd2.outcome || '').toLowerCase();
+                if (!invoiceNumber) {
+                  invoiceNumber = cd2.invoiceNumber || cd2.invoice || cd2.referenceNumber || cd2.reference || sessionKey || undefined;
+                }
+                last4 = last4 || cd2.last4 || cd2.cardLast4 || (cd2.card && cd2.card.last4) || undefined;
+                if (['approved', 'captured', 'completed', 'success', 'succeeded', 'paid'].includes(st2)) {
+                  normalized = 'completed';
+                } else if (['declined', 'failed', 'canceled', 'cancelled', 'voided'].includes(st2)) {
+                  normalized = 'failed';
+                }
+              }
+            } catch {}
             // Optional: merchant-level fallbacks if available
             try {
               const merchantToken = process.env.HELCIM_API_TOKEN;
@@ -539,6 +595,32 @@ export class HelcimTerminalService {
       } catch {}
     } catch (e) {
       // best effort only
+    }
+  }
+
+  /**
+   * Debug snapshot of recent sessions and webhooks for troubleshooting
+   */
+  debugSnapshot(limit: number = 10) {
+    try {
+      const sessions: any[] = [];
+      sessionStore.forEach((value, key) => {
+        sessions.push({ key, ...value });
+      });
+      sessions.sort((a, b) => b.startedAt - a.startedAt);
+
+      const webhooks: any[] = [];
+      webhookStore.forEach((value, key) => {
+        webhooks.push({ key, ...value });
+      });
+      webhooks.sort((a, b) => b.updatedAt - a.updatedAt);
+
+      return {
+        sessions: sessions.slice(0, limit),
+        webhooks: webhooks.slice(0, limit),
+      };
+    } catch {
+      return { sessions: [], webhooks: [] };
     }
   }
 

@@ -9,7 +9,7 @@ interface EmailTemplateEditorProps {
 }
 
 export interface EmailTemplateEditorRef {
-  exportHtml: () => void;
+  exportHtml: () => Promise<{ design: any; html: string }>;
 }
 
 const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEditorProps>(({
@@ -22,14 +22,17 @@ const EmailTemplateEditor = forwardRef<EmailTemplateEditorRef, EmailTemplateEdit
   const containerRef = useRef<HTMLDivElement>(null);
   const [editorHeight, setEditorHeight] = useState(600);
 
-  const exportHtml = () => {
+  const exportHtml = (): Promise<{ design: any; html: string }> => {
     const unlayer = emailEditorRef.current?.editor;
-    if (!unlayer) return;
+    if (!unlayer) return Promise.resolve({ design: null as any, html: "" });
 
-    unlayer.exportHtml((data) => {
-      const { design, html } = data;
-      onDesignChange?.(design);
-      onHtmlChange?.(html);
+    return new Promise((resolve) => {
+      unlayer.exportHtml((data: any) => {
+        const { design, html } = data;
+        onDesignChange?.(design);
+        onHtmlChange?.(html);
+        resolve({ design, html });
+      });
     });
   };
 

@@ -13,6 +13,9 @@ config();
 
 const app = express();
 
+// Disable ETag to prevent 304 on dynamic API responses (polling endpoints)
+app.set('etag', false);
+
 // Add CORS support for external applications
 app.use((req, res, next) => {
   const origin = req.headers.origin as string | undefined;
