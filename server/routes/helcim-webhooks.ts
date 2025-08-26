@@ -21,7 +21,7 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
       if (typeof maybe === 'string') { try { maybe = JSON.parse(maybe); } catch {} }
       const normalized = {
         invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
-        transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId || body?.id,
+        transactionId: maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || body?.id,
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
       };

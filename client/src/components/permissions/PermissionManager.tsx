@@ -106,6 +106,7 @@ const PermissionManager: React.FC = () => {
   const [isAssignGroupOpen, setIsAssignGroupOpen] = useState(false);
   const [selectedCreatePermIds, setSelectedCreatePermIds] = useState<Set<number>>(new Set());
   const [selectedEditPermIds, setSelectedEditPermIds] = useState<Set<number>>(new Set());
+  const [assignGroupId, setAssignGroupId] = useState<string>("");
 
   // Fetch permissions
   const { data: permissions, isLoading: permissionsLoading, error: permissionsError } = useQuery({
@@ -155,7 +156,7 @@ const PermissionManager: React.FC = () => {
           throw new Error(`Failed to fetch users: ${response.statusText}`);
         }
         const data = await response.json();
-        return data.data as User[] || [];
+        return (Array.isArray(data) ? data : (data.data as User[])) || [];
       } catch (error) {
         console.error('Error fetching users:', error);
         throw error;
@@ -266,7 +267,11 @@ const PermissionManager: React.FC = () => {
   const handleAssignGroup = (formData: FormData) => {
     if (!selectedUser) return;
 
-    const groupId = Number(formData.get('groupId'));
+    const groupIdRaw = formData.get('groupId');
+    const groupId = groupIdRaw ? Number(groupIdRaw) : NaN;
+    if (!groupId || Number.isNaN(groupId)) {
+      return;
+    }
 
     assignGroupMutation.mutate({
       userId: selectedUser.id,
@@ -696,7 +701,8 @@ const PermissionManager: React.FC = () => {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="group-select">Permission Group</Label>
-                <Select name="groupId" required>
+                <input type="hidden" name="groupId" value={assignGroupId} />
+                <Select value={assignGroupId} onValueChange={setAssignGroupId}>
                   <SelectTrigger>
                     <SelectValue placeholder="Choose a permission group" />
                   </SelectTrigger>
@@ -714,7 +720,7 @@ const PermissionManager: React.FC = () => {
               <Button type="button" variant="outline" onClick={() => setIsAssignGroupOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={assignGroupMutation.isPending}>
+              <Button type="submit" disabled={assignGroupMutation.isPending || !assignGroupId}>
                 {assignGroupMutation.isPending ? 'Assigning...' : 'Assign Group'}
               </Button>
             </DialogFooter>

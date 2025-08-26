@@ -463,7 +463,7 @@ export class HelcimTerminalService {
   async handleWebhook(payload: any) {
     try {
       let invoiceNumber = payload?.invoiceNumber || payload?.invoice || payload?.referenceNumber || payload?.reference;
-      const transactionId = payload?.transactionId || payload?.id || payload?.paymentId;
+      const transactionId = payload?.transactionId || payload?.cardTransactionId || payload?.id || payload?.paymentId;
       let last4 = payload?.last4 || payload?.cardLast4 || payload?.card?.last4 || payload?.cardLastFour || undefined;
       const rawStatus = String(payload?.status || payload?.result || payload?.outcome || '').toLowerCase();
       let normalized: 'completed' | 'failed' | 'pending' = ['approved', 'captured', 'completed', 'success', 'succeeded'].includes(rawStatus)

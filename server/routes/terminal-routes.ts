@@ -350,7 +350,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
         // Helcim docs: cardTransaction webhook can be { id, type: 'cardTransaction' }
         // We map id->transactionId and enrich later in service
         invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
-        transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId || payload?.id,
+        transactionId: maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || payload?.id,
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
       };
