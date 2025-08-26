@@ -280,33 +280,44 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       let immediateSent = 0;
       let immediateFailed = 0;
       try {
-        const immediateBatchSize = parseInt(process.env.SMS_DRIP_IMMEDIATE_BATCH_SIZE || '10', 10);
-        const allAfterQueue = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
-        const pendingBatch = (allAfterQueue as any[]).filter(r => (r as any).status === 'pending').slice(0, Math.max(0, immediateBatchSize));
-        for (const rec of pendingBatch) {
-          try {
-            const user = await storage.getUser((rec as any).userId);
-            const hasConsent = !!user?.smsPromotions || isSpecificAudience;
-            if (!user || !user.phone || !hasConsent) {
-              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
-              immediateFailed++;
-              continue;
-            }
-            const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
-            const sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
-            if (sendResult.success) {
-              immediateSent++;
-              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
-            } else {
-              immediateFailed++;
-              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: sendResult.error || 'send_failed' } as any);
-            }
-          } catch (err: any) {
-            immediateFailed++;
+        const now = new Date();
+        const centralNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+        const startOfWindow = new Date(centralNow);
+        startOfWindow.setHours(8, 0, 0, 0);
+        const endOfWindow = new Date(centralNow);
+        endOfWindow.setHours(20, 0, 0, 0);
+        const withinWindow = centralNow >= startOfWindow && centralNow <= endOfWindow;
+        if (withinWindow) {
+          const immediateBatchSize = parseInt(process.env.SMS_DRIP_IMMEDIATE_BATCH_SIZE || '10', 10);
+          const allAfterQueue = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
+          const pendingBatch = (allAfterQueue as any[]).filter(r => (r as any).status === 'pending').slice(0, Math.max(0, immediateBatchSize));
+          for (const rec of pendingBatch) {
             try {
-              await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: err?.message || 'error' } as any);
-            } catch {}
+              const user = await storage.getUser((rec as any).userId);
+              const hasConsent = !!user?.smsPromotions || isSpecificAudience;
+              if (!user || !user.phone || !hasConsent) {
+                await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: 'no_phone_or_pref' } as any);
+                immediateFailed++;
+                continue;
+              }
+              const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
+              const sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
+              if (sendResult.success) {
+                immediateSent++;
+                await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
+              } else {
+                immediateFailed++;
+                await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: sendResult.error || 'send_failed' } as any);
+              }
+            } catch (err: any) {
+              immediateFailed++;
+              try {
+                await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'failed', errorMessage: err?.message || 'error' } as any);
+              } catch {}
+            }
           }
+        } else {
+          LoggerService.info("Immediate SMS sending skipped due to quiet hours (8am–8pm CT)", { ...context, campaignId });
         }
 
         // Refresh campaign and update counters/status

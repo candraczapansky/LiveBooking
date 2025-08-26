@@ -390,6 +390,19 @@ export class MarketingCampaignService {
     // Seed recipients on first run
     await this.seedSmsRecipientsIfNeeded(campaign);
 
+    // Enforce 8am–8pm Central Time sending window for SMS campaigns
+    const now = new Date();
+    const centralNow = new Date(now.toLocaleString('en-US', { timeZone: 'America/Chicago' }));
+    const startOfWindow = new Date(centralNow);
+    startOfWindow.setHours(8, 0, 0, 0);
+    const endOfWindow = new Date(centralNow);
+    endOfWindow.setHours(20, 0, 0, 0);
+    const withinWindow = centralNow >= startOfWindow && centralNow <= endOfWindow;
+    if (!withinWindow) {
+      // Defer processing until next interval during allowed hours
+      return { totalRecipients: (await this.storage.getMarketingCampaignRecipients(campaign.id)).length, sentCount: 0, failedCount: 0 };
+    }
+
     const allRecipients = await this.storage.getMarketingCampaignRecipients(campaign.id);
     const pending = (allRecipients || []).filter(r => (r as any).status === 'pending');
     const batchSize = parseInt(process.env.SMS_DRIP_BATCH_SIZE || '100', 10);

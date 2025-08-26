@@ -70,8 +70,12 @@ export class HelcimTerminalService {
 
       // Provide callback URL if configured so Helcim can notify our app on completion
       try {
-        const base = (process.env.TERMINAL_WEBHOOK_URL || process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
-        if (base) {
+        const fullUrl = process.env.TERMINAL_WEBHOOK_URL?.trim();
+        const base = (process.env.PUBLIC_BASE_URL || '').replace(/\/$/, '');
+        const isPublicHttps = (u: string) => /^https:\/\//i.test(u) && !/localhost|127\.|\.local\b/i.test(u);
+        if (fullUrl && isPublicHttps(fullUrl)) {
+          payload.callbackUrl = fullUrl;
+        } else if (base && isPublicHttps(base)) {
           payload.callbackUrl = `${base}/api/terminal/webhook`;
         }
       } catch {}
@@ -177,6 +181,14 @@ export class HelcimTerminalService {
       // If paymentId looks like our invoice-based session, try to resolve via Helcim by invoiceNumber
       if (typeof paymentId === 'string' && paymentId.startsWith('POS-')) {
         const session = sessionStore.get(paymentId);
+        // Derive approximate start time from POS-<timestamp> even if session was lost (e.g., after restart)
+        let derivedStartMs: number | null = null;
+        try {
+          const ts = Number(paymentId.replace(/^POS-/, ''));
+          if (Number.isFinite(ts) && ts > 1_000_000_000_000 && ts < 10_000_000_000_000) {
+            derivedStartMs = ts;
+          }
+        } catch {}
         try {
           // Attempt device-level lookup by invoiceNumber if supported
           // 1) Try with query param (if API supports it)
@@ -214,15 +226,16 @@ export class HelcimTerminalService {
               return sameInvoice && sameAmount;
             });
             // Fallback: if no invoice match found, try best by recent time + amount proximity
-            if (!match && session) {
+            if (!match && (session || derivedStartMs)) {
               try {
                 const windowMs = 10 * 60 * 1000; // 10 minutes
                 const candidates = rlist
                   .filter((t: any) => {
                     const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
                     const createdAt = new Date(t?.createdAt || t?.created_at || t?.timestamp || Date.now());
-                    const timeOk = Math.abs(createdAt.getTime() - session.startedAt) <= windowMs;
-                    const amountOk = Math.abs(amt - session.totalAmount) < 0.01;
+                    const anchor = session ? session.startedAt : (derivedStartMs ?? Date.now());
+                    const timeOk = Math.abs(createdAt.getTime() - anchor) <= windowMs;
+                    const amountOk = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
                     return timeOk && amountOk;
                   })
                   .sort((a: any, b: any) => new Date(b?.createdAt || b?.timestamp || 0).getTime() - new Date(a?.createdAt || a?.timestamp || 0).getTime());
@@ -273,15 +286,16 @@ export class HelcimTerminalService {
                 return sameInvoice && sameAmount;
               });
               // Fallback by recent time + amount if invoice missing at merchant level
-              if (!match && session) {
+              if (!match && (session || derivedStartMs)) {
                 try {
                   const windowMs = 10 * 60 * 1000;
                   const candidates = mlist
                     .filter((t: any) => {
                       const amt = Number(t?.transactionAmount ?? t?.amount ?? t?.total ?? 0);
                       const createdAt = new Date(t?.createdAt || t?.created_at || t?.timestamp || Date.now());
-                      const timeOk = Math.abs(createdAt.getTime() - session.startedAt) <= windowMs;
-                      const amountOk = Math.abs(amt - session.totalAmount) < 0.01;
+                      const anchor = session ? session.startedAt : (derivedStartMs ?? Date.now());
+                      const timeOk = Math.abs(createdAt.getTime() - anchor) <= windowMs;
+                      const amountOk = session ? Math.abs(amt - session.totalAmount) < 0.01 : true;
                       return timeOk && amountOk;
                     })
                     .sort((a: any, b: any) => new Date(b?.createdAt || b?.timestamp || 0).getTime() - new Date(a?.createdAt || a?.timestamp || 0).getTime());

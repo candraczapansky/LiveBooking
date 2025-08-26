@@ -458,11 +458,15 @@ const MarketingPage = () => {
       const queuedCount = (data && (data.queuedCount ?? data.results?.queuedCount)) ?? undefined;
       const totalRecipients = (data && (data.totalRecipients ?? data.results?.totalRecipients)) ?? undefined;
       const sentCount = (data && data.results?.sentCount) ?? undefined;
+      const failedCount = (data && (data.failedCount ?? data.results?.failedCount)) ?? undefined;
       let description = data?.message || 'Campaign queued for sending';
       if (typeof queuedCount === 'number' && typeof totalRecipients === 'number') {
         description = `Queued ${queuedCount} of ${totalRecipients} recipients for sending`;
       } else if (typeof sentCount === 'number') {
         description = `Sent to ${sentCount} recipients`;
+      }
+      if (typeof failedCount === 'number') {
+        description = `${description} · Undeliverable: ${failedCount}`;
       }
       toast({
         title: "Campaign queued",
@@ -830,7 +834,7 @@ const MarketingPage = () => {
                           )}
                           
                           {campaign.status === "sent" && (
-                            <div className="mt-4 grid grid-cols-2 gap-4">
+                            <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
                               <div className="text-center p-2 bg-muted rounded">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Sent to</span>
                                 <p className="font-medium">{campaign.sentCount}</p>
@@ -839,13 +843,21 @@ const MarketingPage = () => {
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Open Rate</span>
                                 <p className="font-medium">{campaign.openRate}%</p>
                               </div>
+                              <div className="text-center p-2 bg-muted rounded">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">Undeliverable</span>
+                                <p className="font-medium">{campaign.failedCount ?? 0}</p>
+                              </div>
                             </div>
                           )}
                           {campaign.status === "sending" && (
-                            <div className="mt-4 grid grid-cols-1 gap-4">
+                            <div className="mt-4 grid grid-cols-2 gap-4">
                               <div className="text-center p-2 bg-muted rounded">
                                 <span className="text-sm text-gray-500 dark:text-gray-400">Sent so far</span>
                                 <p className="font-medium">{campaign.sentCount ?? 0}</p>
+                              </div>
+                              <div className="text-center p-2 bg-muted rounded">
+                                <span className="text-sm text-gray-500 dark:text-gray-400">Undeliverable so far</span>
+                                <p className="font-medium">{campaign.failedCount ?? 0}</p>
                               </div>
                             </div>
                           )}

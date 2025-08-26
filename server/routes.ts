@@ -45,6 +45,7 @@ import { registerLLMRoutes } from "./routes/llm.js";
 import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
 import { registerMembershipRoutes } from "./routes/memberships.js";
 import createTerminalRoutes from "./routes/terminal-routes.js";
+import createHelcimWebhookRoutes from "./routes/helcim-webhooks.js";
 import helcimPaymentsRouter from "./routes/payments/helcim.js";
 import { CheckSoftwareService } from "./check-software-service.js";
 import { registerExternalRoutes } from "./external-api.js";
@@ -106,6 +107,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
   // Register terminal routes
   app.use('/api/terminal', createTerminalRoutes(storage));
+  // Helcim admin-level webhooks (aliases) -> reuse terminal webhook handler
+  app.use('/api/helcim', createHelcimWebhookRoutes(storage));
   // Enable helcim payment routes
   app.use('/api/payments/helcim', helcimPaymentsRouter);
 

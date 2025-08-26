@@ -328,13 +328,19 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
   router.post('/webhook', async (req, res) => {
     try {
       try { log('🟢 POST /api/terminal/webhook'); } catch {}
-      // Accept JSON, or Helcim-form-urlencoded payloads
-      let payload = (req as any).body || {};
-      if (!payload || Object.keys(payload).length === 0 && (req as any).rawBody) {
+      // Accept JSON or x-www-form-urlencoded and handle nested JSON strings
+      let payload: any = (req as any).body || {};
+      if (!payload || (Object.keys(payload).length === 0 && (req as any).rawBody)) {
         try { payload = JSON.parse((req as any).rawBody); } catch {}
       }
-      // Some gateways nest the event under data or event
-      const maybe = payload?.data || payload?.event || payload;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+      // Some gateways nest the event under payload/data/event; sometimes as a JSON string
+      let maybe: any = payload?.payload ?? payload?.data ?? payload?.event ?? payload;
+      if (typeof maybe === 'string') {
+        try { maybe = JSON.parse(maybe); } catch {}
+      }
       try {
         console.log('📥 Terminal webhook raw', { headers: (req as any).headers, payload });
         console.log('📥 Terminal webhook maybe', { maybe });
@@ -344,7 +350,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
         // Helcim docs: cardTransaction webhook can be { id, type: 'cardTransaction' }
         // We map id->transactionId and enrich later in service
         invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
-        transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId,
+        transactionId: maybe?.transactionId || maybe?.id || maybe?.paymentId || payload?.id,
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
       };
@@ -359,6 +365,15 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     } catch (error: any) {
       console.error('❌ Error handling terminal webhook:', error);
       return res.status(400).json({ received: false });
+    }
+  });
+
+  // Simple health endpoint to verify webhook path is live
+  router.get('/webhook', async (_req, res) => {
+    try {
+      res.json({ status: 'ok' });
+    } catch (e: any) {
+      res.status(500).json({ status: 'error', message: e?.message || 'unknown' });
     }
   });
 
