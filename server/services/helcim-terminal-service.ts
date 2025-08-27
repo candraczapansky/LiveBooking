@@ -195,11 +195,12 @@ export class HelcimTerminalService {
           // 1) Try with query param (if API supports it)
           let match: any | undefined;
           try {
+            const token = config.apiToken || process.env.HELCIM_API_TOKEN;
             const q1 = await this.makeRequest(
               'GET',
               `/devices/${config.deviceCode}/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
               undefined,
-              config.apiToken
+              token
             );
             const d1 = (q1?.data as any) || {};
             const list1 = Array.isArray(d1) ? d1 : (Array.isArray(d1?.transactions) ? d1.transactions : []);
@@ -209,11 +210,12 @@ export class HelcimTerminalService {
           } catch {}
           if (!match) {
             try {
+              const token = config.apiToken || process.env.HELCIM_API_TOKEN;
               const q2 = await this.makeRequest(
                 'GET',
                 `/devices/${config.deviceCode}/transactions?referenceNumber=${encodeURIComponent(paymentId)}`,
                 undefined,
-                config.apiToken
+                token
               );
               const d2 = (q2?.data as any) || {};
               const list2 = Array.isArray(d2) ? d2 : (Array.isArray(d2?.transactions) ? d2.transactions : []);
@@ -224,11 +226,12 @@ export class HelcimTerminalService {
           }
           if (!match) {
             try {
+              const token = config.apiToken || process.env.HELCIM_API_TOKEN;
               const q3 = await this.makeRequest(
                 'GET',
                 `/devices/${config.deviceCode}/transactions?invoice=${encodeURIComponent(paymentId)}`,
                 undefined,
-                config.apiToken
+                token
               );
               const d3 = (q3?.data as any) || {};
               const list3 = Array.isArray(d3) ? d3 : (Array.isArray(d3?.transactions) ? d3.transactions : []);
@@ -240,11 +243,12 @@ export class HelcimTerminalService {
 
           // 2) If not supported, fetch recent device transactions and search
           if (!match) {
+            const token = config.apiToken || process.env.HELCIM_API_TOKEN;
             const recentQuery = await this.makeRequest(
               'GET',
               `/devices/${config.deviceCode}/transactions`,
               undefined,
-              config.apiToken
+              token
             );
             const rd = (recentQuery?.data as any) || {};
             const rlist = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
@@ -380,7 +384,8 @@ export class HelcimTerminalService {
 
       // Try device transaction by id first
       try {
-        const response = await this.makeRequest('GET', `/devices/${config.deviceCode}/transactions/${paymentId}`, undefined, config.apiToken);
+        const token = config.apiToken || process.env.HELCIM_API_TOKEN;
+        const response = await this.makeRequest('GET', `/devices/${config.deviceCode}/transactions/${paymentId}`, undefined, token);
         const data: any = response?.data || {};
         const st = String(data.status || data.result || data.outcome || '').toLowerCase();
         let normalized: 'completed' | 'failed' | 'pending' = 'pending';
@@ -400,7 +405,14 @@ export class HelcimTerminalService {
         // If device lookup not found, try cardTransactions by id
         if (msg1.includes('Not Found') || msg1.includes('404')) {
           try {
-            const ct = await this.makeRequest('GET', `/cardTransactions/${paymentId}`, undefined, config.apiToken);
+            const token = config.apiToken || process.env.HELCIM_API_TOKEN;
+            // Try both path styles just in case
+            let ct: any;
+            try {
+              ct = await this.makeRequest('GET', `/cardTransactions/${paymentId}`, undefined, token);
+            } catch (tryKebab: any) {
+              ct = await this.makeRequest('GET', `/card-transactions/${paymentId}`, undefined, token);
+            }
             const cd: any = ct?.data || {};
             const st = String(cd.status || cd.result || cd.outcome || '').toLowerCase();
             let normalized: 'completed' | 'failed' | 'pending' = 'pending';
@@ -421,7 +433,13 @@ export class HelcimTerminalService {
             try {
               const merchantToken = process.env.HELCIM_API_TOKEN;
               if (merchantToken) {
-                const mtx = await this.makeRequest('GET', `/transactions/${paymentId}`, undefined, merchantToken);
+                // Prefer card-transactions, then transactions
+                let mtx: any;
+                try {
+                  mtx = await this.makeRequest('GET', `/card-transactions/${paymentId}`, undefined, merchantToken);
+                } catch {
+                  mtx = await this.makeRequest('GET', `/transactions/${paymentId}`, undefined, merchantToken);
+                }
                 const md: any = mtx?.data || {};
                 const st = String(md.status || md.result || md.outcome || '').toLowerCase();
                 let normalized: 'completed' | 'failed' | 'pending' = 'pending';
