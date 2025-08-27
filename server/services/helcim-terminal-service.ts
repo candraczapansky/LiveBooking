@@ -15,6 +15,8 @@ type TerminalConfig = z.infer<typeof TerminalConfigSchema>;
 // In-memory session store for invoice-based fallbacks
 const sessionStore: Map<string, { startedAt: number; locationId: string; deviceCode: string; totalAmount: number; invoiceNumber: string; description?: string }> = new Map();
 const webhookStore: Map<string, { status: string; transactionId?: string; last4?: string; updatedAt: number }> = new Map();
+// Track recheck attempts to avoid excessive duplicate lookups
+const recheckScheduled: Set<string> = new Set();
 
 export class HelcimTerminalService {
   private readonly baseUrl = 'https://api.helcim.com/v2';
@@ -517,7 +519,10 @@ export class HelcimTerminalService {
         url: `${this.baseUrl}${endpoint}`,
         headers: {
           'api-token': apiToken,
+          // Send Bearer as well for environments that require it
+          ...(apiToken ? { 'Authorization': `Bearer ${apiToken}` } : {}),
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         data,
       });
@@ -716,6 +721,41 @@ export class HelcimTerminalService {
       try {
         console.log('📬 Webhook cached', { invoiceNumber, transactionId, status: normalized });
       } catch {}
+
+      // If still pending, schedule a couple of quick rechecks via merchant token
+      if (transactionId && normalized === 'pending' && !recheckScheduled.has(transactionId)) {
+        recheckScheduled.add(transactionId);
+        const attempt = async () => {
+          try {
+            const merchantToken = process.env.HELCIM_API_TOKEN;
+            if (!merchantToken) return;
+            // Try card-transactions first, then transactions
+            let res: any;
+            try {
+              res = await this.makeRequest('GET', `/card-transactions/${transactionId}`, undefined, merchantToken);
+            } catch {
+              res = await this.makeRequest('GET', `/transactions/${transactionId}`, undefined, merchantToken);
+            }
+            const d: any = res?.data || {};
+            const st = String(d.status || d.result || d.outcome || '').toLowerCase();
+            if (['approved', 'captured', 'completed', 'success', 'succeeded', 'paid'].includes(st)) {
+              const cv = {
+                status: 'completed',
+                transactionId,
+                last4: d.last4 || d.cardLast4 || (d.card && d.card.last4) || undefined,
+                updatedAt: Date.now(),
+              } as const;
+              webhookStore.set(String(transactionId), cv);
+              if (invoiceNumber) webhookStore.set(String(invoiceNumber), cv);
+            }
+          } catch {}
+        };
+        // quick retry soon, then again a bit later
+        setTimeout(attempt, 1500);
+        setTimeout(attempt, 7000);
+        // Clear flag after some time so future webhooks can reschedule
+        setTimeout(() => recheckScheduled.delete(transactionId), 30000);
+      }
     } catch (e) {
       // best effort only
     }

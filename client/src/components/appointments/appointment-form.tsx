@@ -123,6 +123,38 @@ const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => 
   return slotMinutes >= startMinutes && slotMinutes < endMinutes;
 };
 
+// Determine if a staff member has an active (non-blocked) schedule for a given date and location
+const isStaffScheduledForDate = (
+  staffId: number,
+  date: Date,
+  schedules: any[],
+  locationId?: number
+) => {
+  if (!schedules || schedules.length === 0) return false;
+  const dayName = getDayName(date);
+  const currentDateString = formatDateForComparison(date);
+
+  return schedules.some((schedule: any) => {
+    if (schedule.staffId !== staffId) return false;
+    if (schedule.dayOfWeek !== dayName) return false;
+    if (locationId && schedule.locationId !== locationId) return false;
+    if (schedule.isBlocked) return false;
+
+    const startDateString = typeof schedule.startDate === 'string'
+      ? schedule.startDate
+      : new Date(schedule.startDate).toISOString().slice(0, 10);
+    const endDateString = schedule.endDate
+      ? (typeof schedule.endDate === 'string'
+          ? schedule.endDate
+          : new Date(schedule.endDate).toISOString().slice(0, 10))
+      : null;
+
+    const withinStart = startDateString <= currentDateString;
+    const withinEnd = !endDateString || endDateString >= currentDateString;
+    return withinStart && withinEnd;
+  });
+};
+
 
 
 const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated, appointments }: AppointmentFormProps) => {
@@ -317,6 +349,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   };
 
   const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointments, appointmentId]);
+
+  // Filter staff list to only those scheduled at the selected location for the selected date
+  // Apply only when creating a new appointment (not when editing)
+  const staffOptions = useMemo(() => {
+    const baseStaff = staff || [];
+    if (appointmentId && appointmentId > 0) return baseStaff;
+    const dateToCheck = selectedFormDate || new Date();
+    const locationId = selectedLocation?.id;
+    return baseStaff.filter((s: any) =>
+      isStaffScheduledForDate(Number(s.id), dateToCheck, (schedules as any[]) || [], locationId)
+    );
+  }, [staff, schedules, selectedFormDate, selectedLocation?.id, appointmentId]);
   
   const endTime = selectedService && startTimeString ? (() => {
     const [hours, minutes] = startTimeString.split(':').map(Number);
@@ -830,7 +874,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           <SelectValue placeholder="Select a staff member first" />
                         </SelectTrigger>
                         <SelectContent>
-                          {staff?.map((staffMember: any, index: number) => {
+                          {staffOptions?.map((staffMember: any, index: number) => {
                             const staffName = staffMember.user ? `${staffMember.user.firstName} ${staffMember.user.lastName}` : 'Unknown Staff';
                             return (
                               <SelectItem key={`${staffMember.id}-${index}`} value={staffMember.id.toString()}>
