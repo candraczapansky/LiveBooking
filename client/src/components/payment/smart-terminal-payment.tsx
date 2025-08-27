@@ -38,6 +38,8 @@ export default function SmartTerminalPayment({
   const { toast } = useToast();
 
   const startPayment = async () => {
+    // Pre-generate a reference so we can attach to an in-progress terminal session if Helcim returns a conflict
+    const preReference = `POS-${Date.now()}`;
     try {
       setIsLoading(true);
       setStatus('processing');
@@ -48,6 +50,7 @@ export default function SmartTerminalPayment({
         locationId: String(locationId ?? ''),
         amount,
         description,
+        reference: preReference,
         tipAmount: typeof tipAmount === 'number' ? tipAmount : undefined,
       });
       const data = await response.json();
@@ -73,6 +76,20 @@ export default function SmartTerminalPayment({
       }
 
     } catch (error) {
+      // If Helcim reports a conflict/busy terminal, attach to the in-progress session using our pre-generated reference
+      const errMsg = String((error as any)?.message || error || '').toLowerCase();
+      if (errMsg.includes('conflict') || errMsg.includes('busy')) {
+        try {
+          setStatus('processing');
+          setMessage('Terminal is busy. Attaching to in-progress payment...');
+          const locId = String(locationId ?? '');
+          const ref = preReference;
+          await pollPaymentStatus(locId, ref);
+          return;
+        } catch (attachErr) {
+          // Fall through to error handling below
+        }
+      }
       console.error('Payment failed:', error);
       setStatus('error');
       setMessage('Payment failed. Please try again.');

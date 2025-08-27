@@ -473,8 +473,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 <p>Your appointment has been confirmed:</p>
                 <ul>
                   <li><strong>Service:</strong> ${service.name}</li>
-                  <li><strong>Date:</strong> ${new Date(newAppointment.startTime).toLocaleDateString()}</li>
-                  <li><strong>Time:</strong> ${newAppointment.startTime} - ${newAppointment.endTime}</li>
+                  <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
+                  <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                   <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
                 </ul>
                 <p>We look forward to seeing you!</p>
@@ -508,8 +508,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                     <p>This is a TEST email to verify email functionality:</p>
                     <ul>
                       <li><strong>Service:</strong> ${service.name}</li>
-                      <li><strong>Date:</strong> ${new Date(newAppointment.startTime).toLocaleDateString()}</li>
-                      <li><strong>Time:</strong> ${newAppointment.startTime} - ${newAppointment.endTime}</li>
+                      <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
+                      <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
                     </ul>
                     <p>This is a test email to verify the email service is working.</p>
@@ -546,8 +546,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                     <p>Your appointment has been confirmed:</p>
                     <ul>
                       <li><strong>Service:</strong> ${service.name}</li>
-                      <li><strong>Date:</strong> ${new Date(newAppointment.startTime).toLocaleDateString()}</li>
-                      <li><strong>Time:</strong> ${newAppointment.startTime} - ${newAppointment.endTime}</li>
+                      <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
+                      <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
                     </ul>
                     <p>We look forward to seeing you!</p>
@@ -577,7 +577,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         });
         
         try {
-          const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Date(newAppointment.startTime).toLocaleDateString()} at ${newAppointment.startTime} has been confirmed.`;
+          const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} (Central Time) has been confirmed.`;
           await sendSMS(client.phone, message);
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
           LoggerService.info("SMS confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
@@ -783,8 +783,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>This is a reminder for your upcoming appointment:</p>
               <ul>
                 <li><strong>Service:</strong> ${service.name}</li>
-                <li><strong>Date:</strong> ${new Date(appointment.startTime).toLocaleDateString()}</li>
-                <li><strong>Time:</strong> ${appointment.startTime} - ${appointment.endTime}</li>
+                <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
+                <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
                 <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
               </ul>
               <p>We look forward to seeing you!</p>
@@ -897,6 +897,173 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     });
   }));
 
+  // Resend appointment confirmation (email and/or SMS)
+  app.post("/api/appointments/:id/resend-confirmation", asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = parseInt(req.params.id);
+    const context = getLogContext(req);
+    const { channel } = (req.body || {}) as { channel?: 'email' | 'sms' | 'both' };
+
+    LoggerService.info("Resending appointment confirmation", { ...context, appointmentId, channel: channel || 'auto' });
+
+    const appointment = await storage.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+
+    const client = await storage.getUser(appointment.clientId);
+    const staff = await storage.getUser(appointment.staffId);
+    const service = await storage.getService(appointment.serviceId);
+
+    if (!client || !service) {
+      throw new NotFoundError("Appointment details");
+    }
+
+    let emailSent = false;
+    let smsSent = false;
+
+    // Decide which channels to send
+    const sendEmailRequested = channel === 'email' || channel === 'both' || (!channel);
+    const sendSmsRequested = channel === 'sms' || channel === 'both' || (!channel);
+
+    // Send email confirmation if allowed
+    if (sendEmailRequested && client.emailAppointmentReminders && client.email) {
+      try {
+        await sendEmail({
+          to: client.email,
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+          subject: 'Appointment Confirmation - Glo Head Spa',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Appointment Confirmation</h2>
+              <p>Hello ${client.firstName || client.username || ''},</p>
+              <p>Your appointment has been confirmed:</p>
+              <ul>
+                <li><strong>Service:</strong> ${service.name}</li>
+                <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
+                <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
+                <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+              </ul>
+              <p>We look forward to seeing you!</p>
+            </div>
+          `
+        });
+        LoggerService.logCommunication("email", "appointment_confirmation_resent", { ...context, userId: client.id });
+        emailSent = true;
+      } catch (error) {
+        LoggerService.error("Failed to resend email confirmation", { ...context, appointmentId }, error as Error);
+      }
+    }
+
+    // Send SMS confirmation if allowed
+    if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
+      try {
+        const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        await sendSMS(client.phone, message);
+        LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
+        smsSent = true;
+      } catch (error) {
+        LoggerService.error("Failed to resend SMS confirmation", { ...context, appointmentId }, error as Error);
+      }
+    }
+
+    if (!emailSent && !smsSent) {
+      return res.status(400).json({
+        success: false,
+        error: "No confirmation sent. Ensure client preferences are enabled and channel is valid.",
+        details: {
+          emailPreference: client.emailAppointmentReminders,
+          hasEmail: !!client.email,
+          smsPreference: client.smsAppointmentReminders,
+          hasPhone: !!client.phone,
+        }
+      });
+    }
+
+    return res.json({ success: true, emailSent, smsSent });
+  }));
+
+  // Alias route to support alternate path ordering
+  app.post("/api/appointments/resend-confirmation/:id", asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = parseInt(req.params.id);
+    const context = getLogContext(req);
+    const { channel } = (req.body || {}) as { channel?: 'email' | 'sms' | 'both' };
+
+    LoggerService.info("Resending appointment confirmation (alias route)", { ...context, appointmentId, channel: channel || 'auto' });
+
+    const appointment = await storage.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+
+    const client = await storage.getUser(appointment.clientId);
+    const staff = await storage.getUser(appointment.staffId);
+    const service = await storage.getService(appointment.serviceId);
+
+    if (!client || !service) {
+      throw new NotFoundError("Appointment details");
+    }
+
+    let emailSent = false;
+    let smsSent = false;
+
+    const sendEmailRequested = channel === 'email' || channel === 'both' || (!channel);
+    const sendSmsRequested = channel === 'sms' || channel === 'both' || (!channel);
+
+    if (sendEmailRequested && client.emailAppointmentReminders && client.email) {
+      try {
+        await sendEmail({
+          to: client.email,
+          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+          subject: 'Appointment Confirmation - Glo Head Spa',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #333;">Appointment Confirmation</h2>
+              <p>Hello ${client.firstName || client.username || ''},</p>
+              <p>Your appointment has been confirmed:</p>
+              <ul>
+                <li><strong>Service:</strong> ${service.name}</li>
+                <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
+                <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
+                <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+              </ul>
+              <p>We look forward to seeing you!</p>
+            </div>
+          `
+        });
+        LoggerService.logCommunication("email", "appointment_confirmation_resent", { ...context, userId: client.id });
+        emailSent = true;
+      } catch (error) {
+        LoggerService.error("Failed to resend email confirmation (alias)", { ...context, appointmentId }, error as Error);
+      }
+    }
+
+    if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
+      try {
+        const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        await sendSMS(client.phone, message);
+        LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
+        smsSent = true;
+      } catch (error) {
+        LoggerService.error("Failed to resend SMS confirmation (alias)", { ...context, appointmentId }, error as Error);
+      }
+    }
+
+    if (!emailSent && !smsSent) {
+      return res.status(400).json({
+        success: false,
+        error: "No confirmation sent. Ensure client preferences are enabled and channel is valid.",
+        details: {
+          emailPreference: client.emailAppointmentReminders,
+          hasEmail: !!client.email,
+          smsPreference: client.smsAppointmentReminders,
+          hasPhone: !!client.phone,
+        }
+      });
+    }
+
+    return res.json({ success: true, emailSent, smsSent });
+  }));
+
   // DEBUG ENDPOINT: Test email functionality with simulated data
   app.post("/api/debug/test-email-functionality", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
@@ -968,8 +1135,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 <p>This is a DEBUG TEST email to verify the email functionality:</p>
                 <ul>
                   <li><strong>Service:</strong> ${simulatedService.name}</li>
-                  <li><strong>Date:</strong> ${new Date(simulatedAppointment.startTime).toLocaleDateString()}</li>
-                  <li><strong>Time:</strong> ${simulatedAppointment.startTime} - ${simulatedAppointment.endTime}</li>
+                  <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(simulatedAppointment.startTime))} (Central Time)</li>
+                  <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(simulatedAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(simulatedAppointment.endTime))} (Central Time)</li>
                   <li><strong>Staff:</strong> ${simulatedStaff.firstName} ${simulatedStaff.lastName}</li>
                 </ul>
                 <p>This is a debug test email to verify the email service is working correctly.</p>

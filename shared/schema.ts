@@ -186,6 +186,8 @@ export const services = pgTable("services", {
   bufferTimeAfter: integer("buffer_time_after").default(0), // in minutes
   color: text("color").default("#3B82F6"), // hex color code
   isActive: boolean("is_active").default(true),
+  // New: allow hiding a service from public online booking without deactivating it internally
+  isHidden: boolean("is_hidden").default(false),
 });
 
 export const insertServiceSchema = createInsertSchema(services).omit({

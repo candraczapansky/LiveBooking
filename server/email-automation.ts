@@ -558,7 +558,7 @@ export class EmailAutomationService {
     staff: StaffData
   ): Promise<void> {
     const appointmentDate = new Date(appointment.startTime);
-    const appointmentTime = format(appointmentDate, 'HH:mm');
+    const appointmentTime = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(appointmentDate);
     
     const templateData = {
       clientName: `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Valued Client',

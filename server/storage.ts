@@ -484,11 +484,11 @@ export class DatabaseStorage implements IStorage {
   constructor() {
     // PostgreSQL storage - no in-memory structures needed
     this.initializeConnection();
-    // Sample data initialization disabled to prevent automatic recreation of deleted data
-    // this.initializeSampleData().catch(error => {
-    //   console.error('Sample data initialization failed:', error);
-    //   // Don't throw error to prevent server startup failure
-    // });
+    // Initialize sample data including services
+    this.initializeSampleData().catch(error => {
+      console.error('Sample data initialization failed:', error);
+      // Don't throw error to prevent server startup failure
+    });
   }
 
   private async initializeConnection() {
@@ -511,7 +511,13 @@ export class DatabaseStorage implements IStorage {
       
       // Check if sample data has already been initialized
       const sampleDataFlag = await this.getSystemConfig('sample_data_initialized');
-      if (sampleDataFlag && sampleDataFlag.value === 'true') {
+      const existingServices = await this.getAllServices();
+      
+      // If services are missing, force re-initialization of services only
+      if (existingServices.length === 0) {
+        console.log('Services are missing, forcing service restoration...');
+        // Continue with initialization
+      } else if (sampleDataFlag && sampleDataFlag.value === 'true') {
         console.log('Sample data initialization skipped - flag indicates it has already been initialized');
         return;
       }
@@ -552,6 +558,9 @@ export class DatabaseStorage implements IStorage {
           description: 'Skincare and facial rejuvenation treatments'
         });
       }
+      
+      // Re-fetch categories after creation to ensure we have the latest data
+      const categoriesAfterCreate = await this.getAllServiceCategories();
 
       // Create sample rooms only if they don't exist
       const existingRooms = await this.getAllRooms();
@@ -749,13 +758,13 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Create sample services only if they don't exist
-      const existingServices = await this.getAllServices();
+      const existingServicesCheck = await this.getAllServices();
       
-      // Get the actual category IDs for reference
-      const hairServicesCategory = existingCategories.find(c => c.name === 'Hair Services');
-      const facialTreatmentsCategory = existingCategories.find(c => c.name === 'Facial Treatments');
+      // Get the actual category IDs for reference (use the refreshed categories)
+      const hairServicesCategory = categoriesAfterCreate.find(c => c.name === 'Hair Services');
+      const facialTreatmentsCategory = categoriesAfterCreate.find(c => c.name === 'Facial Treatments');
       
-      if (!existingServices.find((s: Service) => s.name === 'Women\'s Haircut & Style') && hairServicesCategory) {
+      if (!existingServicesCheck.find((s: Service) => s.name === 'Women\'s Haircut & Style') && hairServicesCategory) {
         console.log('Creating Women\'s Haircut & Style service...');
         await this.createService({
           name: 'Women\'s Haircut & Style',
@@ -770,7 +779,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find((s: Service) => s.name === 'Color & Highlights') && hairServicesCategory) {
+      if (!existingServicesCheck.find((s: Service) => s.name === 'Color & Highlights') && hairServicesCategory) {
         console.log('Creating Color & Highlights service...');
         await this.createService({
           name: 'Color & Highlights',
@@ -785,7 +794,7 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
-      if (!existingServices.find((s: Service) => s.name === 'Deep Cleansing Facial') && facialTreatmentsCategory) {
+      if (!existingServicesCheck.find((s: Service) => s.name === 'Deep Cleansing Facial') && facialTreatmentsCategory) {
         console.log('Creating Deep Cleansing Facial service...');
         await this.createService({
           name: 'Deep Cleansing Facial',
@@ -1370,21 +1379,94 @@ Glo Head Spa`,
   }
 
   async getService(id: number): Promise<Service | undefined> {
-    const [row] = await db.select().from(services).where(eq(services.id, id));
-    return row;
+    try {
+      const [row] = await db.select().from(services).where(eq(services.id, id));
+      return row;
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        const result: any = await db.execute(sql`
+          SELECT 
+            id, name, description, duration, price,
+            category_id AS "categoryId",
+            color,
+            is_active AS "isActive"
+          FROM services
+          WHERE id = ${id}
+          LIMIT 1
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        return rows?.[0] as Service | undefined;
+      }
+      throw err;
+    }
   }
 
   async getServiceByName(name: string): Promise<Service | undefined> {
-    const [row] = await db.select().from(services).where(eq(services.name, name));
-    return row;
+    try {
+      const [row] = await db.select().from(services).where(eq(services.name, name));
+      return row;
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        const result: any = await db.execute(sql`
+          SELECT 
+            id, name, description, duration, price,
+            category_id AS "categoryId",
+            color,
+            is_active AS "isActive"
+          FROM services
+          WHERE name = ${name}
+          LIMIT 1
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        return rows?.[0] as Service | undefined;
+      }
+      throw err;
+    }
   }
 
   async getServicesByCategory(categoryId: number): Promise<Service[]> {
-    return await db.select().from(services).where(eq(services.categoryId, categoryId));
+    try {
+      return await db.select().from(services).where(eq(services.categoryId, categoryId));
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        const result: any = await db.execute(sql`
+          SELECT 
+            id, name, description, duration, price,
+            category_id AS "categoryId",
+            color,
+            is_active AS "isActive"
+          FROM services
+          WHERE category_id = ${categoryId}
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        return rows as Service[];
+      }
+      throw err;
+    }
   }
 
   async getAllServices(): Promise<Service[]> {
-    return await db.select().from(services);
+    try {
+      return await db.select().from(services);
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        const result: any = await db.execute(sql`
+          SELECT 
+            id, name, description, duration, price,
+            category_id AS "categoryId",
+            color,
+            is_active AS "isActive"
+          FROM services
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        return rows as Service[];
+      }
+      throw err;
+    }
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
@@ -1411,7 +1493,25 @@ Glo Head Spa`,
   }
 
   async getServicesByStatus(isActive: boolean): Promise<Service[]> {
-    return await db.select().from(services).where(eq(services.isActive as any, isActive));
+    try {
+      return await db.select().from(services).where(eq(services.isActive as any, isActive));
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        const result: any = await db.execute(sql`
+          SELECT 
+            id, name, description, duration, price,
+            category_id AS "categoryId",
+            color,
+            is_active AS "isActive"
+          FROM services
+          WHERE is_active = ${isActive}
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        return rows as Service[];
+      }
+      throw err;
+    }
   }
 
   // Staff operations
@@ -1677,7 +1777,6 @@ Glo Head Spa`,
     const appointmentData = await db
       .select({
         appointments,
-        services,
         staff: {
           id: staff.id,
           userId: staff.userId,
@@ -1693,7 +1792,6 @@ Glo Head Spa`,
       })
       .from(appointments)
       .where(eq(appointments.id, id))
-      .leftJoin(services, eq(appointments.serviceId, services.id))
       .leftJoin(staff, eq(appointments.staffId, staff.id))
       .leftJoin(users, eq(staff.userId, users.id));
 
@@ -1714,7 +1812,6 @@ Glo Head Spa`,
     const appointmentList = await db
       .select({
         appointments,
-        services,
         staff: {
           id: staff.id,
           userId: staff.userId,
@@ -1729,7 +1826,6 @@ Glo Head Spa`,
         users,
       })
       .from(appointments)
-      .leftJoin(services, eq(appointments.serviceId, services.id))
       .leftJoin(staff, eq(appointments.staffId, staff.id))
       .leftJoin(users, eq(staff.userId, users.id))
       .orderBy(desc(appointments.startTime));
@@ -1739,7 +1835,6 @@ Glo Head Spa`,
       ...row.appointments,
       startTime: this.convertLocalToDate(row.appointments.startTime),
       endTime: this.convertLocalToDate(row.appointments.endTime),
-      service: row.services,
       staff: row.staff ? {
         ...row.staff,
         user: row.users,

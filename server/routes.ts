@@ -204,6 +204,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const assignments = await storage.getStaffServices(staffId);
 
       // Map to full service objects and include assignment metadata
+      const isPublic = String((req.query as any)?.public) === 'true';
       const services = (
         await Promise.all(assignments.map(async (assignment) => {
           const service = await storage.getService(assignment.serviceId);
@@ -218,7 +219,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         }))
       ).filter(Boolean);
 
-      return res.json(services);
+      const filtered = isPublic
+        ? (services as any[]).filter((s: any) => !s.isHidden && (s.isActive !== false))
+        : services;
+
+      return res.json(filtered);
     } catch (error) {
       console.error("Error getting services for staff:", error);
       res.status(500).json({

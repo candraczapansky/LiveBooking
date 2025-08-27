@@ -34,8 +34,22 @@ const SchedulePage = () => {
     queryKey: ['/api/schedules'],
   });
 
+  // Fetch locations for display
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ['/api/locations'],
+  });
+
   const getScheduleCount = (staffId: number) => {
     return schedules.filter((schedule: any) => schedule.staffId === staffId).length;
+  };
+
+  const getStaffLocations = (staffId: number) => {
+    const staffSchedules = schedules.filter((schedule: any) => schedule.staffId === staffId);
+    const uniqueLocationIds = [...new Set(staffSchedules.map((schedule: any) => schedule.locationId))];
+    return uniqueLocationIds.map((locationId: any) => {
+      const location = locations.find((loc: any) => loc.id === locationId);
+      return location?.name || 'Unknown Location';
+    });
   };
 
   const getStaffName = (staffMember: StaffMember) => {
@@ -127,6 +141,7 @@ const SchedulePage = () => {
               <div className="space-y-3">
                 {filteredStaff?.map((staffMember: StaffMember) => {
                   const scheduleCount = getScheduleCount(staffMember.id);
+                  const staffLocations = getStaffLocations(staffMember.id);
                   return (
                     <Card 
                       key={staffMember.id} 
@@ -148,6 +163,19 @@ const SchedulePage = () => {
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                               {staffMember.title}
                             </p>
+                            {staffLocations.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {staffLocations.map((location: string, index: number) => (
+                                  <Badge 
+                                    key={index} 
+                                    variant="secondary" 
+                                    className="text-xs font-medium text-gray-700 dark:text-gray-200"
+                                  >
+                                    {location}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                         

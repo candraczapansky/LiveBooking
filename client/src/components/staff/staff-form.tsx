@@ -1051,7 +1051,7 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                           type="button"
                           onClick={async () => {
                             try {
-                              await apiRequest('DELETE', `/api/staff/${staffId}/services/${svc.id}`);
+                              await apiRequest('DELETE', `/api/staff-services/${svc.staffServiceId}`);
                               queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
                             } catch (e) {}
                           }}

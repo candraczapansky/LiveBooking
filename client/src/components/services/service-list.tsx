@@ -123,13 +123,14 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
     }
   });
 
-  const filteredServices = services?.filter((service: Service) =>
-    (categoryId == null || service.categoryId === categoryId) &&
-    (
+  const filteredServices = services?.filter((service: Service) => {
+    const matchesCategory = (categoryId == null) || (String((service as any).categoryId) === String(categoryId));
+    const matchesSearch = (
       service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       service.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
+    );
+    return matchesCategory && matchesSearch;
+  });
 
   const handleEditService = (serviceId: number) => {
     setSelectedService(serviceId);

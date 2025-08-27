@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText } from "lucide-react";
+import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
@@ -62,14 +62,33 @@ const AppointmentDetails = ({
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
 
-  // Fetch appointment details
+  // Fetch appointment details (robust with fallback)
   const { data: appointment, isLoading } = useQuery({
     queryKey: ['/api/appointments', appointmentId],
     queryFn: async () => {
       if (!appointmentId) return null;
-      const response = await fetch(`/api/appointments/${appointmentId}`);
-      if (!response.ok) throw new Error('Failed to fetch appointment');
-      return response.json();
+      try {
+        const res = await apiRequest("GET", `/api/appointments/${appointmentId}?v=${Date.now()}`);
+        if (res.ok) {
+          return res.json();
+        }
+        // If not found (404), return null to show not found dialog
+        if (res.status === 404) {
+          return null;
+        }
+      } catch {}
+
+      // Fallback: fetch all appointments and find locally
+      try {
+        const listRes = await apiRequest("GET", '/api/appointments');
+        if (listRes.ok) {
+          const list = await listRes.json();
+          const found = Array.isArray(list) ? list.find((a: any) => a?.id === appointmentId) : null;
+          return found || null;
+        }
+      } catch {}
+
+      return null;
     },
     enabled: open && !!appointmentId
   });
@@ -165,6 +184,50 @@ const AppointmentDetails = ({
         variant: "destructive",
       });
     },
+  });
+
+  // Resend confirmation - SMS
+  const resendSmsMutation = useMutation({
+    mutationFn: async () => {
+      if (!appointmentId) throw new Error('No appointment ID');
+      return apiRequest("POST", `/api/appointments/${appointmentId}/resend-confirmation`, { channel: 'sms' });
+    },
+    onSuccess: async (res: Response) => {
+      try { await res.json(); } catch {}
+      toast({
+        title: "SMS Sent",
+        description: "Confirmation SMS has been resent.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "SMS Not Sent",
+        description: error?.message || "Unable to resend SMS. Check client preferences.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Resend confirmation - Email
+  const resendEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!appointmentId) throw new Error('No appointment ID');
+      return apiRequest("POST", `/api/appointments/${appointmentId}/resend-confirmation`, { channel: 'email' });
+    },
+    onSuccess: async (res: Response) => {
+      try { await res.json(); } catch {}
+      toast({
+        title: "Email Sent",
+        description: "Confirmation email has been resent.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Email Not Sent",
+        description: error?.message || "Unable to resend email. Check client preferences.",
+        variant: "destructive",
+      });
+    }
   });
 
   const getStatusIcon = (status: string) => {
@@ -1068,6 +1131,24 @@ const AppointmentDetails = ({
         </div>
 
         <DialogFooter className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => resendSmsMutation.mutate()}
+            disabled={resendSmsMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            <MessageSquare className="h-4 w-4" />
+            {resendSmsMutation.isPending ? "Sending SMS..." : "Resend SMS"}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => resendEmailMutation.mutate()}
+            disabled={resendEmailMutation.isPending}
+            className="flex items-center gap-2"
+          >
+            <Mail className="h-4 w-4" />
+            {resendEmailMutation.isPending ? "Sending Email..." : "Resend Email"}
+          </Button>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

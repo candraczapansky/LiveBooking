@@ -49,6 +49,7 @@ const serviceFormSchema = z.object({
   bufferTimeBefore: z.coerce.number().min(0, "Buffer time must be 0 or greater").optional(),
   bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code").optional(),
+  isHidden: z.boolean().optional(),
   
   // These are handled separately and not sent to the service creation endpoint
   assignedStaff: z.array(z.object({
@@ -66,9 +67,10 @@ type ServiceFormProps = {
   onOpenChange: (open: boolean) => void;
   serviceId?: number;
   onServiceCreated?: (categoryId: number) => void;
+  defaultIsHidden?: boolean;
 };
 
-const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: ServiceFormProps) => {
+const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultIsHidden }: ServiceFormProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -121,6 +123,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       bufferTimeBefore: 0,
       bufferTimeAfter: 0,
       color: "#3B82F6",
+      isHidden: false,
       assignedStaff: [],
       requiredDevices: [],
     },
@@ -165,6 +168,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
             bufferTimeBefore: serviceData.bufferTimeBefore || 0,
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
             color: serviceData.color || "#3B82F6",
+            isHidden: !!serviceData.isHidden,
             assignedStaff: assignedStaff,
             requiredDevices: serviceData.requiredDevices || [],
           });
@@ -192,6 +196,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
         bufferTimeBefore: 0,
         bufferTimeAfter: 0,
         color: "#3B82F6",
+        isHidden: !!defaultIsHidden,
         assignedStaff: [],
         requiredDevices: [],
       });
@@ -234,6 +239,10 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
       
       if (data.color && data.color.match(/^#[0-9A-F]{6}$/i)) {
         cleanServiceData.color = data.color;
+      }
+
+      if (typeof data.isHidden === 'boolean') {
+        (cleanServiceData as any).isHidden = data.isHidden;
       }
       
       console.log('🔍 Creating service with cleaned data:', cleanServiceData);
@@ -801,6 +810,30 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated }: Servic
                       No staff members available. Please create staff members first to assign them to services.
                     </div>
                   )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Hide from online booking */}
+            <FormField
+              control={form.control}
+              name="isHidden"
+              render={({ field }) => (
+                <FormItem>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="is-hidden"
+                      checked={!!field.value}
+                      onCheckedChange={(checked) => field.onChange(!!checked)}
+                    />
+                    <Label htmlFor="is-hidden" className="cursor-pointer">
+                      Hide from online booking
+                    </Label>
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    When enabled, clients will not see this service in the booking page. Staff can still book it.
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

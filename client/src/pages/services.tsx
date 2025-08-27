@@ -4,8 +4,9 @@ import { SidebarController } from "@/components/layout/sidebar";
 import CategoryList from "@/components/services/category-list";
 import ServiceList from "@/components/services/service-list";
 import ServiceForm from "@/components/services/service-form";
+import ServiceDropdownView from "@/components/services/service-dropdown-view";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, FolderPlus } from "lucide-react";
+import { PlusCircle, FolderPlus, LayoutGrid, List } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -15,6 +16,8 @@ const ServicesPage = () => {
   const [isServiceFormOpen, setIsServiceFormOpen] = useState(false);
   const [isCategoryFormOpen, setIsCategoryFormOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isAddOnMode, setIsAddOnMode] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "dropdown">("grid"); // New state for view mode
 
   const handleCategorySelect = (categoryId: number | null) => {
     setSelectedCategoryId(categoryId);
@@ -65,9 +68,13 @@ const ServicesPage = () => {
                   <FolderPlus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
-                <Button variant="default" onClick={() => setIsServiceFormOpen(true)} className="flex items-center justify-center h-12 w-full sm:w-auto">
+                <Button variant="default" onClick={() => { setIsAddOnMode(false); setIsServiceFormOpen(true); }} className="flex items-center justify-center h-12 w-full sm:w-auto">
                   <PlusCircle className="h-4 w-4 mr-2" />
                   Add Service
+                </Button>
+                <Button variant="default" onClick={() => { setIsAddOnMode(true); setIsServiceFormOpen(true); }} className="flex items-center justify-center h-12 w-full sm:w-auto">
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add Add-On Service
                 </Button>
               </div>
             </div>
@@ -105,6 +112,7 @@ const ServicesPage = () => {
         open={isServiceFormOpen} 
         onOpenChange={setIsServiceFormOpen}
         onServiceCreated={(categoryId) => setSelectedCategoryId(categoryId)}
+        defaultIsHidden={isAddOnMode}
       />
       
     </div>

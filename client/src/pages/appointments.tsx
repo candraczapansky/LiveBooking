@@ -56,9 +56,8 @@ const AppointmentsPage = () => {
   const { data: staff = [] } = useQuery({
     queryKey: ['/api/staff', selectedLocation?.id],
     queryFn: async () => {
-      const url = selectedLocation?.id 
-        ? `/api/staff?locationId=${selectedLocation.id}`
-        : '/api/staff';
+      // Fetch all staff to ensure resources include anyone with appointments at the selected location
+      const url = '/api/staff';
       console.log('🔄 Fetching staff from:', url);
       const response = await apiRequest("GET", url);
       const data = await response.json();
@@ -205,9 +204,46 @@ const AppointmentsPage = () => {
   };
 
   const filteredAppointments = appointments.filter((apt: any) => {
-    if (selectedStaffFilter === "all") return true;
-    return apt.staffId === parseInt(selectedStaffFilter);
+    // Filter by selected location if set
+    if (selectedLocation?.id && apt.locationId !== selectedLocation.id) {
+      return false;
+    }
+    // Then apply staff filter
+    if (selectedStaffFilter !== "all" && apt.staffId !== parseInt(selectedStaffFilter)) {
+      return false;
+    }
+    return true;
   });
+
+  // Helper: Determine if a staff member has an appointment in the current calendar view
+  const hasAppointmentInCurrentView = (staffId: number) => {
+    try {
+      const baseDate = selectedDate || new Date();
+      return filteredAppointments.some((apt: any) => {
+        if (!apt || apt.staffId !== staffId || !apt.startTime) return false;
+        const aptStart = new Date(apt.startTime);
+        if (isNaN(aptStart.getTime())) return false;
+        if (calendarView === 'day') {
+          return aptStart.toDateString() === baseDate.toDateString();
+        }
+        if (calendarView === 'week') {
+          const d = new Date(baseDate);
+          const day = d.getDay();
+          const weekStart = new Date(d);
+          weekStart.setDate(d.getDate() - day);
+          weekStart.setHours(0, 0, 0, 0);
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 6);
+          weekEnd.setHours(23, 59, 59, 999);
+          return aptStart >= weekStart && aptStart <= weekEnd;
+        }
+        // month view
+        return aptStart.getFullYear() === baseDate.getFullYear() && aptStart.getMonth() === baseDate.getMonth();
+      });
+    } catch {
+      return false;
+    }
+  };
 
   const filteredResources = staff.filter((s: any) => {
     // First apply staff filter
@@ -219,15 +255,21 @@ const AppointmentsPage = () => {
     if (calendarView === 'day') {
       const dateToCheck = selectedDate || new Date();
       const isScheduled = isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id);
-      
+
       if (!isScheduled) {
-        const reason = selectedLocation?.id 
+        // Fallback: include staff if they have at least one appointment visible in the current view
+        if (hasAppointmentInCurrentView(s.id)) {
+          console.log(`✅ Including staff ${s.user?.firstName} ${s.user?.lastName} (ID: ${s.id}) due to visible appointment(s)`);
+          return true;
+        }
+        const reason = selectedLocation?.id
           ? `not scheduled for ${dateToCheck.toLocaleDateString()} at ${selectedLocation.name}`
           : `not scheduled for ${dateToCheck.toLocaleDateString()}`;
         console.log(`🚫 Staff ${s.user?.firstName} ${s.user?.lastName} (ID: ${s.id}) ${reason}, filtering out`);
+        return false;
       }
       
-      return isScheduled;
+      return true;
     }
     
     // For week and month views, only show staff who have schedules at the selected location
@@ -235,12 +277,18 @@ const AppointmentsPage = () => {
       const hasLocationSchedule = schedules.some((schedule: any) => 
         schedule.staffId === s.id && schedule.locationId === selectedLocation.id
       );
-      
+
       if (!hasLocationSchedule) {
+        // Fallback: include staff if they have at least one appointment visible in the current view
+        if (hasAppointmentInCurrentView(s.id)) {
+          console.log(`✅ Including staff ${s.user?.firstName} ${s.user?.lastName} (ID: ${s.id}) due to visible appointment(s) at this location view`);
+          return true;
+        }
         console.log(`🚫 Staff ${s.user?.firstName} ${s.user?.lastName} (ID: ${s.id}) has no schedules at ${selectedLocation.name}, filtering out`);
+        return false;
       }
       
-      return hasLocationSchedule;
+      return true;
     }
     
     // If no location selected, show all staff (existing behavior)
@@ -392,10 +440,47 @@ const AppointmentsPage = () => {
         }
       })();
       
-      console.log('Staff to show:', staffToShow.length);
+      // Ensure we also include any staff who have visible appointments in the current view,
+      // even if they don't have an active schedule entry (so their events render)
+      const staffIdsWithAppointmentsInView = new Set<number>();
+      try {
+        const baseDate = selectedDate || new Date();
+        filteredAppointments.forEach((apt: any) => {
+          if (!apt || !apt.staffId || !apt.startTime) return;
+          const aptStart = new Date(apt.startTime);
+          if (isNaN(aptStart.getTime())) return;
+          let inView = false;
+          if (calendarView === 'day') {
+            inView = aptStart.toDateString() === baseDate.toDateString();
+          } else if (calendarView === 'week') {
+            const d = new Date(baseDate);
+            const day = d.getDay();
+            const weekStart = new Date(d);
+            weekStart.setDate(d.getDate() - day);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+            inView = aptStart >= weekStart && aptStart <= weekEnd;
+          } else {
+            inView = aptStart.getFullYear() === baseDate.getFullYear() && aptStart.getMonth() === baseDate.getMonth();
+          }
+          if (inView) {
+            staffIdsWithAppointmentsInView.add(apt.staffId);
+          }
+        });
+      } catch {}
+
+      const appointmentStaffToInclude = staff.filter((s: any) => staffIdsWithAppointmentsInView.has(s.id));
+      const staffToProcess = [
+        ...staffToShow,
+        ...appointmentStaffToInclude.filter((s: any) => !staffToShow.some((ex: any) => ex.id === s.id))
+      ];
+
+      console.log('Staff to show:', staffToProcess.length);
       
       // For each staff member
-      staffToShow.forEach((s: any) => {
+      staffToProcess.forEach((s: any) => {
         try {
           if (!s || !s.id) {
             console.warn('Invalid staff member:', s);
@@ -488,8 +573,8 @@ const AppointmentsPage = () => {
               const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
               const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
               
-              // Get existing appointments for this staff on this day
-              const staffAppointments = appointments.filter((apt: any) => {
+              // Get existing appointments for this staff on this day (location-filtered)
+              const staffAppointments = filteredAppointments.filter((apt: any) => {
                 try {
                   if (!apt || !apt.startTime) return false;
                   const aptDate = new Date(apt.startTime);

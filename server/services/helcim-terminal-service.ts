@@ -60,9 +60,11 @@ export class HelcimTerminalService {
       throw new Error(`No terminal configured for location ${locationId}`);
     }
 
+    // Precompute values so we can fall back in outer catch without 500
+    const totalAmount = Number((amount || 0) + (options.tipAmount || 0));
+    const invoiceNumber = options.reference || `POS-${Date.now()}`;
+
     try {
-      const totalAmount = Number((amount || 0) + (options.tipAmount || 0));
-      const invoiceNumber = options.reference || `POS-${Date.now()}`;
       const payload = {
         currency: 'USD',
         transactionAmount: Number(totalAmount.toFixed(2)),
@@ -93,7 +95,40 @@ export class HelcimTerminalService {
       });
 
       const token = config.apiToken || process.env.HELCIM_API_TOKEN;
-      const response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, token);
+      let response: any;
+      try {
+        response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, token);
+      } catch (postErr: any) {
+        const emsg = String(postErr?.message || '').toLowerCase();
+        // Try to locate the transaction anyway if purchase endpoint errors (conflict/busy/etc)
+        try {
+          const recentQuery = await this.makeRequest(
+            'GET',
+            `/devices/${config.deviceCode}/transactions`,
+            undefined,
+            token
+          );
+          const rd = (recentQuery?.data as any) || {};
+          const list = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
+          const match = list.find((t: any) => {
+            const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || t?.reference || '';
+            return inv === invoiceNumber;
+          });
+          if (match) {
+            const pid = match.id || match.transactionId;
+            if (pid) {
+              try {
+                const existing = sessionStore.get(invoiceNumber);
+                if (existing) sessionStore.set(String(pid), existing);
+              } catch {}
+              return { transactionId: pid, paymentId: pid, invoiceNumber, status: 'pending' };
+            }
+          }
+        } catch {}
+        // As a resilience measure, always return invoice so client can begin polling while device processes
+        try { console.warn('⚠️ Helcim purchase error; returning invoice for polling:', emsg); } catch {}
+        return { invoiceNumber, status: 'pending' };
+      }
       try {
         console.log('📤 Helcim purchase response debug', {
           status: (response as any)?.status,
@@ -196,8 +231,14 @@ export class HelcimTerminalService {
       // As a last resort, return the invoiceNumber so the client can correlate while we poll
       return { invoiceNumber, status: 'pending' };
     } catch (error: any) {
-      console.error(`❌ Error starting payment on terminal ${config.terminalId}:`, error.message);
-      throw error;
+      const msg = String(error?.message || '');
+      // Only propagate hard misconfiguration; otherwise, provide a polling handle
+      if (msg.includes('No terminal configured')) {
+        console.error(`❌ Error starting payment on terminal ${config.terminalId}:`, error.message);
+        throw error;
+      }
+      try { console.warn('⚠️ startPayment unexpected error; returning invoice for polling:', { invoiceNumber, msg }); } catch {}
+      return { invoiceNumber, status: 'pending' };
     }
   }
 

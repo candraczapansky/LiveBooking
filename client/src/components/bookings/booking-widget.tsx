@@ -122,7 +122,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const selectedLocationId = form.watch('locationId');
 
-  const { data: services } = useQuery({
+  // We no longer use the generic services list for rendering to avoid leaks
+  useQuery({
     queryKey: ['/api/services', selectedCategoryId, selectedLocationId],
     queryFn: async () => {
       const params: string[] = [];
@@ -131,9 +132,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       const endpoint = params.length > 0 ? `/api/services?${params.join('&')}` : '/api/services';
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch services');
+      // Fetch kept for potential price/description refresh, but UI renders from allowedServices
       return response.json();
     },
-    // Always require a location to avoid leaking cross-location services during search
     enabled: open && !!selectedLocationId
   });
 
@@ -148,33 +149,77 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     enabled: open && !!selectedLocationId
   });
 
+  // Fetch schedules for the selected location to detect which staff actually work there
+  const { data: schedules } = useQuery({
+    queryKey: ['/api/schedules', selectedLocationId],
+    queryFn: async () => {
+      const endpoint = selectedLocationId ? `/api/schedules?locationId=${selectedLocationId}` : '/api/schedules';
+      const response = await fetch(endpoint);
+      if (!response.ok) throw new Error('Failed to fetch schedules');
+      return response.json();
+    },
+    enabled: open && !!selectedLocationId
+  });
+
   // Compute allowed services based on staff assignments at the selected location
   const [allowedServiceIds, setAllowedServiceIds] = useState<Set<number>>(new Set());
+  const [allowedServices, setAllowedServices] = useState<any[]>([]);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
-        if (!open || !selectedLocationId || !Array.isArray(staff) || staff.length === 0) {
+        if (!open || !selectedLocationId) {
           setAllowedServiceIds(new Set());
+          setAllowedServices([]);
           return;
         }
+        // Build list of staff IDs that actually have a schedule at this location (fallback to staff list if schedules are empty)
+        const staffIdsFromSchedules = Array.isArray(schedules)
+          ? Array.from(new Set((schedules as any[]).map((sch: any) => sch.staffId)))
+          : [];
+
+        const staffIdsToUse: number[] = staffIdsFromSchedules.length > 0
+          ? staffIdsFromSchedules
+          : (Array.isArray(staff) ? (staff as any[]).map((s: any) => s.id) : []);
+
+        if (staffIdsToUse.length === 0) {
+          setAllowedServiceIds(new Set());
+          setAllowedServices([]);
+          return;
+        }
+
         const lists = await Promise.all(
-          (staff as any[]).map(async (s: any) => {
+          staffIdsToUse.map(async (staffId: number) => {
             try {
-              const res = await fetch(`/api/staff/${s.id}/services`);
-              if (!res.ok) return [] as number[];
+              const res = await fetch(`/api/staff/${staffId}/services?public=true`);
+              if (!res.ok) return [] as any[];
               const data = await res.json();
-              return (data || []).map((svc: any) => svc.id as number);
+              return (data || []) as any[]; // full service objects
             } catch {
-              return [] as number[];
+              return [] as any[];
             }
           })
         );
+        const flat = lists.flat();
         const ids = new Set<number>();
-        lists.flat().forEach((id: number) => ids.add(id));
-        if (!cancelled) setAllowedServiceIds(ids);
+        const uniqById = new Map<number, any>();
+        flat.forEach((svc: any) => {
+          if (!svc || typeof svc.id !== 'number') return;
+          // If a service has an explicit locationId that does not match, skip it.
+          // Otherwise (null/undefined), allow it if the staff at this location offers it.
+          if (selectedLocationId && svc.locationId != null && String(svc.locationId) !== String(selectedLocationId)) return;
+          ids.add(svc.id);
+          if (!uniqById.has(svc.id)) uniqById.set(svc.id, svc);
+        });
+        if (!cancelled) {
+          setAllowedServiceIds(ids);
+          setAllowedServices(Array.from(uniqById.values()));
+        }
       } catch {
-        if (!cancelled) setAllowedServiceIds(new Set());
+        if (!cancelled) {
+          setAllowedServiceIds(new Set());
+          setAllowedServices([]);
+        }
       }
     };
     load();
@@ -216,24 +261,17 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   }, [userData, currentStep, form]);
 
   // Filter services by search query and allowed set (from staff assignments)
-  const filteredServices = services?.filter((service: Service) => {
+  const filteredServices = allowedServices?.filter((service: any) => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       service.description?.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
-    // When a location is selected, only show services offered by at least one staff at that location
-    if (selectedLocationId) {
-      // If we have staff loaded for this location and none are assigned to this service, hide it
-      if (Array.isArray(staff) && staff.length > 0) {
-        return allowedServiceIds.has(service.id);
-      }
-      return false;
-    }
+    if (selectedCategoryId && String(service.categoryId) !== String(selectedCategoryId)) return false;
     return true;
   });
 
   // Get selected service details
   const selectedService = form.watch('serviceId') 
-    ? services?.find((service: Service) => service.id.toString() === form.watch('serviceId')) 
+    ? allowedServices?.find((service: any) => service.id.toString() === form.watch('serviceId')) 
     : null;
 
   // Generate time slots (10am to 6pm with 30 minute intervals)
@@ -440,8 +478,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   {categories?.filter((category: Category) => {
                     if (!selectedLocationId) return true;
                     // Show category only if at least one allowed service belongs to it
-                    if (!services || allowedServiceIds.size === 0) return false;
-                    return services.some((svc: any) => svc.categoryId === category.id && allowedServiceIds.has(svc.id));
+                    if (!allowedServices || allowedServices.length === 0) return false;
+                    return allowedServices.some((svc: any) => svc.categoryId === category.id);
                   }).map((category: Category) => (
                     <Button
                       key={category.id}

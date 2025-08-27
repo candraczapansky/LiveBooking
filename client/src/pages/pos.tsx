@@ -197,6 +197,11 @@ export default function PointOfSale() {
   // Fetch services
   const { data: services, isLoading: servicesLoading } = useQuery({
     queryKey: ["/api/services"],
+    queryFn: async () => {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
+      return response.json();
+    },
     staleTime: 0, // Always consider data stale
     gcTime: 0, // Don't cache data (gcTime replaces cacheTime)
   });
@@ -204,16 +209,31 @@ export default function PointOfSale() {
   // Fetch service categories
   const { data: categories } = useQuery({
     queryKey: ["/api/service-categories"],
+    queryFn: async () => {
+      const response = await fetch('/api/service-categories');
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      return response.json();
+    }
   });
 
   // Fetch products
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["/api/products"],
+    queryFn: async () => {
+      const response = await fetch('/api/products');
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    }
   });
 
   // Fetch clients
   const { data: clients } = useQuery({
     queryKey: ["/api/users"],
+    queryFn: async () => {
+      const response = await fetch('/api/users');
+      if (!response.ok) throw new Error('Failed to fetch clients');
+      return response.json();
+    }
   });
 
   const clientList = (clients as any[])?.filter((user: any) => user.role === 'client') || [];

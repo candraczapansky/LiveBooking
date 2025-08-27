@@ -88,7 +88,7 @@ const AssignedServicesBadges = ({ staffId }: { staffId: number }) => {
             type="button"
             onClick={async () => {
               try {
-                await apiRequest('DELETE', `/api/staff/${staffId}/services/${service.id}`);
+                await apiRequest('DELETE', `/api/staff-services/${service.staffServiceId}`);
                 queryClient.invalidateQueries({ queryKey: ['/api/staff', staffId, 'services'] });
               } catch (e) {}
             }}

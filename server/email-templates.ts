@@ -25,6 +25,47 @@ Handlebars.registerHelper('formatTime', function(time: string) {
   return `${displayHour}:${minutes} ${ampm}`;
 });
 
+// Central Time (America/Chicago) helpers for confirmations
+const ordinalSuffix = (day: number): string => {
+  const j = day % 10;
+  const k = day % 100;
+  if (j === 1 && k !== 11) return `${day}st`;
+  if (j === 2 && k !== 12) return `${day}nd`;
+  if (j === 3 && k !== 13) return `${day}rd`;
+  return `${day}th`;
+};
+
+Handlebars.registerHelper('formatDateCT', function(date: string | Date) {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  }).formatToParts(dateObj);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  const weekday = get('weekday');
+  const month = get('month');
+  const dayStr = get('day');
+  const year = get('year');
+  const dayNum = parseInt(dayStr || '0', 10);
+  const dayWithOrdinal = isNaN(dayNum) ? dayStr : ordinalSuffix(dayNum);
+  return `${weekday}, ${month} ${dayWithOrdinal}, ${year}`;
+});
+
+Handlebars.registerHelper('formatTimeCT', function(date: string | Date) {
+  if (!date) return '';
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Chicago',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  }).format(dateObj);
+});
+
 // Base email template with professional styling
 const baseEmailTemplate = `
 <!DOCTYPE html>
@@ -142,8 +183,8 @@ export const appointmentConfirmationTemplate = Handlebars.compile(`
     <h3 style="margin-top: 0; color: #333;">Appointment Details</h3>
     <p><strong>Client:</strong> {{clientName}}</p>
     <p><strong>Service:</strong> {{serviceName}}</p>
-    <p><strong>Date:</strong> {{formatDate appointmentDate 'EEEE, MMMM do, yyyy'}}</p>
-    <p><strong>Time:</strong> {{formatTime appointmentTime}}</p>
+    <p><strong>Date:</strong> {{formatDateCT appointmentDate}}</p>
+    <p><strong>Time:</strong> {{formatTimeCT appointmentDate}}</p>
     <p><strong>Duration:</strong> {{duration}} minutes</p>
     <p><strong>Staff:</strong> {{staffName}}</p>
     {{#if totalAmount}}
