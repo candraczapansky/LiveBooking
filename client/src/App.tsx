@@ -156,9 +156,13 @@ export default function App() {
         <AuthProvider>
           <QueryClientProvider client={queryClient}>
             <TooltipProvider>
-              <Suspense fallback={<PageLoading />}>
-                <ClientBooking />
-              </Suspense>
+              <BusinessSettingsProvider>
+                <LocationProvider>
+                  <Suspense fallback={<PageLoading />}>
+                    <ClientBooking />
+                  </Suspense>
+                </LocationProvider>
+              </BusinessSettingsProvider>
               <Toaster />
             </TooltipProvider>
           </QueryClientProvider>

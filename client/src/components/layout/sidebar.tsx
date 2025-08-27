@@ -58,16 +58,47 @@ interface SidebarItemProps {
 
 const SidebarItem = ({ icon, label, href, isActive, isOpen: _isOpen, onClick }: SidebarItemProps) => {
   const [, navigate] = useLocation();
+  if (href === '/booking') {
+    return (
+      <a 
+        href={href}
+        className={`
+        flex items-center px-4 py-3 text-sm font-medium rounded-lg
+        transition-all duration-200
+        ${isActive
+          ? 'border-2 border-primary text-primary bg-transparent'
+          : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+        }
+      `}
+        onClick={(e) => {
+          // Prefer SPA navigation; fallback to hard reload if it doesn't take effect
+          e.preventDefault();
+          try {
+            navigate(href);
+          } finally {
+            setTimeout(() => {
+              if (window.location.pathname !== href) {
+                window.location.replace(href);
+              }
+            }, 100);
+          }
+        }}
+      >
+        <span className={`
+        flex-shrink-0 transition-transform duration-200
+        text-primary
+      `}>
+          {icon}
+        </span>
+        <span className="ml-3">{formatDisplayLabel(label)}</span>
+      </a>
+    );
+  }
+
   return (
     <a 
       href={href}
       onClick={(e) => {
-        // Special-case booking to ensure navigation even if client-side routing is blocked
-        if (href === '/booking') {
-          onClick();
-          window.location.assign(href);
-          return;
-        }
         e.preventDefault();
         onClick();
         // Use client-side navigation to avoid full page reloads and 404s behind proxies

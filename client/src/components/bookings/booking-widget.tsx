@@ -36,7 +36,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, Clock, Search } from "lucide-react";
+import { CalendarIcon, Clock, Search, MapPin } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 type Service = {
@@ -70,6 +70,7 @@ type BookingWidgetProps = {
 };
 
 const bookingSchema = z.object({
+  locationId: z.string().min(1, "Please select a location"),
   serviceId: z.string().min(1, "Please select a service"),
   staffId: z.string().min(1, "Please select a staff member"),
   date: z.date({
@@ -85,7 +86,7 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Service", "Staff", "Time", "Details"];
+const steps = ["Location", "Service", "Staff", "Time", "Details"];
 
 const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -96,6 +97,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
     defaultValues: {
+      locationId: "",
       serviceId: "",
       staffId: "",
       date: new Date(),
@@ -118,27 +120,41 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     enabled: open
   });
 
+  const selectedLocationId = form.watch('locationId');
+
   const { data: services } = useQuery({
-    queryKey: ['/api/services', selectedCategoryId],
+    queryKey: ['/api/services', selectedCategoryId, selectedLocationId],
     queryFn: async () => {
-      const endpoint = selectedCategoryId 
-        ? `/api/services?categoryId=${selectedCategoryId}` 
-        : '/api/services';
+      const params: string[] = [];
+      if (selectedCategoryId) params.push(`categoryId=${selectedCategoryId}`);
+      if (selectedLocationId) params.push(`locationId=${selectedLocationId}`);
+      const endpoint = params.length > 0 ? `/api/services?${params.join('&')}` : '/api/services';
       const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     },
-    enabled: open
+    enabled: open && !!selectedLocationId
   });
 
   const { data: staff } = useQuery({
-    queryKey: ['/api/staff'],
+    queryKey: ['/api/staff', selectedLocationId],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
+      const endpoint = selectedLocationId ? `/api/staff?locationId=${selectedLocationId}` : '/api/staff';
+      const response = await fetch(endpoint);
       if (!response.ok) throw new Error('Failed to fetch staff');
       return response.json();
     },
-    enabled: open && currentStep >= 1
+    enabled: open && currentStep >= 2 && !!selectedLocationId
+  });
+
+  const { data: locations } = useQuery({
+    queryKey: ['/api/locations'],
+    queryFn: async () => {
+      const response = await fetch('/api/locations');
+      if (!response.ok) throw new Error('Failed to fetch locations');
+      return response.json();
+    },
+    enabled: open
   });
 
   // Get user details if logged in
@@ -150,7 +166,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (!response.ok) throw new Error('Failed to fetch user data');
       return response.json();
     },
-    enabled: !!userId && open && currentStep === 3
+    enabled: !!userId && open && currentStep === 4
   });
 
   // Pre-fill user data if available
@@ -206,6 +222,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const nextStep = () => {
     const fields = [
+      ['locationId'],
       ['serviceId'],
       ['staffId'],
       ['date', 'time'],
@@ -271,7 +288,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Book an Appointment</DialogTitle>
         </DialogHeader>
@@ -307,8 +324,47 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} noValidate>
-            {/* Step 1: Service Selection */}
+            {/* Step 1: Location Selection */}
             {currentStep === 0 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Location</h3>
+                <FormField
+                  control={form.control}
+                  name="locationId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={(v) => {
+                          // Reset downstream selections when location changes
+                          field.onChange(v);
+                          form.setValue('serviceId', "");
+                          form.setValue('staffId', "");
+                        }} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Choose a location" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {locations?.map((loc: any) => (
+                              <SelectItem key={loc.id} value={String(loc.id)}>
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="h-4 w-4" />
+                                  <span>{loc.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Step 2: Service Selection */}
+            {currentStep === 1 && (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Service</h3>
@@ -398,8 +454,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               </div>
             )}
             
-            {/* Step 2: Staff Selection */}
-            {currentStep === 1 && (
+            {/* Step 3: Staff Selection */}
+            {currentStep === 2 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Staff Member</h3>
                 
@@ -444,8 +500,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               </div>
             )}
             
-            {/* Step 3: Date and Time Selection */}
-            {currentStep === 2 && (
+            {/* Step 4: Date and Time Selection */}
+            {currentStep === 3 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Date & Time</h3>
                 
@@ -530,8 +586,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               </div>
             )}
             
-            {/* Step 4: Customer Details */}
-            {currentStep === 3 && (
+            {/* Step 5: Customer Details */}
+            {currentStep === 4 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Your Details</h3>
                 

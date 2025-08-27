@@ -81,23 +81,25 @@ const ClientBookingPage = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
 
-      <main className="flex-1 max-w-7xl w-full mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 w-full mx-auto py-10 px-4 sm:px-6 lg:px-8">
         {!isAuthenticated ? (
-          <div className="max-w-md mx-auto bg-white dark:bg-gray-800 shadow-sm rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">Create your account</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6 text-center">Sign up to book your appointment.</p>
+          <div className="w-full">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Create your account</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Sign up to book your appointment.</p>
+            </div>
             {error && (
-              <div className="mb-4 text-center text-sm text-red-600 dark:text-red-400 font-medium">{error}</div>
+              <div className="mb-4 text-sm text-red-600 dark:text-red-400 font-medium">{error}</div>
             )}
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-4" noValidate>
-                <div className="grid grid-cols-2 gap-3">
+              <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-5 max-w-2xl" noValidate>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="firstName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">First name</FormLabel>
+                        <FormLabel className="text-sm">First name</FormLabel>
                         <FormControl>
                           <Input placeholder="Jane" {...field} />
                         </FormControl>
@@ -110,7 +112,7 @@ const ClientBookingPage = () => {
                     name="lastName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Last name</FormLabel>
+                        <FormLabel className="text-sm">Last name</FormLabel>
                         <FormControl>
                           <Input placeholder="Doe" {...field} />
                         </FormControl>
@@ -124,7 +126,7 @@ const ClientBookingPage = () => {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Email</FormLabel>
+                      <FormLabel className="text-sm">Email</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="you@example.com" autoComplete="email" {...field} />
                       </FormControl>
@@ -137,7 +139,7 @@ const ClientBookingPage = () => {
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Username</FormLabel>
+                      <FormLabel className="text-sm">Username</FormLabel>
                       <FormControl>
                         <Input placeholder="janedoe" autoComplete="username" {...field} />
                       </FormControl>
@@ -150,7 +152,7 @@ const ClientBookingPage = () => {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Password</FormLabel>
+                      <FormLabel className="text-sm">Password</FormLabel>
                       <FormControl>
                         <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
                       </FormControl>
@@ -158,11 +160,13 @@ const ClientBookingPage = () => {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? "Creating account..." : "Create account & continue"}
-                </Button>
-                <div className="text-center text-xs text-gray-600 dark:text-gray-400">
-                  Already have an account? <button type="button" className="text-primary" onClick={() => navigate("/login")}>Log in</button>
+                <div className="flex items-center gap-4">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? "Creating account..." : "Create account & continue"}
+                  </Button>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    Already have an account? <button type="button" className="text-primary" onClick={() => navigate("/login")}>Log in</button>
+                  </div>
                 </div>
               </form>
             </Form>

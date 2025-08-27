@@ -300,6 +300,12 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
                 immediateFailed++;
                 continue;
               }
+              // Attempt to atomically claim this recipient to avoid duplicate sends
+              const claimed = await (storage as any).claimMarketingCampaignRecipient?.((rec as any).id);
+              if (!claimed) {
+                // Already claimed by another worker; skip
+                continue;
+              }
               const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
               const sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
               if (sendResult.success) {

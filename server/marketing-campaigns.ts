@@ -424,6 +424,13 @@ export class MarketingCampaignService {
           continue;
         }
 
+        // Atomically claim recipient to avoid duplicate sends across workers
+        const claimed = await (this.storage as any).claimMarketingCampaignRecipient?.((rec as any).id);
+        if (!claimed) {
+          // Already claimed elsewhere; skip
+          continue;
+        }
+
         // Use campaign.content for SMS body; attach public media URL when media exists
         const mediaUrl = (campaign as any).photoUrl
           ? getPublicUrl(`/api/marketing-campaigns/${campaign.id}/photo`)

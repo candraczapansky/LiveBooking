@@ -25,8 +25,20 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
       };
-      await (terminalService as any).handleWebhook(normalized);
-      return res.json({ received: true });
+      // Respond immediately to avoid Helcim timeout, process asynchronously
+      try { res.json({ received: true }); } catch {}
+      try {
+        setImmediate(async () => {
+          try {
+            await (terminalService as any).handleWebhook(normalized);
+          } catch (err) {
+            try { console.error('❌ Async helcim webhook processing error:', err); } catch {}
+          }
+        });
+      } catch (e) {
+        try { (terminalService as any).handleWebhook(normalized).catch(() => {}); } catch {}
+      }
+      return;
     } catch (error: any) {
       console.error('❌ Error handling Helcim webhook:', error);
       return res.status(400).json({ received: false });

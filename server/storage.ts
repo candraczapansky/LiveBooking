@@ -242,6 +242,8 @@ export interface IStorage {
   getMarketingCampaignRecipient(id: number): Promise<MarketingCampaignRecipient | undefined>;
   getMarketingCampaignRecipients(campaignId: number): Promise<MarketingCampaignRecipient[]>;
   updateMarketingCampaignRecipient(id: number, data: Partial<InsertMarketingCampaignRecipient>): Promise<MarketingCampaignRecipient>;
+  // Atomically claim a recipient for sending (transitions status from "pending" to a temporary "processing")
+  claimMarketingCampaignRecipient(recipientId: number): Promise<boolean>;
   getMarketingCampaignRecipientByToken(token: string): Promise<MarketingCampaignRecipient | undefined>;
 
   // Email unsubscribe operations
@@ -2513,6 +2515,22 @@ Glo Head Spa`,
     }
     
     return updatedRecipient;
+  }
+
+  // Attempt to atomically claim a recipient for processing. Returns true if claim succeeded.
+  async claimMarketingCampaignRecipient(recipientId: number): Promise<boolean> {
+    try {
+      // Only claim if currently pending
+      const [claimed] = await db
+        .update(marketingCampaignRecipients)
+        .set({ status: 'processing' as any, sentAt: new Date() } as any)
+        .where(and(eq(marketingCampaignRecipients.id, recipientId), eq(marketingCampaignRecipients.status, 'pending' as any)))
+        .returning();
+      return !!claimed;
+    } catch (error) {
+      console.error('Error claiming marketing campaign recipient:', { recipientId }, error);
+      return false;
+    }
   }
 
   // User filtering for campaigns

@@ -20,6 +20,26 @@ function validateBody<T>(schema: z.ZodType<T>) {
 }
 
 export function registerUserRoutes(app: Express, storage: IStorage) {
+  // Minimal route to fetch a client's form submissions for reuse in calendar details
+  app.get("/api/clients/:id/form-submissions", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid client id" });
+      }
+
+      if (!(storage as any).getClientFormSubmissions) {
+        return res.status(501).json({ error: "Form submissions not supported" });
+      }
+
+      const submissions = await (storage as any).getClientFormSubmissions(id);
+      return res.json(submissions || []);
+    } catch (error: any) {
+      console.error("Error fetching client form submissions:", error);
+      res.status(500).json({ error: "Failed to fetch form submissions" });
+    }
+  });
+
   // Create client (admin/staff action)
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
     try {

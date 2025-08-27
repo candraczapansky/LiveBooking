@@ -312,17 +312,25 @@ const SimpleMobileMenu = () => {
                             {item.children.map((child: any) => {
                               const ChildIcon = child.icon;
                               const childActive = location === child.href;
+                              const linkProps: any = {
+                                key: child.href,
+                                href: child.href,
+                                onClick: handleLinkClick,
+                                className: `w-full flex items-center px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${
+                                  childActive 
+                                    ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
+                                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
+                                }`
+                              };
+                              if (child.href === '/booking') {
+                                linkProps.onClick = (e: any) => {
+                                  e.preventDefault();
+                                  saveScrollPosition();
+                                  window.location.assign('/booking');
+                                };
+                              }
                               return (
-                                <Link
-                                  key={child.href}
-                                  href={child.href}
-                                  onClick={handleLinkClick}
-                                  className={`w-full flex items-center px-3 py-2 rounded-lg cursor-pointer text-sm transition-colors ${
-                                    childActive 
-                                      ? "border-2 border-primary text-primary dark:text-primary-foreground bg-transparent" 
-                                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
-                                  }`}
-                                >
+                                <Link {...linkProps}>
                                   <ChildIcon className="w-5 h-5 mr-3 flex-shrink-0" strokeWidth={1.75} />
                                   <span className="truncate flex-1">{formatDisplayLabel(child.label)}</span>
                                 </Link>

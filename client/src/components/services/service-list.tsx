@@ -158,14 +158,26 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b">
           <CardTitle className="text-lg font-medium">{categoryId ? (category?.name || 'Services') : 'All Services'}</CardTitle>
-          <div className="relative">
-            <Input
-              placeholder="Search services..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 py-1 h-8 text-sm"
-            />
-            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Input
+                placeholder="Search services..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 py-1 h-8 text-sm"
+              />
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            </div>
+            <Button
+              variant="default"
+              className="h-8"
+              onClick={() => {
+                setSelectedService(null);
+                setIsServiceFormOpen(true);
+              }}
+            >
+              Add Service
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">

@@ -20,10 +20,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift } from "lucide-react";
+import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
+import ClientFormSubmissions from "@/components/client/client-form-submissions";
 
 interface AppointmentDetailsProps {
   open: boolean;
@@ -57,6 +58,7 @@ const AppointmentDetails = ({
   const [giftCardCode, setGiftCardCode] = useState("");
   const [showHelcimModal, setShowHelcimModal] = useState(false);
   const [tipAmount, setTipAmount] = useState<number>(0);
+  const [isFormsOpen, setIsFormsOpen] = useState(false);
 
   // Fetch appointment details
   const { data: appointment, isLoading } = useQuery({
@@ -544,7 +546,8 @@ const AppointmentDetails = ({
   const isValidEndTime = !isNaN(endTime.getTime());
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -897,8 +900,8 @@ const AppointmentDetails = ({
                           </Button>
                         </div>
                         <SmartTerminalPayment
-                          open={true}
-                          onOpenChange={() => {}}
+                          open={showTerminalPayment}
+                          onOpenChange={setShowTerminalPayment}
                           amount={chargeAmount || getAppointmentChargeAmount()}
                           tipAmount={tipAmount}
                           locationId={appointment.locationId}
@@ -980,6 +983,15 @@ const AppointmentDetails = ({
                       >
                         <MessageSquare className="h-4 w-4" />
                         View Note History
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsFormsOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <FileText className="h-4 w-4" />
+                        View Client Forms
                       </Button>
                       <Button
                         variant="outline"
@@ -1085,6 +1097,23 @@ const AppointmentDetails = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    {client && (
+      <Dialog open={isFormsOpen} onOpenChange={setIsFormsOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Client Forms
+            </DialogTitle>
+            <DialogDescription>
+              Forms submitted by {client.firstName} {client.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <ClientFormSubmissions clientId={client.id} clientName={`${client.firstName} ${client.lastName}`} />
+        </DialogContent>
+      </Dialog>
+    )}
+    </>
   );
 };
 

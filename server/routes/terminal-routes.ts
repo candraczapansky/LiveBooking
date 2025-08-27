@@ -324,6 +324,54 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     }
   });
 
+  // Fallback: attempt to resolve and complete by invoice or transaction id
+  router.post('/complete-by-invoice', async (req, res) => {
+    try {
+      const { locationId, paymentId, appointmentId, dbPaymentId } = req.body || {};
+      if (!locationId || !paymentId) {
+        return res.status(400).json({ success: false, message: 'locationId and paymentId are required' });
+      }
+      // Try to resolve status by provided id
+      let status = await terminalService.checkPaymentStatus(String(locationId), String(paymentId));
+      // If we got a different concrete transactionId, try once more by that id
+      if (status?.transactionId && status.transactionId !== paymentId && status.status !== 'completed') {
+        try {
+          const s2 = await terminalService.checkPaymentStatus(String(locationId), String(status.transactionId));
+          if (s2) status = s2 as any;
+        } catch {}
+      }
+      const isCompleted = (status as any)?.status === 'completed';
+      // If completed, update DB similarly to complete-payment
+      if (isCompleted) {
+        try {
+          if (dbPaymentId !== undefined && dbPaymentId !== null) {
+            const numericPaymentId = typeof dbPaymentId === 'string' ? parseInt(dbPaymentId, 10) : dbPaymentId;
+            if (!Number.isNaN(numericPaymentId)) {
+              await (storage as any).updatePayment(numericPaymentId, {
+                status: 'completed',
+                processedAt: new Date(),
+              });
+            }
+          }
+          if (appointmentId !== undefined && appointmentId !== null) {
+            const numericAppointmentId = typeof appointmentId === 'string' ? parseInt(appointmentId, 10) : appointmentId;
+            if (!Number.isNaN(numericAppointmentId)) {
+              await storage.updateAppointment(numericAppointmentId, { paymentStatus: 'paid' } as any);
+            }
+          }
+        } catch {}
+      }
+      return res.json({
+        success: isCompleted,
+        status: (status as any)?.status || 'pending',
+        transactionId: (status as any)?.transactionId || paymentId,
+      });
+    } catch (error: any) {
+      console.error('❌ Error completing by invoice:', error);
+      return res.status(500).json({ success: false, message: error.message || 'Failed to complete by invoice' });
+    }
+  });
+
   // Helcim webhook endpoint (configure in Helcim dashboard)
   router.post('/webhook', async (req, res) => {
     try {
@@ -360,8 +408,20 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
           console.log('ℹ️ Minimal webhook received; will enrich by id', normalized);
         }
       } catch {}
-      await (terminalService as any).handleWebhook(normalized);
-      return res.json({ received: true });
+      // Respond immediately to avoid Helcim timeout, process asynchronously
+      try { res.json({ received: true }); } catch {}
+      try {
+        setImmediate(async () => {
+          try {
+            await (terminalService as any).handleWebhook(normalized);
+          } catch (err) {
+            try { console.error('❌ Async terminal webhook processing error:', err); } catch {}
+          }
+        });
+      } catch (e) {
+        try { (terminalService as any).handleWebhook(normalized).catch(() => {}); } catch {}
+      }
+      return;
     } catch (error: any) {
       console.error('❌ Error handling terminal webhook:', error);
       return res.status(400).json({ received: false });
