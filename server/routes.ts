@@ -37,6 +37,7 @@ import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerAutomationRuleRoutes } from "./routes/automation-rules.js";
 import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
 import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerFormsRoutes } from "./routes/forms.js";
@@ -96,6 +97,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
+  // Automations
+  registerAutomationRuleRoutes(app, storage);
   // Memberships
   registerMembershipRoutes(app, storage);
   // Notes

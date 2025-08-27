@@ -124,8 +124,11 @@ const ServiceList = ({ categoryId }: ServiceListProps) => {
   });
 
   const filteredServices = services?.filter((service: Service) =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    (categoryId == null || service.categoryId === categoryId) &&
+    (
+      service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      service.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
   );
 
   const handleEditService = (serviceId: number) => {

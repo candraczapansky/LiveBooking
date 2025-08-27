@@ -133,6 +133,8 @@ export default function App() {
   const isPublicFormRoute = !!location.match(/^\/forms\/\d+$/);
   // Always treat reset-password as a standalone public page (no MainLayout/header)
   const isResetPasswordRoute = location.startsWith('/reset-password');
+  // Treat booking as a minimal page (no MainLayout/header)
+  const isBookingRoute = location.startsWith('/booking');
 
   if (isResetPasswordRoute) {
     return (
@@ -144,6 +146,24 @@ export default function App() {
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
+    );
+  }
+
+  // Minimal render for booking (no MainLayout/sidebar/header), but with AuthProvider
+  if (isBookingRoute) {
+    return (
+      <GlobalErrorBoundary>
+        <AuthProvider>
+          <QueryClientProvider client={queryClient}>
+            <TooltipProvider>
+              <Suspense fallback={<PageLoading />}>
+                <ClientBooking />
+              </Suspense>
+              <Toaster />
+            </TooltipProvider>
+          </QueryClientProvider>
+        </AuthProvider>
+      </GlobalErrorBoundary>
     );
   }
 

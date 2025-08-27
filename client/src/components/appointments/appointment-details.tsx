@@ -372,6 +372,14 @@ const AppointmentDetails = ({
             
             if (completeResult.success) {
               console.log('✅ Terminal payment completed and calendar synced successfully');
+              try {
+                await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointment.id] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+                await queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+                await queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+              } catch {}
               
               toast({
                 title: "Payment Confirmed",
@@ -395,6 +403,15 @@ const AppointmentDetails = ({
               await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
                 paymentStatus: 'paid'
               });
+
+              try {
+                await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointment.id] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+                await queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+                await queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+                await queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+              } catch {}
 
               toast({
                 title: "Payment Confirmed",

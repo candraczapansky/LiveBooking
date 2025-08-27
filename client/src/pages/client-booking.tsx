@@ -80,18 +80,6 @@ const ClientBookingPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <BusinessBrand size="md" className="text-gray-900 dark:text-gray-100" />
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => navigate("/login")}
-          >
-            Log In
-          </Button>
-        </div>
-      </header>
 
       <main className="flex-1 max-w-7xl w-full mx-auto py-8 px-4 sm:px-6 lg:px-8">
         {!isAuthenticated ? (

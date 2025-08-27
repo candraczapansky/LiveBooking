@@ -56,12 +56,18 @@ interface SidebarItemProps {
   onClick: () => void;
 }
 
-const SidebarItem = ({ icon, label, href, isActive, isOpen, onClick }: SidebarItemProps) => {
+const SidebarItem = ({ icon, label, href, isActive, isOpen: _isOpen, onClick }: SidebarItemProps) => {
   const [, navigate] = useLocation();
   return (
     <a 
       href={href}
       onClick={(e) => {
+        // Special-case booking to ensure navigation even if client-side routing is blocked
+        if (href === '/booking') {
+          onClick();
+          window.location.assign(href);
+          return;
+        }
         e.preventDefault();
         onClick();
         // Use client-side navigation to avoid full page reloads and 404s behind proxies
@@ -87,7 +93,7 @@ const SidebarItem = ({ icon, label, href, isActive, isOpen, onClick }: SidebarIt
   );
 };
 
-export function Sidebar({ isOpen, isMobile }: SidebarProps) {
+export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
   const { toggleSidebar, closeSidebar } = useSidebar();
@@ -101,7 +107,7 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
   const [isInsightsExpanded, setIsInsightsExpanded] = useState<boolean>(isInInsightsSection);
   const isInBusinessSection = location === '/locations' || location === '/settings' || location === '/permissions';
   const [isBusinessExpanded, setIsBusinessExpanded] = useState<boolean>(isInBusinessSection);
-  const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships';
+  const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships' || location === '/booking';
   const [isClientsExpanded, setIsClientsExpanded] = useState<boolean>(isInClientsSection);
   const isInServicesSection = location === '/services' || location === '/devices' || location === '/rooms';
   const [isServicesExpanded, setIsServicesExpanded] = useState<boolean>(isInServicesSection);
@@ -291,6 +297,16 @@ export function Sidebar({ isOpen, isMobile }: SidebarProps) {
                             label="Note Templates"
                             href="/note-templates"
                             isActive={location === "/note-templates"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<Calendar className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Client Booking"
+                            href="/booking"
+                            isActive={location === "/booking"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />

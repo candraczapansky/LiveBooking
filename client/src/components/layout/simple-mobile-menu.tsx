@@ -74,6 +74,7 @@ const SimpleMobileMenu = () => {
       { icon: Users, label: "Client Profiles", href: "/clients" },
       { icon: FileText, label: "Forms", href: "/forms" },
       { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
+      { icon: Calendar, label: "Client Booking", href: "/booking" },
       { icon: CreditCard, label: "Memberships", href: "/memberships" },
     ]},
     { icon: UserCircle, label: "Staff", href: "/staff" },
