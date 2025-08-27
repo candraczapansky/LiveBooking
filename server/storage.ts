@@ -1494,6 +1494,7 @@ Glo Head Spa`,
           fixedRate: staff.fixedRate,
         })
         .from(staff)
+        .where(eq(staff.isActive, true))
         .orderBy(staff.id);
       console.log('Retrieved staff from database:', result);
       return result as unknown as Staff[];
@@ -1514,6 +1515,7 @@ Glo Head Spa`,
       if ((staffData as any).commissionRate !== undefined) safeUpdate.commissionRate = (staffData as any).commissionRate;
       if ((staffData as any).hourlyRate !== undefined) safeUpdate.hourlyRate = (staffData as any).hourlyRate;
       if ((staffData as any).fixedRate !== undefined) safeUpdate.fixedRate = (staffData as any).fixedRate;
+      if ((staffData as any).isActive !== undefined) safeUpdate.isActive = (staffData as any).isActive;
 
       const [result] = await db
         .update(staff)

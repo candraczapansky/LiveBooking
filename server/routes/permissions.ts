@@ -9,6 +9,7 @@ import {
   permissionGroups as permissionGroupsTable,
   permissionGroupMappings as permissionGroupMappingsTable,
   userPermissionGroups as userPermissionGroupsTable,
+  userDirectPermissions as userDirectPermissionsTable,
 } from "../../shared/schema.js";
 
 export function registerPermissionRoutes(app: Express) {
@@ -249,7 +250,7 @@ export function registerPermissionRoutes(app: Express) {
         const groupIds = userGroups.map(g => g.id).filter(Boolean) as number[];
 
         // Aggregate permission names from assigned groups
-        let permissionNames: string[] = [];
+        const permissionNameSet = new Set<string>();
         if (groupIds.length > 0) {
           const rows = await db
             .select({ name: permissionsTable.name })
@@ -259,7 +260,36 @@ export function registerPermissionRoutes(app: Express) {
               eq(permissionGroupMappingsTable.permissionId, permissionsTable.id)
             )
             .where(inArray(permissionGroupMappingsTable.groupId, groupIds));
-          permissionNames = rows.map(r => r.name!).filter(Boolean);
+          for (const r of rows) {
+            if (r.name) permissionNameSet.add(r.name);
+          }
+        }
+
+        // Fetch direct permissions (grants/denies) for the user
+        const directPermRows = await db
+          .select({
+            id: userDirectPermissionsTable.id,
+            permissionId: userDirectPermissionsTable.permissionId,
+            isGranted: userDirectPermissionsTable.isGranted,
+            name: permissionsTable.name,
+            description: permissionsTable.description,
+            category: permissionsTable.category,
+            action: permissionsTable.action,
+            resource: permissionsTable.resource,
+          })
+          .from(userDirectPermissionsTable)
+          .leftJoin(
+            permissionsTable,
+            eq(userDirectPermissionsTable.permissionId, permissionsTable.id)
+          )
+          .where(eq(userDirectPermissionsTable.userId, userId));
+
+        // Apply direct permission overrides
+        for (const dp of directPermRows) {
+          const permName = dp.name;
+          if (!permName) continue;
+          if (dp.isGranted) permissionNameSet.add(permName);
+          else permissionNameSet.delete(permName);
         }
 
         res.json({
@@ -267,8 +297,8 @@ export function registerPermissionRoutes(app: Express) {
           data: {
             userId,
             groups: userGroups.filter(g => g.id),
-            permissions: Array.from(new Set(permissionNames)),
-            directPermissions: [],
+            permissions: Array.from(permissionNameSet),
+            directPermissions: directPermRows.filter(r => r.permissionId),
           },
         });
       } catch (error) {
@@ -342,6 +372,87 @@ export function registerPermissionRoutes(app: Express) {
         res.status(500).json({
           success: false,
           message: "Failed to remove permission group from user",
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    })
+  );
+
+  // Grant or deny a direct permission to a user
+  app.post("/api/users/:id/direct-permissions",
+    authenticateToken,
+    requireAdmin,
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const userId = parseInt(req.params.id);
+        const { permissionId, isGranted } = req.body || {};
+        if (!permissionId || Number.isNaN(Number(permissionId))) {
+          return res.status(400).json({ success: false, message: "permissionId is required" });
+        }
+
+        // Upsert behavior: update existing row or insert new
+        const existing = await db
+          .select({ id: userDirectPermissionsTable.id })
+          .from(userDirectPermissionsTable)
+          .where(
+            and(
+              eq(userDirectPermissionsTable.userId, userId),
+              eq(userDirectPermissionsTable.permissionId, Number(permissionId))
+            )
+          );
+
+        if (existing[0]?.id) {
+          await db
+            .update(userDirectPermissionsTable)
+            .set({ isGranted: isGranted === false ? false : true })
+            .where(eq(userDirectPermissionsTable.id, existing[0].id));
+        } else {
+          await db
+            .insert(userDirectPermissionsTable)
+            .values({
+              userId,
+              permissionId: Number(permissionId),
+              isGranted: isGranted === false ? false : true,
+            } as any)
+            .onConflictDoNothing();
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        console.error('Error setting direct permission:', error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to set direct permission",
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    })
+  );
+
+  // Remove a direct permission from a user
+  app.delete("/api/users/:id/direct-permissions/:permissionId",
+    authenticateToken,
+    requireAdmin,
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const userId = parseInt(req.params.id);
+        const permissionId = parseInt(req.params.permissionId);
+
+        await db
+          .delete(userDirectPermissionsTable)
+          .where(
+            and(
+              eq(userDirectPermissionsTable.userId, userId),
+              eq(userDirectPermissionsTable.permissionId, permissionId)
+            )
+          );
+
+        res.json({ success: true, message: "Direct permission removed" });
+      } catch (error) {
+        console.error('Error removing direct permission:', error);
+        res.status(500).json({
+          success: false,
+          message: "Failed to remove direct permission",
           error: error instanceof Error ? error.message : 'Unknown error'
         });
       }

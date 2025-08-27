@@ -90,7 +90,8 @@ export class HelcimTerminalService {
         description: options.description,
       });
 
-      const response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, config.apiToken);
+      const token = config.apiToken || process.env.HELCIM_API_TOKEN;
+      const response = await this.makeRequest('POST', `/devices/${config.deviceCode}/payment/purchase`, payload, token);
       try {
         console.log('📤 Helcim purchase response debug', {
           status: (response as any)?.status,
@@ -139,7 +140,7 @@ export class HelcimTerminalService {
               'GET',
               `/devices/${config.deviceCode}/transactions`,
               undefined,
-              config.apiToken
+              token
             );
             const rd = (recentQuery?.data as any) || {};
             const list = Array.isArray(rd) ? rd : (Array.isArray(rd?.transactions) ? rd.transactions : []);
@@ -194,18 +195,48 @@ export class HelcimTerminalService {
           // 1) Try with query param (if API supports it)
           let match: any | undefined;
           try {
-            const deviceQuery = await this.makeRequest(
+            const q1 = await this.makeRequest(
               'GET',
               `/devices/${config.deviceCode}/transactions?invoiceNumber=${encodeURIComponent(paymentId)}`,
               undefined,
               config.apiToken
             );
-            const d = (deviceQuery?.data as any) || {};
-            const list = Array.isArray(d) ? d : (Array.isArray(d?.transactions) ? d.transactions : []);
-            match = list.find((t: any) => (
-              t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId
+            const d1 = (q1?.data as any) || {};
+            const list1 = Array.isArray(d1) ? d1 : (Array.isArray(d1?.transactions) ? d1.transactions : []);
+            match = list1.find((t: any) => (
+              t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId
             ));
           } catch {}
+          if (!match) {
+            try {
+              const q2 = await this.makeRequest(
+                'GET',
+                `/devices/${config.deviceCode}/transactions?referenceNumber=${encodeURIComponent(paymentId)}`,
+                undefined,
+                config.apiToken
+              );
+              const d2 = (q2?.data as any) || {};
+              const list2 = Array.isArray(d2) ? d2 : (Array.isArray(d2?.transactions) ? d2.transactions : []);
+              match = list2.find((t: any) => (
+                t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId
+              ));
+            } catch {}
+          }
+          if (!match) {
+            try {
+              const q3 = await this.makeRequest(
+                'GET',
+                `/devices/${config.deviceCode}/transactions?invoice=${encodeURIComponent(paymentId)}`,
+                undefined,
+                config.apiToken
+              );
+              const d3 = (q3?.data as any) || {};
+              const list3 = Array.isArray(d3) ? d3 : (Array.isArray(d3?.transactions) ? d3.transactions : []);
+              match = list3.find((t: any) => (
+                t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId
+              ));
+            } catch {}
+          }
 
           // 2) If not supported, fetch recent device transactions and search
           if (!match) {
@@ -271,8 +302,34 @@ export class HelcimTerminalService {
               );
               const m = (merchantQuery?.data as any) || {};
               const list = Array.isArray(m) ? m : (Array.isArray(m?.transactions) ? m.transactions : []);
-              match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId);
+              match = list.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId);
             } catch {}
+            if (!match) {
+              try {
+                const merchantQuery2 = await this.makeRequest(
+                  'GET',
+                  `/transactions?referenceNumber=${encodeURIComponent(paymentId)}`,
+                  undefined,
+                  merchantToken
+                );
+                const m2 = (merchantQuery2?.data as any) || {};
+                const list2 = Array.isArray(m2) ? m2 : (Array.isArray(m2?.transactions) ? m2.transactions : []);
+                match = list2.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId);
+              } catch {}
+            }
+            if (!match) {
+              try {
+                const merchantQuery3 = await this.makeRequest(
+                  'GET',
+                  `/transactions?invoice=${encodeURIComponent(paymentId)}`,
+                  undefined,
+                  merchantToken
+                );
+                const m3 = (merchantQuery3?.data as any) || {};
+                const list3 = Array.isArray(m3) ? m3 : (Array.isArray(m3?.transactions) ? m3.transactions : []);
+                match = list3.find((t: any) => t?.invoiceNumber === paymentId || t?.invoice === paymentId || t?.referenceNumber === paymentId || t?.reference === paymentId);
+              } catch {}
+            }
             if (!match) {
               const recentMerchant = await this.makeRequest('GET', `/transactions`, undefined, merchantToken);
               const md = (recentMerchant?.data as any) || {};
@@ -536,11 +593,10 @@ export class HelcimTerminalService {
                 }
               }
             } catch {}
-            // Optional: merchant-level fallbacks if available
+            // Optional: merchant-level fallbacks if available (when session exists)
             try {
               const merchantToken = process.env.HELCIM_API_TOKEN;
-              if (merchantToken) {
-                // Prefer cardTransactions by id; many card webhooks reference this
+              if (merchantToken && normalized === 'pending') {
                 try {
                   const ctx = await this.makeRequest('GET', `/cardTransactions/${transactionId}`, undefined, merchantToken);
                   const cd: any = ctx?.data || {};
@@ -555,7 +611,6 @@ export class HelcimTerminalService {
                     normalized = 'failed';
                   }
                 } catch {
-                  // Fallback to general transactions by id
                   const mtx = await this.makeRequest('GET', `/transactions/${transactionId}`, undefined, merchantToken);
                   const md: any = (mtx?.data as any) || {};
                   const st = String(md.status || md.result || md.outcome || '').toLowerCase();
@@ -572,6 +627,42 @@ export class HelcimTerminalService {
               }
             } catch {}
           }
+        }
+
+        // If we couldn't find a session (e.g., server restarted), still try merchant-level lookup by transactionId
+        if ((!session || normalized === 'pending') && transactionId) {
+          try {
+            const merchantToken = process.env.HELCIM_API_TOKEN;
+            if (merchantToken) {
+              try {
+                const ctx = await this.makeRequest('GET', `/cardTransactions/${transactionId}`, undefined, merchantToken);
+                const cd: any = ctx?.data || {};
+                const st = String(cd.status || cd.result || cd.outcome || '').toLowerCase();
+                if (!invoiceNumber) {
+                  invoiceNumber = cd.invoiceNumber || cd.invoice || cd.referenceNumber || cd.reference || undefined;
+                }
+                last4 = last4 || cd.last4 || cd.cardLast4 || (cd.card && cd.card.last4) || undefined;
+                if (['approved', 'captured', 'completed', 'success', 'succeeded', 'paid'].includes(st)) {
+                  normalized = 'completed';
+                } else if (['declined', 'failed', 'canceled', 'cancelled', 'voided'].includes(st)) {
+                  normalized = 'failed';
+                }
+              } catch {
+                const mtx = await this.makeRequest('GET', `/transactions/${transactionId}`, undefined, merchantToken);
+                const md: any = (mtx?.data as any) || {};
+                const st = String(md.status || md.result || md.outcome || '').toLowerCase();
+                if (!invoiceNumber) {
+                  invoiceNumber = md.invoiceNumber || md.invoice || md.referenceNumber || md.reference || undefined;
+                }
+                last4 = last4 || md.last4 || md.cardLast4 || (md.card && md.card.last4) || undefined;
+                if (['approved', 'captured', 'completed', 'success', 'succeeded', 'paid'].includes(st)) {
+                  normalized = 'completed';
+                } else if (['declined', 'failed', 'canceled', 'cancelled', 'voided'].includes(st)) {
+                  normalized = 'failed';
+                }
+              }
+            }
+          } catch {}
         }
       }
 

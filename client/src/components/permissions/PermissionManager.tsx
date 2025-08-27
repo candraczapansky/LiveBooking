@@ -107,6 +107,7 @@ const PermissionManager: React.FC = () => {
   const [selectedCreatePermIds, setSelectedCreatePermIds] = useState<Set<number>>(new Set());
   const [selectedEditPermIds, setSelectedEditPermIds] = useState<Set<number>>(new Set());
   const [assignGroupId, setAssignGroupId] = useState<string>("");
+  const [assignDirectPermissionId, setAssignDirectPermissionId] = useState<string>("");
 
   // Fetch permissions
   const { data: permissions, isLoading: permissionsLoading, error: permissionsError } = useQuery({
@@ -146,12 +147,12 @@ const PermissionManager: React.FC = () => {
     retry: 1,
   });
 
-  // Fetch users
+  // Fetch users (staff only)
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/users');
+        const response = await apiRequest('GET', '/api/users?role=staff');
         if (!response.ok) {
           throw new Error(`Failed to fetch users: ${response.statusText}`);
         }
@@ -223,6 +224,32 @@ const PermissionManager: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-permissions'] });
       setIsAssignGroupOpen(false);
+    },
+  });
+
+  // Grant direct permission to user
+  const grantDirectPermissionMutation = useMutation({
+    mutationFn: async ({ userId, permissionId }: { userId: number; permissionId: number }) => {
+      const response = await apiRequest('POST', `/api/users/${userId}/direct-permissions`, {
+        permissionId,
+        isGranted: true,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-permissions'] });
+      setAssignDirectPermissionId("");
+    },
+  });
+
+  // Remove direct permission from user
+  const removeDirectPermissionMutation = useMutation({
+    mutationFn: async ({ userId, permissionId }: { userId: number; permissionId: number }) => {
+      const response = await apiRequest('DELETE', `/api/users/${userId}/direct-permissions/${permissionId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-permissions'] });
     },
   });
 
@@ -425,13 +452,15 @@ const PermissionManager: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex space-x-4">
                   <div className="flex-1">
-                    <Label htmlFor="user-select">Select User</Label>
+                    <Label htmlFor="user-select">Select Staff Member</Label>
                     <Select onValueChange={(value) => {
                       const user = users?.find(u => u.id.toString() === value);
                       setSelectedUser(user || null);
+                      setAssignGroupId("");
+                      setAssignDirectPermissionId("");
                     }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Choose a user" />
+                        <SelectValue placeholder="Choose staff" />
                       </SelectTrigger>
                       <SelectContent>
                         {users?.map((user) => (
@@ -483,20 +512,76 @@ const PermissionManager: React.FC = () => {
                             <CardTitle className="text-base">Direct Permissions</CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <ScrollArea className="h-32">
-                              {userPermissions.permissions.length > 0 ? (
-                                <div className="space-y-1">
-                                  {userPermissions.permissions.map((permission) => (
-                                    <div key={permission} className="flex items-center space-x-2">
-                                      <CheckCircle className="w-4 h-4 text-green-600" />
-                                      <span className="text-sm">{permission}</span>
-                                    </div>
-                                  ))}
+                            <div className="space-y-3">
+                              <div className="flex items-center space-x-2">
+                                <div className="flex-1">
+                                  <Label htmlFor="direct-permission-select">Add Direct Permission</Label>
+                                  <Select
+                                    value={assignDirectPermissionId}
+                                    onValueChange={setAssignDirectPermissionId}
+                                    disabled={!selectedUser}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Choose a permission to grant" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {permissions?.filter(p => {
+                                        const directGrantedIds = new Set(
+                                          (userPermissions?.directPermissions || [])
+                                            .filter((dp: any) => dp.isGranted)
+                                            .map((dp: any) => dp.permissionId)
+                                        );
+                                        return !directGrantedIds.has(p.id);
+                                      }).map((p) => (
+                                        <SelectItem key={p.id} value={p.id.toString()}>
+                                          {p.name}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
                                 </div>
-                              ) : (
-                                <p className="text-sm text-gray-500">No direct permissions</p>
-                              )}
-                            </ScrollArea>
+                                <Button
+                                  onClick={() => {
+                                    if (!selectedUser || !assignDirectPermissionId) return;
+                                    grantDirectPermissionMutation.mutate({
+                                      userId: selectedUser.id,
+                                      permissionId: Number(assignDirectPermissionId),
+                                    });
+                                  }}
+                                  disabled={!assignDirectPermissionId || grantDirectPermissionMutation.isPending}
+                                >
+                                  {grantDirectPermissionMutation.isPending ? 'Adding...' : 'Add'}
+                                </Button>
+                              </div>
+
+                              <ScrollArea className="h-32">
+                                {(userPermissions?.directPermissions || []).filter((dp: any) => dp.isGranted).length > 0 ? (
+                                  <div className="space-y-1">
+                                    {(userPermissions?.directPermissions || []).filter((dp: any) => dp.isGranted).map((dp: any) => (
+                                      <div key={`${dp.permissionId}-${dp.id}`} className="flex items-center justify-between space-x-2">
+                                        <div className="flex items-center space-x-2">
+                                          <CheckCircle className="w-4 h-4 text-green-600" />
+                                          <span className="text-sm">{dp.name || dp.action + '_' + dp.resource}</span>
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="text-red-600"
+                                          onClick={() => {
+                                            if (!selectedUser) return;
+                                            removeDirectPermissionMutation.mutate({ userId: selectedUser.id, permissionId: dp.permissionId });
+                                          }}
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-500">No direct permissions</p>
+                                )}
+                              </ScrollArea>
+                            </div>
                           </CardContent>
                         </Card>
                       </div>
