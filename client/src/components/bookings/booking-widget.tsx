@@ -133,6 +133,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     },
+    // Always require a location to avoid leaking cross-location services during search
     enabled: open && !!selectedLocationId
   });
 
@@ -144,8 +145,43 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (!response.ok) throw new Error('Failed to fetch staff');
       return response.json();
     },
-    enabled: open && currentStep >= 2 && !!selectedLocationId
+    enabled: open && !!selectedLocationId
   });
+
+  // Compute allowed services based on staff assignments at the selected location
+  const [allowedServiceIds, setAllowedServiceIds] = useState<Set<number>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!open || !selectedLocationId || !Array.isArray(staff) || staff.length === 0) {
+          setAllowedServiceIds(new Set());
+          return;
+        }
+        const lists = await Promise.all(
+          (staff as any[]).map(async (s: any) => {
+            try {
+              const res = await fetch(`/api/staff/${s.id}/services`);
+              if (!res.ok) return [] as number[];
+              const data = await res.json();
+              return (data || []).map((svc: any) => svc.id as number);
+            } catch {
+              return [] as number[];
+            }
+          })
+        );
+        const ids = new Set<number>();
+        lists.flat().forEach((id: number) => ids.add(id));
+        if (!cancelled) setAllowedServiceIds(ids);
+      } catch {
+        if (!cancelled) setAllowedServiceIds(new Set());
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedLocationId, staff]);
 
   const { data: locations } = useQuery({
     queryKey: ['/api/locations'],
@@ -179,11 +215,21 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     }
   }, [userData, currentStep, form]);
 
-  // Filter services by search query
-  const filteredServices = services?.filter((service: Service) =>
-    service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    service.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter services by search query and allowed set (from staff assignments)
+  const filteredServices = services?.filter((service: Service) => {
+    const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      service.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+    // When a location is selected, only show services offered by at least one staff at that location
+    if (selectedLocationId) {
+      // If we have staff loaded for this location and none are assigned to this service, hide it
+      if (Array.isArray(staff) && staff.length > 0) {
+        return allowedServiceIds.has(service.id);
+      }
+      return false;
+    }
+    return true;
+  });
 
   // Get selected service details
   const selectedService = form.watch('serviceId') 
@@ -391,7 +437,12 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   >
                     All Services
                   </Button>
-                  {categories?.map((category: Category) => (
+                  {categories?.filter((category: Category) => {
+                    if (!selectedLocationId) return true;
+                    // Show category only if at least one allowed service belongs to it
+                    if (!services || allowedServiceIds.size === 0) return false;
+                    return services.some((svc: any) => svc.categoryId === category.id && allowedServiceIds.has(svc.id));
+                  }).map((category: Category) => (
                     <Button
                       key={category.id}
                       type="button"

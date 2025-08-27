@@ -124,6 +124,22 @@ export class HelcimTerminalService {
       if (locationHeader && typeof locationHeader === 'string') {
         const parts = locationHeader.split('/').filter(Boolean);
         const transactionId = parts[parts.length - 1];
+        // Bridge: map device transaction id -> session so webhook cache by invoice can be found during polling by id
+        try {
+          const existing = sessionStore.get(invoiceNumber);
+          if (existing) {
+            sessionStore.set(transactionId, existing);
+          } else {
+            sessionStore.set(transactionId, {
+              startedAt: Date.now(),
+              locationId,
+              deviceCode: config.deviceCode,
+              totalAmount: Number(totalAmount.toFixed(2)),
+              invoiceNumber,
+              description: options.description,
+            });
+          }
+        } catch {}
         return { transactionId, paymentId: transactionId, invoiceNumber, status: 'pending' };
       }
 
@@ -131,6 +147,13 @@ export class HelcimTerminalService {
       const data = response.data || {};
       if ((data as any).transactionId || (data as any).id) {
         const pid = (data as any).transactionId || (data as any).id;
+        // Bridge mapping for id -> session
+        try {
+          const existing = sessionStore.get(invoiceNumber);
+          if (existing) {
+            sessionStore.set(String(pid), existing);
+          }
+        } catch {}
         return { ...data, transactionId: pid, paymentId: pid, invoiceNumber };
       }
 
@@ -153,6 +176,13 @@ export class HelcimTerminalService {
             if (match) {
               const pid = match.id || match.transactionId;
               if (pid) {
+                try {
+                  // Bridge mapping for discovered id -> session
+                  const existing = sessionStore.get(invoiceNumber);
+                  if (existing) {
+                    sessionStore.set(String(pid), existing);
+                  }
+                } catch {}
                 try { console.log('⚡ Found transactionId after purchase', { invoiceNumber, transactionId: pid }); } catch {}
                 return { transactionId: pid, paymentId: pid, invoiceNumber, status: 'pending' };
               }

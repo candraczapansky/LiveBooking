@@ -191,7 +191,18 @@ const StaffPageSimple = () => {
       setIsDeleteDialogOpen(false);
       setStaffToDelete(null);
     },
-    onError: () => {
+    onError: async (_err, _id) => {
+      try {
+        if (staffToDelete?.id) {
+          // Fallback to soft-delete
+          await apiRequest("PATCH", `/api/staff/${staffToDelete.id}`, { isActive: false });
+          queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+          toast({ title: "Staff member removed", description: "Marked inactive instead of deleting." });
+          setIsDeleteDialogOpen(false);
+          setStaffToDelete(null);
+          return;
+        }
+      } catch {}
       toast({
         title: "Error",
         description: "Failed to delete staff member. Please try again.",

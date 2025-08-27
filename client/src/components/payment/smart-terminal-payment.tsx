@@ -84,14 +84,20 @@ export default function SmartTerminalPayment({
     try {
       let attempts = 0;
       const maxAttempts = 60; // 2 minutes with 2-second intervals
+      let currentId = paymentId;
       
       const poll = async () => {
         if (attempts >= maxAttempts) {
           throw new Error('Payment timed out');
         }
 
-        const response = await apiRequest('GET', `/api/terminal/payment/${locId}/${paymentId}`);
+        const response = await apiRequest('GET', `/api/terminal/payment/${locId}/${currentId}`);
         const data = await response.json();
+
+        // If server reveals a concrete transactionId different from what we're polling, switch to it
+        if (data?.transactionId && String(data.transactionId) !== String(currentId)) {
+          currentId = String(data.transactionId);
+        }
 
         if (data.status === 'completed') {
           setStatus('success');

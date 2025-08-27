@@ -124,21 +124,17 @@ export default function HelcimPayJsModal({
         // Wait for Pay.js render helper
         await waitFor(() => window.appendHelcimPayIframe, 12000, 100);
 
-        // Render the Helcim Pay.js iframe (it handles the entire flow)
+        // Always render the Helcim Pay.js iframe inside our container for full width
+        const container = document.getElementById('helcim-payment-container');
         try {
-          window.appendHelcimPayIframe!(initData.token);
-        } catch (e) {
-          console.warn('appendHelcimPayIframe without options failed, retry with container');
-          const container = document.getElementById('helcim-payment-container');
-          if (container) {
-            // Some implementations accept options with elementId
-            try {
-              window.appendHelcimPayIframe!(initData.token, { elementId: 'helcim-payment-container' });
-            } catch (err) {
-              console.error('appendHelcimPayIframe failed:', err);
-              throw err;
-            }
+          if (container && window.appendHelcimPayIframe) {
+            window.appendHelcimPayIframe!(initData.token, { elementId: 'helcim-payment-container' });
+          } else if (window.appendHelcimPayIframe) {
+            window.appendHelcimPayIframe!(initData.token);
           }
+        } catch (err) {
+          console.error('appendHelcimPayIframe failed:', err);
+          throw err;
         }
 
         // Listen for Pay.js postMessage events
@@ -227,7 +223,7 @@ export default function HelcimPayJsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[900px] w-[95vw]">
         <DialogHeader>
           <DialogTitle>Process Payment</DialogTitle>
           <DialogDescription>
@@ -241,7 +237,7 @@ export default function HelcimPayJsModal({
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
             </div>
           ) : (
-            <div id="helcim-payment-container" className="min-h-[300px]">
+            <div id="helcim-payment-container" className="min-h-[400px] w-full overflow-x-hidden">
               {/* Helcim.js will inject the payment form here */}
             </div>
           )}

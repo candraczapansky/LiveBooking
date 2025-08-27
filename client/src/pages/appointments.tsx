@@ -827,6 +827,7 @@ const AppointmentsPage = () => {
           align-items: center !important;
           justify-content: center !important;
           border-radius: 0.375rem !important;
+          box-sizing: border-box !important; /* Keep borders inside fixed box to stay centered */
         }
 
         /* Mini calendar: highlight the selected date when in day view */
@@ -836,6 +837,7 @@ const AppointmentsPage = () => {
           color: hsl(var(--primary)) !important;
           background: transparent !important;
           border-radius: 0.375rem !important;
+          box-sizing: border-box !important; /* Prevent border from shifting box */
         }
 
         /* Fallback for DayPicker's selected class */

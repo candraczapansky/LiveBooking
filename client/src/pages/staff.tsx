@@ -206,10 +206,19 @@ const StaffPage = () => {
       });
       setIsDeleteDialogOpen(false);
     },
-    onError: (error) => {
+    onError: async (_error) => {
+      try {
+        if (staffToDelete?.id) {
+          await apiRequest("PATCH", `/api/staff/${staffToDelete.id}`, { isActive: false });
+          queryClient.invalidateQueries({ queryKey: ['/api/staff'] });
+          toast({ title: 'Staff member removed', description: 'Marked inactive instead.' });
+          setIsDeleteDialogOpen(false);
+          return;
+        }
+      } catch {}
       toast({
         title: "Error",
-        description: `Failed to delete staff member: ${error.message}`,
+        description: `Failed to delete staff member: ${(_error as any)?.message || 'Unknown error'}`,
         variant: "destructive",
       });
     }

@@ -101,14 +101,14 @@ export default function AppointmentCheckout({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="w-full w-[95vw] max-w-2xl md:max-w-3xl">
         <CardHeader>
           <CardTitle className="flex items-center text-lg">
             <CheckCircle className="h-5 w-5 mr-2 text-green-600" />
             Complete Appointment
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 overflow-x-hidden">
           {!isSuccess ? (
             <>
               <div className="space-y-3">

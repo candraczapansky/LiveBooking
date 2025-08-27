@@ -120,6 +120,12 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     try {
       const staff = await storage.getAllStaff();
 
+      // Optional filter by locationId
+      const locationIdParam = req.query.locationId as string | undefined;
+      const filteredByLocation = locationIdParam
+        ? staff.filter((s: any) => String(s.locationId) === String(parseInt(locationIdParam)))
+        : staff;
+
       // Enrich staff with linked user info so the client can access email/phone
       let users: any[] = [];
       try {
@@ -129,7 +135,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       }
       const usersById = new Map<number, any>(users.map((u: any) => [u.id, u]));
 
-      const enriched = staff.map((s: any) => {
+      const enriched = filteredByLocation.map((s: any) => {
         const u = usersById.get(s.userId);
         return {
           ...s,
@@ -305,6 +311,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       if (body.fixed_rate !== undefined || body.fixedRate !== undefined) {
         updateData.fixedRate = body.fixed_rate ?? body.fixedRate;
       }
+      if (body.is_active !== undefined || body.isActive !== undefined) {
+        updateData.isActive = body.is_active ?? body.isActive;
+      }
       // Omit photoUrl to avoid touching a column that may not exist in some deployments
 
       const updated = await storage.updateStaff(id, updateData);
@@ -330,12 +339,19 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         return res.status(404).json({ error: "Staff member not found" });
       }
 
-      // Intentionally do not modify or delete related appointments.
+      // Try a hard delete first; leave appointments intact.
       const ok = await storage.deleteStaff(id);
-      if (!ok) {
+      if (ok) {
+        return res.json({ success: true, deleted: true });
+      }
+
+      // If hard delete fails due to related records, perform a soft delete instead
+      try {
+        const updated = await storage.updateStaff(id, { isActive: false } as any);
+        return res.json({ success: true, deleted: false, deactivated: true, staffId: updated.id });
+      } catch (e) {
         return res.status(500).json({ error: "Failed to delete staff member" });
       }
-      return res.json({ success: true });
     } catch (error) {
       console.error("Error deleting staff member:", error);
       res.status(500).json({

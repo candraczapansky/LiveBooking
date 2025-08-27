@@ -16,14 +16,14 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
   // Get all services
   app.get("/api/services", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { category, categoryId, active, staffId } = req.query;
+    const { category, categoryId, active, staffId, locationId } = req.query as any;
 
-    LoggerService.debug("Fetching services", { ...context, filters: { category, categoryId, active, staffId } });
+    LoggerService.debug("Fetching services", { ...context, filters: { category, categoryId, active, staffId, locationId } });
 
     let services;
     // Support both 'category' and 'categoryId' parameters for backwards compatibility
     const filterCategoryId = categoryId || category;
-    if (filterCategoryId) {
+    if (filterCategoryId && !locationId && !staffId) {
       const categoryServices = await storage.getServicesByCategory(parseInt(filterCategoryId as string));
       // Add category information for consistency
       const categoryInfo = await storage.getServiceCategory(parseInt(filterCategoryId as string));
@@ -49,6 +49,35 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
             customRate: staffService.customRate,
             customCommissionRate: staffService.customCommissionRate,
             ...service
+          };
+        })
+      );
+    } else if (locationId) {
+      // Filter services to those offered by at least one staff at this location
+      const locId = parseInt(locationId as string);
+      const allStaff = await storage.getAllStaff();
+      const staffAtLocation = allStaff.filter((s: any) => String(s.locationId) === String(locId));
+      const staffIds = staffAtLocation.map((s: any) => s.id);
+      const allAssignments = await storage.getAllStaffServices();
+      const serviceIdsAtLocation = new Set<number>(
+        allAssignments
+          .filter((a: any) => staffIds.includes(a.staffId))
+          .map((a: any) => a.serviceId)
+      );
+      const base = filterCategoryId
+        ? await storage.getServicesByCategory(parseInt(filterCategoryId as string))
+        : await storage.getAllServices();
+      const filtered = base.filter((svc: any) => serviceIdsAtLocation.has(svc.id));
+      services = await Promise.all(
+        filtered.map(async (service: any) => {
+          const category = await storage.getServiceCategory(service.categoryId);
+          return {
+            ...service,
+            category: category ? {
+              id: category.id,
+              name: category.name,
+              description: category.description
+            } : null
           };
         })
       );

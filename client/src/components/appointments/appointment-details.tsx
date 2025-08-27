@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import AppointmentPhotos from "./appointment-photos";
 import { NoteInput } from "@/components/ui/note-input";
-import { useLocation } from "wouter";
+// removed useLocation; handled note history locally
 
 
 import {
@@ -25,6 +25,7 @@ import { formatPrice } from "@/lib/utils";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
+import ClientNoteHistory from "@/components/client/client-note-history";
 
 interface AppointmentDetailsProps {
   open: boolean;
@@ -46,7 +47,7 @@ const AppointmentDetails = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState("");
-  const [location, setLocation] = useLocation();
+  // no routing needed for notes/forms dialogs
   const [isProcessingCashPayment, setIsProcessingCashPayment] = useState(false);
   const [isProcessingCardPayment, setIsProcessingCardPayment] = useState(false);
   const [chargeAmount, setChargeAmount] = useState<number>(0);
@@ -59,6 +60,7 @@ const AppointmentDetails = ({
   const [showHelcimModal, setShowHelcimModal] = useState(false);
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [isFormsOpen, setIsFormsOpen] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
 
   // Fetch appointment details
   const { data: appointment, isLoading } = useQuery({
@@ -548,7 +550,7 @@ const AppointmentDetails = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-4xl md:max-w-5xl max-h-[80vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getStatusIcon(appointment.status || 'pending')}
@@ -729,7 +731,8 @@ const AppointmentDetails = ({
                     {!showPaymentOptions ? (
                       <Button
                         onClick={() => setShowPaymentOptions(true)}
-                        className="w-full bg-green-600 hover:bg-green-700"
+                        variant="outline"
+                        className="w-full"
                         disabled={getAppointmentChargeAmount() <= 0}
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
@@ -978,7 +981,7 @@ const AppointmentDetails = ({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setLocation(`/clients/${appointment?.clientId}`)}
+                        onClick={() => setIsNotesOpen(true)}
                         className="flex items-center gap-2"
                       >
                         <MessageSquare className="h-4 w-4" />
@@ -1110,6 +1113,22 @@ const AppointmentDetails = ({
             </DialogDescription>
           </DialogHeader>
           <ClientFormSubmissions clientId={client.id} clientName={`${client.firstName} ${client.lastName}`} />
+        </DialogContent>
+      </Dialog>
+    )}
+    {client && (
+      <Dialog open={isNotesOpen} onOpenChange={setIsNotesOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Note History
+            </DialogTitle>
+            <DialogDescription>
+              Notes for {client.firstName} {client.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <ClientNoteHistory clientId={client.id} clientName={`${client.firstName} ${client.lastName}`} />
         </DialogContent>
       </Dialog>
     )}
