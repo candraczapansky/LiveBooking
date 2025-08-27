@@ -224,6 +224,7 @@ export const staff = pgTable("staff", {
   userId: integer("user_id").notNull(),
   title: text("title").notNull(),
   bio: text("bio"),
+  isActive: boolean("is_active").default(true),
   locationId: integer("location_id").references(() => locations.id),
   commissionType: text("commission_type").notNull().default("commission"), // commission, hourly, fixed, hourly_plus_commission
   commissionRate: doublePrecision("commission_rate"), // percentage for commission (0-1)
