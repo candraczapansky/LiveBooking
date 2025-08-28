@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
@@ -24,7 +24,8 @@ import {
   Trash2, 
   Play, 
   Pause,
-  Settings
+  Settings,
+  Beaker
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -67,6 +68,7 @@ const smsRuleSchema = z.object({
   customTriggerName: z.string().optional(),
 });
 
+// Types inferred from zod; using any with react-hook-form to avoid strict resolver generics friction
 type EmailRuleFormValues = z.infer<typeof emailRuleSchema>;
 type SMSRuleFormValues = z.infer<typeof smsRuleSchema>;
 
@@ -79,6 +81,108 @@ export default function Automations() {
   const [editingRule, setEditingRule] = useState<AutomationRule | null>(null);
   const [selectedEmailTrigger, setSelectedEmailTrigger] = useState("");
   const [selectedSMSTrigger, setSelectedSMSTrigger] = useState("");
+  const [selectedEmailLocationId, setSelectedEmailLocationId] = useState("");
+  const [selectedSMSLocationId, setSelectedSMSLocationId] = useState("");
+  const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+  const [testingRule, setTestingRule] = useState<AutomationRule | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [isTesting, setIsTesting] = useState(false);
+  const [testLocationId, setTestLocationId] = useState<string>("");
+
+  // Locations for optional per-location scoping
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations"],
+  });
+
+  const stripLocationTag = (text: string): string => {
+    try {
+      return (text || '').replace(/\s*(\[location:[^\]]+\]|@location:[^\s]+)/ig, '').trim();
+    } catch { return text; }
+  };
+
+  const openTestDialog = (rule: AutomationRule) => {
+    setTestingRule(rule);
+    setTestEmail("");
+    setIsTestDialogOpen(true);
+  };
+
+  const runAutomationTest = async () => {
+    if (!testingRule) return;
+    const email = (testEmail || '').trim();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address.", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsTesting(true);
+      await apiRequest("POST", "/api/automation-rules/trigger", {
+        trigger: testingRule.trigger,
+        customTriggerName: testingRule.trigger === 'custom' ? testingRule.customTriggerName : undefined,
+        testEmail: email,
+        locationId: testLocationId ? parseInt(testLocationId) : undefined,
+      });
+      toast({ title: "Test triggered", description: `Automation "${testingRule.name}" executed.` });
+      setIsTestDialogOpen(false);
+    } catch (e: any) {
+      toast({ title: "Test failed", description: e?.message || "Unable to trigger automation.", variant: "destructive" });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const appendLocationTag = (base: string, locationId: string): string => {
+    if (!locationId) return base;
+    const cleaned = stripLocationTag(base);
+    return `${cleaned} [location:${locationId}]`;
+  };
+
+  const parseLocationToken = (text?: string | null): string => {
+    try {
+      if (!text) return "";
+      const m = /(?:\[location:([^\]]+)\]|@location:([^\s]+))/i.exec(text);
+      if (!m) return "";
+      const token = (m[1] || m[2] || '').toString().trim();
+      // If numeric id, return as-is; otherwise try to map name to id from locations list
+      const n = parseInt(token);
+      if (!Number.isNaN(n)) return String(n);
+      const key = token.toLowerCase();
+      const found = (Array.isArray(locations) ? locations : []).find((l: any) => String(l?.name || '').trim().toLowerCase() === key);
+      return found?.id ? String(found.id) : "";
+    } catch { return ""; }
+  };
+
+  // Refs to manage cursor insertion for quick variable buttons
+  const emailSubjectRef = useRef<HTMLInputElement | null>(null);
+  const emailTemplateRef = useRef<HTMLTextAreaElement | null>(null);
+  const smsTemplateRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Generic insertion helper for input/textarea
+  const insertAtCursor = (
+    el: HTMLInputElement | HTMLTextAreaElement | null,
+    currentValue: string,
+    onChange: (val: string) => void,
+    token: string
+  ) => {
+    const value = currentValue || "";
+    if (el && typeof (el as any).selectionStart === 'number') {
+      const start = (el as any).selectionStart as number;
+      const end = (el as any).selectionEnd as number;
+      const before = value.slice(0, start);
+      const after = value.slice(end ?? start);
+      const next = `${before}${token}${after}`;
+      onChange(next);
+      // Reset caret just after inserted token
+      setTimeout(() => {
+        try {
+          el.focus();
+          const pos = start + token.length;
+          (el as any).setSelectionRange(pos, pos);
+        } catch {}
+      }, 0);
+    } else {
+      onChange(`${value}${token}`);
+    }
+  };
 
   // Fetch automation rules from API
   const { data: automationRules = [], isLoading, refetch } = useQuery<any[]>({
@@ -135,7 +239,7 @@ export default function Automations() {
   });
 
   // Form handlers
-  const emailForm = useForm<EmailRuleFormValues>({
+  const emailForm = useForm<any>({
     resolver: zodResolver(emailRuleSchema),
     defaultValues: {
       name: "",
@@ -148,7 +252,7 @@ export default function Automations() {
     },
   });
 
-  const smsForm = useForm<SMSRuleFormValues>({
+  const smsForm = useForm<any>({
     resolver: zodResolver(smsRuleSchema),
     defaultValues: {
       name: "",
@@ -172,6 +276,7 @@ export default function Automations() {
         customTriggerName: editingRule.customTriggerName || "",
       });
       setSelectedSMSTrigger(editingRule.trigger);
+      setSelectedSMSLocationId(parseLocationToken(editingRule.name));
       setIsSMSDialogOpen(true);
     } else if (editingRule && editingRule.type === 'email') {
       emailForm.reset({
@@ -184,6 +289,10 @@ export default function Automations() {
         customTriggerName: editingRule.customTriggerName || "",
       });
       setSelectedEmailTrigger(editingRule.trigger);
+      // Prefer name tag; fall back to subject tag for backward compatibility
+      const locFromName = parseLocationToken(editingRule.name);
+      const locFromSubject = parseLocationToken(editingRule.subject);
+      setSelectedEmailLocationId(locFromName || locFromSubject || "");
       setIsEmailDialogOpen(true);
     }
   }, [editingRule]);
@@ -222,13 +331,14 @@ export default function Automations() {
   ];
 
   // Form submission handlers
-  const onEmailSubmit = (data: EmailRuleFormValues) => {
+  const onEmailSubmit = (data: any) => {
     const ruleData = {
-      name: data.name,
+      name: appendLocationTag(data.name, selectedEmailLocationId),
       type: "email" as const,
       trigger: data.trigger,
       timing: data.timing,
-      subject: data.subject,
+      // Optionally also tag the subject so it's visible in lists; keep name as source of truth
+      subject: selectedEmailLocationId ? appendLocationTag(data.subject, selectedEmailLocationId) : data.subject,
       template: data.template,
       active: data.active,
       customTriggerName: data.trigger === "custom" ? data.customTriggerName : undefined
@@ -242,16 +352,17 @@ export default function Automations() {
     
     setIsEmailDialogOpen(false);
     setSelectedEmailTrigger("");
+    setSelectedEmailLocationId("");
     setEditingRule(null);
     emailForm.reset();
   };
 
-  const onSMSSubmit = (data: SMSRuleFormValues) => {
+  const onSMSSubmit = (data: any) => {
     console.log('✅ SMS form submitted successfully with data:', data);
     console.log('Form errors (should be empty):', smsForm.formState.errors);
     
     const ruleData = {
-      name: data.name,
+      name: appendLocationTag(data.name, selectedSMSLocationId),
       type: "sms" as const,
       trigger: data.trigger,
       timing: data.timing,
@@ -270,6 +381,7 @@ export default function Automations() {
     
     setIsSMSDialogOpen(false);
     setSelectedSMSTrigger("");
+    setSelectedSMSLocationId("");
     setEditingRule(null);
     smsForm.reset();
   };
@@ -335,6 +447,34 @@ Glo Head Spa`,
       toast({
         title: "Error",
         description: "Failed to create booking confirmation SMS rule.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Optional: quick-create default cancellation email rule
+  const createDefaultCancellationEmail = async () => {
+    const ruleData = {
+      name: "Cancellation Email",
+      type: "email" as const,
+      trigger: "cancellation",
+      timing: "immediately",
+      subject: "Your appointment has been cancelled - Glo Head Spa",
+      template: `Hi {client_name},\n\nYour appointment for {service_name} on {appointment_date} at {appointment_time} has been cancelled.\n\nIf you didn’t request this or would like to reschedule, please contact us.\n\n- {salon_name}`,
+      active: true,
+      customTriggerName: undefined
+    };
+
+    try {
+      await createRuleMutation.mutateAsync(ruleData);
+      toast({
+        title: "Success",
+        description: "Cancellation email rule created successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to create cancellation rule.",
         variant: "destructive",
       });
     }
@@ -631,6 +771,31 @@ Glo Head Spa`,
                             />
                           </div>
 
+                          {/* Optional: Location scope */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-2">
+                              <FormLabel>Location (optional)</FormLabel>
+                              <Select value={selectedEmailLocationId} onValueChange={(v) => setSelectedEmailLocationId(v === 'all' ? '' : v)}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="All locations" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="all">All locations</SelectItem>
+                                  {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                                    <SelectItem key={loc.id} value={String(loc.id)}>
+                                      {loc.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                If set, this rule only runs for appointments at the selected location.
+                              </FormDescription>
+                            </div>
+                          </div>
+
                           {selectedEmailTrigger === "custom" && (
                             <FormField
                               control={emailForm.control}
@@ -657,11 +822,28 @@ Glo Head Spa`,
                               <FormItem>
                                 <FormLabel>Email Subject</FormLabel>
                                 <FormControl>
-                                  <Input placeholder="Your appointment is tomorrow" {...field} />
+                                  <Input 
+                                    placeholder="Your appointment is tomorrow" 
+                                    {...field}
+                                    ref={(el) => { emailSubjectRef.current = el; (field as any).ref?.(el); }}
+                                  />
                                 </FormControl>
                                 <FormDescription>
                                   Variables: {templateVariables.slice(0, 5).join(", ")}, etc.
                                 </FormDescription>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {templateVariables.map((tok) => (
+                                    <Button
+                                      key={`subj-${tok}`}
+                                      type="button"
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => insertAtCursor(emailSubjectRef.current, field.value as any, field.onChange, tok)}
+                                    >
+                                      {tok}
+                                    </Button>
+                                  ))}
+                                </div>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -677,12 +859,26 @@ Glo Head Spa`,
                                   <Textarea 
                                     placeholder="Hi {client_name}, this is a reminder about your appointment..." 
                                     className="min-h-[100px]"
-                                    {...field} 
+                                    {...field}
+                                    ref={(el) => { emailTemplateRef.current = el; (field as any).ref?.(el); }} 
                                   />
                                 </FormControl>
                                 <FormDescription>
                                   Variables: {templateVariables.slice(0, 5).join(", ")}, etc.
                                 </FormDescription>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {templateVariables.map((tok) => (
+                                    <Button
+                                      key={`tmpl-${tok}`}
+                                      type="button"
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => insertAtCursor(emailTemplateRef.current, field.value as any, field.onChange, tok)}
+                                    >
+                                      {tok}
+                                    </Button>
+                                  ))}
+                                </div>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -743,6 +939,14 @@ Glo Head Spa`,
                             onClick={() => toggleRuleStatus(rule.id)}
                           >
                             {rule.active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openTestDialog(rule)}
+                            title="Test this automation"
+                          >
+                            <Beaker className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -902,6 +1106,31 @@ Glo Head Spa`,
                             />
                           </div>
 
+                          {/* Optional: Location scope */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-2">
+                              <FormLabel>Location (optional)</FormLabel>
+                              <Select value={selectedSMSLocationId} onValueChange={(v) => setSelectedSMSLocationId(v === 'all' ? '' : v)}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="All locations" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="all">All locations</SelectItem>
+                                  {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                                    <SelectItem key={loc.id} value={String(loc.id)}>
+                                      {loc.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                If set, this rule only runs for appointments at the selected location.
+                              </FormDescription>
+                            </div>
+                          </div>
+
                           {selectedSMSTrigger === "custom" && (
                             <FormField
                               control={smsForm.control}
@@ -931,12 +1160,26 @@ Glo Head Spa`,
                                   <Textarea 
                                     placeholder="Hi {client_name}, thank you for choosing us to pamper you! If you have the spare time, we would love to have you did! If you were unsatisfied for any reason, please call us so we can help! : https://g.co/kgs/yvPWvGE" 
                                     className="min-h-[100px]"
-                                    {...field} 
+                                    {...field}
+                                    ref={(el) => { smsTemplateRef.current = el; (field as any).ref?.(el); }} 
                                   />
                                 </FormControl>
                                 <FormDescription>
                                   Max 500 characters. Variables: {templateVariables.slice(0, 5).join(", ")}, etc.
                                 </FormDescription>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  {templateVariables.map((tok) => (
+                                    <Button
+                                      key={`sms-${tok}`}
+                                      type="button"
+                                      variant="default"
+                                      size="sm"
+                                      onClick={() => insertAtCursor(smsTemplateRef.current, field.value as any, field.onChange, tok)}
+                                    >
+                                      {tok}
+                                    </Button>
+                                  ))}
+                                </div>
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -1014,6 +1257,14 @@ Glo Head Spa`,
                           <Button
                             variant="ghost"
                             size="sm"
+                            onClick={() => openTestDialog(rule)}
+                            title="Test this automation"
+                          >
+                            <Beaker className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => setEditingRule(rule)}
                           >
                             <Edit className="h-4 w-4" />
@@ -1077,6 +1328,53 @@ Glo Head Spa`,
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Test Automation Dialog */}
+            <Dialog open={isTestDialogOpen} onOpenChange={setIsTestDialogOpen}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Test Automation</DialogTitle>
+                  <DialogDescription>
+                    {testingRule ? `Rule: ${testingRule.name}` : ''}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Test Email</label>
+                  <Input 
+                    type="email"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    placeholder="name@example.com"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Sends this rule’s email content directly to the address above (ignores client preferences).
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-sm font-medium">Location (optional)</label>
+                  <Select value={testLocationId} onValueChange={(v) => setTestLocationId(v === 'all' ? '' : v)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All locations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All locations</SelectItem>
+                      {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                        <SelectItem key={`testloc-${loc.id}`} value={String(loc.id)}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500">If your rule has a location tag (e.g., [location:2]), set the matching location here for testing.</p>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsTestDialogOpen(false)} disabled={isTesting}>Cancel</Button>
+                  <Button onClick={runAutomationTest} disabled={isTesting}>
+                    {isTesting ? 'Testing...' : 'Run Test'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </main>
       </div>

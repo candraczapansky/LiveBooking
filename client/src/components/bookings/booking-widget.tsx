@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { formatDuration, formatPrice, formatTime } from "@/lib/utils";
+import { formatDuration, formatPrice } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -34,10 +34,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, Clock, Search, MapPin } from "lucide-react";
+import { CalendarIcon, Clock, Search, MapPin, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Service = {
   id: number;
@@ -110,12 +110,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     },
   });
 
-  const { data: categories } = useQuery({
+  const { data: categories, isLoading: isLoadingCategories } = useQuery({
     queryKey: ['/api/service-categories'],
     queryFn: async () => {
-      const response = await fetch('/api/service-categories');
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      return response.json();
+      const res = await apiRequest('GET', '/api/service-categories');
+      return res.json();
     },
     enabled: open
   });
@@ -130,47 +129,58 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (selectedCategoryId) params.push(`categoryId=${selectedCategoryId}`);
       if (selectedLocationId) params.push(`locationId=${selectedLocationId}`);
       const endpoint = params.length > 0 ? `/api/services?${params.join('&')}` : '/api/services';
-      const response = await fetch(endpoint);
-      if (!response.ok) throw new Error('Failed to fetch services');
+      const res = await apiRequest('GET', endpoint);
       // Fetch kept for potential price/description refresh, but UI renders from allowedServices
-      return response.json();
+      return res.json();
     },
     enabled: open && !!selectedLocationId
   });
 
-  const { data: staff } = useQuery({
+  const { data: staff, isLoading: isLoadingStaff } = useQuery({
     queryKey: ['/api/staff', selectedLocationId],
     queryFn: async () => {
-      const endpoint = selectedLocationId ? `/api/staff?locationId=${selectedLocationId}` : '/api/staff';
-      const response = await fetch(endpoint);
-      if (!response.ok) throw new Error('Failed to fetch staff');
-      return response.json();
+      // Fetch all staff; we'll filter by schedules and service assignments client-side
+      const res = await apiRequest('GET', '/api/staff');
+      return res.json();
     },
     enabled: open && !!selectedLocationId
   });
 
   // Fetch schedules for the selected location to detect which staff actually work there
-  const { data: schedules } = useQuery({
+  const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
     queryKey: ['/api/schedules', selectedLocationId],
     queryFn: async () => {
       const endpoint = selectedLocationId ? `/api/schedules?locationId=${selectedLocationId}` : '/api/schedules';
-      const response = await fetch(endpoint);
-      if (!response.ok) throw new Error('Failed to fetch schedules');
-      return response.json();
+      const res = await apiRequest('GET', endpoint);
+      return res.json();
+    },
+    enabled: open && !!selectedLocationId
+  });
+
+  // Fetch appointments for the selected location to prevent double-booking
+  const { data: appointments = [] } = useQuery({
+    queryKey: ['/api/appointments', selectedLocationId],
+    queryFn: async () => {
+      const endpoint = selectedLocationId ? `/api/appointments?locationId=${selectedLocationId}` : '/api/appointments';
+      const res = await apiRequest('GET', endpoint);
+      return res.json();
     },
     enabled: open && !!selectedLocationId
   });
 
   // Compute allowed services based on staff assignments at the selected location
-  const [allowedServiceIds, setAllowedServiceIds] = useState<Set<number>>(new Set());
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [allowedServices, setAllowedServices] = useState<any[]>([]);
+  // Map of staffId -> set of serviceIds they are assigned (public)
+  const [staffServiceIdsMap, setStaffServiceIdsMap] = useState<Map<number, Set<number>>>(new Map());
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       try {
+        setIsLoadingServices(true);
         if (!open || !selectedLocationId) {
-          setAllowedServiceIds(new Set());
           setAllowedServices([]);
+          if (!cancelled) setIsLoadingServices(false);
           return;
         }
         // Build list of staff IDs that actually have a schedule at this location (fallback to staff list if schedules are empty)
@@ -183,16 +193,15 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
           : (Array.isArray(staff) ? (staff as any[]).map((s: any) => s.id) : []);
 
         if (staffIdsToUse.length === 0) {
-          setAllowedServiceIds(new Set());
           setAllowedServices([]);
+          if (!cancelled) setIsLoadingServices(false);
           return;
         }
 
         const lists = await Promise.all(
           staffIdsToUse.map(async (staffId: number) => {
             try {
-              const res = await fetch(`/api/staff/${staffId}/services?public=true`);
-              if (!res.ok) return [] as any[];
+              const res = await apiRequest('GET', `/api/staff/${staffId}/services?public=true`);
               const data = await res.json();
               return (data || []) as any[]; // full service objects
             } catch {
@@ -201,24 +210,33 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
           })
         );
         const flat = lists.flat();
-        const ids = new Set<number>();
         const uniqById = new Map<number, any>();
         flat.forEach((svc: any) => {
           if (!svc || typeof svc.id !== 'number') return;
-          // If a service has an explicit locationId that does not match, skip it.
-          // Otherwise (null/undefined), allow it if the staff at this location offers it.
-          if (selectedLocationId && svc.locationId != null && String(svc.locationId) !== String(selectedLocationId)) return;
-          ids.add(svc.id);
+          // Rely on staff schedules at the selected location and their assigned services.
+          // Do not filter by service.locationId here to avoid excluding valid staff-assigned services.
           if (!uniqById.has(svc.id)) uniqById.set(svc.id, svc);
         });
+        // Build staff -> serviceIds map from lists aligned with staffIdsToUse
+        const map = new Map<number, Set<number>>();
+        staffIdsToUse.forEach((sid, idx) => {
+          const svcList = lists[idx] || [];
+          const serviceIds = new Set<number>();
+          svcList.forEach((svc: any) => {
+            if (svc && typeof svc.id === 'number') serviceIds.add(svc.id);
+          });
+          map.set(sid, serviceIds);
+        });
         if (!cancelled) {
-          setAllowedServiceIds(ids);
           setAllowedServices(Array.from(uniqById.values()));
+          setStaffServiceIdsMap(map);
+          setIsLoadingServices(false);
         }
       } catch {
         if (!cancelled) {
-          setAllowedServiceIds(new Set());
           setAllowedServices([]);
+          setStaffServiceIdsMap(new Map());
+          setIsLoadingServices(false);
         }
       }
     };
@@ -226,14 +244,15 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     return () => {
       cancelled = true;
     };
-  }, [open, selectedLocationId, staff]);
+  }, [open, selectedLocationId, staff, schedules]);
+
+  const isPreparingServices = isLoadingCategories || isLoadingStaff || isLoadingSchedules || isLoadingServices;
 
   const { data: locations } = useQuery({
     queryKey: ['/api/locations'],
     queryFn: async () => {
-      const response = await fetch('/api/locations');
-      if (!response.ok) throw new Error('Failed to fetch locations');
-      return response.json();
+      const res = await apiRequest('GET', '/api/locations');
+      return res.json();
     },
     enabled: open
   });
@@ -269,16 +288,41 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     return true;
   });
 
-  // Get selected service details
-  const selectedService = form.watch('serviceId') 
-    ? allowedServices?.find((service: any) => service.id.toString() === form.watch('serviceId')) 
+  // Selected service and details
+  const selectedServiceId = form.watch('serviceId');
+  const selectedService = selectedServiceId 
+    ? allowedServices?.find((service: any) => service.id.toString() === selectedServiceId) 
     : null;
+  const selectedStaffId = form.watch('staffId');
+  const selectedFormDate = form.watch('date');
 
-  // Generate time slots (10am to 6pm with 30 minute intervals)
+  // Reset selected staff when service changes
+  useEffect(() => {
+    if (open) {
+      form.setValue('staffId', "");
+    }
+  }, [selectedServiceId]);
+
+  // Compute staff available for the selected service at this location
+  const staffIdsFromSchedulesSet = new Set<number>(
+    Array.isArray(schedules) ? (schedules as any[]).map((sch: any) => sch.staffId) : []
+  );
+  const useScheduleFilter = staffIdsFromSchedulesSet.size > 0;
+  const availableStaff = Array.isArray(staff) && selectedServiceId
+    ? (staff as any[]).filter((s: any) => {
+        const matchesSchedule = useScheduleFilter ? staffIdsFromSchedulesSet.has(s.id) : true;
+        const svcSet = staffServiceIdsMap.get(s.id);
+        const svcIdNum = parseInt(selectedServiceId);
+        const matchesService = svcSet ? svcSet.has(svcIdNum) : false;
+        return matchesSchedule && matchesService;
+      })
+    : [];
+
+  // Generate time slots (8am to 10pm with 30 minute intervals)
   const generateTimeSlots = () => {
     const slots = [];
-    const startHour = 10; // 10 AM
-    const endHour = 18; // 6 PM
+    const startHour = 8; // 8 AM
+    const endHour = 22; // 10 PM
     const interval = 30; // 30 minutes
     
     for (let hour = startHour; hour < endHour; hour++) {
@@ -299,9 +343,165 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const timeSlots = generateTimeSlots();
 
+  // Helpers for schedule filtering
+  const getDayName = (date: Date) => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[date.getDay()];
+  };
+  const formatDateForComparison = (date: Date) => date.toISOString().split('T')[0];
+  const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => {
+    const toMinutes = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const slot = toMinutes(timeSlot);
+    const start = toMinutes(startTime);
+    const end = toMinutes(endTime);
+    return slot >= start && slot < end;
+  };
+
+  // Compute available time slots based on staff schedule and existing appointments
+  const getAvailableTimeSlots = () => {
+    if (!selectedStaffId || !selectedFormDate) return timeSlots;
+
+    const dayName = getDayName(selectedFormDate);
+    const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
+      const currentDateString = formatDateForComparison(selectedFormDate);
+      const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+      const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+
+      return schedule.staffId === parseInt(selectedStaffId) &&
+        schedule.dayOfWeek === dayName &&
+        startDateString <= currentDateString &&
+        (!endDateString || endDateString >= currentDateString) &&
+        !schedule.isBlocked;
+    });
+
+    if (staffSchedules.length === 0) return [];
+
+    const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+      .filter((apt: any) => apt.staffId === parseInt(selectedStaffId))
+      .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
+      .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+    const filtered = timeSlots.filter(slot => {
+      const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
+      if (!withinSchedule) return false;
+
+      const svc: any = selectedService;
+      if (!svc) return true;
+
+      const [hours, minutes] = slot.value.split(':').map(Number);
+      const appointmentStart = new Date(selectedFormDate);
+      appointmentStart.setHours(hours, minutes, 0, 0);
+      const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
+      const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+
+      for (const apt of staffAppointments) {
+        const existingStart = new Date(apt.startTime);
+        const existingEnd = new Date(apt.endTime);
+        if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    return filtered;
+  };
+
+  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointments, timeSlots]);
+
+  // Compute available days (next 30 days) based on staff schedules, service duration and existing appointments
+  const availableDatesSet = useMemo(() => {
+    const result = new Set<string>();
+    try {
+      if (!selectedStaffId || !selectedServiceId) return result;
+
+      const staffIdNum = parseInt(selectedStaffId);
+      const svc: any = selectedService;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const max = addDays(today, 30);
+
+      const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
+        .filter((schedule: any) => schedule.staffId === staffIdNum && !schedule.isBlocked);
+
+      if (staffSchedules.length === 0) return result;
+
+      const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+        .filter((apt: any) => apt.staffId === staffIdNum);
+
+      for (let d = new Date(today); d <= max; d.setDate(d.getDate() + 1)) {
+        const day = new Date(d);
+        const dayName = getDayName(day);
+        const currentDateString = formatDateForComparison(day);
+
+        const schedulesForDay = staffSchedules.filter((schedule: any) => {
+          const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+          const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+          return schedule.dayOfWeek === dayName &&
+            startDateString <= currentDateString &&
+            (!endDateString || endDateString >= currentDateString);
+        });
+
+        if (schedulesForDay.length === 0) continue;
+
+        const appointmentsForDay = staffAppointments
+          .filter((apt: any) => new Date(apt.startTime).toDateString() === day.toDateString())
+          .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+        let dayHasAvailability = false;
+        for (const slot of timeSlots) {
+          const withinSchedule = schedulesForDay.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
+          if (!withinSchedule) continue;
+
+          const [hours, minutes] = String(slot.value).split(':').map(Number);
+          const appointmentStart = new Date(day);
+          appointmentStart.setHours(hours, minutes, 0, 0);
+          const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
+          const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+
+          let overlaps = false;
+          for (const apt of appointmentsForDay) {
+            const existingStart = new Date(apt.startTime);
+            const existingEnd = new Date(apt.endTime);
+            if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
+              overlaps = true;
+              break;
+            }
+          }
+
+          if (!overlaps) {
+            result.add(currentDateString);
+            dayHasAvailability = true;
+            break;
+          }
+        }
+
+        if (!dayHasAvailability) {
+          // no-op; keep day without marker
+        }
+      }
+    } catch {
+      // swallow errors; show no markers on failure
+    }
+    return result;
+  }, [selectedStaffId, selectedServiceId, schedules, appointments, timeSlots, selectedService]);
+
+  // Clear time if it becomes invalid when dependencies change
+  useEffect(() => {
+    const current = form.getValues('time');
+    if (current && !availableTimeSlots.some(slot => slot.value === current)) {
+      form.setValue('time', '');
+    }
+  }, [availableTimeSlots]);
+
   const handleCategoryChange = (categoryId: string) => {
-    setSelectedCategoryId(categoryId === "all" ? null : categoryId);
+    setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId));
+    // Reset search and selected service when switching categories
     setSearchQuery("");
+    form.setValue('serviceId', "");
   };
 
   const nextStep = () => {
@@ -371,7 +571,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">Book an Appointment</DialogTitle>
@@ -452,94 +652,114 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Service</h3>
-                  <div className="relative">
-                    <Input 
-                      type="text" 
-                      placeholder="Search services..." 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-8 pr-4 py-2 text-sm"
-                    />
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  </div>
+                  {selectedCategoryId && (
+                    <div className="relative">
+                      <Input 
+                        type="text" 
+                        placeholder="Search services..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8 pr-4 py-2 text-sm"
+                      />
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
+                  )}
                 </div>
+
+                {isPreparingServices && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading available services…</span>
+                  </div>
+                )}
                 
                 {/* Service Categories */}
                 <div className="flex overflow-x-auto space-x-2 py-2">
-                  <Button
-                    type="button"
-                    variant={selectedCategoryId === null ? "default" : "outline"}
-                    size="sm"
-                    className="rounded-full whitespace-nowrap"
-                    onClick={() => handleCategoryChange("all")}
-                  >
-                    All Services
-                  </Button>
-                  {categories?.filter((category: Category) => {
-                    if (!selectedLocationId) return true;
-                    // Show category only if at least one allowed service belongs to it
-                    if (!allowedServices || allowedServices.length === 0) return false;
-                    return allowedServices.some((svc: any) => svc.categoryId === category.id);
-                  }).map((category: Category) => (
-                    <Button
-                      key={category.id}
-                      type="button"
-                      variant={selectedCategoryId === category.id.toString() ? "default" : "outline"}
-                      size="sm"
-                      className="rounded-full whitespace-nowrap"
-                      onClick={() => handleCategoryChange(category.id.toString())}
-                    >
-                      {category.name}
-                    </Button>
-                  ))}
+                  {isPreparingServices ? (
+                    <>
+                      <Skeleton className="h-8 w-20 rounded-full" />
+                      <Skeleton className="h-8 w-24 rounded-full" />
+                      <Skeleton className="h-8 w-16 rounded-full" />
+                      <Skeleton className="h-8 w-28 rounded-full" />
+                    </>
+                  ) : (
+                    categories?.filter((category: Category) => {
+                      if (!selectedLocationId) return true;
+                      // Show category only if at least one allowed service belongs to it
+                      if (!allowedServices || allowedServices.length === 0) return false;
+                      return allowedServices.some((svc: any) => svc.categoryId === category.id);
+                    }).map((category: Category) => (
+                      <Button
+                        key={category.id}
+                        type="button"
+                        variant={selectedCategoryId === category.id.toString() ? "default" : "outline"}
+                        size="sm"
+                        className="rounded-full whitespace-nowrap"
+                        onClick={() => handleCategoryChange(category.id.toString())}
+                      >
+                        {category.name}
+                      </Button>
+                    ))
+                  )}
                 </div>
                 
-                {/* Service List */}
-                <FormField
-                  control={form.control}
-                  name="serviceId"
-                  render={({ field }) => (
-                    <FormItem className="space-y-0">
-                      <FormControl>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {filteredServices?.length === 0 ? (
-                            <div className="col-span-2 text-center py-4 text-gray-500 dark:text-gray-400">
-                              No services found. Please try a different search term.
-                            </div>
-                          ) : (
-                            filteredServices?.map((service: Service) => (
-                              <Card
-                                key={service.id}
-                                className={`cursor-pointer transition-all hover:shadow-md ${
-                                  field.value === service.id.toString()
-                                    ? "border-primary ring-2 ring-primary ring-opacity-50"
-                                    : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                                }`}
-                                onClick={() => field.onChange(service.id.toString())}
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex justify-between items-start">
-                                    <div>
-                                      <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">{service.name}</h4>
-                                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{service.description}</p>
-                                      <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
-                                        <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
+                {/* Service List - shown only after selecting a category */}
+                {selectedCategoryId && (
+                  <FormField
+                    control={form.control}
+                    name="serviceId"
+                    render={({ field }) => (
+                      <FormItem className="space-y-0">
+                        <FormControl>
+                          <div className="grid grid-cols-1 gap-4">
+                            {isPreparingServices ? (
+                              <>
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                                <Skeleton className="h-24 w-full" />
+                              </>
+                            ) : (
+                              filteredServices?.length === 0 ? (
+                                <div className="col-span-2 text-center py-4 text-gray-500 dark:text-gray-400">
+                                  No services found. Please try a different search term.
+                                </div>
+                              ) : (
+                                filteredServices?.map((service: Service) => (
+                                  <Card
+                                    key={service.id}
+                                    className={`cursor-pointer transition-all hover:shadow-md ${
+                                      field.value === service.id.toString()
+                                        ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                        : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                                    }`}
+                                    onClick={() => field.onChange(service.id.toString())}
+                                  >
+                                    <CardContent className="p-4">
+                                      <div className="flex justify-between items-start">
+                                        <div>
+                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">{service.name}</h4>
+                                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{service.description}</p>
+                                          <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                            <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
+                                          </div>
+                                        </div>
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                          {formatPrice(service.price)}
+                                        </div>
                                       </div>
-                                    </div>
-                                    <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                                      {formatPrice(service.price)}
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))
-                          )}
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                                    </CardContent>
+                                  </Card>
+                                ))
+                              )
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             )}
             
@@ -555,7 +775,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                     <FormItem className="space-y-1">
                       <FormControl>
                         <div className="grid grid-cols-1 gap-4">
-                          {staff?.map((staffMember: Staff) => (
+                          {(availableStaff as any[]).map((staffMember: Staff) => (
                             <Card
                               key={staffMember.id}
                               className={`cursor-pointer transition-all hover:shadow-md ${
@@ -568,11 +788,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                               <CardContent className="p-4">
                                 <div className="flex items-center">
                                   <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-medium text-lg">
-                                    {staffMember.user.firstName?.[0] || ""}{staffMember.user.lastName?.[0] || ""}
+                                    {`${staffMember.user?.firstName?.[0] || ""}${staffMember.user?.lastName?.[0] || ""}`}
                                   </div>
                                   <div className="ml-4">
                                     <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                      {staffMember.user.firstName} {staffMember.user.lastName}
+                                      {staffMember.user ? `${staffMember.user.firstName || ""} ${staffMember.user.lastName || ""}`.trim() : "Unknown Staff"}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
                                   </div>
@@ -580,6 +800,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                               </CardContent>
                             </Card>
                           ))}
+                          {selectedServiceId && (availableStaff as any[]).length === 0 && (
+                            <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                              No staff available for this service at the selected location.
+                            </div>
+                          )}
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -606,7 +831,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className="w-full pl-3 text-left font-normal"
+                                className="w-full pl-3 text-left font-normal min-h-[44px] justify-start"
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -617,15 +842,27 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                          <PopoverContent className="w-auto p-0 z-[90]" align="start">
                             <Calendar
                               mode="single"
                               selected={field.value}
-                              onSelect={field.onChange}
-                              disabled={(date) => 
-                                date < new Date() || 
-                                date > addDays(new Date(), 30)
-                              }
+                              onSelect={(d) => d && field.onChange(d)}
+                              modifiers={{
+                                available: (date) => availableDatesSet.has(formatDateForComparison(date))
+                              }}
+                              modifiersClassNames={{
+                                available: "relative after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[2px] after:h-1.5 after:w-1.5 after:rounded-full after:bg-primary"
+                              }}
+                              classNames={{
+                                day_selected:
+                                  "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground"
+                              }}
+                              disabled={(date) => {
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const max = addDays(today, 30);
+                                return date < today || date > max;
+                              }}
                               initialFocus
                             />
                           </PopoverContent>
@@ -641,14 +878,14 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Time</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a time" />
+                            <SelectTrigger className="min-h-[44px]">
+                              <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {timeSlots.map((slot) => (
+                            {availableTimeSlots.map((slot) => (
                               <SelectItem key={slot.value} value={slot.value}>
                                 {slot.label}
                               </SelectItem>

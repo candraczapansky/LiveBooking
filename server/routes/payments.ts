@@ -11,6 +11,7 @@ import {
 } from "../utils/errors.js";
 import LoggerService, { getLogContext } from "../utils/logger.js";
 import { validateRequest, requireAuth } from "../middleware/error-handler.js";
+import { triggerAfterPayment } from "../automation-triggers.js";
 
 import cache, { invalidateCache } from "../utils/cache.js";
 
@@ -94,7 +95,8 @@ async function createSalesHistoryRecord(storage: IStorage, paymentData: any, tra
       // External tracking
       helcimPaymentId: paymentData.helcimPaymentId || null,
       
-      // Audit
+      // Discount and audit
+      discountAmount: (additionalData && typeof additionalData.discountAmount === 'number') ? additionalData.discountAmount : 0,
       createdBy: null, // Could be set to current user ID if available
       notes: paymentData.notes || null
     };
@@ -123,6 +125,19 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     // Invalidate relevant caches
     invalidateCache('payments');
     invalidateCache(`user:${paymentData.clientId}`);
+
+    // Fire automation for appointment payments completed at creation time
+    try {
+      if ((newPayment as any)?.appointmentId && String((newPayment as any)?.status) === 'completed') {
+        const apptId = (newPayment as any).appointmentId as number;
+        const appointment = await storage.getAppointment(apptId);
+        if (appointment) {
+          await triggerAfterPayment(appointment, storage);
+        }
+      }
+    } catch (e) {
+      try { LoggerService.error("Failed to trigger after_payment automation on create", { error: e instanceof Error ? e.message : String(e) }); } catch {}
+    }
 
     res.status(201).json(newPayment);
   }));
@@ -180,6 +195,20 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     // Invalidate relevant caches
     invalidateCache('payments');
     invalidateCache(`payment:${paymentId}`);
+
+    // Fire automation if transitioning to completed for an appointment payment
+    try {
+      const transitionedToCompleted = String(existingPayment.status) !== 'completed' && String((updatedPayment as any)?.status) === 'completed';
+      const apptId = (updatedPayment as any)?.appointmentId || (existingPayment as any)?.appointmentId;
+      if (transitionedToCompleted && apptId) {
+        const appointment = await storage.getAppointment(apptId as number);
+        if (appointment) {
+          await triggerAfterPayment(appointment, storage);
+        }
+      }
+    } catch (e) {
+      try { LoggerService.error("Failed to trigger after_payment automation on update", { ...context, error: e instanceof Error ? e.message : String(e) }); } catch {}
+    }
 
     res.json(updatedPayment);
   }));
@@ -340,6 +369,16 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     }
 
     LoggerService.logPayment("cash_payment_confirmed", amount, { ...context, paymentId: payment.id });
+
+    // Fire automation for after payment
+    try {
+      const appt = await storage.getAppointment(appointmentId);
+      if (appt) {
+        await triggerAfterPayment(appt, storage);
+      }
+    } catch (e) {
+      try { LoggerService.error("Failed to trigger after_payment automation (cash)", { ...context, paymentId: payment.id, error: e instanceof Error ? e.message : String(e) }); } catch {}
+    }
 
     res.json({ success: true, payment });
   }));
@@ -515,6 +554,16 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     }
 
     LoggerService.logPayment("gift_card_payment_confirmed", amount, { ...context, paymentId: payment.id });
+
+    // Fire automation for after payment
+    try {
+      const appt = await storage.getAppointment(appointmentId);
+      if (appt) {
+        await triggerAfterPayment(appt, storage);
+      }
+    } catch (e) {
+      try { LoggerService.error("Failed to trigger after_payment automation (gift card)", { ...context, paymentId: payment.id, error: e instanceof Error ? e.message : String(e) }); } catch {}
+    }
 
     res.json({ success: true, payment, remainingBalance: giftCard.currentBalance - amount });
   }));
@@ -933,6 +982,20 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     }
 
     LoggerService.logPayment("payment_confirmed", payment.amount, { ...context, paymentId });
+
+    // Fire automation if transitioning to completed
+    try {
+      const transitionedToCompleted = String(payment.status) !== 'completed' && String((updatedPayment as any)?.status) === 'completed';
+      const apptId = appointmentId || (payment as any)?.appointmentId;
+      if (transitionedToCompleted && apptId) {
+        const appt = await storage.getAppointment(apptId);
+        if (appt) {
+          await triggerAfterPayment(appt, storage);
+        }
+      }
+    } catch (e) {
+      try { LoggerService.error("Failed to trigger after_payment automation (confirm)", { ...context, paymentId, error: e instanceof Error ? e.message : String(e) }); } catch {}
+    }
 
     res.json({ success: true, payment: updatedPayment });
   }));

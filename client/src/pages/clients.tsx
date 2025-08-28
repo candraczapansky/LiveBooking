@@ -1344,11 +1344,6 @@ const ClientsPage = () => {
                 <CardTitle className="text-lg sm:text-xl">All Clients</CardTitle>
                 <CardDescription>
                   View and manage all your salon clients
-                  {process.env.NODE_ENV === 'development' && (
-                    <div className="mt-2 text-xs text-gray-400">
-                      Debug: {filteredClients?.length || 0} clients, search: "{searchQuery}"
-                    </div>
-                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-6">

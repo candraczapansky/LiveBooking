@@ -1,8 +1,6 @@
 import React, { useState } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useSidebar } from "@/contexts/SidebarContext";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -135,13 +133,32 @@ const getDateRange = (timePeriod: string, customStartDate?: string, customEndDat
   
   const now = new Date();
   const startDate = new Date();
+  let endDateOverride: Date | null = null;
   
   switch (timePeriod) {
+    case "day":
+      // Today: start at the beginning of the current day
+      startDate.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+      startDate.setHours(0, 0, 0, 0);
+      break;
+    case "yesterday": {
+      // Yesterday: full previous calendar day
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      startDate.setFullYear(y.getFullYear(), y.getMonth(), y.getDate());
+      startDate.setHours(0, 0, 0, 0);
+      endDateOverride = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59, 999);
+      break;
+    }
     case "week":
-      startDate.setDate(now.getDate() - 7);
+      // This Week: last 7 full days ending today
+      startDate.setDate(now.getDate() - 6);
+      startDate.setHours(0, 0, 0, 0);
+      now.setHours(23, 59, 59, 999);
       break;
     case "month":
-      startDate.setMonth(now.getMonth() - 1);
+      // This Month: start at the first day of the current month
+      startDate.setFullYear(now.getFullYear(), now.getMonth(), 1);
       break;
     case "quarter":
       startDate.setMonth(now.getMonth() - 3);
@@ -153,7 +170,7 @@ const getDateRange = (timePeriod: string, customStartDate?: string, customEndDat
       startDate.setMonth(now.getMonth() - 1);
   }
   
-  return { startDate, endDate: now };
+  return { startDate, endDate: endDateOverride ?? now };
 };
 
 // Landing Page Component
@@ -680,31 +697,119 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
     refetchOnMount: true,
     staleTime: 0,
   });
+  // Payments fallback for very recent transactions (in case sales_history has not been written yet)
+  const { data: payments = [] } = useQuery({
+    queryKey: ["/api/payments"],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
+  // Fetch appointments (optionally filtered by location) to support location-based sales filtering
+  const appointmentsUrl = selectedLocation && selectedLocation !== 'all'
+    ? `/api/appointments?locationId=${selectedLocation}`
+    : '/api/appointments';
+  const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
+    queryKey: [appointmentsUrl],
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    staleTime: 0,
+  });
   
   const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+  const normalizedStart = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0);
+  const normalizedEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999);
+  const isSingleDay = timePeriod === 'day' || timePeriod === 'yesterday';
+  const targetUtcDay = new Date(Date.UTC(normalizedStart.getFullYear(), normalizedStart.getMonth(), normalizedStart.getDate())).toISOString().slice(0, 10);
   
   // Filter sales by date range, completed status, and location
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
-    const dateFilter = saleDate >= normalizedStart && saleDate <= normalizedEnd;
+    const dateFilterPrimary = saleDate >= normalizedStart && saleDate <= normalizedEnd;
+    // Fallback for single-day views using businessDate (stored as UTC date)
+    let dateFilterFallback = true;
+    if (isSingleDay) {
+      const businessDateRaw = sale.businessDate || sale.business_date;
+      const businessDateStr = businessDateRaw instanceof Date
+        ? businessDateRaw.toISOString().slice(0, 10)
+        : typeof businessDateRaw === 'string'
+          ? businessDateRaw.slice(0, 10)
+          : '';
+      dateFilterFallback = businessDateStr === targetUtcDay;
+    }
+    const dateFilter = dateFilterPrimary || dateFilterFallback;
     const statusFilter = (sale.paymentStatus === "completed" || sale.payment_status === "completed");
     
     // Location filtering - for appointment sales, check the appointment's location
     let locationFilter = true;
-    if (selectedLocation && selectedLocation !== 'all' && sale.transactionType === 'appointment' && sale.appointmentId) {
-      // For appointment sales, we need to check the appointment's location
-      // This will be handled by the backend API, but we can do basic filtering here
-      // The main filtering should be done in the API call
+    if (selectedLocation && selectedLocation !== 'all') {
+      if (sale.transactionType === 'appointment' && sale.appointmentId) {
+        const apt = (appointments as any[]).find((a: any) => a.id === sale.appointmentId);
+        locationFilter = !!apt && String(apt.locationId) === String(selectedLocation);
+      } else if (sale.transactionType === 'pos_sale') {
+        // Exclude POS sales when a specific location is selected (no location mapping available)
+        locationFilter = false;
+      } else {
+        // Exclude any other non-appointment sales (e.g., memberships) when filtering by location
+        locationFilter = false;
+      }
     }
     
     return dateFilter && statusFilter && locationFilter;
   });
   
-  const totalRevenue = filteredSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
-  const totalTransactions = filteredSales.length;
-  const totalTax = filteredSales.reduce((sum: number, sale: any) => sum + (sale.taxAmount || sale.tax_amount || 0), 0);
-  const totalTips = filteredSales.reduce((sum: number, sale: any) => sum + (sale.tipAmount || sale.tip_amount || 0), 0);
-  const totalDiscounts = filteredSales.reduce((sum: number, sale: any) => sum + (sale.discountAmount || sale.discount_amount || 0), 0);
+  // Build fallback sales-like records from payments to capture very recent activity
+  const paymentFallbackRecords = (() => {
+    try {
+      const byPaymentId = new Set(
+        (salesHistory as any[])
+          .map((s: any) => s.paymentId || s.payment_id)
+          .filter(Boolean)
+      );
+
+      return (payments as any[])
+        .filter((p: any) => {
+          const statusOk = (p.status || '').toLowerCase() === 'completed';
+          const d = new Date(p.paymentDate || p.createdAt || p.processedAt || Date.now());
+          const inRange = d >= normalizedStart && d <= normalizedEnd;
+          if (!statusOk || !inRange) return false;
+          if (selectedLocation && selectedLocation !== 'all') {
+            const apt = (appointments as any[]).find((a: any) => a.id === p.appointmentId);
+            if (!apt || String(apt.locationId) !== String(selectedLocation)) return false;
+          }
+          // Avoid duplicates when a sales_history already exists for this payment
+          const pid = p.id || p.paymentId;
+          if (pid && byPaymentId.has(pid)) return false;
+          return true;
+        })
+        .map((p: any) => ({
+          transactionType: 'appointment',
+          transactionDate: new Date(p.paymentDate || p.createdAt || p.processedAt || Date.now()),
+          paymentId: p.id || p.paymentId,
+          totalAmount: p.totalAmount ?? p.amount ?? 0,
+          taxAmount: p.taxAmount ?? 0,
+          tipAmount: p.tipAmount ?? 0,
+          discountAmount: p.discountAmount ?? 0,
+          paymentMethod: p.method || 'card',
+          paymentStatus: p.status || 'completed',
+          appointmentId: p.appointmentId || null,
+          // Minimal fields for table rendering
+          clientName: '',
+          staffName: '',
+        }));
+    } catch {
+      return [] as any[];
+    }
+  })();
+
+  const combinedSales = [...filteredSales, ...paymentFallbackRecords];
+
+  const totalRevenue = combinedSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
+  const totalTransactions = combinedSales.length;
+  const totalTax = combinedSales.reduce((sum: number, sale: any) => sum + (sale.taxAmount || sale.tax_amount || 0), 0);
+  const totalTips = combinedSales.reduce((sum: number, sale: any) => sum + (sale.tipAmount || sale.tip_amount || 0), 0);
+  const totalDiscounts = combinedSales.reduce((sum: number, sale: any) => sum + (sale.discountAmount || sale.discount_amount || 0), 0);
 
   // Calculate sales by category
   const salesByCategory = () => {
@@ -761,11 +866,16 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
       }
     });
     
-    return Array.from(categoryMap.entries()).map(([category, amount]) => ({
-      category,
-      amount: Number(amount),
-      percentage: (Number(amount) / totalRevenue) * 100
-    })).sort((a, b) => b.amount - a.amount);
+    const total = Number(totalRevenue) || 0;
+    return Array.from(categoryMap.entries()).map(([category, amount]) => {
+      const amt = Number(amount) || 0;
+      const pct = total > 0 ? (amt / total) * 100 : 0;
+      return {
+        category,
+        amount: amt,
+        percentage: pct,
+      };
+    }).sort((a, b) => b.amount - a.amount);
   };
 
   // Calculate daily sales trend
@@ -969,7 +1079,10 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ category, percentage }) => `${category}: ${percentage.toFixed(1)}%`}
+                    label={({ category, percentage }) => {
+                      const pct = Number.isFinite(percentage) ? percentage : 0;
+                      return `${category}: ${pct.toFixed(1)}%`;
+                    }}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="amount"
@@ -1066,7 +1179,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredSales.slice(0, 20).map((sale: any, index: number) => (
+                {combinedSales.slice(0, 20).map((sale: any, index: number) => (
                   <tr key={sale.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {new Date(sale.transactionDate || sale.transaction_date).toLocaleDateString()}
@@ -2557,7 +2670,8 @@ const ReportsPage = () => {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
-  const { isOpen: sidebarOpen } = useSidebar();
+  // Apply filters only when user clicks "Load Report"
+  const [appliedLocation, setAppliedLocation] = useState<string>("all");
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
@@ -2604,10 +2718,7 @@ const ReportsPage = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${
-        sidebarOpen ? "ml-64" : "ml-16"
-      }`}>
+      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
           <div className="container mx-auto px-4 md:px-6 py-6 md:py-8">
             {/* Header Section */}
@@ -2638,6 +2749,16 @@ const ReportsPage = () => {
                           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                           <span>Real-time updates enabled</span>
                         </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-400">
+                          {(() => {
+                            try {
+                              const { startDate, endDate } = getDateRange(timePeriod, customStartDate, customEndDate);
+                              return `Period: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`;
+                            } catch {
+                              return null;
+                            }
+                          })()}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2658,6 +2779,8 @@ const ReportsPage = () => {
                           <SelectValue placeholder="Select period" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="day">Today</SelectItem>
+                          <SelectItem value="yesterday">Yesterday</SelectItem>
                           <SelectItem value="week">This Week</SelectItem>
                           <SelectItem value="month">This Month</SelectItem>
                           <SelectItem value="quarter">This Quarter</SelectItem>
@@ -2756,20 +2879,17 @@ const ReportsPage = () => {
                         <span>Updated {lastUpdateTime.toLocaleTimeString()}</span>
                       </div>
                       <Button 
-                        variant="outline" 
                         size="sm"
                         onClick={() => {
+                          setAppliedLocation(selectedLocation);
                           queryClient.invalidateQueries();
                           setLastUpdateTime(new Date());
                         }}
                         className="min-h-[44px]"
                       >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Refresh
+                        Load Report
                       </Button>
-                      <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">
-                        Export Report
-                      </Button>
+                      <Button variant="outline" className="w-full sm:w-auto min-h-[44px]">Export Report</Button>
                     </div>
                   </div>
                 )}
@@ -2818,7 +2938,7 @@ const ReportsPage = () => {
                   timePeriod={timePeriod}
                   customStartDate={customStartDate}
                   customEndDate={customEndDate}
-                  selectedLocation={selectedLocation}
+                  selectedLocation={appliedLocation}
                 />
               </div>
             ) : (

@@ -1,0 +1,10 @@
+export { registerAuthRoutes } from './auth.js';
+export { registerUserRoutes } from './users.js';
+export { registerAppointmentRoutes } from './appointments.js';
+export { registerAppointmentPhotoRoutes } from './appointment-photos.js';
+export { registerPaymentRoutes } from './payments.js';
+export { registerServiceRoutes } from './services.js';
+export { registerMarketingRoutes } from './marketing.js';
+export { registerNoteTemplateRoutes } from './note-templates.js';
+export { registerNoteHistoryRoutes } from './note-history.js';
+export { registerLocationRoutes } from './locations.js';

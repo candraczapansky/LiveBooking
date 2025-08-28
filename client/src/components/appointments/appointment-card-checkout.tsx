@@ -47,6 +47,9 @@ export default function AppointmentCardCheckout({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [tipAmount, setTipAmount] = useState(0);
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
   const [cardData, setCardData] = useState({
     cardNumber: '',
     cardExpiryMonth: '',
@@ -60,7 +63,36 @@ export default function AppointmentCardCheckout({
                     appointment.amount || 
                     0;
   
-  const totalAmount = baseAmount + tipAmount;
+  const totalAmount = Math.max(baseAmount - discountAmount, 0) + tipAmount;
+
+  const handleApplyDiscount = async () => {
+    const code = discountCode.trim();
+    if (!code) {
+      toast({ title: "Enter a code", description: "Please enter a discount code to apply.", variant: "destructive" });
+      return;
+    }
+    setIsApplyingDiscount(true);
+    try {
+      const res = await apiRequest("POST", "/api/promo-codes/validate", {
+        code,
+        serviceId: appointment.service?.id,
+        amount: baseAmount,
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.valid) {
+        setDiscountAmount(0);
+        toast({ title: "Invalid code", description: data?.message || "This discount code cannot be applied.", variant: "destructive" });
+        return;
+      }
+      setDiscountAmount(Math.max(0, Number(data.discountAmount) || 0));
+      toast({ title: "Discount applied", description: `${code.toUpperCase()} applied successfully.` });
+    } catch (err) {
+      setDiscountAmount(0);
+      toast({ title: "Error", description: "Failed to validate discount code.", variant: "destructive" });
+    } finally {
+      setIsApplyingDiscount(false);
+    }
+  };
 
   const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\s/g, ''); // Remove spaces
@@ -240,6 +272,12 @@ export default function AppointmentCardCheckout({
                 <span>Service Total:</span>
                 <span>{formatPrice(baseAmount)}</span>
               </div>
+              {discountAmount > 0 && (
+                <div className="flex justify-between items-center text-sm mt-2 text-green-600">
+                  <span>Discount{discountCode ? ` (${discountCode.toUpperCase()})` : ''}:</span>
+                  <span>-{formatPrice(discountAmount)}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center text-sm mt-2">
                 <span>Tip:</span>
                 <span>{formatPrice(tipAmount)}</span>
@@ -248,6 +286,33 @@ export default function AppointmentCardCheckout({
               <div className="flex justify-between items-center text-xl font-bold">
                 <span>Total Amount:</span>
                 <span>{formatPrice(totalAmount)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Discount Code */}
+          <div className="space-y-3">
+            <h4 className="text-md font-medium">Discount Code</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+              <div className="md:col-span-2">
+                <Label htmlFor="discountCode" className="text-sm">Discount Code</Label>
+                <Input
+                  id="discountCode"
+                  placeholder="Enter code"
+                  value={discountCode}
+                  onChange={(e) => setDiscountCode(e.target.value)}
+                  disabled={isProcessing || isApplyingDiscount}
+                />
+              </div>
+              <div className="flex">
+                <Button
+                  type="button"
+                  onClick={handleApplyDiscount}
+                  disabled={isProcessing || isApplyingDiscount}
+                  className="w-full"
+                >
+                  {isApplyingDiscount ? "Applying..." : "Apply"}
+                </Button>
               </div>
             </div>
           </div>

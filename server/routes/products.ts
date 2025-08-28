@@ -33,8 +33,25 @@ export function registerProductRoutes(app: Express, storage: IStorage) {
     validateRequest(insertProductSchema),
     asyncHandler(async (req: Request, res: Response) => {
       const productData = req.body;
-      const product = await storage.createProduct(productData);
-      res.status(201).json(product);
+      try {
+        const product = await storage.createProduct(productData);
+        res.status(201).json(product);
+      } catch (error: any) {
+        // Handle duplicate SKU gracefully with a clear 409 response
+        if (
+          error?.code === '23505' ||
+          (typeof error?.message === 'string' && error.message.includes('products_sku_unique'))
+        ) {
+          return res.status(409).json({
+            error: 'ConflictError',
+            message: 'SKU already exists',
+            timestamp: new Date().toISOString(),
+            path: req.path,
+            method: req.method,
+          });
+        }
+        throw error;
+      }
     })
   );
 

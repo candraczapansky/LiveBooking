@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDuration, formatPrice } from "@/lib/utils";
 import ServiceForm from "./service-form";
-import { Edit, Trash2, PlusCircle, Eye, EyeOff } from "lucide-react";
+import { Edit, Trash2, PlusCircle, Eye, EyeOff, Check } from "lucide-react";
 
 import {
   Select,
@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Service = {
   id: number;
@@ -65,6 +66,12 @@ type ServiceCategory = {
   description?: string;
 };
 
+type Staff = {
+  id: number;
+  title?: string;
+  user?: { firstName?: string; lastName?: string };
+};
+
 type ServiceDropdownViewProps = {
   initialCategoryId?: number | null;
 };
@@ -82,6 +89,8 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
   const [editingServiceId, setEditingServiceId] = useState<number | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<number | null>(null);
+  const [isEditingAppliesTo, setIsEditingAppliesTo] = useState(false);
+  const [selectedBaseServices, setSelectedBaseServices] = useState<number[]>([]);
 
   // Fetch categories
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
@@ -100,6 +109,24 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
       const response = await fetch('/api/services');
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
+    }
+  });
+
+  // Staff and assignments (always fetch for add-on display)
+  const { data: staff = [] } = useQuery({
+    queryKey: ['/api/staff'],
+    queryFn: async () => {
+      const res = await fetch('/api/staff');
+      if (!res.ok) throw new Error('Failed to fetch staff');
+      return res.json();
+    }
+  });
+  const { data: staffServices = [] } = useQuery({
+    queryKey: ['/api/staff-services'],
+    queryFn: async () => {
+      const res = await fetch('/api/staff-services');
+      if (!res.ok) throw new Error('Failed to fetch staff-services');
+      return res.json();
     }
   });
 
@@ -128,6 +155,27 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
   const selectedService = selectedServiceId 
     ? allServices.find((s: Service) => s.id === Number(selectedServiceId))
     : null;
+
+  // Fetch mapping of base services for an add-on
+  const { data: addOnBasesData, refetch: refetchAddOnBases } = useQuery({
+    queryKey: ['/api/services', selectedServiceId, 'add-on-bases'],
+    queryFn: async () => {
+      const res = await fetch(`/api/services/${selectedServiceId}/add-on-bases`);
+      if (!res.ok) throw new Error('Failed to fetch add-on mapping');
+      return res.json();
+    },
+    enabled: !!selectedService && !!selectedService.isHidden
+  });
+
+  // Initialize selected base services when data loads or selection changes
+  useEffect(() => {
+    if (addOnBasesData?.baseServiceIds) {
+      setSelectedBaseServices(addOnBasesData.baseServiceIds.map((id: any) => Number(id)));
+    } else {
+      setSelectedBaseServices([]);
+    }
+    setIsEditingAppliesTo(false); // Reset edit mode when switching services
+  }, [addOnBasesData, selectedServiceId]);
 
   // Delete service mutation
   const deleteServiceMutation = useMutation({
@@ -177,12 +225,38 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
     setEditingServiceId(null);
   };
 
+  // Save the "applies to" mapping
+  const saveAppliesToMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedService) return;
+      const response = await apiRequest("POST", `/api/services/${selectedService.id}/add-on-bases`, {
+        baseServiceIds: selectedBaseServices
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Service assignments updated successfully",
+      });
+      setIsEditingAppliesTo(false);
+      refetchAddOnBases();
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update assignments: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Control Panel */}
       <Card>
         <CardHeader>
-          <CardTitle>Service Management - Dropdown View</CardTitle>
+          <CardTitle>Service Management</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -336,31 +410,143 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4">
+              {/* Different layout for add-ons vs regular services */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label>Name</Label>
+                  <p className="text-sm font-medium">{selectedService.name}</p>
+                </div>
+                <div>
+                  <Label>{selectedService.isHidden ? "Cost" : "Price"}</Label>
+                  <p className="text-sm font-medium">{formatPrice(selectedService.price)}</p>
+                </div>
+                <div>
+                  <Label>{selectedService.isHidden ? "Additional Time" : "Duration"}</Label>
+                  <p className="text-sm font-medium">
+                    {selectedService.isHidden 
+                      ? (selectedService.duration > 0 ? formatDuration(selectedService.duration) : "None")
+                      : formatDuration(selectedService.duration)
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Description */}
               <div>
                 <Label>Description</Label>
                 <p className="text-sm text-muted-foreground">
                   {selectedService.description || "No description provided"}
                 </p>
               </div>
-              
-              <div className="grid grid-cols-3 gap-4">
+
+              {/* Staff for this service */}
+              <div>
+                <Label>Staff</Label>
+                <p className="text-sm font-medium">
+                  {(() => {
+                    const svcId = Number(selectedService.id);
+                    let assigned: any[] = [];
+                    if (selectedService.isHidden) {
+                      const baseIds: number[] = (addOnBasesData?.baseServiceIds || []).map((n: any) => Number(n));
+                      assigned = Array.isArray(staffServices)
+                        ? (staffServices as any[]).filter((a) => a && baseIds.includes(Number(a.serviceId)))
+                        : [];
+                    } else {
+                      assigned = Array.isArray(staffServices)
+                        ? (staffServices as any[]).filter((a) => a && Number(a.serviceId) === svcId)
+                        : [];
+                    }
+                    if (!assigned.length) return "—";
+                    const staffById = new Map<number, Staff>((staff as any[]).map((s: Staff) => [s.id, s]));
+                    const uniqueStaffIds = new Set(assigned.map((a: any) => a.staffId));
+                    const names = Array.from(uniqueStaffIds).map((staffId: number) => {
+                      const s = staffById.get(staffId);
+                      const first = s?.user?.firstName || "";
+                      const last = s?.user?.lastName || "";
+                      const full = `${first} ${last}`.trim();
+                      return full || s?.title || `Staff #${staffId}`;
+                    });
+                    return names.join(", ");
+                  })()}
+                </p>
+              </div>
+
+              {/* Applies to (base services) - for add-ons only */}
+              {selectedService.isHidden && (
                 <div>
-                  <Label>Category</Label>
-                  <p className="text-sm font-medium">
-                    {selectedService.category?.name || "Uncategorized"}
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>Applies To</Label>
+                    <Button
+                      size="sm"
+                      variant={isEditingAppliesTo ? "default" : "outline"}
+                      onClick={() => {
+                        if (isEditingAppliesTo) {
+                          // Save
+                          saveAppliesToMutation.mutate();
+                        } else {
+                          // Start editing
+                          setIsEditingAppliesTo(true);
+                        }
+                      }}
+                      disabled={saveAppliesToMutation.isPending}
+                    >
+                      {isEditingAppliesTo ? (
+                        saveAppliesToMutation.isPending ? "Saving..." : "Save"
+                      ) : (
+                        "Edit"
+                      )}
+                    </Button>
+                  </div>
+                  
+                  {isEditingAppliesTo ? (
+                    <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
+                      {allServices
+                        .filter((s: Service) => !s.isHidden)
+                        .map((service: Service) => (
+                          <div key={service.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`service-${service.id}`}
+                              checked={selectedBaseServices.includes(service.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedBaseServices([...selectedBaseServices, service.id]);
+                                } else {
+                                  setSelectedBaseServices(selectedBaseServices.filter(id => id !== service.id));
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor={`service-${service.id}`}
+                              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                            >
+                              {service.name}
+                            </label>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm font-medium">
+                      {(() => {
+                        const ids: number[] = (addOnBasesData?.baseServiceIds || []).map((n: any) => Number(n));
+                        if (!ids.length) return "Not assigned to any services";
+                        const byId = new Map<number, Service>((allServices as any[]).map((s: Service) => [s.id, s]));
+                        const names = ids.map((id) => byId.get(id)?.name || `Service #${id}`);
+                        return names.join(", ");
+                      })()}
+                    </p>
+                  )}
                 </div>
-                <div>
-                  <Label>Duration</Label>
-                  <p className="text-sm font-medium">
-                    {formatDuration(selectedService.duration)}
-                  </p>
-                </div>
-                <div>
-                  <Label>Price</Label>
-                  <p className="text-sm font-medium">
-                    {formatPrice(selectedService.price)}
-                  </p>
+              )}
+
+              {/* Color */}
+              <div>
+                <Label>Color</Label>
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-5 h-5 rounded-full border" 
+                    style={{ backgroundColor: selectedService.color }}
+                  />
+                  <span className="text-sm font-mono text-muted-foreground">{selectedService.color}</span>
                 </div>
               </div>
             </div>

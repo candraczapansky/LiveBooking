@@ -83,6 +83,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
         `;
       } else {
         // Admin and client see all sales
+        // If a location is specified, exclude POS sales (no location mapping available)
         salesByCategoryQuery = sql`
           WITH sales_by_category AS (
             -- Service sales (from appointments)
@@ -102,9 +103,10 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
               ${locationId ? sql`AND a.location_id = ${locationId}` : sql``}
             GROUP BY sc.id, sc.name
             
+            ${locationId ? sql`` : sql`
             UNION ALL
             
-            -- Product sales (from POS) - Note: POS sales don't have location filtering yet
+            -- Product sales (from POS)
             SELECT 
               p.category as category_name,
               'product' as transaction_type,
@@ -118,7 +120,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
               AND sh.payment_status = 'completed'
               AND sh.transaction_date >= ${startDate}
               AND sh.transaction_date <= ${endDate}
-            GROUP BY p.category
+            GROUP BY p.category`}
           )
           SELECT 
             category_name,
@@ -668,7 +670,7 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
           AND sh.transaction_date >= ${startDate}
           AND sh.transaction_date <= ${endDate}
           ${currentUser.role === 'staff' ? sql`AND sh.staff_id = ${currentUser.staffId}` : sql``}
-          ${locationId ? sql`AND (a.location_id = ${locationId} OR sh.transaction_type = 'pos_sale')` : sql``}
+          ${locationId ? sql`AND a.location_id = ${locationId}` : sql``}
         GROUP BY DATE(sh.transaction_date)
         ORDER BY date ASC
       `;

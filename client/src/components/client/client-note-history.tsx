@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,6 +44,8 @@ interface ClientNoteHistoryProps {
 
 export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHistoryProps) {
   const [selectedNote, setSelectedNote] = useState<NoteHistoryEntry | null>(null);
+  const [attachedPhotoData, setAttachedPhotoData] = useState<string | null>(null);
+  const [isLoadingPhoto, setIsLoadingPhoto] = useState(false);
 
   // Fetch client note history
   const { data: noteHistory = [], isLoading, error } = useQuery({
@@ -98,6 +100,84 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
         return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
     }
   };
+
+  // When a note is opened, try to show an attached photo.
+  // Priority:
+  // 1) Inline data URI embedded directly in note content
+  // 2) Explicit (photoId: N) reference → fetch that photo
+  // 3) Fallback: if it looks like a photo upload note and we have appointmentId, load latest appointment photo
+  useEffect(() => {
+    const loadPhotoForNote = async () => {
+      setAttachedPhotoData(null);
+      if (!selectedNote) return;
+
+      // 1) Inline data URI in note content
+      const inline = extractFirstDataUri(selectedNote.noteContent);
+      if (inline) {
+        setAttachedPhotoData(inline);
+        return;
+      }
+
+      // 2) Explicit photoId reference
+      const match = selectedNote.noteContent.match(/\(photoId:\s*(\d+)\)/);
+      if (match) {
+        const photoId = match[1];
+        setIsLoadingPhoto(true);
+        try {
+          const resp = await fetch(`/api/appointment-photos/${photoId}`);
+          if (!resp.ok) throw new Error('Failed to load photo');
+          const json = await resp.json();
+          if (json && json.photoData) {
+            setAttachedPhotoData(json.photoData as string);
+            return;
+          }
+        } catch {
+          // continue to fallback below
+        } finally {
+          setIsLoadingPhoto(false);
+        }
+      }
+
+      // 3) Fallback: looks like a photo upload note; try latest appointment photo
+      if (/photo upload/i.test(selectedNote.noteContent) && selectedNote.appointmentId) {
+        setIsLoadingPhoto(true);
+        try {
+          const resp = await fetch(`/api/appointments/${selectedNote.appointmentId}/photos`);
+          if (resp.ok) {
+            const arr = await resp.json();
+            if (Array.isArray(arr) && arr.length > 0 && arr[0]?.photoData) {
+              setAttachedPhotoData(arr[0].photoData as string);
+              return;
+            }
+          }
+        } catch {
+          // no-op; leave as null
+        } finally {
+          setIsLoadingPhoto(false);
+        }
+      }
+
+      // 4) Final fallback: if this note is tied to an appointment, try loading latest appointment photo anyway
+      if (selectedNote.appointmentId) {
+        setIsLoadingPhoto(true);
+        try {
+          const resp = await fetch(`/api/appointments/${selectedNote.appointmentId}/photos`);
+          if (resp.ok) {
+            const arr = await resp.json();
+            if (Array.isArray(arr) && arr.length > 0 && arr[0]?.photoData) {
+              setAttachedPhotoData(arr[0].photoData as string);
+              return;
+            }
+          }
+        } catch {
+          // no-op
+        } finally {
+          setIsLoadingPhoto(false);
+        }
+      }
+    };
+    loadPhotoForNote();
+  }, [selectedNote]);
 
   if (isLoading) {
     return (
@@ -174,6 +254,9 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                         
                         <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
                           {note.noteContent}
+                          <span className="ml-2 align-text-bottom inline-block">
+                            <PhotoInline note={note} size={40} />
+                          </span>
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
@@ -185,6 +268,12 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                             <User className="h-3 w-3" />
                             {note.createdByRole}
                           </div>
+                          {/* Small inline thumbnail if a photo is attached */}
+                          {(() => {
+                            const m = note.noteContent.match(/\(photoId:\s*(\d+)\)/);
+                            if (!m) return null;
+                            return <PhotoThumb photoId={m[1]} />;
+                          })()}
                         </div>
                       </div>
                       
@@ -239,10 +328,19 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
               <div className="space-y-4">
                 <div>
                   <h4 className="font-medium mb-2">Note Content</h4>
-                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md">
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800 rounded-md space-y-3">
                     <p className="text-sm whitespace-pre-wrap">
                       {selectedNote.noteContent}
                     </p>
+                    {isLoadingPhoto ? (
+                      <div className="text-xs text-gray-500">Loading photo…</div>
+                    ) : attachedPhotoData ? (
+                      <img
+                        src={attachedPhotoData}
+                        alt="Attached photo"
+                        className="w-full max-h-64 object-contain rounded border"
+                      />
+                    ) : null}
                   </div>
                 </div>
                 
@@ -284,3 +382,83 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
     </>
   );
 } 
+
+function PhotoThumb({ photoId }: { photoId: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const resp = await fetch(`/api/appointment-photos/${photoId}`);
+        if (!resp.ok) throw new Error('failed');
+        const json = await resp.json();
+        if (isMounted && json && json.photoData) setSrc(json.photoData as string);
+      } catch {
+        if (isMounted) setError(true);
+      }
+    })();
+    return () => { isMounted = false; };
+  }, [photoId]);
+
+  if (error || !src) return null;
+  return (
+    <img
+      src={src}
+      alt="Attached"
+      className="h-12 w-16 object-cover rounded border"
+    />
+  );
+}
+
+function extractFirstDataUri(text?: string): string | null {
+  if (!text) return null;
+  const match = text.match(/data:image\/(?:png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+/);
+  return match ? match[0] : null;
+}
+
+function PhotoInline({ note, size = 64 }: { note: NoteHistoryEntry; size?: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [tried, setTried] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      // 1) Inline data URI in note content
+      const inline = extractFirstDataUri(note.noteContent);
+      if (inline) {
+        if (isMounted) setSrc(inline);
+        return;
+      }
+      // 2) Direct photoId in content
+      const idMatch = note.noteContent.match(/\(photoId:\s*(\d+)\)/);
+      if (idMatch) {
+        try {
+          const resp = await fetch(`/api/appointment-photos/${idMatch[1]}`);
+          if (resp.ok) {
+            const j = await resp.json();
+            if (isMounted && j?.photoData) { setSrc(j.photoData); return; }
+          }
+        } catch {}
+      }
+      // 3) As a fallback, if this looks like a photo upload note and we have appointmentId, fetch latest photo
+      if (/photo upload/i.test(note.noteContent) && note.appointmentId) {
+        try {
+          const resp = await fetch(`/api/appointments/${note.appointmentId}/photos`);
+          if (resp.ok) {
+            const arr = await resp.json();
+            if (Array.isArray(arr) && arr.length > 0 && arr[0]?.photoData) {
+              if (isMounted) { setSrc(arr[0].photoData); return; }
+            }
+          }
+        } catch {}
+      }
+      if (isMounted) setTried(true);
+    })();
+    return () => { isMounted = false; };
+  }, [note]);
+
+  if (!src) return tried ? null : null;
+  return <img src={src} alt="photo" style={{ height: size, width: 'auto' }} className="rounded border" />;
+}

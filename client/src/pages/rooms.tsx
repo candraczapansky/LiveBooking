@@ -34,6 +34,15 @@ export default function RoomsPage() {
     },
   });
 
+  // Fetch locations to display human-readable location names
+  const { data: locations = [] } = useQuery({
+    queryKey: ["/api/locations"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/locations");
+      return response.json();
+    },
+  });
+
   const deleteRoomMutation = useMutation({
     mutationFn: async (roomId: number) => {
       const response = await fetch(`/api/rooms/${roomId}`, {
@@ -120,6 +129,7 @@ export default function RoomsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Location</TableHead>
                   <TableHead>Capacity</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -131,6 +141,12 @@ export default function RoomsPage() {
                     <TableCell className="font-medium">{room.name}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {room.description || "No description"}
+                    </TableCell>
+                    <TableCell>
+                      {room.location?.name 
+                        || room.locationName 
+                        || ((locations as any[])?.find((l: any) => l.id === room.locationId)?.name)
+                        || 'Unassigned'}
                     </TableCell>
                     <TableCell>
                       {room.capacity ? `${room.capacity} person${room.capacity > 1 ? 's' : ''}` : 'Not specified'}

@@ -24,6 +24,14 @@ import {
 } from "../shared/schema.js";
 
 // Import route registration functions
+// Route modules are loaded dynamically in registerRoutes to avoid hard runtime
+// dependencies on files that may not be emitted in production builds.
+import createTerminalRoutes from "./routes/terminal-routes.js";
+import createHelcimWebhookRoutes from "./routes/helcim-webhooks.js";
+// Import helcim payments router dynamically to avoid missing compiled file failures
+import { CheckSoftwareService } from "./check-software-service.js";
+import { registerExternalRoutes } from "./external-api.js";
+// Statically import route registration functions so TypeScript can resolve them during build
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerUserRoutes } from "./routes/users.js";
 import { registerAppointmentRoutes } from "./routes/appointments.js";
@@ -36,20 +44,16 @@ import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
-import { registerReportRoutes } from "./routes/reports.js";
-import { registerAutomationRuleRoutes } from "./routes/automation-rules.js";
-import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
-import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerFormsRoutes } from "./routes/forms.js";
+import { registerDocumentsRoutes } from "./routes/documents.js";
 import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
 import { registerLLMRoutes } from "./routes/llm.js";
 import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
+import { registerAutomationRuleRoutes } from "./routes/automation-rules.js";
 import { registerMembershipRoutes } from "./routes/memberships.js";
-import createTerminalRoutes from "./routes/terminal-routes.js";
-import createHelcimWebhookRoutes from "./routes/helcim-webhooks.js";
-import helcimPaymentsRouter from "./routes/payments/helcim.js";
-import { CheckSoftwareService } from "./check-software-service.js";
-import { registerExternalRoutes } from "./external-api.js";
+import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
+import { registerNoteHistoryRoutes } from "./routes/note-history.js";
+import { registerReportRoutes } from "./routes/reports.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -94,6 +98,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerPaymentRoutes(app, storage);
   registerMarketingRoutes(app, storage);
   registerFormsRoutes(app, storage);
+  registerDocumentsRoutes(app, storage);
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
@@ -112,8 +117,16 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.use('/api/terminal', createTerminalRoutes(storage));
   // Helcim admin-level webhooks (aliases) -> reuse terminal webhook handler
   app.use('/api/helcim', createHelcimWebhookRoutes(storage));
-  // Enable helcim payment routes
-  app.use('/api/payments/helcim', helcimPaymentsRouter);
+  // Legacy alias used by some Helcim configurations
+  app.use('/api/helcim-smart-terminal', createHelcimWebhookRoutes(storage));
+  // Enable helcim payment routes; load dynamically to avoid missing compiled file in some builds
+  try {
+    const helcimModule = await import('./routes/payments/helcim.js');
+    const helcimPaymentsRouter = helcimModule?.default || helcimModule;
+    app.use('/api/payments/helcim', helcimPaymentsRouter);
+  } catch (e) {
+    console.warn('Helcim payments routes not available:', (e as any)?.message || e);
+  }
 
   // Staff routes
   app.get("/api/staff", async (req: Request, res: Response) => {
@@ -157,6 +170,28 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error("Error getting staff:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to get staff"
+      });
+    }
+  });
+
+  // Sales history - used by Reports (fallback simple endpoint)
+  app.get("/api/sales-history", async (req: Request, res: Response) => {
+    try {
+      const { startDate, endDate } = req.query as Record<string, string | undefined>;
+
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const list = await storage.getSalesHistoryByDateRange(start, end);
+        return res.json(list);
+      }
+
+      const list = await storage.getAllSalesHistory();
+      return res.json(list);
+    } catch (error) {
+      console.error("Error getting sales history:", error);
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to get sales history",
       });
     }
   });
@@ -235,11 +270,81 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.get("/api/rooms", async (req: Request, res: Response) => {
     try {
       const rooms = await storage.getAllRooms();
-      res.json(rooms);
+      // Optionally enrich with location name for UI display
+      let locationsList: any[] = [];
+      try {
+        locationsList = await (storage as any).getAllLocations?.();
+      } catch {}
+      const locById = new Map<number, any>((locationsList || []).map((l: any) => [l.id, l]));
+      const enriched = (rooms || []).map((r: any) => ({
+        ...r,
+        location: locById.get(r.locationId) || undefined,
+        locationName: locById.get(r.locationId)?.name,
+      }));
+      res.json(enriched);
     } catch (error) {
       console.error("Error getting rooms:", error);
       res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to get rooms"
+      });
+    }
+  });
+
+  // Create a room
+  app.post("/api/rooms", async (req: Request, res: Response) => {
+    try {
+      const payload = insertRoomSchema.parse(req.body);
+      const created = await storage.createRoom(payload as any);
+      res.status(201).json(created);
+    } catch (error) {
+      console.error("Error creating room:", error);
+      res.status(400).json({
+        error: error instanceof Error ? error.message : "Failed to create room",
+      });
+    }
+  });
+
+  // Update a room
+  app.patch("/api/rooms/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid room id" });
+      }
+
+      // Validate partial update
+      const updateData = insertRoomSchema.partial().parse(req.body);
+
+      const existing = await storage.getRoom(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Room not found" });
+      }
+
+      const updated = await storage.updateRoom(id, updateData as any);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating room:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to update room",
+      });
+    }
+  });
+
+  // Delete a room (idempotent: returns 200 even if already deleted)
+  app.delete("/api/rooms/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid room id" });
+      }
+
+      const ok = await storage.deleteRoom(id);
+      // Always return 200 to avoid client errors on already-deleted items
+      res.json({ success: !!ok });
+    } catch (error) {
+      console.error("Error deleting room:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to delete room",
       });
     }
   });

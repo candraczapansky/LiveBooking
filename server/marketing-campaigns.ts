@@ -1,7 +1,25 @@
 import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
-import { getPublicUrl } from './utils/url.js';
-import { marketingCampaignTemplate, generateEmailHTML, generateEmailText, generateRawMarketingEmailHTML, htmlToText } from './email-templates.js';
+let getPublicUrl: (path: string) => string = (p) => p;
+try {
+  // Lazy bind getPublicUrl if module exists when compiled
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  getPublicUrl = (await import('./utils/url.js')).getPublicUrl as any;
+} catch {}
+let marketingCampaignTemplate: any, generateEmailHTML: any, generateEmailText: any, generateRawMarketingEmailHTML: any, htmlToText: any;
+async function loadEmailTpl() {
+  if (marketingCampaignTemplate) return;
+  try {
+    const mod = await import('./email-templates.js');
+    marketingCampaignTemplate = (mod as any).marketingCampaignTemplate;
+    generateEmailHTML = (mod as any).generateEmailHTML;
+    generateEmailText = (mod as any).generateEmailText;
+    generateRawMarketingEmailHTML = (mod as any).generateRawMarketingEmailHTML;
+    htmlToText = (mod as any).htmlToText;
+  } catch (e) {
+    console.error('Failed to load email-templates in marketing-campaigns:', e);
+  }
+}
 import type { IStorage } from './storage.js';
 import { addDays, format } from 'date-fns';
 
@@ -134,6 +152,7 @@ export class MarketingCampaignService {
     console.log(`📢 Sending campaign: ${campaign.name}`);
 
     try {
+      await loadEmailTpl();
       // For SMS campaigns, use drip processing and return batch stats
       if (campaign.type === 'sms') {
         const { sentCount, failedCount, totalRecipients } = await this.processSmsDrip(campaign);
@@ -210,17 +229,22 @@ export class MarketingCampaignService {
       recipients = await this.storage.getUsersByRole?.('client');
     }
 
-    const seen = new Set<number>();
+    const seenUserIds = new Set<number>();
+    const seenEmails = new Set<string>();
     for (const r of recipients || []) {
       const userId = r?.id;
-      if (!userId || seen.has(userId)) continue;
-      seen.add(userId);
+      if (!userId || seenUserIds.has(userId)) continue;
+      seenUserIds.add(userId);
       if (!r.email || !r.emailPromotions) continue;
+      const emailKey = (r.email as string).trim().toLowerCase();
+      if (!emailKey) continue;
+      if (seenEmails.has(emailKey)) continue; // prevent duplicate sends to same email across multiple users
       await this.storage.createMarketingCampaignRecipient({
         campaignId: campaign.id,
         userId,
         status: 'pending',
       } as any);
+      seenEmails.add(emailKey);
     }
   }
 
@@ -228,6 +252,7 @@ export class MarketingCampaignService {
    * Process one EMAIL drip batch for a campaign
    */
   private async processEmailDrip(campaign: CampaignData): Promise<CampaignStats> {
+    await loadEmailTpl();
     // Seed recipients on first run
     await this.seedEmailRecipientsIfNeeded(campaign);
 
@@ -249,6 +274,20 @@ export class MarketingCampaignService {
           failedCount++;
           continue;
         }
+
+        // Deduplicate at send-time by email within this campaign to be extra safe
+        // Build a set of emails that have already been sent/processing in this batch
+        // Note: we can keep a local set per invocation to avoid multiple sends in same run
+        if (!(process as any)._emailSendSet) (process as any)._emailSendSet = new Map<number, Set<string>>();
+        const campaignSendSet: Set<string> = (process as any)._emailSendSet.get(campaign.id) || new Set<string>();
+        const emailKey = (user.email as string).trim().toLowerCase();
+        if (campaignSendSet.has(emailKey)) {
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'duplicate_email_suppressed' } as any);
+          failedCount++;
+          continue;
+        }
+        campaignSendSet.add(emailKey);
+        (process as any)._emailSendSet.set(campaign.id, campaignSendSet);
 
         const baseUrl = process.env.CUSTOM_DOMAIN || 'http://localhost:5000';
         const editorHtml = (campaign.htmlContent || campaign.content || '').toString();
@@ -367,19 +406,25 @@ export class MarketingCampaignService {
       recipients = await this.storage.getUsersByRole?.('client');
     }
 
-    const seen = new Set<number>();
+    const seenUserIds = new Set<number>();
+    const seenPhones = new Set<string>();
+    const normalizePhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
     const isSpecificAudience = (campaign.audience || '').toString().toLowerCase().includes('specific');
     for (const r of recipients || []) {
       const userId = r?.id;
-      if (!userId || seen.has(userId)) continue;
-      seen.add(userId);
+      if (!userId || seenUserIds.has(userId)) continue;
+      seenUserIds.add(userId);
       const hasConsent = !!r.smsPromotions || isSpecificAudience;
       if (!r.phone || !hasConsent) continue;
+      const phoneKey = normalizePhone(r.phone as string);
+      if (!phoneKey) continue;
+      if (seenPhones.has(phoneKey)) continue; // prevent duplicate sends to same phone across multiple users
       await this.storage.createMarketingCampaignRecipient({
         campaignId: campaign.id,
         userId,
         status: 'pending',
       } as any);
+      seenPhones.add(phoneKey);
     }
   }
 
@@ -414,6 +459,11 @@ export class MarketingCampaignService {
     // Send sequentially to avoid bursts; small gap for safety
     const perMessageDelayMs = parseInt(process.env.SMS_DRIP_PER_MESSAGE_DELAY_MS || '1000', 10);
     const isSpecificAudience = (campaign.audience || '').toString().toLowerCase().includes('specific');
+    // Keep a per-run set of normalized phone numbers already sent for this campaign
+    if (!(process as any)._smsSendSet) (process as any)._smsSendSet = new Map<number, Set<string>>();
+    const campaignSendSet: Set<string> = (process as any)._smsSendSet.get(campaign.id) || new Set<string>();
+    const normalizePhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+
     for (const rec of batch) {
       try {
         const user = await this.storage.getUser((rec as any).userId);
@@ -430,6 +480,17 @@ export class MarketingCampaignService {
           // Already claimed elsewhere; skip
           continue;
         }
+
+        // Deduplicate by normalized phone within this campaign during this run
+        const phoneKey = normalizePhone(user.phone as string);
+        if (phoneKey && campaignSendSet.has(phoneKey)) {
+          // Already sent to this phone in this run; mark as failed to avoid reprocessing
+          await this.storage.updateMarketingCampaignRecipient((rec as any).id, { status: 'failed', errorMessage: 'duplicate_phone_suppressed' } as any);
+          failedCount++;
+          continue;
+        }
+        if (phoneKey) campaignSendSet.add(phoneKey);
+        (process as any)._smsSendSet.set(campaign.id, campaignSendSet);
 
         // Use campaign.content for SMS body; attach public media URL when media exists
         const mediaUrl = (campaign as any).photoUrl

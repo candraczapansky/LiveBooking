@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, User, Clock, DollarSign, CheckCircle } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -51,21 +53,57 @@ export default function AppointmentCheckout({
   // Calculate base amount
   const baseAmount = appointment.totalAmount || (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
 
+  // Discount state and helpers
+  const [discountCode, setDiscountCode] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
+  const finalAmount = Math.max(baseAmount - discountAmount, 0);
+
+  const handleApplyDiscount = async () => {
+    const code = discountCode.trim();
+    if (!code) {
+      toast({ title: "Enter a code", description: "Please enter a discount code to apply.", variant: "destructive" });
+      return;
+    }
+    setIsApplyingDiscount(true);
+    try {
+      const res = await apiRequest("POST", "/api/promo-codes/validate", {
+        code,
+        serviceId: appointment.service?.id,
+        amount: baseAmount,
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.valid) {
+        setDiscountAmount(0);
+        toast({ title: "Invalid code", description: data?.message || "This discount code cannot be applied.", variant: "destructive" });
+        return;
+      }
+      setDiscountAmount(Math.max(0, Number(data.discountAmount) || 0));
+      toast({ title: "Discount applied", description: `${code.toUpperCase()} applied successfully.` });
+    } catch (err) {
+      setDiscountAmount(0);
+      toast({ title: "Error", description: "Failed to validate discount code.", variant: "destructive" });
+    } finally {
+      setIsApplyingDiscount(false);
+    }
+  };
+
   const handleCompleteAppointment = async () => {
     setIsProcessing(true);
     try {
       // Record a cash payment and create staff earnings, then mark appointment complete
       await apiRequest("POST", "/api/confirm-cash-payment", {
         appointmentId: appointment.id,
-        amount: baseAmount,
-        notes: 'Completed via calendar checkout'
+        amount: finalAmount,
+        notes: `Completed via calendar checkout${discountAmount > 0 && discountCode ? ` | Discount ${discountCode.toUpperCase()} -$${discountAmount.toFixed(2)}` : ''}`,
+        ...(discountAmount > 0 && discountCode ? { discountCode: discountCode.trim(), discountAmount } : {}),
       });
 
       // Ensure appointment is marked completed for calendar views
       await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
         status: 'completed',
         paymentStatus: 'paid',
-        totalAmount: baseAmount
+        totalAmount: finalAmount
       });
 
       toast({
@@ -142,6 +180,45 @@ export default function AppointmentCheckout({
                   <DollarSign className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">
                     Amount: {formatPrice(baseAmount)}
+                  </span>
+                </div>
+
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="discountCode" className="text-sm">Discount Code</Label>
+                    <Input
+                      id="discountCode"
+                      placeholder="Enter code"
+                      value={discountCode}
+                      onChange={(e) => setDiscountCode(e.target.value)}
+                      disabled={isProcessing || isApplyingDiscount}
+                    />
+                  </div>
+                  <div className="flex">
+                    <Button
+                      type="button"
+                      onClick={handleApplyDiscount}
+                      disabled={isProcessing || isApplyingDiscount}
+                      className="w-full"
+                    >
+                      {isApplyingDiscount ? "Applying..." : "Apply"}
+                    </Button>
+                  </div>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="flex items-center space-x-2">
+                    <DollarSign className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      Discount {discountCode ? `(${discountCode.toUpperCase()})` : ''}: -{formatPrice(discountAmount)}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-800 font-semibold">
+                    Total Due: {formatPrice(finalAmount)}
                   </span>
                 </div>
               </div>

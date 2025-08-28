@@ -35,23 +35,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import {
-  Calendar,
-  Clock,
-  CreditCard,
-  DollarSign,
-  Loader2,
-  Search,
-  User,
-} from "lucide-react";
+import { Clock, CreditCard, DollarSign, Loader2, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import CheckoutWithTerminal from "@/components/payment/checkout-with-terminal";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { NoteInput } from "@/components/ui/note-input";
-import { cn, formatPrice } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 
 // Define the form schema
 const appointmentFormSchema = z.object({
@@ -63,6 +53,7 @@ const appointmentFormSchema = z.object({
   }),
   time: z.string().min(1, "Time is required"),
   notes: z.string().optional(),
+  addOnServiceId: z.string().optional(),
 });
 
 type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
@@ -196,13 +187,38 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     queryKey: ['/api/staff', selectedStaffId, 'services'],
     queryFn: async () => {
       if (!selectedStaffId) return [];
-      const response = await apiRequest("GET", `/api/staff/${selectedStaffId}/services`);
+      // Use public=true to exclude add-ons (hidden services) from the primary service list
+      const response = await apiRequest("GET", `/api/staff/${selectedStaffId}/services?public=true`);
       const data = await response.json();
       console.log('Loaded services for staff', selectedStaffId, ':', data);
       // The backend returns service data directly, no need to extract
       return data;
     },
     enabled: open && !!selectedStaffId,
+  });
+
+  // Load add-ons allowed for selected service
+  const selectedServiceForAddOns = services?.find((s: any) => s.id.toString() === form.watch('serviceId'));
+  const { data: addOnMapping } = useQuery({
+    queryKey: ['/api/services', selectedServiceForAddOns?.id, 'addons-for-base'],
+    queryFn: async () => {
+      if (!selectedServiceForAddOns?.id) return [];
+      // We don't have a direct endpoint for reverse lookup, so fetch all services and filter by mapping
+      const all = await (await apiRequest('GET', '/api/services')).json();
+      const results: any[] = [];
+      for (const svc of all) {
+        if (!svc?.isHidden) continue;
+        try {
+          const mapping = await (await apiRequest('GET', `/api/services/${svc.id}/add-on-bases`)).json();
+          const baseIds: number[] = (mapping?.baseServiceIds || []).map((n: any) => Number(n));
+          if (baseIds.includes(Number(selectedServiceForAddOns.id))) {
+            results.push(svc);
+          }
+        } catch {}
+      }
+      return results;
+    },
+    enabled: open && !!selectedServiceForAddOns?.id,
   });
 
   // Fetch staff schedules for time slot filtering
@@ -228,7 +244,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   });
   
   // Get clients
-  const { data: clients, isLoading: isLoadingClients, refetch: refetchClients } = useQuery({
+  const { data: clients, refetch: refetchClients } = useQuery({
     queryKey: ['/api/users?role=client', debouncedClientSearch],
     queryFn: async () => {
       const searchParam = debouncedClientSearch ? `&search=${encodeURIComponent(debouncedClientSearch)}` : '';
@@ -277,7 +293,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
 
     const dayName = getDayName(selectedFormDate);
-    const currentDate = formatDateForComparison(selectedFormDate);
+    // const currentDate = formatDateForComparison(selectedFormDate);
 
     const staffSchedules = (schedules as any[]).filter((schedule: any) => {
       // Fix date comparison logic
@@ -563,6 +579,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         endTime: endTime.toISOString(),
         status: "confirmed",
         notes: values.notes || null,
+        addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
       };
 
       return apiRequest("POST", "/api/appointments", appointmentData);
@@ -784,43 +801,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   const onSubmit = handleFormSubmit;
 
-  const handleCashPayment = async () => {
-    if (!appointmentId || appointmentId <= 0 || !appointment) return;
-    
-    try {
-      // Create a payment record for cash payment
-      await apiRequest("POST", "/api/payments", {
-        clientId: appointment.clientId,
-        appointmentId: appointmentId,
-        amount: selectedService?.price || 0,
-        totalAmount: selectedService?.price || 0,
-        method: "cash",
-        status: "completed"
-      });
-
-      // Update appointment payment status
-      await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
-        ...appointment,
-        paymentStatus: "paid"
-      });
-
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
-      
-      toast({
-        title: "Cash Payment Recorded",
-        description: "Appointment marked as paid with cash.",
-      });
-      
-      onOpenChange(false);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to record cash payment.",
-        variant: "destructive",
-      });
-    }
-  };
+  // const handleCashPayment = async () => { /* unused; removed */ };
 
   const handleDelete = async () => {
     if (!appointmentId || appointmentId <= 0) return;
@@ -943,6 +924,34 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   </FormItem>
                 )}
               />
+
+              {/* Add-On Selection - appears when selected service has applicable add-ons */}
+              {selectedServiceForAddOns && Array.isArray(addOnMapping) && addOnMapping.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="addOnServiceId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Add-On (Optional)</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an add-on (if desired)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {addOnMapping.map((svc: any) => (
+                              <SelectItem key={`addon-${svc.id}`} value={svc.id.toString()}>
+                                {svc.name} - {formatPrice(svc.price)} {svc.duration ? `(+${svc.duration} min)` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               
               {/* Client Selection */}
               <FormField
@@ -970,7 +979,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                                 field.onChange("");
                               }
                             }}
-                            className="flex-1"
+                            className="flex-1 text-gray-900 dark:text-gray-100"
                           />
                           <Button
                             type="button"
@@ -992,46 +1001,49 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           </div>
                         )}
                         
-                        {/* Search Results */}
-                        <div className="border rounded-md max-h-48 overflow-y-auto">
-                          {(() => {
-                            if (!clients || clients.length === 0) {
-                              return (
-                                <div className="p-3 text-sm text-muted-foreground text-center">
-                                  {clientSearchValue.trim() ? 'No clients found. Try a different search term or add a new client.' : 'Type to search for clients...'}
+                        {/* Search Results (only when typing ≥ 2 chars and no client selected) */}
+                        {!field.value && debouncedClientSearch.length >= 2 && (
+                          <div className="border rounded-md max-h-48 overflow-y-auto">
+                            {(() => {
+                              if (!clients || clients.length === 0) {
+                                return (
+                                  <div className="p-3 text-sm text-muted-foreground text-center">
+                                    No clients found. Try a different search term or add a new client.
+                                  </div>
+                                );
+                              }
+
+                              console.log('🔍 Search results:', {
+                                searchTerm: clientSearchValue,
+                                totalClients: clients?.length,
+                                searchValue: clientSearchValue.toLowerCase().trim()
+                              });
+
+                              const limitedClients = clients.slice(0, 50);
+                              return limitedClients.map((client: any) => (
+                                <div
+                                  key={client.id}
+                                  className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
+                                  onClick={() => {
+                                    console.log('Client selected:', client);
+                                    console.log('Setting clientId to:', client.id.toString());
+                                    field.onChange(client.id.toString());
+                                    setClientSearchValue(`${client.firstName} ${client.lastName}`);
+                                    console.log('Form clientId after selection:', form.getValues('clientId'));
+                                  }}
+                                >
+                                  <div className="font-medium">
+                                    {client.firstName} {client.lastName}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {client.email}
+                                    {client.phone && ` • ${client.phone}`}
+                                  </div>
                                 </div>
-                              );
-                            }
-                            
-                            console.log('🔍 Search results:', {
-                              searchTerm: clientSearchValue,
-                              totalClients: clients?.length,
-                              searchValue: clientSearchValue.toLowerCase().trim()
-                            });
-                            
-                            return clients.map((client: any) => (
-                              <div
-                                key={client.id}
-                                className="p-3 hover:bg-accent cursor-pointer border-b last:border-b-0"
-                                onClick={() => {
-                                  console.log('Client selected:', client);
-                                  console.log('Setting clientId to:', client.id.toString());
-                                  field.onChange(client.id.toString());
-                                  setClientSearchValue(`${client.firstName} ${client.lastName}`);
-                                  console.log('Form clientId after selection:', form.getValues('clientId'));
-                                }}
-                              >
-                                <div className="font-medium">
-                                  {client.firstName} {client.lastName}
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                  {client.email}
-                                  {client.phone && ` • ${client.phone}`}
-                                </div>
-                              </div>
-                            ));
-                          })()}
-                        </div>
+                              ));
+                            })()}
+                          </div>
+                        )}
                         
                         {/* Hidden input to ensure clientId is captured */}
                         <input 
@@ -1042,13 +1054,13 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                         
                         {/* Selected Client Display */}
                         {field.value && (
-                          <div className="p-3 bg-accent rounded-md">
+                          <div className="p-3 border rounded-md bg-white dark:bg-transparent">
                             <div className="flex items-center justify-between">
                               <div>
-                                <div className="font-medium">
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
                                   {clients?.find((client: any) => client.id.toString() === field.value)?.firstName} {clients?.find((client: any) => client.id.toString() === field.value)?.lastName}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-sm text-gray-600 dark:text-gray-300">
                                   {clients?.find((client: any) => client.id.toString() === field.value)?.email}
                                 </div>
                               </div>
@@ -1226,6 +1238,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                             amount={appointment.totalAmount || selectedService?.price || 0}
                             reference={`appointment-${appointment.id}`}
                             description={`Payment for ${selectedService?.name || 'appointment'}`}
+                            variant="outline"
                             onPaymentComplete={async (result) => {
                               // Update appointment payment status
                               await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
@@ -1248,11 +1261,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           />
                           <Button
                             type="button"
+                            variant="outline"
                             onClick={() => {
                               setShowCheckout(true);
                               onOpenChange(false); // Close the appointment dialog
                             }}
-                            className="w-full bg-green-600 hover:bg-green-700"
                           >
                             <CreditCard className="mr-2 h-4 w-4" />
                             Other Payment Methods

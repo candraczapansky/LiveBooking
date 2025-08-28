@@ -22,14 +22,24 @@ const registerSchema = z.object({
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
+const loginSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginValues = z.infer<typeof loginSchema>;
+
 const ClientBookingPage = () => {
   useDocumentTitle("Book an Appointment | Glo Head Spa");
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, user } = useAuth();
   const [isBookingOpen, setIsBookingOpen] = useState(true);
   const { toast } = useToast();
   const [location, navigate] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -37,6 +47,14 @@ const ClientBookingPage = () => {
       firstName: "",
       lastName: "",
       email: "",
+      username: "",
+      password: "",
+    },
+  });
+
+  const loginForm = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
       username: "",
       password: "",
     },
@@ -71,105 +89,188 @@ const ClientBookingPage = () => {
     }
   };
 
-  const handleOpenChange = (open: boolean) => {
-    setIsBookingOpen(open);
-    if (!open) {
-      navigate("/");
+  const handleLogin = async (values: LoginValues) => {
+    setIsLoginSubmitting(true);
+    setLoginError(null);
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const message = data?.message || data?.error || "Login failed";
+        setLoginError(message);
+        throw new Error(message);
+      }
+      if (data?.success && data?.user && data?.token) {
+        login(data.user, data.token);
+        toast({ title: "Logged in", description: "You're now ready to book." });
+        setShowLogin(false);
+      } else {
+        throw new Error("Unexpected response from server");
+      }
+    } catch (e: any) {
+      toast({ title: "Login failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setIsLoginSubmitting(false);
     }
   };
+
+  const handleOpenChange = (open: boolean) => {
+    setIsBookingOpen(open);
+    // Stay on the public booking page when closing to avoid entering internal app UI
+    // Intentionally no navigation on close for the public client flow
+  };
+
+  const isClientUser = user?.role === 'client' || user?.role === 'customer';
+  const shouldShowRegister = !isAuthenticated || !isClientUser;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
 
       <main className="flex-1 w-full mx-auto py-10 px-4 sm:px-6 lg:px-8">
-        {!isAuthenticated ? (
+        {shouldShowRegister ? (
           <div className="w-full">
-            <div className="mb-8">
-              <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Create your account</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Sign up to book your appointment.</p>
-            </div>
-            {error && (
-              <div className="mb-4 text-sm text-red-600 dark:text-red-400 font-medium">{error}</div>
+            {showLogin ? (
+              <div>
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Log in</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Sign in to book your appointment.</p>
+                </div>
+                {loginError && (
+                  <div className="mb-4 text-sm text-red-600 dark:text-red-400 font-medium">{loginError}</div>
+                )}
+                <Form {...loginForm}>
+                  <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-5 max-w-2xl" noValidate>
+                    <FormField
+                      control={loginForm.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="your username" autoComplete="username" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={loginForm.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" autoComplete="current-password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-center gap-4">
+                      <Button type="submit" disabled={isLoginSubmitting}>
+                        {isLoginSubmitting ? "Signing in..." : "Sign in"}
+                      </Button>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        New here? <button type="button" className="text-primary" onClick={() => setShowLogin(false)}>Create account</button>
+                      </div>
+                    </div>
+                  </form>
+                </Form>
+              </div>
+            ) : (
+              <>
+                <div className="mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">Create your account</h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Sign up to book your appointment.</p>
+                </div>
+                {error && (
+                  <div className="mb-4 text-sm text-red-600 dark:text-red-400 font-medium">{error}</div>
+                )}
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-5 max-w-2xl" noValidate>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="firstName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">First name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Jane" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="lastName"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm">Last name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Doe" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Email</FormLabel>
+                          <FormControl>
+                            <Input type="email" placeholder="you@example.com" autoComplete="email" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="username"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Username</FormLabel>
+                          <FormControl>
+                            <Input placeholder="janedoe" autoComplete="username" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm">Password</FormLabel>
+                          <FormControl>
+                            <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex items-center gap-4">
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? "Creating account..." : "Create account & continue"}
+                      </Button>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Already have an account? <button type="button" className="text-primary" onClick={() => setShowLogin(true)}>Log in</button>
+                      </div>
+                    </div>
+                  </form>
+                </Form>
+              </>
             )}
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleRegister)} className="space-y-5 max-w-2xl" noValidate>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">First name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Jane" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm">Last name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Email</FormLabel>
-                      <FormControl>
-                        <Input type="email" placeholder="you@example.com" autoComplete="email" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Username</FormLabel>
-                      <FormControl>
-                        <Input placeholder="janedoe" autoComplete="username" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm">Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" autoComplete="new-password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="flex items-center gap-4">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? "Creating account..." : "Create account & continue"}
-                  </Button>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    Already have an account? <button type="button" className="text-primary" onClick={() => navigate("/login")}>Log in</button>
-                  </div>
-                </div>
-              </form>
-            </Form>
           </div>
         ) : (
           <>

@@ -64,11 +64,13 @@ export default function SmartTerminalPayment({
       const sessionId = data?.invoiceNumber || pid;
 
       // Poll for payment status only if we have an identifier
+      console.log('🔄 Starting to poll for payment status with ID:', pid || sessionId);
       if (pid) {
         await pollPaymentStatus(String(locationId ?? ''), String(pid));
       } else {
         // No id yet; keep UI in processing and use invoice-based session to unblock later
         if (sessionId) {
+          console.log('📋 Polling with invoice number:', sessionId);
           await pollPaymentStatus(String(locationId ?? ''), String(sessionId));
         } else {
           setMessage('Waiting for terminal to acknowledge transaction...');
@@ -108,26 +110,38 @@ export default function SmartTerminalPayment({
           throw new Error('Payment timed out');
         }
 
-        const response = await apiRequest('GET', `/api/terminal/payment/${locId}/${currentId}`);
+        const statusPath = locId && String(locId).length > 0
+          ? `/api/terminal/payment/${locId}/${currentId}`
+          : `/api/terminal/payment/${currentId}`;
+        const response = await apiRequest('GET', statusPath);
         const data = await response.json();
+        
+        console.log(`🔍 Poll attempt ${attempts + 1}: status=${data.status}, transactionId=${data.transactionId}`);
 
         // If server reveals a concrete transactionId different from what we're polling, switch to it
         if (data?.transactionId && String(data.transactionId) !== String(currentId)) {
+          console.log('🔄 Switching to new transaction ID:', data.transactionId);
           currentId = String(data.transactionId);
         }
 
         if (data.status === 'completed') {
+          console.log('✅ Payment completed! Response:', data);
           setStatus('success');
           setMessage('Payment successful!');
-          handlePaymentSuccess(data);
+          handlePaymentSuccess({
+            ...data,
+            cardLast4: data.cardLast4 || data.last4,
+            paymentMethod: 'terminal'
+          });
           return;
         } else if (data.status === 'failed') {
+          console.log('❌ Payment failed:', data);
           throw new Error(data.message || 'Payment failed');
         }
 
         // Update status message
         setMessage(data.message || 'Processing payment...');
-        
+
         // Continue polling
         attempts++;
         setTimeout(poll, 2000);

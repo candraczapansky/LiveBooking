@@ -4,7 +4,7 @@ import { z } from "zod";
 import { insertUserSchema } from "../../shared/schema.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
 import { sendEmail } from "../email.js";
-import { hashPassword, comparePassword } from "../utils/password.js";
+import bcrypt from 'bcrypt';
 import { 
   ValidationError, 
   AuthenticationError, 
@@ -75,7 +75,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         throw new AuthenticationError("Invalid credentials");
       }
 
-      const isValidPassword = await comparePassword(sanitizedPassword, user.password);
+      const isValidPassword = await bcrypt.compare(sanitizedPassword, user.password);
       if (!isValidPassword) {
         LoggerService.warn("Login attempt with invalid password", { 
           ...context, 
@@ -146,7 +146,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       }
 
       // Hash password
-      const hashedPassword = await hashPassword(sanitizedData.password);
+      const hashedPassword = await bcrypt.hash(sanitizedData.password, 10);
 
       // Create user
       const newUser = await storage.createUser({
@@ -237,7 +237,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       } else {
         console.log('✅ Creating new staff user');
         // Create new staff user
-        const hashedPassword = await hashPassword(sanitizedData.password);
+        const hashedPassword = await bcrypt.hash(sanitizedData.password, 10);
         newUser = await storage.createUser({
           username: sanitizedData.username,
           email: sanitizedData.email,
@@ -381,7 +381,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       }
 
       // Hash new password
-      const hashedPassword = await hashPassword(newPassword);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       // Update user password and clear reset token
       await storage.updateUser(user.id, {
@@ -418,7 +418,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       }
 
       // Verify current password
-      const isValidPassword = await comparePassword(currentPassword, user.password);
+      const isValidPassword = await bcrypt.compare(currentPassword, user.password);
       if (!isValidPassword) {
         LoggerService.warn("Invalid current password for password change", {
           ...context,
@@ -429,7 +429,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
       }
 
       // Hash new password
-      const hashedPassword = await hashPassword(newPassword);
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       // Update password
       await storage.updateUser(user.id, {

@@ -4,6 +4,7 @@ import { insertAutomationRuleSchema } from "../../shared/schema.js";
 import { z } from "zod";
 import { asyncHandler } from "../utils/errors.js";
 import { AutomationService } from "../automation-service.js";
+import { triggerAutomations } from "../automation-triggers.js";
 
 const updateAutomationRuleSchema = insertAutomationRuleSchema.partial();
 
@@ -48,11 +49,12 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
     res.json({ success: true });
   }));
 
-  // Manually trigger automations for a specific appointment (for testing)
-  // Body: { appointmentId: number, trigger?: string, customTriggerName?: string }
+  // Manually trigger automations (for testing)
+  // Body: { appointmentId?: number, testEmail?: string, trigger?: string, customTriggerName?: string }
   app.post("/api/automation-rules/trigger", asyncHandler(async (req: Request, res: Response) => {
     const bodySchema = z.object({
-      appointmentId: z.number(),
+      appointmentId: z.number().optional(),
+      testEmail: z.string().email().optional(),
       trigger: z.enum([
         "booking_confirmation",
         "appointment_reminder",
@@ -63,11 +65,41 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
         "custom"
       ]).optional(),
       customTriggerName: z.string().optional()
+    }).refine(v => (typeof v.appointmentId === 'number' && !Number.isNaN(v.appointmentId as any)) || !!v.testEmail, {
+      message: 'appointmentId or testEmail is required'
     });
 
-    const { appointmentId, trigger, customTriggerName } = bodySchema.parse(req.body);
+    const { appointmentId, testEmail, trigger, customTriggerName } = bodySchema.parse(req.body);
+    const locationIdRaw = (req.body as any)?.locationId;
+    const locationId = locationIdRaw != null ? parseInt(String(locationIdRaw)) : undefined;
 
-    const appointment = await storage.getAppointment(appointmentId);
+    // Determine trigger if not provided
+    const resolvedTrigger = trigger || (customTriggerName ? "custom" : "booking_confirmation");
+
+    // If testEmail provided, run in test mode without requiring an appointment
+    if (testEmail && (appointmentId == null || Number.isNaN(Number(appointmentId)))) {
+      const now = new Date();
+      const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+      await triggerAutomations(resolvedTrigger as any, {
+        id: 0,
+        clientId: 0,
+        serviceId: 0,
+        staffId: 0,
+        startTime: now.toISOString(),
+        endTime: inOneHour.toISOString(),
+        status: 'test',
+        testEmail,
+        locationId: Number.isFinite(locationId as any) ? (locationId as number) : undefined,
+      } as any, storage, customTriggerName);
+      return res.json({ success: true, trigger: resolvedTrigger, testEmail });
+    }
+
+    // Otherwise require a real appointment
+    const apptId = Number(appointmentId);
+    if (Number.isNaN(apptId)) {
+      return res.status(400).json({ error: 'Invalid appointmentId' });
+    }
+    const appointment = await storage.getAppointment(apptId);
     if (!appointment) {
       return res.status(404).json({ error: "Appointment not found" });
     }
@@ -85,12 +117,9 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
 
     const service = new AutomationService(storage);
 
-    // Determine trigger if not provided
-    const resolvedTrigger = trigger || (customTriggerName ? "custom" : "booking_confirmation");
-
     await service.triggerAutomations(resolvedTrigger as any, context, customTriggerName);
 
-    res.json({ success: true, trigger: resolvedTrigger, appointmentId });
+    res.json({ success: true, trigger: resolvedTrigger, appointmentId: apptId });
   }));
 }
 

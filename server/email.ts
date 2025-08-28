@@ -1,14 +1,21 @@
-import { 
-  appointmentConfirmationTemplate, 
-  appointmentReminderTemplate, 
-  followUpTemplate,
-  birthdayTemplate,
-  marketingCampaignTemplate,
-  generateEmailHTML,
-  generateEmailText,
-  generateRawMarketingEmailHTML,
-  htmlToText
-} from './email-templates.js';
+let appointmentConfirmationTemplate: any, appointmentReminderTemplate: any, followUpTemplate: any, birthdayTemplate: any, marketingCampaignTemplate: any, generateEmailHTML: any, generateEmailText: any, generateRawMarketingEmailHTML: any, htmlToText: any;
+async function ensureEmailTemplates() {
+  if (appointmentConfirmationTemplate) return;
+  try {
+    const mod = await import('./email-templates.js');
+    appointmentConfirmationTemplate = (mod as any).appointmentConfirmationTemplate;
+    appointmentReminderTemplate = (mod as any).appointmentReminderTemplate;
+    followUpTemplate = (mod as any).followUpTemplate;
+    birthdayTemplate = (mod as any).birthdayTemplate;
+    marketingCampaignTemplate = (mod as any).marketingCampaignTemplate;
+    generateEmailHTML = (mod as any).generateEmailHTML;
+    generateEmailText = (mod as any).generateEmailText;
+    generateRawMarketingEmailHTML = (mod as any).generateRawMarketingEmailHTML;
+    htmlToText = (mod as any).htmlToText;
+  } catch (e) {
+    console.error('Failed to load email-templates:', e);
+  }
+}
 import Handlebars from 'handlebars';
 
 // SendGrid is loaded dynamically when needed to avoid ESM/CJS interop issues in some runtimes
@@ -58,6 +65,7 @@ async function sendEmailFallback(params: EmailParams): Promise<boolean> {
 }
 
 export async function sendEmail(params: EmailParams): Promise<boolean> {
+  await ensureEmailTemplates();
   console.log('📧 SENDEMAIL CALLED - Debug Info:');
   console.log('  - To:', params.to);
   console.log('  - From:', params.from);
@@ -204,6 +212,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
 }
 
 export async function sendBulkEmail(emails: EmailParams[]): Promise<{ success: number; failed: number }> {
+  await ensureEmailTemplates();
   let success = 0;
   let failed = 0;
 

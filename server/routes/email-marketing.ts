@@ -53,23 +53,24 @@ router.post('/automation/appointment-confirmation', async (req, res) => {
       return res.status(404).json({ error: 'Appointment not found' });
     }
 
-    const [client, service, staffUser] = await Promise.all([
+    const [client, service, staffRecord] = await Promise.all([
       storageInstance.getUser(appointment.clientId),
       storageInstance.getService(appointment.serviceId),
-      storageInstance.getUser(appointment.staffId)
+      storageInstance.getStaff(appointment.staffId)
     ]);
 
-    if (!client || !service || !staffUser) {
+    if (!client || !service || !staffRecord) {
       return res.status(400).json({ error: 'Missing appointment data' });
     }
 
-    // Create staff data object with user info
+    // Resolve the staff's user
+    const staffUser = await storageInstance.getUser(staffRecord.userId);
     const staff = {
       id: appointment.staffId,
-      userId: appointment.staffId,
+      userId: staffRecord.userId,
       user: {
-        firstName: staffUser.firstName ?? undefined,
-        lastName: staffUser.lastName ?? undefined
+        firstName: staffUser?.firstName ?? undefined,
+        lastName: staffUser?.lastName ?? undefined
       }
     };
 

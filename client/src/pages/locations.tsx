@@ -58,7 +58,8 @@ import {
   Mail,
   Globe,
   Clock,
-  RefreshCw
+  RefreshCw,
+  CreditCard
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -107,6 +108,8 @@ const LocationsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [inlineEdits, setInlineEdits] = useState<Record<number, { phone?: string; email?: string }>>({});
+  const [terminalDialogOpen, setTerminalDialogOpen] = useState(false);
+  const [selectedLocationForTerminal, setSelectedLocationForTerminal] = useState<Location | null>(null);
 
   useEffect(() => {
     const checkSidebarState = () => {
@@ -383,15 +386,15 @@ const LocationsPage = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-      <div className="hidden lg:block">
-        <SidebarController />
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <SidebarController />
       
-      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+      <div className={`flex flex-col transition-all duration-300 ${
+        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
+      }`}>
         
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
               <div>
@@ -476,175 +479,119 @@ const LocationsPage = () => {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-stretch">
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {locations.map((location) => (
-                  <Card key={location.id} className="h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-200 border-0 shadow-sm">
-                    <CardHeader className="pb-4 bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-3">
-                            <CardTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">{location.name}</CardTitle>
+                  <Card key={location.id} className="flex flex-col overflow-hidden hover:shadow-lg transition-all duration-200 border border-gray-200 dark:border-gray-700">
+                    <CardHeader className="pb-3">
+                      <div className="space-y-1">
+                        <div className="flex items-start justify-between">
+                          <CardTitle className="text-lg font-semibold line-clamp-1">{location.name}</CardTitle>
+                          <div className="flex gap-1">
                             {location.isDefault && (
-                              <Badge variant="default" className="bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-100">
-                                <Star className="h-3 w-3 mr-1" />
-                                Default
+                              <Badge variant="default" className="text-xs px-1.5 py-0">
+                                <Star className="h-3 w-3" />
                               </Badge>
                             )}
-                            <Badge variant={location.isActive ? "default" : "secondary"} className={location.isActive ? "bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-100" : "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-100"}>
-                              {location.isActive ? "Active" : "Inactive"}
+                            <Badge 
+                              variant={location.isActive ? "default" : "secondary"} 
+                              className={`text-xs px-1.5 py-0 ${location.isActive ? "bg-green-500" : ""}`}
+                            >
+                              {location.isActive ? "✓" : "✗"}
                             </Badge>
                           </div>
-                          <CardDescription className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                            <MapPin className="h-4 w-4 text-gray-500" />
-                            <span className="font-medium">{location.address}, {location.city}, {location.state} {location.zipCode}</span>
-                          </CardDescription>
                         </div>
+                        <CardDescription className="text-xs line-clamp-2">
+                          <span>{location.address}</span><br/>
+                          <span>{location.city}, {location.state} {location.zipCode}</span>
+                        </CardDescription>
                       </div>
                     </CardHeader>
                     
-                    <CardContent className="pb-4 px-6 flex-1">
-                      <div className="space-y-4">
-                        {location.phone && location.phone.trim() !== "" ? (
-                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <Phone className="h-4 w-4 text-gray-500" />
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{location.phone}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <Phone className="h-4 w-4 text-gray-500" />
-                            <Input
-                              placeholder="(555) 123-4567"
-                              value={inlineEdits[location.id]?.phone ?? ""}
-                              onChange={(e) =>
-                                setInlineEdits((prev) => ({
-                                  ...prev,
-                                  [location.id]: { ...prev[location.id], phone: e.target.value },
-                                }))
-                              }
-                              className="flex-1"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
-                              disabled={!((inlineEdits[location.id]?.phone ?? "").trim()) || updateInlineFieldsMutation.isPending}
-                              onClick={() => {
-                                const phoneVal = (inlineEdits[location.id]?.phone ?? "").trim();
-                                if (!phoneVal) return;
-                                updateInlineFieldsMutation.mutate({ id: location.id, data: { phone: phoneVal } });
-                              }}
-                            >
-                              {updateInlineFieldsMutation.isPending ? "Saving..." : "Save"}
-                            </Button>
+                    <CardContent className="pb-3 px-4 flex-1">
+                      <div className="space-y-2 text-sm">
+                        {location.phone && location.phone.trim() !== "" && (
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <Phone className="h-3 w-3" />
+                            <span className="truncate">{location.phone}</span>
                           </div>
                         )}
 
-                        {location.email && location.email.trim() !== "" ? (
-                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <Mail className="h-4 w-4 text-gray-500" />
-                            <span className="font-medium text-gray-700 dark:text-gray-300">{location.email}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                            <Mail className="h-4 w-4 text-gray-500" />
-                            <Input
-                              placeholder="info@example.com"
-                              value={inlineEdits[location.id]?.email ?? ""}
-                              onChange={(e) =>
-                                setInlineEdits((prev) => ({
-                                  ...prev,
-                                  [location.id]: { ...prev[location.id], email: e.target.value },
-                                }))
-                              }
-                              className="flex-1"
-                            />
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="bg-transparent border-blue-600 text-blue-600 hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
-                              disabled={!((inlineEdits[location.id]?.email ?? "").trim()) || updateInlineFieldsMutation.isPending}
-                              onClick={() => {
-                                const emailVal = (inlineEdits[location.id]?.email ?? "").trim();
-                                if (!emailVal) return;
-                                updateInlineFieldsMutation.mutate({ id: location.id, data: { email: emailVal } });
-                              }}
-                            >
-                              {updateInlineFieldsMutation.isPending ? "Saving..." : "Save"}
-                            </Button>
+                        {location.email && location.email.trim() !== "" && (
+                          <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                            <Mail className="h-3 w-3" />
+                            <span className="truncate">{location.email}</span>
                           </div>
                         )}
                         
-                        <div className="flex items-center gap-3 text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                          <Globe className="h-4 w-4 text-gray-500" />
-                          <span className="font-medium text-gray-700 dark:text-gray-300">{location.timezone}</span>
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <Globe className="h-3 w-3" />
+                          <span className="text-xs">{location.timezone}</span>
                         </div>
                         
                         {location.description && (
-                          <div className="text-sm text-gray-600 dark:text-gray-400 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-200 dark:border-blue-800">
-                            <span className="font-medium text-gray-700 dark:text-gray-300">Description:</span> {location.description}
+                          <div className="text-xs text-gray-500 dark:text-gray-400 pt-1 line-clamp-2">
+                            {location.description}
                           </div>
                         )}
-
-                        {/* Helcim Terminal Management for this location */}
-                        <TerminalManagement locationId={String(location.id)} />
                       </div>
                     </CardContent>
                     
-                    <CardFooter className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 pt-4 border-t border-gray-200 dark:border-gray-700 mt-auto">
-                      <div className="flex flex-col w-full gap-2">
+                    <CardFooter className="p-2 border-t border-gray-200 dark:border-gray-700">
+                      <div className="grid grid-cols-2 gap-1 w-full">
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEditLocation(location)}
-                          className="w-full hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-900/20 dark:hover:text-blue-300 transition-colors"
+                          className="text-xs h-8"
                         >
-                          <Edit className="h-4 w-4 mr-1" />
+                          <Edit className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
                         
-                        {!location.isDefault && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedLocationForTerminal(location);
+                            setTerminalDialogOpen(true);
+                          }}
+                          className="text-xs h-8"
+                        >
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          Terminal
+                        </Button>
+                        
+                        {!location.isDefault ? (
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleSetDefault(location)}
-                            className="w-full hover:bg-yellow-50 hover:text-yellow-700 dark:hover:bg-yellow-900/20 dark:hover:text-yellow-300 transition-colors"
+                            className="text-xs h-8"
                           >
-                            <Star className="h-4 w-4 mr-1" />
-                            Set Default
+                            <Star className="h-3 w-3 mr-1" />
+                            Default
                           </Button>
+                        ) : (
+                          <div></div>
                         )}
                         
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleToggleActive(location)}
-                          className={`w-full transition-colors ${
-                            location.isActive 
-                              ? "hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-300" 
-                              : "hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20 dark:hover:text-green-300"
-                          }`}
+                          className="text-xs h-8"
                         >
                           {location.isActive ? (
                             <>
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Deactivate
+                              <XCircle className="h-3 w-3 mr-1" />
+                              Disable
                             </>
                           ) : (
                             <>
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Activate
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Enable
                             </>
                           )}
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteLocation(location)}
-                          className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-300 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
                         </Button>
                       </div>
                     </CardFooter>
@@ -863,6 +810,21 @@ const LocationsPage = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Terminal Management Dialog */}
+      <Dialog open={terminalDialogOpen} onOpenChange={setTerminalDialogOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Terminal Configuration - {selectedLocationForTerminal?.name}</DialogTitle>
+            <DialogDescription>
+              Configure and manage your Helcim Smart Terminal for this location
+            </DialogDescription>
+          </DialogHeader>
+          {selectedLocationForTerminal && (
+            <TerminalManagement locationId={String(selectedLocationForTerminal.id)} />
+          )}
         </DialogContent>
       </Dialog>
     </div>

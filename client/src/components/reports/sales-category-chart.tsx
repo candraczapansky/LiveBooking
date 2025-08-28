@@ -59,11 +59,26 @@ const SalesCategoryChart: React.FC<SalesCategoryChartProps> = ({
     let endDate = now;
 
     switch (timePeriod) {
+      case "day":
+        // Today: start at the beginning of the current day
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        break;
+      case "yesterday": {
+        const y = new Date(now);
+        y.setDate(now.getDate() - 1);
+        startDate = new Date(y.getFullYear(), y.getMonth(), y.getDate());
+        endDate = new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59, 999);
+        break;
+      }
       case "week":
-        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        // Last 7 full days ending today
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
         break;
       case "month":
-        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        // This Month: start at the first day of the current month
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
         break;
       case "quarter":
         startDate = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
@@ -98,7 +113,7 @@ const SalesCategoryChart: React.FC<SalesCategoryChartProps> = ({
         end_date: endDate.toISOString()
       });
       
-      if (selectedLocation) {
+      if (selectedLocation && selectedLocation !== 'all') {
         params.append('location_id', selectedLocation);
       }
       
@@ -119,10 +134,10 @@ const SalesCategoryChart: React.FC<SalesCategoryChartProps> = ({
   // Prepare chart data
   const chartData = salesData?.data?.map((item: SalesCategoryData) => ({
     name: item.category_name,
-    value: item.total_revenue,
-    revenue: item.total_revenue,
-    transactions: item.transaction_count,
-    percentage: item.percentage
+    value: Number(item.total_revenue || 0),
+    revenue: Number(item.total_revenue || 0),
+    transactions: Number(item.transaction_count || 0),
+    percentage: Number(item.percentage || 0)
   })) || [];
 
   // Generate colors for pie chart
@@ -147,7 +162,7 @@ const SalesCategoryChart: React.FC<SalesCategoryChartProps> = ({
             Transactions: {data.transactions}
           </p>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Percentage: {data.percentage.toFixed(1)}%
+            Percentage: {Number(data.percentage).toFixed(1)}%
           </p>
         </div>
       );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -8,15 +8,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Calendar, User, Download, Eye, X, Image as ImageIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileText, Calendar, User, Download, Eye } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface FormSubmission {
   id: string;
   formId: number;
+  clientId?: number | null;
   formData: Record<string, any>;
   submittedAt: string;
   ipAddress?: string;
@@ -431,6 +434,10 @@ export function FormSubmissionsDialog({
 }: FormSubmissionsDialogProps) {
   const [selectedSubmission, setSelectedSubmission] = useState<FormSubmission | null>(null);
   const [fileToPreview, setFileToPreview] = useState<any>(null);
+  const [attachSubmission, setAttachSubmission] = useState<FormSubmission | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   console.log('FormSubmissionsDialog render:', { open, formId, formTitle });
 
@@ -486,6 +493,48 @@ export function FormSubmissionsDialog({
     enabled: open && !!formId,
     retry: 1,
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Clients list for attaching
+  interface ClientOption { id: number; firstName?: string; lastName?: string; username?: string; email?: string; }
+  const { data: clients = [] } = useQuery({
+    queryKey: ["/api/users", "clients"],
+    queryFn: async () => {
+      const res = await fetch('/api/users?role=client');
+      if (!res.ok) throw new Error('Failed to load clients');
+      return res.json() as Promise<ClientOption[]>;
+    },
+    enabled: open,
+    staleTime: 60 * 1000,
+  });
+
+  const attachMutation = useMutation({
+    mutationFn: async (vars: { submissionId: string; clientId: number }) => {
+      const res = await fetch(`/api/form-submissions/${vars.submissionId}/attach`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: vars.clientId })
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e?.error || 'Failed to attach');
+      }
+      return res.json();
+    },
+    onSuccess: async (_data, vars) => {
+      try {
+        await queryClient.invalidateQueries({ queryKey: [`/api/forms/${formId}/submissions`] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/form-submissions/unclaimed"] });
+        await queryClient.invalidateQueries({ queryKey: [`/api/clients/${vars.clientId}/form-submissions`] });
+        await queryClient.invalidateQueries({ queryKey: [`/api/note-history/client/${vars.clientId}`] });
+      } catch {}
+      setAttachSubmission(null);
+      setSelectedClientId("");
+      toast({ title: 'Form Attached', description: 'Submission attached to client profile.' });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Attach Failed', description: err?.message || 'Unable to attach submission', variant: 'destructive' });
+    }
   });
 
   console.log('Query states:', { 
@@ -556,6 +605,16 @@ export function FormSubmissionsDialog({
       if (cleanFieldId !== field.id) {
         map[cleanFieldId] = label;
       }
+
+      // Special handling for Name field with first/last subfields
+      if (field.type === 'name' && (field as any)?.config?.includeFirstLast) {
+        map[`${field.id}_first`] = 'First Name';
+        map[`${field.id}_last`] = 'Last Name';
+        if (cleanFieldId !== field.id) {
+          map[`${cleanFieldId}_first`] = 'First Name';
+          map[`${cleanFieldId}_last`] = 'Last Name';
+        }
+      }
       
       console.log('Mapping field', field.id, 'to label:', label);
       if (cleanFieldId !== field.id) {
@@ -583,7 +642,7 @@ export function FormSubmissionsDialog({
     // If still not found, try to extract a readable name from the field ID
     if (!label) {
       // Remove "field_" prefix and timestamp, then convert to readable format
-      const cleanFieldId = fieldId.replace(/^field_\d+_/, '');
+      const cleanFieldId = fieldId.replace(/^field_\d+_/, '').replace(/^field_\d+$/, '').replace(/^field_/, '');
       // Convert camelCase or snake_case to readable format
       label = cleanFieldId
         .replace(/([A-Z])/g, ' $1') // Add space before capital letters
@@ -601,11 +660,59 @@ export function FormSubmissionsDialog({
     return label;
   };
 
+  // Parse fields once for name extraction logic
+  const parsedFieldsForName = useMemo(() => {
+    try {
+      if (!form?.fields) return [] as FormField[];
+      if (typeof form.fields === 'string') {
+        const parsed = JSON.parse(form.fields);
+        return Array.isArray(parsed) ? (parsed as FormField[]) : [];
+      }
+      return Array.isArray(form.fields) ? (form.fields as FormField[]) : [];
+    } catch {
+      return [] as FormField[];
+    }
+  }, [form?.fields]);
+
   // Function to extract person's name from form data
   const getPersonName = (formData: Record<string, any>) => {
     console.log('getPersonName called with formData:', formData);
     
-    // Look for common name fields
+    // 1) Prefer explicit Name fields defined in the form schema
+    if (parsedFieldsForName && parsedFieldsForName.length > 0) {
+      for (const field of parsedFieldsForName) {
+        if (field.type === 'name') {
+          const first = formData[`${field.id}_first`];
+          const last = formData[`${field.id}_last`];
+          const single = formData[field.id];
+          if (first || last) {
+            const full = `${first || ''} ${last || ''}`.trim();
+            if (full) {
+              console.log('Using name from name field (first/last):', full);
+              return full;
+            }
+          }
+          if (typeof single === 'string' && single.trim()) {
+            console.log('Using name from single name field:', single.trim());
+            return single.trim();
+          }
+        }
+      }
+
+      // 2) Any text field whose label includes "name"
+      for (const field of parsedFieldsForName) {
+        const label = (field.config?.label || '').toLowerCase();
+        if (label.includes('name')) {
+          const value = formData[field.id];
+          if (typeof value === 'string' && value.trim()) {
+            console.log('Using name from label-matched field:', label, value.trim());
+            return value.trim();
+          }
+        }
+      }
+    }
+    
+    // 3) Heuristic: Look for common name fields directly in submitted data
     const nameFields = [
       'name', 'fullName', 'full_name', 'fullname',
       'firstName', 'first_name', 'firstname',
@@ -682,10 +789,10 @@ export function FormSubmissionsDialog({
             console.log(`File ${index}:`, file);
             
             // Handle new file structure with base64 data
-            const fileData = file.data || file;
+            // const fileData = file.data || file;
             const fileName = file.name || file.filename || `File ${index + 1}`;
             const fileSize = file.size;
-            const fileType = file.type;
+            // const fileType = file.type;
             
             return (
               <div 
@@ -734,10 +841,10 @@ export function FormSubmissionsDialog({
       console.log('Processing single file object:', value);
       
       // Handle new file structure with base64 data
-      const fileData = value.data || value;
+      // const fileData = value.data || value;
       const fileName = value.name || value.filename || 'Uploaded file';
       const fileSize = value.size;
-      const fileType = value.type;
+      // const fileType = value.type;
       
       // Single file object
       return (
@@ -976,14 +1083,25 @@ export function FormSubmissionsDialog({
                               </div>
                             </div>
                           </div>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedSubmission(submission)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSubmission(submission)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              View Details
+                            </Button>
+                            {(!('clientId' in submission) || !submission.clientId) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setAttachSubmission(submission)}
+                              >
+                                Attach
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
                     </Card>
@@ -1051,6 +1169,44 @@ export function FormSubmissionsDialog({
               onOpenChange={() => setFileToPreview(null)}
               file={fileToPreview}
             />
+          )}
+          {attachSubmission && (
+            <Dialog open={!!attachSubmission} onOpenChange={() => setAttachSubmission(null)}>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Attach Submission to Client</DialogTitle>
+                  <DialogDescription>
+                    Select a client profile to attach this submission.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {clients.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {(c.firstName || c.lastName) ? `${c.firstName || ''} ${c.lastName || ''}`.trim() : (c.username || c.email || `Client ${c.id}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setAttachSubmission(null)}>Cancel</Button>
+                    <Button
+                      onClick={() => {
+                        if (!selectedClientId) return;
+                        attachMutation.mutate({ submissionId: attachSubmission.id, clientId: parseInt(selectedClientId) });
+                      }}
+                      disabled={!selectedClientId || attachMutation.isPending}
+                    >
+                      {attachMutation.isPending ? 'Attaching...' : 'Attach'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           )}
         </DialogContent>
       </Dialog>

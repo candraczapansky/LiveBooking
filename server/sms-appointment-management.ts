@@ -180,6 +180,23 @@ export class SMSAppointmentManagementService {
         'client'
       );
 
+      // Trigger cancellation automation using current appointment snapshot
+      try {
+        const { triggerCancellation } = await import('./automation-triggers.js');
+        await triggerCancellation({
+          id: appointment.id,
+          clientId: appointment.clientId,
+          serviceId: appointment.serviceId,
+          staffId: appointment.staffId,
+          locationId: (appointment as any).locationId,
+          startTime: appointment.startTime,
+          endTime: appointment.endTime,
+          status: 'cancelled'
+        }, this.storage as any);
+      } catch (e) {
+        // Non-fatal: continue even if automation fails
+      }
+
       return {
         success: true,
         message: `I've cancelled your ${service?.name || 'appointment'} for ${format(new Date(appointment.startTime), 'EEEE, MMMM d')} at ${format(new Date(appointment.startTime), 'h:mm a')}. You'll receive a confirmation email shortly. If you'd like to reschedule, just let me know! 💆‍♀️✨`,

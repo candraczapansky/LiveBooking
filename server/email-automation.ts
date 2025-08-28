@@ -1,14 +1,22 @@
 import { sendEmail } from './email.js';
-import { 
-  appointmentConfirmationTemplate, 
-  appointmentReminderTemplate, 
-  followUpTemplate,
-  birthdayTemplate,
-  generateEmailHTML,
-  generateEmailText,
-  generateRawMarketingEmailHTML,
-  htmlToText
-} from './email-templates.js';
+// Load templates dynamically at runtime to avoid hard dependency on compiled file path
+let appointmentConfirmationTemplate: any, appointmentReminderTemplate: any, followUpTemplate: any, birthdayTemplate: any, generateEmailHTML: any, generateEmailText: any, generateRawMarketingEmailHTML: any, htmlToText: any;
+async function loadTemplates() {
+  if (appointmentConfirmationTemplate) return;
+  try {
+    const mod = await import('./email-templates.js');
+    appointmentConfirmationTemplate = (mod as any).appointmentConfirmationTemplate;
+    appointmentReminderTemplate = (mod as any).appointmentReminderTemplate;
+    followUpTemplate = (mod as any).followUpTemplate;
+    birthdayTemplate = (mod as any).birthdayTemplate;
+    generateEmailHTML = (mod as any).generateEmailHTML;
+    generateEmailText = (mod as any).generateEmailText;
+    generateRawMarketingEmailHTML = (mod as any).generateRawMarketingEmailHTML;
+    htmlToText = (mod as any).htmlToText;
+  } catch (e) {
+    console.error('Failed to load email templates module:', e);
+  }
+}
 import type { IStorage } from './storage.js';
 import { addHours, addDays, isAfter, format } from 'date-fns';
 
@@ -110,6 +118,7 @@ export class EmailAutomationService {
     console.log('📧 Processing scheduled emails...');
 
     try {
+      await loadTemplates();
       // Process appointment reminders (24 hours before)
       await this.processAppointmentReminders();
       
@@ -134,6 +143,7 @@ export class EmailAutomationService {
     console.log('⏰ Processing appointment reminders...');
 
     try {
+      await loadTemplates();
       // Get appointments that are 24 hours away
       const tomorrow = addDays(new Date(), 1);
       const startOfTomorrow = new Date(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate());
@@ -196,6 +206,7 @@ export class EmailAutomationService {
     console.log('📝 Processing follow-up emails...');
 
     try {
+      await loadTemplates();
       // Get completed appointments from yesterday
       const yesterday = addDays(new Date(), -1);
       const startOfYesterday = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
@@ -257,6 +268,7 @@ export class EmailAutomationService {
     console.log('🎂 Processing birthday emails...');
 
     try {
+      await loadTemplates();
       const today = new Date();
       const todayStr = format(today, 'MM-dd');
 
@@ -305,6 +317,7 @@ export class EmailAutomationService {
     console.log('📢 Processing marketing campaigns...');
 
     try {
+      await loadTemplates();
       // Get scheduled marketing campaigns
       const campaigns = await this.storage.getMarketingCampaigns();
       const scheduledCampaigns = campaigns.filter(campaign => 

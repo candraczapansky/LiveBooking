@@ -94,11 +94,14 @@ const Login = () => {
         throw new Error("Invalid response format from server");
       }
       
-      // Navigate to dashboard (hard navigation to ensure clean app init after login)
+      // Navigate after login
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      const target = redirect && redirect.startsWith('/booking') ? redirect : '/dashboard';
       try {
-        window.location.assign("/dashboard");
+        window.location.assign(target);
       } catch {
-        navigate("/dashboard");
+        navigate(target);
       }
       
     } catch (error: any) {

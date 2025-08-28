@@ -138,7 +138,7 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
   const [isInsightsExpanded, setIsInsightsExpanded] = useState<boolean>(isInInsightsSection);
   const isInBusinessSection = location === '/locations' || location === '/settings' || location === '/permissions';
   const [isBusinessExpanded, setIsBusinessExpanded] = useState<boolean>(isInBusinessSection);
-  const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships' || location === '/booking';
+  const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships' || location === '/booking-test';
   const [isClientsExpanded, setIsClientsExpanded] = useState<boolean>(isInClientsSection);
   const isInServicesSection = location === '/services' || location === '/devices' || location === '/rooms';
   const [isServicesExpanded, setIsServicesExpanded] = useState<boolean>(isInServicesSection);
@@ -325,6 +325,16 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                         <div className="mt-1">
                           <SidebarItem
                             icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Documents"
+                            href="/documents"
+                            isActive={location === "/documents"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
                             label="Note Templates"
                             href="/note-templates"
                             isActive={location === "/note-templates"}
@@ -336,8 +346,8 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                           <SidebarItem
                             icon={<Calendar className="w-5 h-5" strokeWidth={1.75} />}
                             label="Client Booking"
-                            href="/booking"
-                            isActive={location === "/booking"}
+                            href="/booking-test"
+                            isActive={location === "/booking-test"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />

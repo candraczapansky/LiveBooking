@@ -1,5 +1,13 @@
 import { IStorage } from "./storage.js";
-import { config, DatabaseConfig } from "./config.js";
+let config: any = { openai: { apiKey: '', model: 'gpt-3.5-turbo', maxTokens: 500, temperature: 0.7 } };
+let DatabaseConfig: any;
+try {
+  const mod = await import('./config.js');
+  config = (mod as any).config || config;
+  DatabaseConfig = (mod as any).DatabaseConfig || (class { constructor(_s: any) {} async getOpenAIKey() { return process.env.OPENAI_API_KEY || null; } });
+} catch {
+  DatabaseConfig = class { constructor(_s: any) {} async getOpenAIKey() { return process.env.OPENAI_API_KEY || null; } };
+}
 
 // Minimal JSON helpers used in error handling and tool argument parsing
 function parseJsonSafe(input: any): any {
@@ -94,7 +102,7 @@ interface LLMResponse {
 export class LLMService {
   private config: LLMConfig;
   private storage: IStorage;
-  private dbConfig: DatabaseConfig;
+  private dbConfig: any;
 
   constructor(storage: IStorage, llmConfig: LLMConfig = {}) {
     this.storage = storage;

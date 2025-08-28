@@ -12,11 +12,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare, ClipboardList } from "lucide-react";
+import { PlusCircle, FileText, Users, Calendar, Settings, Eye, Edit, Trash2, MessageSquare, ClipboardList, Mail } from "lucide-react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { FormBuilder } from "@/components/forms/form-builder";
 import { FormViewer } from "@/components/forms/form-viewer";
 import { SendFormSMSDialog } from "@/components/forms/send-form-sms-dialog";
+import { SendFormEmailDialog } from "@/components/forms/send-form-email-dialog";
 import { FormSubmissionsDialog } from "@/components/forms/form-submissions-dialog";
 import { getForms } from "@/api/forms";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +28,7 @@ const FormsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewFormOpen, setIsViewFormOpen] = useState(false);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [submissionsDialogOpen, setSubmissionsDialogOpen] = useState(false);
   const [selectedForm, setSelectedForm] = useState<{ id: number; title: string } | null>(null);
   const [formToEdit, setFormToEdit] = useState<{ id: number; title: string } | null>(null);
@@ -324,9 +326,10 @@ const FormsPage = () => {
                             setSelectedForm({ id: form.id, title: form.title });
                             setIsViewFormOpen(true);
                           }}
+                          title="View"
+                          aria-label="View"
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
+                          <Eye className="h-4 w-4" />
                         </Button>
                         <Button 
                           variant="outline" 
@@ -356,6 +359,18 @@ const FormsPage = () => {
                           variant="outline" 
                           size="sm" 
                           className="w-full"
+                          onClick={() => {
+                            setSelectedForm({ id: form.id, title: form.title });
+                            setEmailDialogOpen(true);
+                          }}
+                        >
+                          <Mail className="h-4 w-4 mr-1" />
+                          Send Email
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full col-span-2"
                           onClick={() => {
                             setSelectedForm({ id: form.id, title: form.title });
                             setSubmissionsDialogOpen(true);
@@ -438,6 +453,16 @@ const FormsPage = () => {
         <SendFormSMSDialog
           open={smsDialogOpen}
           onOpenChange={setSmsDialogOpen}
+          formId={selectedForm.id}
+          formTitle={selectedForm.title}
+        />
+      )}
+
+      {/* Send Email Dialog */}
+      {selectedForm && (
+        <SendFormEmailDialog
+          open={emailDialogOpen}
+          onOpenChange={setEmailDialogOpen}
           formId={selectedForm.id}
           formTitle={selectedForm.title}
         />

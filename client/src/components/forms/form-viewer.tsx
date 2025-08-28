@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Eye, Calendar, Users, Star, CheckSquare, List, Image, Upload } from "lucide-react";
+import { SignaturePad } from "@/components/forms/signature-pad";
 
 interface FormField {
   id: string;
@@ -80,6 +81,19 @@ interface FormViewerProps {
 }
 
 export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
+  const cleanFieldLabel = (raw: string | undefined): string => {
+    let s = String(raw || '').trim();
+    if (!s) return 'Field';
+    // Remove any builder-generated tokens like field_1753634868182_ anywhere
+    s = s.replace(/\bfield_\d+_/gi, '');
+    s = s.replace(/\bfield_\d+\b/gi, '');
+    s = s.replace(/^field_/i, '');
+    // Replace underscores with spaces and split camelCase
+    s = s.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+    s = s.trim();
+    if (!s) return 'Field';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
   // Fetch form data
   const { data: form, isLoading, error } = useQuery({
     queryKey: [`/api/forms/${formId}`],
@@ -128,9 +142,19 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
         parsedFields = [];
       }
       
+      // Normalize labels across all fields so any consumer renders friendly names
+      const fieldsWithCleanLabels = Array.isArray(parsedFields)
+        ? parsedFields.map((f: any) => {
+            const originalLabel = (f?.config?.label ?? f?.label ?? f?.id) as string | undefined;
+            const cleaned = cleanFieldLabel(originalLabel);
+            const nextConfig = f?.config ? { ...f.config, label: cleaned } : { label: cleaned };
+            return { ...f, label: cleaned, config: nextConfig };
+          })
+        : [];
+
       const result = {
         ...formData,
-        fields: parsedFields,
+        fields: fieldsWithCleanLabels,
       } as Form;
       
       console.log('Final form data:', result);
@@ -208,17 +232,19 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
     if (!config) {
       return (
         <div className="space-y-2">
-          <Label>Field {field.id}</Label>
+          <Label>{cleanFieldLabel(field.id)}</Label>
           <Input placeholder="Field configuration missing" disabled />
         </div>
       );
     }
+
+    const displayLabel = cleanFieldLabel(config.label || field.label || field.id);
     
     switch (field.type) {
       case "name":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             {config.includeFirstLast ? (
               <div className="grid grid-cols-2 gap-2">
                 <Input placeholder="First Name" disabled />
@@ -233,7 +259,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "text":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Input placeholder={config.placeholder} disabled />
           </div>
         );
@@ -241,7 +267,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "textarea":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Textarea 
               placeholder={config.placeholder} 
               rows={config.rows || 3} 
@@ -253,7 +279,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "email":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Input type="email" placeholder={config.placeholder} disabled />
           </div>
         );
@@ -261,7 +287,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "phone":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Input type="tel" placeholder={config.placeholder} disabled />
           </div>
         );
@@ -269,7 +295,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "date":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Input type="date" disabled />
           </div>
         );
@@ -277,7 +303,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "address":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <div className="space-y-2">
               {config.includeStreet && (
                 <Input placeholder="Street Address" disabled />
@@ -300,7 +326,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "number":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Input type="number" placeholder={config.placeholder} disabled />
           </div>
         );
@@ -308,7 +334,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "rating":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <div className="flex space-x-1">
               {Array.from({ length: config.maxStars || 5 }, (_, i) => (
                 <Star key={i} className="h-5 w-5 text-gray-300" />
@@ -321,14 +347,14 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
         return (
           <div className="flex items-center space-x-2">
             <Checkbox disabled />
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
           </div>
         );
       
       case "radio":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <div className="space-y-2">
               {config.options?.map((option: string, index: number) => (
                 <div key={index} className="flex items-center space-x-2">
@@ -343,7 +369,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "select":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <Select disabled>
               <SelectTrigger>
                 <SelectValue placeholder="Select an option" />
@@ -362,7 +388,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "image":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center">
               <Image className="h-6 w-6 mx-auto mb-2 text-gray-400" />
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -378,7 +404,7 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
       case "file":
         return (
           <div className="space-y-2">
-            <Label>{config.label}</Label>
+            <Label>{displayLabel}</Label>
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center">
               <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -390,14 +416,22 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
             </div>
           </div>
         );
+
+      case "signature":
+        return (
+          <div className="space-y-2">
+            <Label>{displayLabel}</Label>
+            <SignaturePad penColor={(config as any)?.penColor || '#000000'} backgroundColor={(config as any)?.backgroundColor || '#ffffff'} />
+          </div>
+        );
       
       case "divider":
         return (
           <div className="my-4">
-            {config.label && (
+            {displayLabel && (
               <div className="text-center mb-2">
                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  {config.label}
+                  {displayLabel}
                 </span>
               </div>
             )}

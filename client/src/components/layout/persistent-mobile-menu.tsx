@@ -74,7 +74,7 @@ const PersistentMobileMenu = () => {
       { icon: Users, label: "Client Profiles", href: "/clients" },
       { icon: FileText, label: "Forms", href: "/forms" },
       { icon: StickyNote, label: "Note Templates", href: "/note-templates" },
-      { icon: Calendar, label: "Client Booking", href: "/booking" },
+      { icon: Calendar, label: "Client Booking", href: "/booking-test" },
       { icon: CreditCard, label: "Memberships", href: "/memberships" },
     ]},
     { icon: UserCircle, label: "Staff", href: "/staff" },
@@ -306,11 +306,11 @@ const PersistentMobileMenu = () => {
                                     childActive ? "border-2 border-primary text-primary bg-transparent" : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 border-2 border-transparent"
                                   }`
                                 };
-                                if (child.href === '/booking') {
+                                if (child.href === '/booking-test') {
                                   linkProps.onClick = (e: any) => {
                                     e.preventDefault();
                                     saveScrollPosition();
-                                    window.location.assign('/booking');
+                                    window.location.assign('/booking-test');
                                   };
                                 }
                                 return (

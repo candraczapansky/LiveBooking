@@ -145,6 +145,16 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       throw new ValidationError("Campaign can only be sent if it's in draft or scheduled status");
     }
 
+    // Optional per-location targeting: allow filtering recipients by locationId when provided in request
+    const targetLocationId = (() => {
+      try {
+        const v = (req.body?.locationId ?? req.query?.locationId) as any;
+        if (v == null || v === '') return null;
+        const n = parseInt(String(v));
+        return Number.isNaN(n) ? null : n;
+      } catch { return null; }
+    })();
+
     // Get target audience, supporting both legacy and UI labels
     let recipients: any[] = [];
     const audience = (campaign.audience || '').toString();
@@ -186,6 +196,23 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       recipients = await storage.getUsersByRole('client');
     }
 
+    // If filtering by location, restrict recipients to those with recent or upcoming appointments at that location,
+    // or staff assigned to that location.
+    if (targetLocationId != null) {
+      try {
+        const allAppointments = await storage.getAppointmentsByLocation(targetLocationId);
+        const clientIdsAtLocation = new Set<number>((allAppointments || []).map((a: any) => a.clientId).filter((id: any) => typeof id === 'number'));
+        const staffList = await storage.getAllStaff();
+        const staffUserIdsAtLocation = new Set<number>((staffList || []).filter((s: any) => String(s.locationId) === String(targetLocationId)).map((s: any) => s.userId).filter((id: any) => typeof id === 'number'));
+        recipients = (recipients || []).filter((u: any) => {
+          if (!u) return false;
+          if (u.role === 'client') return clientIdsAtLocation.has(u.id);
+          if (u.role === 'staff') return staffUserIdsAtLocation.has(u.id);
+          return false;
+        });
+      } catch {}
+    }
+
     let sentCount = 0;
     let errorCount = 0;
 
@@ -218,15 +245,33 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       // Queue recipients for email drip sending (like SMS)
       const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
       const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
+      // Build a set of emails that are already queued/sent for this campaign to avoid duplicate sends
+      const existingEmails = new Set<string>();
+      try {
+        const existingUserIds = Array.from(new Set((existing as any[]).map((r: any) => r.userId).filter(Boolean)));
+        const existingUsers = await Promise.all(existingUserIds.map((id: number) => storage.getUser(id)));
+        for (const u of existingUsers) {
+          const key = (u?.email || '').toString().trim().toLowerCase();
+          if (key) existingEmails.add(key);
+        }
+      } catch {}
+
+      const queuedEmails = new Set<string>();
       let queued = 0;
       for (const recipient of recipients) {
         if (!(recipient.email && recipient.emailPromotions)) continue;
+        // Normalize email for deduplication across multiple client accounts sharing the same email
+        const emailKey = (recipient.email as string).trim().toLowerCase();
+        if (!emailKey) continue;
         if (existingByUser.has(recipient.id)) continue;
+        if (existingEmails.has(emailKey)) continue;
+        if (queuedEmails.has(emailKey)) continue;
         await (storage as any).createMarketingCampaignRecipient?.({
           campaignId,
           userId: recipient.id,
           status: 'pending',
         });
+        queuedEmails.add(emailKey);
         queued++;
       }
 
@@ -254,16 +299,34 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
       // Queue recipients for drip sending instead of blasting at once
       const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
       const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
+      // Build a set of existing phone numbers already queued/sent for this campaign to avoid duplicate sends across multiple client accounts
+      const normalizePhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+      const existingPhones = new Set<string>();
+      try {
+        const existingUserIds = Array.from(new Set((existing as any[]).map((r: any) => r.userId).filter(Boolean)));
+        const existingUsers = await Promise.all(existingUserIds.map((id: number) => storage.getUser(id)));
+        for (const u of existingUsers) {
+          const key = normalizePhone(u?.phone || '');
+          if (key) existingPhones.add(key);
+        }
+      } catch {}
+
+      const queuedPhones = new Set<string>();
       let queued = 0;
       for (const recipient of recipients) {
         const hasConsent = !!recipient.smsPromotions || isSpecificAudience;
         if (!(recipient.phone && hasConsent)) continue;
+        const phoneKey = normalizePhone(recipient.phone as string);
+        if (!phoneKey) continue;
         if (existingByUser.has(recipient.id)) continue;
+        if (existingPhones.has(phoneKey)) continue;
+        if (queuedPhones.has(phoneKey)) continue;
         await (storage as any).createMarketingCampaignRecipient?.({
           campaignId,
           userId: recipient.id,
           status: 'pending',
         });
+        queuedPhones.add(phoneKey);
         queued++;
       }
 
@@ -291,6 +354,7 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
           const immediateBatchSize = parseInt(process.env.SMS_DRIP_IMMEDIATE_BATCH_SIZE || '10', 10);
           const allAfterQueue = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
           const pendingBatch = (allAfterQueue as any[]).filter(r => (r as any).status === 'pending').slice(0, Math.max(0, immediateBatchSize));
+          const seenPhonesImmediate = new Set<string>();
           for (const rec of pendingBatch) {
             try {
               const user = await storage.getUser((rec as any).userId);
@@ -300,6 +364,13 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
                 immediateFailed++;
                 continue;
               }
+              const normalizePhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+              const phoneKey = normalizePhone(user.phone);
+              if (phoneKey && seenPhonesImmediate.has(phoneKey)) {
+                // Skip duplicate phone in the immediate batch; process drip will handle remaining
+                continue;
+              }
+              if (phoneKey) seenPhonesImmediate.add(phoneKey);
               // Attempt to atomically claim this recipient to avoid duplicate sends
               const claimed = await (storage as any).claimMarketingCampaignRecipient?.((rec as any).id);
               if (!claimed) {
@@ -568,6 +639,75 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     res.status(201).json(created);
   }));
 
+  // Update a promo code
+  app.put("/api/promo-codes/:id", validateRequest(insertPromoCodeSchema.partial()), asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    const payload = req.body;
+    const updated = await (storage as any).updatePromoCode?.(id, payload);
+    if (!updated) {
+      return res.status(404).json({ error: 'Promo code not found' });
+    }
+    res.json(updated);
+  }));
+
+  // Delete a promo code
+  app.delete("/api/promo-codes/:id", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+    const deleted = await (storage as any).deletePromoCode?.(id);
+    if (!deleted) {
+      return res.status(404).json({ error: 'Promo code not found' });
+    }
+    res.status(204).end();
+  }));
+
+  // Validate a promo code for checkout
+  app.post("/api/promo-codes/validate", asyncHandler(async (req: Request, res: Response) => {
+    const codeRaw = (req.body?.code || '').toString().trim();
+    const amount = Number(req.body?.amount || 0) || 0;
+    const serviceId = req.body?.serviceId as number | undefined;
+    if (!codeRaw) return res.status(400).json({ valid: false, message: 'Missing code' });
+
+    const promo = await (storage as any).getPromoCodeByCode?.(codeRaw);
+    if (!promo || promo.active === false) {
+      return res.status(404).json({ valid: false, message: 'Invalid or inactive code' });
+    }
+    try {
+      const now = new Date();
+      if (promo.expirationDate && new Date(promo.expirationDate) < now) {
+        return res.status(400).json({ valid: false, message: 'Code expired' });
+      }
+      if (typeof promo.usageLimit === 'number' && typeof promo.usedCount === 'number' && promo.usedCount >= promo.usageLimit) {
+        return res.status(400).json({ valid: false, message: 'Usage limit reached' });
+      }
+      // Optional simple service check: if promo.service set, require match by ID string
+      if (promo.service && serviceId != null && String(promo.service) !== String(serviceId)) {
+        // Not a hard fail; treat as invalid for this service
+        return res.status(400).json({ valid: false, message: 'Code not valid for this service' });
+      }
+
+      let discountAmount = 0;
+      const type = (promo.type || '').toString().toLowerCase();
+      const value = Number(promo.value || 0) || 0;
+      if (type === 'percentage') {
+        discountAmount = Math.max(0, Math.min(amount, amount * (value / 100)));
+      } else if (type === 'fixed') {
+        discountAmount = Math.max(0, Math.min(amount, value));
+      } else {
+        discountAmount = 0;
+      }
+      const newTotal = Math.max(0, amount - discountAmount);
+      return res.json({ valid: discountAmount > 0, discountAmount, newTotal, code: codeRaw });
+    } catch (err) {
+      return res.status(500).json({ valid: false, message: 'Validation error' });
+    }
+  }));
+
   // ===== Email Unsubscribes =====
   app.get("/api/unsubscribes", asyncHandler(async (_req: Request, res: Response) => {
     const emailUnsubs = await (storage as any).getAllEmailUnsubscribes?.() ?? [];
@@ -804,12 +944,20 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
     let sentCount = 0;
     let errorCount = 0;
 
+    const normalizePhone = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+    const seenPhones = new Set<string>();
     for (const recipientId of recipientIds) {
       try {
         const recipient = await storage.getUser(recipientId);
         if (!recipient || !recipient.phone || !recipient.smsPromotions) {
           continue;
         }
+        const phoneKey = normalizePhone(recipient.phone as string);
+        if (phoneKey && seenPhones.has(phoneKey)) {
+          // Skip duplicate phone number across different user records
+          continue;
+        }
+        if (phoneKey) seenPhones.add(phoneKey);
 
         const smsContent = ensureSmsMarketingCompliance(message);
         await sendSMS(recipient.phone, smsContent);

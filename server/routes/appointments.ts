@@ -12,6 +12,16 @@ import LoggerService, { getLogContext } from "../utils/logger.js";
 import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { triggerCancellation } from "../automation-triggers.js";
+
+// Minimal helper to replace template variables like {client_name}
+function replaceTemplateVariables(template: string, variables: Record<string, string>): string {
+  let result = template;
+  for (const [key, value] of Object.entries(variables)) {
+    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), String(value ?? ''));
+  }
+  return result;
+}
 
 export function registerAppointmentRoutes(app: Express, storage: IStorage) {
   // TEST ENDPOINT: Check SendGrid configuration
@@ -207,9 +217,10 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     LoggerService.info("Creating new appointment", { ...context, appointmentData });
 
-    // Validate appointment time conflicts (staff and rooms)
+    // Validate appointment time conflicts (staff and rooms) and enforce room capacity
     const allAppointments = await storage.getAllAppointments();
     const allServices = await storage.getAllServices();
+    const allRooms = await (storage as any).getAllRooms?.();
     const serviceIdToRoomId = new Map<number, number | null>(
       allServices.map((svc: any) => [svc.id, (svc as any).roomId ?? null])
     );
@@ -305,7 +316,50 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       throw new ConflictError("Appointment time conflicts with existing appointments");
     }
 
+    // Enforce room capacity if the service maps to a room
+    if (newAppointmentRoomId != null) {
+      const roomInfo = Array.isArray(allRooms) ? (allRooms as any[]).find((r: any) => r.id === newAppointmentRoomId) : undefined;
+      const capacity = Number(roomInfo?.capacity ?? 1) || 1;
+
+      // Count overlapping appointments in the same room (active statuses only)
+      const newStart = new Date(appointmentData.startTime);
+      const newEnd = new Date(appointmentData.endTime);
+      const overlappingInRoom = allAppointments.filter((apt: any) => {
+        const existingRoomId = serviceIdToRoomId.get(apt.serviceId) ?? null;
+        if (!(existingRoomId != null && existingRoomId === newAppointmentRoomId)) return false;
+        if (apt.status === 'cancelled' || apt.status === 'completed') return false;
+        const aptStart = new Date(apt.startTime);
+        const aptEnd = new Date(apt.endTime);
+        const hasOverlap = aptStart < newEnd && aptEnd > newStart;
+        return hasOverlap;
+      }).length;
+
+      if (overlappingInRoom >= capacity) {
+        LoggerService.warn("Room capacity reached for booking", {
+          ...context,
+          roomId: newAppointmentRoomId,
+          capacity,
+          overlappingInRoom,
+          startTime: appointmentData.startTime,
+          endTime: appointmentData.endTime,
+        });
+        throw new ConflictError("This room is at capacity for the selected time.");
+      }
+    }
+
     const newAppointment = await storage.createAppointment(appointmentData);
+
+    // Persist any add-ons passed for this appointment (optional field addOnServiceIds[])
+    try {
+      const addOnServiceIds = Array.isArray((req.body as any).addOnServiceIds)
+        ? (req.body as any).addOnServiceIds.map((n: any) => parseInt(n))
+        : [];
+      if (addOnServiceIds.length > 0) {
+        await storage.setAddOnsForAppointment(newAppointment.id, addOnServiceIds);
+      }
+    } catch (e) {
+      // Non-fatal
+    }
 
     LoggerService.logAppointment("created", newAppointment.id, context);
     
@@ -392,7 +446,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     
     try {
       const client = await storage.getUser(newAppointment.clientId);
-      const staff = await storage.getUser(newAppointment.staffId);
+      const staffRecord = await storage.getStaff(newAppointment.staffId);
+      const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
       const service = await storage.getService(newAppointment.serviceId);
 
       LoggerService.info("Client data retrieved", {
@@ -454,35 +509,70 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         
         // Send email confirmation
         if (client.emailAppointmentReminders && client.email) {
-          LoggerService.info("Sending email confirmation", {
-            ...context,
-            appointmentId: newAppointment.id,
-            to: client.email,
-            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com'
-          });
-          
           try {
-                          await sendEmail({
+            const rules = await storage.getAllAutomationRules();
+            const emailRule = Array.isArray(rules) ? rules.find((r: any) => r.active && r.type === 'email' && r.trigger === 'booking_confirmation') : null;
+            if (emailRule) {
+              const apptStart = new Date(newAppointment.startTime);
+              const dateStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(apptStart);
+              const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(apptStart);
+              const staffName = `${staff.firstName} ${staff.lastName}`.trim();
+              const clientFullName = client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : (client.firstName || client.username || 'Client');
+              const variables: Record<string, string> = {
+                client_name: clientFullName,
+                client_first_name: client.firstName || 'Client',
+                client_last_name: client.lastName || '',
+                client_email: client.email || '',
+                client_phone: client.phone || '',
+                service_name: service.name,
+                staff_name: staffName || 'Your stylist',
+                appointment_date: dateStr,
+                appointment_time: timeStr,
+                appointment_datetime: `${dateStr} ${timeStr}`,
+                salon_name: 'Glo Head Spa',
+                salon_phone: '(555) 123-4567',
+                salon_address: '123 Beauty Street, City, State 12345'
+              };
+              const subject = emailRule.subject ? replaceTemplateVariables(emailRule.subject, variables) : 'Appointment Confirmation - Glo Head Spa';
+              const body = replaceTemplateVariables(emailRule.template, variables);
+              await sendEmail({
                 to: client.email,
                 from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-            subject: 'Appointment Confirmation - Glo Head Spa',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #333;">Appointment Confirmation</h2>
-                <p>Hello ${client.firstName || client.username},</p>
-                <p>Your appointment has been confirmed:</p>
-                <ul>
-                  <li><strong>Service:</strong> ${service.name}</li>
-                  <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
-                  <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
-                  <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
-                </ul>
-                <p>We look forward to seeing you!</p>
-              </div>
-            `
-          });
-          LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
-            LoggerService.info("Email confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
+                subject,
+                html: `<p>${body.replace(/\n/g, '<br>')}</p>`
+              });
+              LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
+              LoggerService.info("Email confirmation sent successfully (automation template)", { ...context, appointmentId: newAppointment.id });
+            } else {
+              LoggerService.info("Sending email confirmation", {
+                ...context,
+                appointmentId: newAppointment.id,
+                to: client.email,
+                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com'
+              });
+              
+              await sendEmail({
+                to: client.email,
+                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+                subject: 'Appointment Confirmation - Glo Head Spa',
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #333;">Appointment Confirmation</h2>
+                    <p>Hello ${client.firstName || client.username},</p>
+                    <p>Your appointment has been confirmed:</p>
+                    <ul>
+                      <li><strong>Service:</strong> ${service.name}</li>
+                      <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
+                      <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
+                      <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
+                    </ul>
+                    <p>We look forward to seeing you!</p>
+                  </div>
+                `
+              });
+              LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
+              LoggerService.info("Email confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
+            }
           } catch (emailError) {
             LoggerService.error("Failed to send email confirmation", { ...context, appointmentId: newAppointment.id }, emailError as Error);
           }
@@ -577,8 +667,37 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         });
         
         try {
-          const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} (Central Time) has been confirmed.`;
-          await sendSMS(client.phone, message);
+          let smsMessage = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} (Central Time) has been confirmed.`;
+          try {
+            const rules = await storage.getAllAutomationRules();
+            const smsRule = Array.isArray(rules) ? rules.find((r: any) => r.active && r.type === 'sms' && r.trigger === 'booking_confirmation') : null;
+            if (smsRule) {
+              const apptStart = new Date(newAppointment.startTime);
+              const dateStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(apptStart);
+              const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(apptStart);
+              const staffName = staff ? `${staff.firstName} ${staff.lastName}`.trim() : 'Your stylist';
+              const clientFullName = client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : (client.firstName || client.username || 'Client');
+              const variables: Record<string, string> = {
+                client_name: clientFullName,
+                client_first_name: client.firstName || 'Client',
+                client_last_name: client.lastName || '',
+                client_email: client.email || '',
+                client_phone: client.phone || '',
+                service_name: service?.name || 'Service',
+                staff_name: staffName,
+                appointment_date: dateStr,
+                appointment_time: timeStr,
+                appointment_datetime: `${dateStr} ${timeStr}`,
+                salon_name: 'Glo Head Spa',
+                salon_phone: '(555) 123-4567',
+                salon_address: '123 Beauty Street, City, State 12345'
+              };
+              smsMessage = replaceTemplateVariables(smsRule.template, variables);
+            }
+          } catch (_e) {
+            // Non-fatal, use default smsMessage
+          }
+          await sendSMS(client.phone, smsMessage);
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
           LoggerService.info("SMS confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
         } catch (smsError) {
@@ -614,6 +733,45 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     res.json(appointment);
+  }));
+
+  // Cancel appointment (move to cancelled store and remove from active list)
+  app.post("/api/appointments/:id/cancel", asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    LoggerService.info("Cancelling appointment", { ...context, appointmentId });
+
+    const appointment = await storage.getAppointment(appointmentId);
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+
+    // Move appointment data to cancelled store and delete original
+    const reason = (req.body as any)?.reason || 'Cancelled by user';
+    const cancelledBy = (req as any).user?.id || null;
+    const cancelledByRole = (req as any).user?.role || 'system';
+
+    await storage.moveAppointmentToCancelled(appointmentId, reason, cancelledBy, cancelledByRole);
+
+    // Fire cancellation automation using appointment snapshot
+    try {
+      await triggerCancellation({
+        id: appointment.id,
+        clientId: appointment.clientId,
+        serviceId: appointment.serviceId,
+        staffId: appointment.staffId,
+        locationId: (appointment as any).locationId,
+        startTime: appointment.startTime,
+        endTime: appointment.endTime,
+        status: 'cancelled'
+      } as any, storage);
+    } catch (autoErr) {
+      LoggerService.error("Failed to trigger cancellation automation", { ...context, appointmentId }, autoErr as Error);
+    }
+
+    LoggerService.logAppointment("cancelled", appointmentId, context);
+    res.json({ success: true, message: "Appointment cancelled successfully" });
   }));
 
   // Get appointments by client
@@ -681,6 +839,17 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     LoggerService.logAppointment("updated", appointmentId, context);
 
+    // If status changed to cancelled, trigger cancellation automation
+    try {
+      const becameCancelled = updatedAppointment.status === 'cancelled' && existingAppointment.status !== 'cancelled';
+      if (becameCancelled) {
+        await triggerCancellation(updatedAppointment as any, storage);
+        LoggerService.info("Cancellation automation triggered", { ...context, appointmentId });
+      }
+    } catch (autoErr) {
+      LoggerService.error("Failed to trigger cancellation automation", { ...context, appointmentId }, autoErr as Error);
+    }
+
     res.json(updatedAppointment);
   }));
 
@@ -694,6 +863,16 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const appointment = await storage.getAppointment(appointmentId);
     if (!appointment) {
       throw new NotFoundError("Appointment");
+    }
+
+    // If a deletion is used as the way to cancel, trigger cancellation automation before delete
+    try {
+      if ((appointment as any).status !== 'cancelled') {
+        await triggerCancellation(appointment as any, storage);
+        LoggerService.info("Cancellation automation triggered from delete", { ...context, appointmentId });
+      }
+    } catch (autoErr) {
+      LoggerService.error("Failed to trigger cancellation automation from delete", { ...context, appointmentId }, autoErr as Error);
     }
 
     await storage.deleteAppointment(appointmentId);

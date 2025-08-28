@@ -10,12 +10,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SignaturePad } from "@/components/forms/signature-pad";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Send, CheckCircle, AlertCircle } from "lucide-react";
 
 interface FormField {
   id: string;
-  type: 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'number' | 'name' | 'address' | 'rating' | 'image' | 'file';
+  type: 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'number' | 'name' | 'address' | 'rating' | 'image' | 'file' | 'signature';
   label?: string;
   required?: boolean;
   placeholder?: string;
@@ -121,9 +122,33 @@ const FormDisplay = () => {
         parsedFields = [];
       }
       
+      // Upgrade legacy signature fields on the client as a final safeguard
+      const upgradedFields = (parsedFields || []).map((f: any) => {
+        const typeLower = String(f?.type || '').toLowerCase();
+        const label = String(f?.config?.label || f?.label || '').toLowerCase();
+        const placeholder = String(f?.config?.placeholder || f?.placeholder || '').toLowerCase();
+        const idLower = String(f?.id || '').toLowerCase();
+        const isSignatureLike =
+          typeLower.includes('signature') ||
+          label.includes('signature') ||
+          placeholder.includes('signature') ||
+          idLower.includes('signature') ||
+          /\bsign\b/.test(label) ||
+          /\bsign\b/.test(placeholder);
+        if (!isSignatureLike) return f;
+        const cfg = {
+          ...(f?.config || {}),
+          label: f?.config?.label || f?.label || 'Signature',
+          required: (f?.config?.required ?? f?.required) ?? false,
+          penColor: f?.config?.penColor || '#000000',
+          backgroundColor: f?.config?.backgroundColor || '#ffffff',
+        };
+        return { ...f, type: 'signature', config: cfg };
+      });
+
       const result = {
         ...formData,
-        fields: parsedFields,
+        fields: upgradedFields,
       } as Form;
       
       return result;
@@ -254,8 +279,57 @@ const FormDisplay = () => {
     const fieldLabel = field.label || field.config?.label || field.id;
     const fieldPlaceholder = field.placeholder || field.config?.placeholder;
     const fieldRequired = field.required || field.config?.required;
+    const typeLower = String(field.type || '').toLowerCase();
+    const labelLower = String(fieldLabel || '').toLowerCase();
+    const placeholderLower = String(fieldPlaceholder || '').toLowerCase();
+    const idLower = String(field.id || '').toLowerCase();
+
+    // Explicit handling: if field type is signature, always render the draw pad
+    if (typeLower === 'signature') {
+      const pen = (field as any).config?.penColor || '#000000';
+      const bg = (field as any).config?.backgroundColor || '#ffffff';
+      return (
+        <div className="space-y-2">
+          <SignaturePad
+            value={typeof value === 'string' ? value : ''}
+            penColor={pen}
+            backgroundColor={bg}
+            onChange={(dataUrl) => handleFieldChange(field.id, dataUrl)}
+          />
+          {fieldRequired && !value && (
+            <p className="text-xs text-gray-500">Signature is required.</p>
+          )}
+        </div>
+      );
+    }
+
+    const looksLikeSignature =
+      typeLower.includes('signature') ||
+      labelLower.includes('signature') ||
+      placeholderLower.includes('signature') ||
+      idLower.includes('signature') ||
+      // Heuristic for forms that used a text field named "Sign" or "Sign here"
+      (/\bsign\b/.test(labelLower) || /\bsign\b/.test(placeholderLower));
+
+    if (looksLikeSignature) {
+      const pen = (field as any).config?.penColor || '#000000';
+      const bg = (field as any).config?.backgroundColor || '#ffffff';
+      return (
+        <div className="space-y-2">
+          <SignaturePad
+            value={typeof value === 'string' ? value : ''}
+            penColor={pen}
+            backgroundColor={bg}
+            onChange={(dataUrl) => handleFieldChange(field.id, dataUrl)}
+          />
+          {fieldRequired && !value && (
+            <p className="text-xs text-gray-500">Signature is required.</p>
+          )}
+        </div>
+      );
+    }
     
-    switch (field.type) {
+    switch (typeLower) {
       case 'name':
         if (field.config?.includeFirstLast) {
           return (
@@ -286,7 +360,19 @@ const FormDisplay = () => {
           );
         }
       
-      case 'text':
+      case 'text': {
+        return (
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+            placeholder={fieldPlaceholder}
+            required={fieldRequired}
+            min={field.validation?.min}
+            max={field.validation?.max}
+          />
+        );
+      }
       case 'email':
       case 'phone':
       case 'number':
@@ -452,8 +538,46 @@ const FormDisplay = () => {
             )}
           </div>
         );
+
+      case 'signature': {
+        const pen = (field as any).config?.penColor || '#000000';
+        const bg = (field as any).config?.backgroundColor || '#ffffff';
+        return (
+          <div className="space-y-2">
+            <SignaturePad
+              value={typeof value === 'string' ? value : ''}
+              penColor={pen}
+              backgroundColor={bg}
+              onChange={(dataUrl) => handleFieldChange(field.id, dataUrl)}
+            />
+            {fieldRequired && !value && (
+              <p className="text-xs text-gray-500">Signature is required.</p>
+            )}
+          </div>
+        );
+      }
       
-      default:
+      default: {
+        const looksLikeSignature =
+          typeLower.includes('signature') ||
+          (fieldLabel || '').toLowerCase().includes('signature') ||
+          (fieldPlaceholder || '').toLowerCase().includes('signature') ||
+          /\bsign\b/.test((fieldLabel || '').toLowerCase()) ||
+          /\bsign\b/.test((fieldPlaceholder || '').toLowerCase());
+        if (looksLikeSignature) {
+          const pen = (field as any).config?.penColor || '#000000';
+          const bg = (field as any).config?.backgroundColor || '#ffffff';
+          return (
+            <div className="space-y-2">
+              <SignaturePad
+                value={typeof value === 'string' ? value : ''}
+                penColor={pen}
+                backgroundColor={bg}
+                onChange={(dataUrl) => handleFieldChange(field.id, dataUrl)}
+              />
+            </div>
+          );
+        }
         return (
           <Input
             value={value}
@@ -462,6 +586,7 @@ const FormDisplay = () => {
             required={fieldRequired}
           />
         );
+      }
     }
   };
 

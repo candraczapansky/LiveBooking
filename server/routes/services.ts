@@ -496,6 +496,39 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     });
   }));
 
+  // -----------------------------
+  // Add-on mapping endpoints
+  // Map add-on service (hidden) to one or more base services it applies to
+  app.get("/api/services/:id/add-on-bases", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const bases = await storage.getBaseServicesForAddOn(id);
+    res.json({ addOnServiceId: id, baseServiceIds: bases });
+  }));
+
+  app.post("/api/services/:id/add-on-bases", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const { baseServiceIds } = req.body || {};
+    if (!Array.isArray(baseServiceIds)) {
+      throw new ValidationError("baseServiceIds must be an array of IDs");
+    }
+    await storage.setBaseServicesForAddOn(id, baseServiceIds.map((n: any) => parseInt(n)));
+    res.json({ success: true });
+  }));
+
+  app.post("/api/services/:id/add-on-bases/:baseId", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const baseId = parseInt(req.params.baseId);
+    await storage.addBaseServiceToAddOn(id, baseId);
+    res.json({ success: true });
+  }));
+
+  app.delete("/api/services/:id/add-on-bases/:baseId", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const baseId = parseInt(req.params.baseId);
+    await storage.removeBaseServiceFromAddOn(id, baseId);
+    res.json({ success: true });
+  }));
+
   // Bulk update services
   app.put("/api/services/bulk-update", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);

@@ -10,6 +10,8 @@ interface CheckoutWithTerminalProps {
   description?: string;
   onPaymentComplete: (result: any) => void;
   onPaymentError: (error: string) => void;
+  className?: string;
+  variant?: any;
 }
 
 export default function CheckoutWithTerminal({
@@ -20,6 +22,8 @@ export default function CheckoutWithTerminal({
   description,
   onPaymentComplete,
   onPaymentError,
+  className,
+  variant,
 }: CheckoutWithTerminalProps) {
   const {
     isOpen,
@@ -45,7 +49,7 @@ export default function CheckoutWithTerminal({
 
   return (
     <>
-      <Button onClick={handlePayClick}>
+      <Button onClick={handlePayClick} className={className} variant={variant}>
         Pay with Terminal
       </Button>
 

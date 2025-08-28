@@ -35,14 +35,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
-import CategoryList from "@/components/services/category-list";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+// Removed service category imports; products use their own categories
 
 type Product = {
   id: number;
@@ -87,7 +80,10 @@ export default function Products() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -117,10 +113,24 @@ export default function Products() {
     queryKey: ["/api/products"],
   });
 
-  // Fetch categories (reuse service categories for products UI)
-  const { data: categories = [] } = useQuery<any[]>({
+  // Fetch service categories only to exclude them from product category UI
+  const { data: serviceCategories = [] } = useQuery<any[]>({
     queryKey: ["/api/service-categories"],
   });
+
+  // Product categories are independent: derive from products and exclude service categories (normalized)
+  const excludedCategoryNames = new Set(
+    (serviceCategories as any[]).map((c: any) => (c.name || "").trim().toLowerCase())
+  );
+  const productCategories = Array.from(
+    new Set(
+      (products || [])
+        .map((p: Product) => (p.category || "").trim())
+        .filter((c) => !!c && !excludedCategoryNames.has((c as string).toLowerCase()))
+    )
+  ).sort();
+
+  const allCategories = Array.from(new Set([...(productCategories as string[]), ...extraCategories])).sort();
 
   // Create product mutation
   const createProductMutation = useMutation({
@@ -137,10 +147,10 @@ export default function Products() {
       setIsAddDialogOpen(false);
       resetForm();
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to create product",
+        description: error?.message || "Failed to create product",
         variant: "destructive",
       });
     },
@@ -289,10 +299,37 @@ export default function Products() {
       }
     }
     
+    // Sanitize payload: trim strings and remove empty optional fields to avoid unique("") conflicts
+    const payload: any = {
+      ...productData,
+      name: productData.name.trim(),
+      category: productData.category.trim(),
+    };
+
+    if (!productData.description || productData.description.trim() === "") delete payload.description; else payload.description = productData.description.trim();
+    if (!productData.sku || productData.sku.trim() === "") delete payload.sku; else payload.sku = productData.sku.trim();
+    if (!productData.barcode || productData.barcode.trim() === "") delete payload.barcode; else payload.barcode = productData.barcode.trim();
+    if (!productData.brand || productData.brand.trim() === "") delete payload.brand; else payload.brand = productData.brand.trim();
+    if (!productData.dimensions || productData.dimensions.trim() === "") delete payload.dimensions; else payload.dimensions = productData.dimensions.trim();
+    if (!productData.imageUrl || productData.imageUrl.trim() === "") delete payload.imageUrl;
+
+    // Client-side duplicate SKU check
+    if (payload.sku && Array.isArray(products)) {
+      const skuExists = (products as any[]).some((p: any) => (p.sku || '').toLowerCase() === payload.sku.toLowerCase());
+      if (!editingProduct && skuExists) {
+        toast({
+          title: "Duplicate SKU",
+          description: "That SKU already exists. Use a different SKU or leave it blank.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     if (editingProduct) {
-      updateProductMutation.mutate({ id: editingProduct.id, data: productData });
+      updateProductMutation.mutate({ id: editingProduct.id, data: payload });
     } else {
-      createProductMutation.mutate(productData);
+      createProductMutation.mutate(payload);
     }
   };
 
@@ -333,17 +370,15 @@ export default function Products() {
 
 
 
-  const selectedCategoryName = selectedCategoryId !== null
-    ? (categories as any[])?.find((c: any) => c.id === selectedCategoryId)?.name
-    : null;
-
   const filteredProducts = (products as Product[])?.filter((product: Product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (product.category || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (product.brand && product.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (product.sku && product.sku.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = selectedCategoryName ? product.category === selectedCategoryName : true;
+    const matchesCategory = selectedCategory 
+      ? (product.category || '').trim().toLowerCase() === selectedCategory.trim().toLowerCase() 
+      : true;
     return matchesSearch && matchesCategory;
   }) || [];
 
@@ -415,7 +450,7 @@ export default function Products() {
                 </CardHeader>
                 <CardContent className="px-3 sm:px-4 pb-3 sm:pb-4">
                   <div className="text-xl sm:text-2xl font-bold">
-                    {new Set(products?.map((p: Product) => p.category)).size || 0}
+                    {allCategories.length}
                   </div>
                   <p className="text-xs text-muted-foreground leading-tight">
                     Product categories
@@ -426,12 +461,41 @@ export default function Products() {
 
             {/* Categories + Products Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Categories Sidebar */}
+              {/* Categories Sidebar (Product categories only) */}
               <div className="lg:col-span-1">
-                <CategoryList
-                  selectedCategoryId={selectedCategoryId}
-                  onCategorySelect={setSelectedCategoryId}
-                />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Product Categories</CardTitle>
+                    <CardDescription>Filter products by category</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant={selectedCategory === null ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedCategory(null)}
+                      >
+                        All
+                      </Button>
+                      {allCategories.map((cat) => (
+                        <Button
+                          key={cat}
+                          variant={selectedCategory === cat ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedCategory(cat)}
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+                    <div className="mt-4">
+                      <Button onClick={() => setIsAddCategoryOpen(true)} className="min-h-[36px]">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Category
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
 
               {/* Search, Add Product, and Products List */}
@@ -476,27 +540,31 @@ export default function Products() {
                           </div>
                           <div>
                             <Label htmlFor="category">Category *</Label>
-                            <Select
-                              value={formData.category}
-                              onValueChange={(value) => setFormData({ ...formData, category: value })}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {Array.isArray(categories) && categories.length > 0 ? (
-                                  (categories as any[]).map((category: any) => (
-                                    <SelectItem key={category.id} value={category.name}>
-                                      {category.name}
+                            {allCategories.length > 0 ? (
+                              <Select
+                                value={formData.category}
+                                onValueChange={(value) => setFormData({ ...formData, category: value })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {allCategories.map((cat) => (
+                                    <SelectItem key={cat} value={cat}>
+                                      {cat}
                                     </SelectItem>
-                                  ))
-                                ) : (
-                                  <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
-                                    No categories available
-                                  </div>
-                                )}
-                              </SelectContent>
-                            </Select>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                id="category"
+                                value={formData.category}
+                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                                placeholder="e.g., Hair Care, Skincare"
+                                required
+                              />
+                            )}
                           </div>
                         </div>
 
@@ -687,6 +755,46 @@ export default function Products() {
                       </form>
                     </DialogContent>
                   </Dialog>
+
+                  {/* Add Category Dialog */}
+                  <Dialog open={isAddCategoryOpen} onOpenChange={setIsAddCategoryOpen}>
+                    <DialogContent className="w-[95vw] sm:w-full max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Product Category</DialogTitle>
+                        <DialogDescription>Enter a new product category name.</DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="new-category">Category Name</Label>
+                          <Input
+                            id="new-category"
+                            value={newCategoryName}
+                            onChange={(e) => setNewCategoryName(e.target.value)}
+                            placeholder="e.g., Hair Care"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" onClick={() => setIsAddCategoryOpen(false)}>Cancel</Button>
+                          <Button
+                            onClick={() => {
+                              const name = newCategoryName.trim();
+                              if (!name) return;
+                              // Avoid duplicates (case-insensitive)
+                              const exists = allCategories.some((c) => c.toLowerCase() === name.toLowerCase());
+                              if (!exists) {
+                                setExtraCategories((prev) => [...prev, name]);
+                              }
+                              setSelectedCategory(name);
+                              setNewCategoryName("");
+                              setIsAddCategoryOpen(false);
+                            }}
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
 
                 {/* Products */}
@@ -873,27 +981,31 @@ export default function Products() {
                     </div>
                     <div>
                       <Label htmlFor="edit-category">Category *</Label>
-                      <Select
-                        value={formData.category}
-                        onValueChange={(value) => setFormData({ ...formData, category: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.isArray(categories) && categories.length > 0 ? (
-                            (categories as any[]).map((category: any) => (
-                              <SelectItem key={category.id} value={category.name}>
-                                {category.name}
+                      {allCategories.length > 0 ? (
+                        <Select
+                          value={formData.category}
+                          onValueChange={(value) => setFormData({ ...formData, category: value })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {allCategories.map((cat) => (
+                              <SelectItem key={cat} value={cat}>
+                                {cat}
                               </SelectItem>
-                            ))
-                          ) : (
-                            <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
-                              No categories available
-                            </div>
-                          )}
-                        </SelectContent>
-                      </Select>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id="edit-category"
+                          value={formData.category}
+                          onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                          placeholder="e.g., Hair Care, Skincare"
+                          required
+                        />
+                      )}
                     </div>
                   </div>
 

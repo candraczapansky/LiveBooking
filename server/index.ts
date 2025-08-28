@@ -1,9 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
+import fs from "fs";
+import path from "path";
 import { config } from "dotenv";
-import { registerRoutes } from "./routes.js";
-import { setupVite, serveStatic, log } from "./vite.js";
+// registerRoutes is loaded dynamically to tolerate different build outputs
+// (e.g., ./routes.js vs ./routes/index.js) in various deployment environments
+// Avoid importing vite helpers at module load to prevent requiring vite.js in production builds
+import { log } from "./log.js";
 import { DatabaseStorage } from "./storage.js";
-import { securityHeaders } from "./middleware/security.js";
 import { EmailAutomationService } from "./email-automation.js";
 import { MarketingCampaignService } from "./marketing-campaigns.js";
 import { createServer } from "http";
@@ -15,6 +18,21 @@ const app = express();
 
 // Disable ETag to prevent 304 on dynamic API responses (polling endpoints)
 app.set('etag', false);
+
+// Capture raw body for signature verification and to support minimal webhook payloads
+const rawBodySaver = (req: any, _res: any, buf: Buffer) => {
+  try {
+    if (buf && (buf as any).length) {
+      (req as any).rawBody = buf.toString('utf8');
+    }
+  } catch {}
+};
+
+// Accept text bodies for Helcim webhook endpoints (they may send very basic payloads)
+// Place before JSON/urlencoded parsers so text/plain bodies are captured
+app.use('/api/terminal/webhook', express.text({ type: '*/*', limit: '10mb' }));
+app.use('/api/helcim', express.text({ type: '*/*', limit: '10mb' }));
+app.use('/api/helcim-smart-terminal', express.text({ type: '*/*', limit: '10mb' }));
 
 // Add CORS support for external applications
 app.use((req, res, next) => {
@@ -44,11 +62,22 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+app.use(express.json({ limit: '10mb', verify: rawBodySaver as any } as any));
+app.use(express.urlencoded({ extended: false, limit: '10mb', verify: rawBodySaver as any } as any));
 
-// Apply security headers early
-app.use(...securityHeaders());
+// Apply security headers early (dynamically import to avoid hard dependency in production build)
+try {
+  (async () => {
+    try {
+      const mod = await import("./middleware/security.js");
+      if (mod?.securityHeaders) {
+        app.use(...mod.securityHeaders());
+      }
+    } catch (e) {
+      log(`Security middleware not loaded: ${(e as any)?.message || e}`);
+    }
+  })();
+} catch {}
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -117,7 +146,42 @@ async function findAvailablePort(startPort: number): Promise<number> {
     const marketingCampaignService = new MarketingCampaignService(storage);
     marketingCampaignService.startService();
     
-    const server = await registerRoutes(app, storage);
+    // Load routes module with resilient resolution
+    const routesModule = await import("./routes.js").catch(async () => {
+      return await import("./routes/index.js");
+    });
+    const server = await (routesModule as any).registerRoutes(app, storage);
+
+    // Booking-only domain guard: force all HTML navigations to /booking
+    // Configure with BOOKING_ONLY_HOSTS env var (comma-separated hostnames)
+    try {
+      const bookingOnlyHosts = (process.env.BOOKING_ONLY_HOSTS || '')
+        .split(',')
+        .map(h => h.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (bookingOnlyHosts.length > 0) {
+        app.use((req: Request, res: Response, next: NextFunction) => {
+          // Skip API routes and non-GET requests
+          if (req.path.startsWith('/api') || req.method !== 'GET') return next();
+
+          const hostHeader = (req.headers.host || '').split(':')[0].toLowerCase();
+          if (!bookingOnlyHosts.includes(hostHeader)) return next();
+
+          // Only intercept browser navigations (HTML)
+          const accept = String(req.headers.accept || '');
+          const isHtmlNav = accept.includes('text/html');
+          if (!isHtmlNav) return next();
+
+          // Allow only the booking page itself; redirect everything else
+          if (req.path !== '/booking') {
+            return res.redirect(302, '/booking');
+          }
+
+          return next();
+        });
+      }
+    } catch {}
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
@@ -132,9 +196,25 @@ async function findAvailablePort(startPort: number): Promise<number> {
     // setting up all the other routes so the catch-all route
     // doesn't interfere with the other routes
     if (app.get("env") === "development") {
-      await setupVite(app, server);
+      try {
+        const { setupVite } = await import("./vite.js");
+        await setupVite(app, server);
+      } catch (e) {
+        log(`Vite dev server not available: ${(e as any)?.message || e}`);
+      }
     } else {
-      serveStatic(app);
+      // Minimal static serving for production without importing vite.js
+      const distPublic = path.resolve(process.cwd(), "dist", "public");
+      if (fs.existsSync(distPublic)) {
+        app.use(express.static(distPublic));
+        app.get("*", (req, res, next) => {
+          const url = req.originalUrl || req.url || "";
+          if (url.startsWith("/api/")) return next();
+          res.sendFile(path.resolve(distPublic, "index.html"));
+        });
+      } else {
+        log("Static build not found at " + distPublic);
+      }
     }
 
     // Determine port: In production (Cloud Run/Replit Deploy), use provided PORT and do not scan.

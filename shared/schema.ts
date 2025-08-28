@@ -1018,6 +1018,17 @@ export type TerminalDevice = typeof terminalDevices.$inferSelect;
 export type InsertTerminalDevice = z.infer<typeof insertTerminalDeviceSchema>;
 export type UpdateTerminalDevice = z.infer<typeof updateTerminalDeviceSchema>;
 
+// Terminal configuration type used by terminal services
+export type TerminalConfig = {
+  terminalId: string;
+  deviceCode: string;
+  locationId: string;
+  apiToken: string;
+  isActive?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 // Automation Rules schema
 export const automationRules = pgTable("automation_rules", {
   id: serial("id").primaryKey(),

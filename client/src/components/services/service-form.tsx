@@ -58,6 +58,8 @@ const serviceFormSchema = z.object({
     customCommissionRate: z.union([z.coerce.number().min(0, "Commission rate must be 0 or greater"), z.literal(""), z.undefined()]).transform(val => val === "" || val === undefined ? undefined : val),
   })).optional().default([]),
   requiredDevices: z.array(z.number()).optional().default([]),
+  // Add-on mapping (not sent to base service create endpoint)
+  appliesToServiceIds: z.array(z.number()).optional().default([]),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -111,6 +113,16 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
     }
   });
 
+  // All services (for selecting which base services an add-on applies to)
+  const { data: allServices } = useQuery({
+    queryKey: ['/api/services'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/services');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
+    }
+  });
+
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
     defaultValues: {
@@ -126,6 +138,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       isHidden: false,
       assignedStaff: [],
       requiredDevices: [],
+      appliesToServiceIds: [],
     },
   });
 
@@ -199,13 +212,14 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         isHidden: !!defaultIsHidden,
         assignedStaff: [],
         requiredDevices: [],
+        appliesToServiceIds: [],
       });
     }
   }, [serviceId, open]);
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
-      const { assignedStaff, requiredDevices } = data;
+      const { assignedStaff, requiredDevices, appliesToServiceIds } = data;
       
       // Validate required fields
       if (!data.name || !data.duration || data.price === undefined || !data.categoryId) {
@@ -268,6 +282,13 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
               customCommissionRate: assignment.customCommissionRate || null,
             });
           }
+        }
+
+        // If creating an add-on, save mapping to base services
+        if ((data.isHidden || defaultIsHidden) && Array.isArray(appliesToServiceIds) && appliesToServiceIds.length > 0) {
+          await apiRequest("POST", `/api/services/${service.id}/add-on-bases`, {
+            baseServiceIds: appliesToServiceIds,
+          });
         }
         
         return service;
@@ -615,35 +636,77 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
                 )}
               />
 
+              {/* Only show room field for regular services, not add-ons */}
+              {!form.watch('isHidden') && (
+                <FormField
+                  control={form.control}
+                  name="roomId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Room (Optional)</FormLabel>
+                      <Select
+                        value={field.value === null || field.value === undefined ? 'none' : String(field.value)}
+                        onValueChange={(value) => field.onChange(value === 'none' ? null : parseInt(value))}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a room" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No room assigned</SelectItem>
+                          {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
+                            <SelectItem key={room.id} value={room.id.toString()}>
+                              {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+
+            {/* Applies To (for Add-Ons only) */}
+            {form.watch('isHidden') && (
               <FormField
                 control={form.control}
-                name="roomId"
+                name="appliesToServiceIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Room (Optional)</FormLabel>
-                    <Select
-                      value={field.value === null || field.value === undefined ? 'none' : String(field.value)}
-                      onValueChange={(value) => field.onChange(value === 'none' ? null : parseInt(value))}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a room" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No room assigned</SelectItem>
-                        {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
-                          <SelectItem key={room.id} value={room.id.toString()}>
-                            {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Applies To Services</FormLabel>
+                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                      {Array.isArray(allServices) && allServices.filter((s: any) => !s.isHidden).map((svc: any) => {
+                        const checked = (field.value || []).includes(svc.id);
+                        return (
+                          <div key={svc.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`applies-${svc.id}`}
+                              checked={checked}
+                              onCheckedChange={(isChecked) => {
+                                const current = field.value || [];
+                                if (isChecked) {
+                                  field.onChange([...current, svc.id]);
+                                } else {
+                                  field.onChange(current.filter((id: number) => id !== svc.id));
+                                }
+                              }}
+                            />
+                            <label htmlFor={`applies-${svc.id}`} className="text-sm cursor-pointer">
+                              {svc.name}
+                            </label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Select the main services this add-on can be added to.</div>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
+            )}
 
             {/* Required Devices */}
             <FormField

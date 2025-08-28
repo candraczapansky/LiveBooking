@@ -151,10 +151,10 @@ export default function PointOfSale() {
       setIsAddProductOpen(false);
       resetProductForm();
     },
-    onError: () => {
+    onError: (error: any) => {
       toast({
         title: "Error",
-        description: "Failed to create product",
+        description: error?.message || "Failed to create product",
         variant: "destructive",
       });
     },
@@ -178,15 +178,54 @@ export default function PointOfSale() {
 
   const handleCreateProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newProduct.name || newProduct.price <= 0) {
+    // Validate required fields per backend schema
+    if (!newProduct.name || newProduct.price <= 0 || !newProduct.category || newProduct.category.trim() === "") {
       toast({
         title: "Validation Error",
-        description: "Please fill in required fields",
+        description: "Please provide Name, Category, and a valid Price",
         variant: "destructive",
       });
       return;
     }
-    createProductMutation.mutate(newProduct);
+    // Clean payload: remove optional fields if empty to avoid DB unique conflicts (e.g., empty SKU)
+    const payload: any = {
+      ...newProduct,
+      name: newProduct.name.trim(),
+      category: newProduct.category.trim(),
+    };
+
+    if (!newProduct.description || newProduct.description.trim() === "") {
+      delete payload.description;
+    } else {
+      payload.description = newProduct.description.trim();
+    }
+
+    if (!newProduct.sku || newProduct.sku.trim() === "") {
+      delete payload.sku;
+    } else {
+      payload.sku = newProduct.sku.trim();
+    }
+
+    if (!newProduct.brand || newProduct.brand.trim() === "") {
+      delete payload.brand;
+    } else {
+      payload.brand = newProduct.brand.trim();
+    }
+
+    // Pre-validate SKU uniqueness client-side to provide a friendly error
+    if (payload.sku && Array.isArray(products)) {
+      const skuExists = (products as any[]).some((p: any) => (p.sku || '').toLowerCase() === payload.sku.toLowerCase());
+      if (skuExists) {
+        toast({
+          title: "Duplicate SKU",
+          description: "That SKU already exists. Please use a different SKU or leave it blank.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    createProductMutation.mutate(payload);
   };
 
 
@@ -225,6 +264,17 @@ export default function PointOfSale() {
       return response.json();
     }
   });
+
+  // Build product category list from existing products
+  const productCategories: string[] = Array.from(
+    new Set(((products as any[]) || []).map((p: any) => (p.category || '').trim()).filter((c: string) => c))
+  ).sort();
+
+  // Local additions for categories within POS dialog
+  const [posExtraCategories, setPosExtraCategories] = useState<string[]>([]);
+  const allProductCategories: string[] = Array.from(new Set([...(productCategories as string[]), ...posExtraCategories]));
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryNamePOS, setNewCategoryNamePOS] = useState("");
 
   // Fetch clients
   const { data: clients } = useQuery({
@@ -732,6 +782,16 @@ export default function PointOfSale() {
                               <span className="min-[380px]:hidden text-lg">+</span>
                             </Button>
                           </DialogTrigger>
+                          <DialogTrigger asChild>
+                            <Button
+                              size="default"
+                              variant="default"
+                              className="hidden lg:inline-flex flex-shrink-0 h-11 px-4 bg-primary hover:bg-primary/90 text-primary-foreground shadow-md items-center gap-2"
+                            >
+                              <Plus className="h-4 w-4" />
+                              Add Product
+                            </Button>
+                          </DialogTrigger>
                           <DialogContent className="w-[95vw] max-w-md mx-auto max-h-[90vh] overflow-y-auto p-4">
                             <DialogHeader>
                               <DialogTitle>Add New Product</DialogTitle>
@@ -798,12 +858,60 @@ export default function PointOfSale() {
                                 <div className="grid grid-cols-2 gap-3">
                                   <div>
                                     <Label htmlFor="category">Category</Label>
-                                    <Input
-                                      id="category"
+                                    <Select
                                       value={newProduct.category}
-                                      onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-                                      placeholder="Hair Care, Skincare, etc."
-                                    />
+                                      onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select a category" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {allProductCategories.length > 0 ? (
+                                          allProductCategories.map((cat) => (
+                                            <SelectItem key={cat} value={cat}>
+                                              {cat}
+                                            </SelectItem>
+                                          ))
+                                        ) : (
+                                          <div className="px-2 py-1.5 text-sm text-muted-foreground">No categories yet</div>
+                                        )}
+                                        <div className="px-2 py-1.5">
+                                          <Button
+                                            type="button"
+                                            className="w-full"
+                                            variant="outline"
+                                            onClick={(e) => { e.preventDefault(); setIsAddingCategory(true); }}
+                                          >
+                                            + Add Category
+                                          </Button>
+                                        </div>
+                                      </SelectContent>
+                                    </Select>
+                                    {isAddingCategory && (
+                                      <div className="mt-2 flex items-center gap-2">
+                                        <Input
+                                          value={newCategoryNamePOS}
+                                          onChange={(e) => setNewCategoryNamePOS(e.target.value)}
+                                          placeholder="New category name"
+                                          className="min-h-[40px]"
+                                        />
+                                        <Button
+                                          type="button"
+                                          onClick={() => {
+                                            const name = newCategoryNamePOS.trim();
+                                            if (!name) return;
+                                            const exists = allProductCategories.some((c) => c.toLowerCase() === name.toLowerCase());
+                                            if (!exists) setPosExtraCategories((prev) => [...prev, name]);
+                                            setNewCategoryNamePOS("");
+                                            setIsAddingCategory(false);
+                                            setNewProduct({ ...newProduct, category: name });
+                                          }}
+                                        >
+                                          Save
+                                        </Button>
+                                        <Button type="button" variant="ghost" onClick={() => setIsAddingCategory(false)}>Cancel</Button>
+                                      </div>
+                                    )}
                                   </div>
                                   
                                   <div>
@@ -988,13 +1096,60 @@ export default function PointOfSale() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <Label htmlFor="category-alt">Category</Label>
-                                  <Input
-                                    id="category-alt"
+                                  <Select
                                     value={newProduct.category}
-                                    onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-                                    placeholder="Hair Care, Skincare, etc."
-                                    className="min-h-[44px]"
-                                  />
+                                    onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
+                                  >
+                                    <SelectTrigger className="min-h-[44px]">
+                                      <SelectValue placeholder="Select a category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {allProductCategories.length > 0 ? (
+                                        allProductCategories.map((cat) => (
+                                          <SelectItem key={cat} value={cat}>
+                                            {cat}
+                                          </SelectItem>
+                                        ))
+                                      ) : (
+                                        <div className="px-2 py-1.5 text-sm text-muted-foreground">No categories yet</div>
+                                      )}
+                                      <div className="px-2 py-1.5">
+                                        <Button
+                                          type="button"
+                                          className="w-full"
+                                          variant="outline"
+                                          onClick={(e) => { e.preventDefault(); setIsAddingCategory(true); }}
+                                        >
+                                          + Add Category
+                                        </Button>
+                                      </div>
+                                    </SelectContent>
+                                  </Select>
+                                  {isAddingCategory && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <Input
+                                        value={newCategoryNamePOS}
+                                        onChange={(e) => setNewCategoryNamePOS(e.target.value)}
+                                        placeholder="New category name"
+                                        className="min-h-[40px]"
+                                      />
+                                      <Button
+                                        type="button"
+                                        onClick={() => {
+                                          const name = newCategoryNamePOS.trim();
+                                          if (!name) return;
+                                          const exists = allProductCategories.some((c) => c.toLowerCase() === name.toLowerCase());
+                                          if (!exists) setPosExtraCategories((prev) => [...prev, name]);
+                                          setNewCategoryNamePOS("");
+                                          setIsAddingCategory(false);
+                                          setNewProduct({ ...newProduct, category: name });
+                                        }}
+                                      >
+                                        Save
+                                      </Button>
+                                      <Button type="button" variant="ghost" onClick={() => setIsAddingCategory(false)}>Cancel</Button>
+                                    </div>
+                                  )}
                                 </div>
                                 
                                 <div>

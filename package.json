@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development DISABLE_AUTOMATIC_SERVICE_CREATION=true tsx server/index.ts",
-    "build": "vite build && tsc",
+    "build": "rm -rf dist && rm -f node_modules/typescript/tsbuildinfo && vite build && tsc",
     "start": "NODE_ENV=production node --experimental-specifier-resolution=node dist/server/index.js",
     "start-clean": "rm -rf node_modules && npm install && npm run dev"
   },
@@ -64,6 +64,7 @@
     "react-email-editor": "^1.7.11",
     "react-hook-form": "^7.62.0",
     "recharts": "^3.1.2",
+    "signature_pad": "^4.2.0",
     "sonner": "^2.0.7",
     "speakeasy": "^2.0.0",
     "square": "^43.0.2",

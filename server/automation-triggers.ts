@@ -2,6 +2,9 @@ import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
 import type { IStorage } from './storage.js';
 import type { AutomationRule } from '../shared/schema.js';
+import { db } from './db.js';
+import { locations } from '../shared/schema.js';
+import { eq } from 'drizzle-orm';
 
 // Automation rules are now stored in the database via storage layer
 
@@ -97,9 +100,147 @@ export async function triggerAutomations(
   console.log("🔧 RELEVANT RULES FOR TRIGGER:", trigger, relevantRules.length);
   console.log("🔧 RELEVANT RULES:", relevantRules);
 
-  if (relevantRules.length === 0) {
+  // Optional location-aware filtering: support naming convention tags like "[location:2]" or "@location:2"
+  const apptLocationIdRaw = (appointmentData as any)?.locationId;
+  const apptLocationId = apptLocationIdRaw != null ? parseInt(String(apptLocationIdRaw)) : null;
+
+  // Build a lookup of location names -> IDs (trimmed, case-insensitive)
+  let locNameToId = new Map<string, number>();
+  try {
+    const allLocs = await (storage as any).getAllLocations?.();
+    if (Array.isArray(allLocs)) {
+      for (const l of allLocs) {
+        const key = String((l?.name ?? '')).trim().toLowerCase();
+        if (key && typeof l?.id === 'number') locNameToId.set(key, l.id);
+      }
+    }
+  } catch {}
+  // Fallback: query DB directly if storage method not available
+  try {
+    if (locNameToId.size === 0) {
+      const rows = await db.select().from(locations);
+      for (const l of rows as any[]) {
+        const key = String((l?.name ?? '')).trim().toLowerCase();
+        if (key && typeof l?.id === 'number') locNameToId.set(key, l.id);
+      }
+    }
+  } catch {}
+
+  const parseLocationToken = (text: string | null | undefined): string | null => {
+    try {
+      if (!text) return null;
+      const m = /(?:\[location:([^\]]+)\]|@location:([^\s]+))/i.exec(text);
+      if (m) {
+        const token = (m[1] || m[2] || '').toString().trim();
+        return token || null;
+      }
+      return null;
+    } catch { return null; }
+  };
+
+  const resolveRuleLocationId = (r: any): number | null => {
+    const token = parseLocationToken(r?.name) || parseLocationToken(r?.subject);
+    if (!token) return null;
+    const n = parseInt(token);
+    if (!Number.isNaN(n)) return n;
+    const key = token.trim().toLowerCase();
+    return locNameToId.get(key) ?? null;
+  };
+
+  const withLocationMeta = relevantRules.map(r => ({
+    rule: r,
+    loc: resolveRuleLocationId(r),
+  }));
+  // If appointment has a location, prefer rules tagged for that location; otherwise include global (no tag)
+  let scopedRules = withLocationMeta;
+  if (apptLocationId != null) {
+    const specific = withLocationMeta.filter(x => x.loc === apptLocationId);
+    const global = withLocationMeta.filter(x => x.loc == null);
+    scopedRules = specific.length > 0 ? specific : global;
+  }
+  const effectiveRules = scopedRules.map(x => x.rule);
+
+  if (effectiveRules.length === 0) {
     console.log(`No active automation rules found for trigger: ${trigger}`);
     return;
+  }
+
+  // Test mode: allow direct email testing without requiring an appointment/client
+  const testEmail: string | undefined = (appointmentData as any)?.testEmail;
+  if (testEmail) {
+    try {
+      // Prepare minimal variables for testing
+      const now = new Date();
+      const inOneHour = new Date(now.getTime() + 60 * 60 * 1000);
+
+      // Reuse location-aware branding if locationId provided
+      let salonName = 'Glo Head Spa';
+      let salonPhone = '(555) 123-4567';
+      let salonAddress = '123 Beauty Street, City, State 12345';
+      try {
+        const locId = (appointmentData as any)?.locationId;
+        if (locId != null) {
+          const allLocs = await (storage as any).getAllLocations?.();
+          const location = Array.isArray(allLocs) ? allLocs.find((l: any) => String(l.id) === String(locId)) : null;
+          if (location) {
+            if (location.name) salonName = String(location.name);
+            if (location.phone) salonPhone = String(location.phone);
+            const addrParts = [location.address, location.city, location.state, location.zipCode].filter(Boolean);
+            if (addrParts.length) salonAddress = addrParts.join(', ');
+          }
+        }
+      } catch {}
+
+      const appointmentDate = new Date(appointmentData?.startTime || now.toISOString());
+      const dateStr = appointmentDate.toLocaleDateString('en-US', { timeZone: 'America/Chicago' });
+      const timeStr = appointmentDate.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: '2-digit', minute: '2-digit', hour12: true });
+
+      const variables: Record<string, string> = {
+        client_name: 'Test Recipient',
+        client_first_name: 'Test',
+        client_last_name: 'Recipient',
+        client_email: testEmail,
+        client_phone: '',
+        service_name: 'Service',
+        service_duration: '60',
+        staff_name: 'Your stylist',
+        staff_phone: '',
+        appointment_date: dateStr,
+        appointment_time: timeStr,
+        appointment_datetime: `${dateStr} ${timeStr}`,
+        salon_name: salonName,
+        salon_phone: salonPhone,
+        salon_address: salonAddress,
+        booking_date: dateStr,
+        total_amount: '0'
+      };
+
+      // In test mode, ignore location tags so you can preview any rule
+      const rulesToRun = relevantRules;
+      for (const rule of rulesToRun) {
+        try {
+          if (rule.type !== 'email') continue; // Only send emails in test mode
+          const processedTemplate = replaceTemplateVariables(rule.template, variables);
+          const subject = rule.subject ? replaceTemplateVariables(rule.subject, variables) : 'Automation Test';
+          await sendEmail({
+            to: testEmail,
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            subject,
+            text: processedTemplate,
+            html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`
+          });
+          const newSentCount = (rule.sentCount || 0) + 1;
+          await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
+          console.log(`Test email sent for rule: ${rule.name} -> ${testEmail}`);
+        } catch (e) {
+          console.log(`Test email failed for rule: ${rule.name}`, e);
+        }
+      }
+      return; // Do not proceed to real appointment flow in test mode
+    } catch (e) {
+      console.log('Test mode error:', e);
+      return;
+    }
   }
 
   // Get appointment details
@@ -145,6 +286,29 @@ export async function triggerAutomations(
   const appointmentDateString = appointmentDate.toLocaleDateString('en-US', localDateOptions);
   const appointmentDateTime = appointmentDate.toLocaleString('en-US', localDateTimeOptions);
   
+  // Resolve location details for branding (fallback to defaults)
+  let salonName = 'Glo Head Spa';
+  let salonPhone = '(555) 123-4567';
+  let salonAddress = '123 Beauty Street, City, State 12345';
+  try {
+    const locId = (appointmentData as any)?.locationId;
+    if (locId != null) {
+      let location: any = null;
+      // Try storage helpers if present
+      try { location = await (storage as any).getLocation?.(locId); } catch {}
+      if (!location) { try { location = await (storage as any).getLocationById?.(locId); } catch {} }
+      if (!location) { try { const allLocs = await (storage as any).getAllLocations?.(); if (Array.isArray(allLocs)) location = allLocs.find((l: any) => String(l.id) === String(locId)); } catch {} }
+      // Fallback to DB
+      if (!location) { try { const rows = await db.select().from(locations).where(eq(locations.id, Number(locId))).limit(1); location = (rows as any[])?.[0] || null; } catch {} }
+      if (location) {
+        if (location.name) salonName = String(location.name);
+        if (location.phone) salonPhone = String(location.phone);
+        const addrParts = [location.address, location.city, location.state, location.zipCode].filter(Boolean);
+        if (addrParts.length) salonAddress = addrParts.join(', ');
+      }
+    }
+  } catch {}
+
   const variables = {
     client_name: client.firstName || client.username,
     client_email: client.email,
@@ -155,30 +319,60 @@ export async function triggerAutomations(
     appointment_date: appointmentDateString,
     appointment_time: appointmentTime,
     appointment_datetime: appointmentDateTime,
-    salon_name: 'Glo Head Spa',
-    salon_phone: '(555) 123-4567',
-    salon_address: '123 Beauty Street, City, State 12345',
+    salon_name: salonName,
+    salon_phone: salonPhone,
+    salon_address: salonAddress,
     booking_date: new Date().toLocaleDateString('en-US', localDateOptions),
     total_amount: service?.price?.toString() || '0'
   };
 
   // Process each automation rule
-  for (const rule of relevantRules) {
+  for (const rule of effectiveRules) {
     try {
-      const processedTemplate = replaceTemplateVariables(rule.template, variables);
+      // If the rule is scoped to a specific location, prefer that location's branding for {salon_name}
+      let variablesForRule = variables;
+      try {
+        const ruleLocId = resolveRuleLocationId(rule);
+        if (ruleLocId != null) {
+          let loc: any = null;
+          try { loc = await (storage as any).getLocation?.(ruleLocId); } catch {}
+          if (!loc) { try { loc = await (storage as any).getLocationById?.(ruleLocId); } catch {} }
+          if (!loc) {
+            try {
+              const allLocs = await (storage as any).getAllLocations?.();
+              if (Array.isArray(allLocs)) loc = allLocs.find((l: any) => String(l.id) === String(ruleLocId));
+            } catch {}
+          }
+          // Fallback to DB
+          if (!loc) {
+            try {
+              const rows = await db.select().from(locations).where(eq(locations.id, Number(ruleLocId))).limit(1);
+              loc = (rows as any[])?.[0] || null;
+            } catch {}
+          }
+          if (loc && loc.name) {
+            variablesForRule = { ...variablesForRule, salon_name: String(loc.name) } as any;
+          }
+        }
+      } catch {}
+
+      const processedTemplate = replaceTemplateVariables(rule.template, variablesForRule);
       
       // Check client preferences before sending
-      if (rule.type === 'email' && client.email && shouldSendEmail(rule, client)) {
+      const overrideEmail = (appointmentData as any)?.testEmail as string | undefined;
+      const canSend = overrideEmail ? true : shouldSendEmail(rule, client);
+      const toEmail = overrideEmail || client.email;
+      if (rule.type === 'email' && toEmail && canSend) {
         console.log(`Email automation check for ${rule.name}: client.email=${!!client.email}, canSendEmail=${shouldSendEmail(rule, client)}, preferences:`, {
           emailAccountManagement: client.emailAccountManagement,
           emailAppointmentReminders: client.emailAppointmentReminders,
           emailPromotions: client.emailPromotions
         });
         
-        const subject = rule.subject ? replaceTemplateVariables(rule.subject, variables) : 'Notification from BeautyBook Salon';
+        const subject = rule.subject ? replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from BeautyBook Salon';
         
         const emailSent = await sendEmail({
-          to: client.email,
+          to: toEmail,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           subject,
           text: processedTemplate,

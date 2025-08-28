@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from '@/lib/queryClient';
 
@@ -13,14 +12,15 @@ interface TerminalManagementProps {
 export default function TerminalManagement({ locationId }: TerminalManagementProps) {
   const [deviceCode, setDeviceCode] = useState('');
   const [apiToken, setApiToken] = useState('');
+  const [terminalId, setTerminalId] = useState('');
   const [isInitializing, setIsInitializing] = useState(false);
   const { toast } = useToast();
 
   const handleInitializeTerminal = async () => {
-    if (!deviceCode || !apiToken) {
+    if (!deviceCode || !apiToken || !terminalId) {
       toast({
         title: "Validation Error",
-        description: "Device Code and API Token are required",
+        description: "Terminal ID, Device Code and API Token are required",
         variant: "destructive",
       });
       return;
@@ -30,6 +30,7 @@ export default function TerminalManagement({ locationId }: TerminalManagementPro
 
     try {
       const response = await apiRequest('POST', '/api/terminal/initialize', {
+        terminalId,
         deviceCode,
         locationId,
         apiToken,
@@ -81,14 +82,19 @@ export default function TerminalManagement({ locationId }: TerminalManagementPro
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Terminal Management</CardTitle>
-        <CardDescription>
-          Configure and manage your Helcim Smart Terminal for this location
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="terminalId">Terminal ID</Label>
+          <Input
+            id="terminalId"
+            value={terminalId}
+            onChange={(e) => setTerminalId(e.target.value)}
+            placeholder="Enter Terminal ID (e.g., terminal-1)"
+          />
+          <p className="text-sm text-gray-500">
+            A unique identifier for this terminal (e.g., "terminal-1", "front-desk", etc.)
+          </p>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="deviceCode">Device Code</Label>
           <Input
@@ -116,9 +122,8 @@ export default function TerminalManagement({ locationId }: TerminalManagementPro
           <p className="text-sm text-gray-500">
             Each terminal should have its own API token from Helcim
           </p>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-end gap-2">
+      </div>
+      <div className="flex justify-end gap-2 pt-4 border-t">
         <Button
           variant="outline"
           onClick={handleTestTerminal}
@@ -132,7 +137,7 @@ export default function TerminalManagement({ locationId }: TerminalManagementPro
         >
           {isInitializing ? "Initializing..." : "Initialize Terminal"}
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -150,6 +150,30 @@ CREATE TABLE IF NOT EXISTS terminal_configurations (
   }
 
   /**
+   * Fallback: get any active terminal configuration when locationId is missing
+   */
+  async getAnyActiveTerminalConfig(): Promise<TerminalConfig | null> {
+    try {
+      const dbClient: any = (this.storage as any).db ?? (await import('../db.js')).db;
+      const sel = sql`SELECT * FROM terminal_configurations WHERE is_active = true ORDER BY updated_at DESC LIMIT 1` as any;
+      const res: any = await dbClient.execute(sel);
+      const config = res?.rows || res || [];
+      if (!config.length) return null;
+      const row: any = config[0];
+      const decryptedToken = await decrypt(row.api_token);
+      return {
+        terminalId: String(row.terminal_id ?? row.terminalId ?? ''),
+        deviceCode: String(row.device_code ?? row.deviceCode ?? ''),
+        locationId: String(row.location_id ?? row.locationId ?? ''),
+        apiToken: decryptedToken,
+      } as any;
+    } catch (error: any) {
+      console.error('❌ Error getting fallback terminal configuration:', error);
+      return null;
+    }
+  }
+
+  /**
    * Get terminal configuration by device code
    */
   async getTerminalConfigByDeviceCode(deviceCode: string): Promise<TerminalConfig | null> {

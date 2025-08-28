@@ -61,6 +61,7 @@ import {
   User
 } from "lucide-react";
 import { ImageUploadField } from "./image-upload-field";
+import { SignaturePad } from "@/components/forms/signature-pad";
 import { createForm } from "@/api/forms";
 
 // Error Boundary Component
@@ -752,12 +753,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         return (
           <div className="space-y-2">
             <Label>{config.label}</Label>
-            <div className="border-2 border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center min-h-[120px] flex items-center justify-center">
-              <div className="text-gray-500 dark:text-gray-400">
-                <FileText className="h-8 w-8 mx-auto mb-2" />
-                <p className="text-sm">Click to sign</p>
-              </div>
-            </div>
+            <SignaturePad penColor={config.penColor || "#000000"} backgroundColor={config.backgroundColor || "#ffffff"} />
           </div>
         );
       
@@ -1273,12 +1269,41 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[calc(100vw-2rem)] md:max-w-[90vw] max-w-[1100px] max-h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>{formId ? "Edit Form" : "Form Builder"}</DialogTitle>
-            <DialogDescription>
-              {formId
-                ? "Update your form below."
-                : "Build your form by adding fields and configuring them."}
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <DialogTitle>{formId ? "Edit Form" : "Form Builder"}</DialogTitle>
+                <DialogDescription>
+                  {formId
+                    ? "Update your form below."
+                    : "Build your form by adding fields and configuring them."}
+                </DialogDescription>
+              </div>
+              {formId && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    form="form-builder-form"
+                    disabled={saveFormMutation.isPending || form.formState.isSubmitting}
+                  >
+                    {saveFormMutation.isPending ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Updating...
+                      </>
+                    ) : (
+                      "Update Form"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           <div className="flex flex-1 min-h-0 gap-4 overflow-x-hidden">
@@ -1342,7 +1367,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
               {/* Form Content */}
               <div className="flex-1 overflow-y-auto p-4">
                 <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <form id="form-builder-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                     {activeTab === "builder" ? (
                       <>
                         {/* Form Settings */}
@@ -1566,34 +1591,36 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                       </div>
                     )}
 
-                    {/* Form Submit Button */}
-                    <div className="flex justify-end space-x-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => onOpenChange(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={saveFormMutation.isPending || form.formState.isSubmitting}
-                        onClick={() => {
-                          console.log("Submit button clicked");
-                          console.log("Current form values:", form.getValues());
-                          console.log("Form errors:", form.formState.errors);
-                        }}
-                      >
-                        {saveFormMutation.isPending ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                            {formId ? "Updating..." : "Creating..."}
-                          </>
-                        ) : (
-                          formId ? "Update Form" : "Create Form"
-                        )}
-                      </Button>
-                    </div>
+                    {/* Form Submit Button at bottom remains for new form flow, shows only when creating */}
+                    {!formId && (
+                      <div className="flex justify-end space-x-2 pt-4">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => onOpenChange(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={saveFormMutation.isPending || form.formState.isSubmitting}
+                          onClick={() => {
+                            console.log("Submit button clicked");
+                            console.log("Current form values:", form.getValues());
+                            console.log("Form errors:", form.formState.errors);
+                          }}
+                        >
+                          {saveFormMutation.isPending ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Creating...
+                            </>
+                          ) : (
+                            "Create Form"
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </form>
                 </Form>
               </div>

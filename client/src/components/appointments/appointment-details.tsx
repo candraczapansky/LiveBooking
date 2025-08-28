@@ -3,8 +3,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import AppointmentPhotos from "./appointment-photos";
 import { NoteInput } from "@/components/ui/note-input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 // removed useLocation; handled note history locally
 
 
@@ -16,16 +18,26 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, X, Save, Trash2, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail } from "lucide-react";
+import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientNoteHistory from "@/components/client/client-note-history";
+import AppointmentPhotos from "@/components/appointments/appointment-photos";
+// Removed inline photo upload UI; keep only components in use
 
 interface AppointmentDetailsProps {
   open: boolean;
@@ -34,6 +46,35 @@ interface AppointmentDetailsProps {
   onEdit?: (appointmentId: number) => void;
   onDelete?: (appointmentId: number) => void;
 }
+
+// Client form schema
+const clientFormSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  firstName: z.string().min(1, { message: "First name is required" }).optional().or(z.literal('')),
+  lastName: z.string().min(1, { message: "Last name is required" }).optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
+  address: z.string().optional().or(z.literal('')),
+  city: z.string().optional().or(z.literal('')),
+  state: z.string().optional().or(z.literal('')),
+  zipCode: z.string().optional().or(z.literal(''))
+});
+
+type ClientFormValues = z.infer<typeof clientFormSchema>;
+
+// Service form schema
+const serviceFormSchema = z.object({
+  name: z.string().min(1, { message: "Service name is required" }),
+  description: z.string().optional().or(z.literal('')),
+  duration: z.number().min(1, { message: "Duration must be at least 1 minute" }),
+  price: z.number().min(0, { message: "Price must be 0 or greater" }),
+  color: z.string().optional().or(z.literal('')),
+});
+
+type ServiceFormValues = z.infer<typeof serviceFormSchema>;
+
+// Staff edit removed
+
+// Photo upload form types removed from notes card
 
 const AppointmentDetails = ({ 
   open, 
@@ -44,23 +85,62 @@ const AppointmentDetails = ({
 }: AppointmentDetailsProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [editedNotes, setEditedNotes] = useState("");
+  const [isCancelling, setIsCancelling] = useState(false);
+  // Removed legacy inline notes editing state
   // no routing needed for notes/forms dialogs
   const [isProcessingCashPayment, setIsProcessingCashPayment] = useState(false);
-  const [isProcessingCardPayment, setIsProcessingCardPayment] = useState(false);
+  const [isProcessingCardPayment] = useState(false);
   const [chargeAmount, setChargeAmount] = useState<number>(0);
   const [isProcessingGiftCardPayment, setIsProcessingGiftCardPayment] = useState(false);
   const [showPaymentOptions, setShowPaymentOptions] = useState(false);
   const [showCardPayment, setShowCardPayment] = useState(false);
   const [showTerminalPayment, setShowTerminalPayment] = useState(false);
-  const [selectedTerminalDevice, setSelectedTerminalDevice] = useState<string>('');
+  // Removed terminal device selection UI; keep minimal state if needed in future
   const [giftCardCode, setGiftCardCode] = useState("");
   const [showHelcimModal, setShowHelcimModal] = useState(false);
   const [tipAmount, setTipAmount] = useState<number>(0);
+  const [discountCode, setDiscountCode] = useState<string>("");
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [isValidatingDiscount, setIsValidatingDiscount] = useState(false);
+  const [appliedDiscountCode, setAppliedDiscountCode] = useState<string>("");
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isEditClientOpen, setIsEditClientOpen] = useState(false);
+  const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
+  // Staff edit dialog removed
+
+  // Inline photo upload removed; handled by standalone AppointmentPhotos
+  const [photoSectionNote, setPhotoSectionNote] = useState("");
+  const [isSavingPhotoNote, setIsSavingPhotoNote] = useState(false);
+
+  // Client edit form
+  const editClientForm = useForm<ClientFormValues>({
+    resolver: zodResolver(clientFormSchema),
+    defaultValues: {
+      email: '',
+      firstName: '',
+      lastName: '',
+      phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zipCode: ''
+    }
+  });
+
+  // Service edit form
+  const editServiceForm = useForm<ServiceFormValues>({
+    resolver: zodResolver(serviceFormSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      duration: 60,
+      price: 0,
+      color: '#3B82F6',
+    }
+  });
+
+  // Staff edit removed
 
   // Fetch appointment details (robust with fallback)
   const { data: appointment, isLoading } = useQuery({
@@ -137,6 +217,73 @@ const AppointmentDetails = ({
     enabled: !!staff?.userId
   });
 
+  // Ensure fresh client data when opening the edit dialog
+  useEffect(() => {
+    if (isEditClientOpen && appointment?.clientId) {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['/api/users', appointment.clientId] });
+        queryClient.refetchQueries({ queryKey: ['/api/users', appointment.clientId] });
+      } catch {}
+    }
+  }, [isEditClientOpen, appointment?.clientId, queryClient]);
+
+  // Client update mutation
+  const updateClientMutation = useMutation({
+    mutationFn: async (data: ClientFormValues & { id: number }) => {
+      const response = await apiRequest("PUT", `/api/users/${data.id}`, data);
+      if (!response.ok) {
+        throw new Error('Failed to update client');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users', appointment?.clientId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+      setIsEditClientOpen(false);
+      toast({
+        title: "Success",
+        description: "Client information updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update client information.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Service update mutation
+  const updateServiceMutation = useMutation({
+    mutationFn: async (data: ServiceFormValues & { id: number }) => {
+      const response = await apiRequest("PUT", `/api/services/${data.id}`, data);
+      if (!response.ok) {
+        throw new Error('Failed to update service');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/services', appointment?.serviceId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+      setIsEditServiceOpen(false);
+      toast({
+        title: "Success",
+        description: "Service information updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update service information.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Staff update removed per request
+
   // Compute the amount to charge for this appointment
   const getAppointmentChargeAmount = () => {
     const total = Number((appointment as any)?.totalAmount ?? 0);
@@ -161,30 +308,82 @@ const AppointmentDetails = ({
     }
   }, [showCardPayment, (appointment as any)?.totalAmount, (service as any)?.price]);
 
-  // Update notes mutation
-  const updateNotesMutation = useMutation({
-    mutationFn: async (notes: string) => {
-      if (!appointmentId) throw new Error('No appointment ID');
-      return apiRequest("PUT", `/api/appointments/${appointmentId}`, {
-        notes: notes || null
+  const calculateFinalAmount = () => {
+    const base = getAppointmentChargeAmount() || 0;
+    const discounted = Math.max(0, base - (appliedDiscountCode ? discountAmount : 0));
+    return discounted + (tipAmount || 0);
+  };
+
+  const handleApplyDiscount = async () => {
+    const code = discountCode.trim();
+    if (!code) {
+      toast({ title: "Enter a code", description: "Please enter a discount code to apply.", variant: "destructive" });
+      return;
+    }
+    setIsValidatingDiscount(true);
+    try {
+      const res = await apiRequest("POST", "/api/promo-codes/validate", {
+        code,
+        serviceId: service?.id,
+        amount: getAppointmentChargeAmount() || 0,
       });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
-      setIsEditingNotes(false);
-      toast({
-        title: "Success",
-        description: "Notes updated successfully.",
+      const data = await res.json();
+      if (!res.ok || !data?.valid) {
+        setDiscountAmount(0);
+        setAppliedDiscountCode("");
+        toast({ title: "Invalid code", description: data?.message || "This discount code cannot be applied.", variant: "destructive" });
+        return;
+      }
+      setDiscountAmount(Math.max(0, Number(data.discountAmount) || 0));
+      setAppliedDiscountCode(code.toUpperCase());
+      toast({ title: "Discount applied", description: `${code.toUpperCase()} applied successfully.` });
+    } catch (err) {
+      setDiscountAmount(0);
+      setAppliedDiscountCode("");
+      toast({ title: "Error", description: "Failed to validate discount code.", variant: "destructive" });
+    } finally {
+      setIsValidatingDiscount(false);
+    }
+  };
+
+  const handleRemoveDiscount = () => {
+    setDiscountCode("");
+    setDiscountAmount(0);
+    setAppliedDiscountCode("");
+  };
+
+  // Populate client edit form when client data changes
+  useEffect(() => {
+    if (client && isEditClientOpen) {
+      editClientForm.reset({
+        email: client.email || '',
+        firstName: client.firstName || '',
+        lastName: client.lastName || '',
+        phone: client.phone || '',
+        address: client.address || '',
+        city: client.city || '',
+        state: client.state || '',
+        zipCode: client.zipCode || ''
       });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update notes.",
-        variant: "destructive",
+    }
+  }, [client, isEditClientOpen, editClientForm]);
+
+  // Populate service edit form when service data changes
+  useEffect(() => {
+    if (service && isEditServiceOpen) {
+      editServiceForm.reset({
+        name: service.name || '',
+        description: service.description || '',
+        duration: service.duration || 60,
+        price: service.price || 0,
+        color: service.color || '#3B82F6',
       });
-    },
-  });
+    }
+  }, [service, isEditServiceOpen, editServiceForm]);
+
+  // Staff edit dialog removed
+
+  // Removed legacy update notes mutation
 
   // Resend confirmation - SMS
   const resendSmsMutation = useMutation({
@@ -259,85 +458,98 @@ const AppointmentDetails = ({
     }
   };
 
-  const handleDelete = async () => {
+  
+
+  const handleCancel = async () => {
     if (!appointmentId) return;
-    
-    setIsDeleting(true);
+    setIsCancelling(true);
     try {
-      await apiRequest("DELETE", `/api/appointments/${appointmentId}`);
-      toast({
-        title: "Success",
-        description: "Appointment deleted successfully.",
-      });
+      const res = await apiRequest("POST", `/api/appointments/${appointmentId}/cancel`, { reason: 'Cancelled from dashboard' });
+      try { await res.json(); } catch {}
+      try {
+        await queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+        await queryClient.invalidateQueries({ queryKey: ['/api/cancelled-appointments'] });
+      } catch {}
+      toast({ title: 'Appointment Cancelled', description: 'The appointment has been moved to cancelled.' });
       onOpenChange(false);
       if (onDelete) onDelete(appointmentId);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete appointment.",
-        variant: "destructive",
-      });
+      toast({ title: 'Error', description: error?.message || 'Failed to cancel appointment.', variant: 'destructive' });
     } finally {
-      setIsDeleting(false);
+      setIsCancelling(false);
     }
   };
 
-  const handleStartEditNotes = () => {
-    setEditedNotes(appointment?.notes || "");
-    setIsEditingNotes(true);
-  };
+  // Notes edit handlers
+  // Removed legacy inline notes editing handlers
+  // Removed legacy save-to-profile handler
 
-  const handleCancelEditNotes = () => {
-    setIsEditingNotes(false);
-    setEditedNotes("");
-  };
+  // Inline photo helpers removed; handled by standalone AppointmentPhotos
 
-  const handleSaveNotes = async () => {
-    if (!appointment) return;
-
+  const handleSavePhotoSectionNote = async () => {
+    if (!appointment || !client) return;
+    if (!photoSectionNote.trim()) return;
+    setIsSavingPhotoNote(true);
     try {
-      // Update appointment notes
-      await updateNotesMutation.mutateAsync(editedNotes);
-
-      // Also save to note history
       await fetch('/api/note-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientId: appointment.clientId,
+          clientId: client.id,
           appointmentId: appointment.id,
-          noteContent: editedNotes,
+          noteContent: photoSectionNote,
           noteType: 'appointment',
-          createdBy: 1, // TODO: Get actual user ID from auth context
+          createdBy: 1,
           createdByRole: 'staff'
         })
       });
-
-      setIsEditingNotes(false);
-      toast({
-        title: "Notes Updated",
-        description: "Appointment notes have been updated successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update notes. Please try again.",
-        variant: "destructive",
-      });
+      try {
+        await queryClient.invalidateQueries({ queryKey: [`/api/note-history/client/${client.id}`] });
+      } catch {}
+      toast({ title: 'Note Added', description: 'Your note was saved.' });
+      setPhotoSectionNote("");
+    } catch {
+      toast({ title: 'Error', description: 'Failed to save note', variant: 'destructive' });
+    } finally {
+      setIsSavingPhotoNote(false);
     }
   };
+
+  const handleEditClient = async (values: ClientFormValues) => {
+    if (!client) return;
+    
+    await updateClientMutation.mutateAsync({
+      ...values,
+      id: client.id
+    });
+  };
+
+  const handleEditService = async (values: ServiceFormValues) => {
+    if (!service) return;
+    
+    await updateServiceMutation.mutateAsync({
+      ...values,
+      id: service.id
+    });
+  };
+
+  // Staff edit removed
 
   const handleCashPayment = async () => {
     if (!appointmentId || !appointment) return;
     
     setIsProcessingCashPayment(true);
     try {
+      const finalAmount = calculateFinalAmount();
       // Create a payment record for cash payment
       await apiRequest("POST", "/api/payments", {
         clientId: appointment.clientId,
         appointmentId: appointmentId,
-        amount: appointment.totalAmount || 0,
-        totalAmount: appointment.totalAmount || 0,
+        amount: finalAmount,
+        totalAmount: finalAmount,
+        discountAmount: appliedDiscountCode ? discountAmount : 0,
+        discountCode: appliedDiscountCode || null,
         method: "cash",
         status: "completed"
       });
@@ -345,7 +557,9 @@ const AppointmentDetails = ({
       // Update appointment payment status
       await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
         ...appointment,
-        paymentStatus: "paid"
+        paymentStatus: "paid",
+        tipAmount: tipAmount || 0,
+        totalAmount: finalAmount
       });
 
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -383,28 +597,7 @@ const AppointmentDetails = ({
     setShowHelcimModal(true);
   };
 
-  const handleCardPaymentSuccess = () => {
-    setShowCardPayment(false);
-    setShowPaymentOptions(false);
-    queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
-    toast({
-      title: "Card Payment Successful",
-      description: "Payment processed successfully.",
-    });
-  };
-
-  const handleCardPaymentError = (error: string) => {
-    toast({
-      title: "Payment Error",
-      description: error,
-      variant: "destructive",
-    });
-  };
-
-  const handleCardPaymentCancel = () => {
-    setShowCardPayment(false);
-  };
+  // Card payment inline handlers handled inline in JSX
 
   const pollForPaymentConfirmation = async (transactionId: string, paymentId: string) => {
     let attempts = 0;
@@ -531,12 +724,15 @@ const AppointmentDetails = ({
     
     setIsProcessingGiftCardPayment(true);
     try {
+      const finalAmount = calculateFinalAmount();
       // Create a payment record for gift card payment
       await apiRequest("POST", "/api/payments", {
         clientId: appointment.clientId,
         appointmentId: appointmentId,
-        amount: appointment.totalAmount || 0,
-        totalAmount: appointment.totalAmount || 0,
+        amount: finalAmount,
+        totalAmount: finalAmount,
+        discountAmount: appliedDiscountCode ? discountAmount : 0,
+        discountCode: appliedDiscountCode || null,
         method: "gift_card",
         status: "completed",
         notes: `Gift card payment with code: ${giftCardCode}`
@@ -545,7 +741,9 @@ const AppointmentDetails = ({
       // Update appointment payment status
       await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
         ...appointment,
-        paymentStatus: "paid"
+        paymentStatus: "paid",
+        tipAmount: tipAmount || 0,
+        totalAmount: finalAmount
       });
 
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
@@ -667,6 +865,17 @@ const AppointmentDetails = ({
                     </p>
                   </div>
                 </div>
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-gray-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Staff
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Unknown Staff'}
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -674,9 +883,22 @@ const AppointmentDetails = ({
           {/* Client Information */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <User className="h-5 w-5 text-gray-500" />
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Client</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-gray-500" />
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Client</h3>
+                </div>
+                {client && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditClientOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <UserCog className="h-4 w-4" />
+                    Edit Client
+                  </Button>
+                )}
               </div>
               {client ? (
                 <div className="space-y-2">
@@ -701,9 +923,22 @@ const AppointmentDetails = ({
           {/* Service Information */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <Scissors className="h-5 w-5 text-gray-500" />
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Service</h3>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Scissors className="h-5 w-5 text-gray-500" />
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Service</h3>
+                </div>
+                {service && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditServiceOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="h-4 w-4" />
+                    Edit Service
+                  </Button>
+                )}
               </div>
               {service ? (
                 <div className="space-y-2">
@@ -728,32 +963,7 @@ const AppointmentDetails = ({
             </CardContent>
           </Card>
 
-          {/* Staff Information */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <User className="h-5 w-5 text-gray-500" />
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Staff Member</h3>
-              </div>
-              {staffUser ? (
-                <div className="space-y-2">
-                  <p className="text-sm">
-                    <span className="font-medium">Name:</span> {staffUser.firstName} {staffUser.lastName}
-                  </p>
-                  <p className="text-sm">
-                    <span className="font-medium">Email:</span> {staffUser.email}
-                  </p>
-                  {staff?.title && (
-                    <p className="text-sm">
-                      <span className="font-medium">Title:</span> {staff.title}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">Staff information not available</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* Staff Information section removed per request */}
 
           {/* Payment Information */}
           <Card>
@@ -773,6 +983,37 @@ const AppointmentDetails = ({
                 {/* Payment Options - Only show if not already paid */}
                 {(appointment.paymentStatus || 'unpaid') !== 'paid' && (
                   <div className="pt-3 space-y-3">
+                    {/* Discount Code Section */}
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Discount Code</div>
+                      {!appliedDiscountCode ? (
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Enter discount code"
+                            value={discountCode}
+                            onChange={(e) => setDiscountCode(e.target.value)}
+                            className="flex-1"
+                            disabled={isValidatingDiscount}
+                          />
+                          <Button
+                            onClick={handleApplyDiscount}
+                            disabled={!discountCode.trim() || isValidatingDiscount}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {isValidatingDiscount ? "Validating" : "Apply"}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md">
+                          <span className="text-sm text-green-700 dark:text-green-300 font-medium">
+                            {appliedDiscountCode}: -{formatPrice(discountAmount)}
+                          </span>
+                          <Button onClick={handleRemoveDiscount} variant="ghost" size="sm" className="h-6 px-2 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20">Remove</Button>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Tip selection shown before choosing payment method */}
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Tip</div>
@@ -787,7 +1028,7 @@ const AppointmentDetails = ({
                         <div className="flex items-center gap-2">
                           <span className="text-sm">Custom:</span>
                           <Input type="number" className="h-8 w-28" value={Number.isNaN(tipAmount) ? '' : tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} min="0" step="0.01" />
-                          <span className="ml-auto text-sm">Total: {formatPrice((getAppointmentChargeAmount() || 0) + (tipAmount || 0))}</span>
+                          <span className="ml-auto text-sm">Total: {formatPrice(calculateFinalAmount())}</span>
                         </div>
                       </div>
                     </div>
@@ -800,7 +1041,7 @@ const AppointmentDetails = ({
                       >
                         <DollarSign className="h-4 w-4 mr-2" />
                         {getAppointmentChargeAmount() > 0 ? (
-                          <>Pay {formatPrice((getAppointmentChargeAmount() || 0) + (tipAmount || 0))}</>
+                          <>Pay {formatPrice(calculateFinalAmount())}</>
                         ) : (
                           <>Calculating price…</>
                         )}
@@ -901,7 +1142,7 @@ const AppointmentDetails = ({
                         <div className="bg-muted p-4 rounded-lg">
                           <div className="flex justify-between items-center text-lg font-semibold">
                             <span>Total:</span>
-                            <span>${(((chargeAmount || getAppointmentChargeAmount()) + (tipAmount || 0))).toFixed(2)}</span>
+                            <span>{formatPrice(calculateFinalAmount())}</span>
                           </div>
                         </div>
                         <div className="flex gap-3">
@@ -922,7 +1163,7 @@ const AppointmentDetails = ({
                         <HelcimPayJsModal
                           open={showHelcimModal}
                           onOpenChange={setShowHelcimModal}
-                          amount={(chargeAmount || getAppointmentChargeAmount()) + (tipAmount || 0)}
+                          amount={calculateFinalAmount()}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
                           appointmentId={appointment.id}
                           clientId={appointment.clientId}
@@ -933,7 +1174,7 @@ const AppointmentDetails = ({
                                 status: 'completed',
                                 paymentStatus: 'paid',
                                 tipAmount: tipAmount || 0,
-                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0)
+                                totalAmount: calculateFinalAmount()
                               });
                             } catch {}
                             setShowHelcimModal(false);
@@ -968,19 +1209,22 @@ const AppointmentDetails = ({
                         <SmartTerminalPayment
                           open={showTerminalPayment}
                           onOpenChange={setShowTerminalPayment}
-                          amount={chargeAmount || getAppointmentChargeAmount()}
+                          amount={Math.max(0, (chargeAmount || getAppointmentChargeAmount()) - (appliedDiscountCode ? discountAmount : 0))}
                           tipAmount={tipAmount}
                           locationId={appointment.locationId}
                           description={`Payment for ${service?.name || 'Appointment'}`}
                           onSuccess={async (result: any) => {
                             try {
+                              const finalAmount = calculateFinalAmount();
                               // First, create a pending payment record - don't mark as completed yet
                               const paymentResponse = await apiRequest("POST", "/api/payments", {
                                 clientId: appointment.clientId,
                                 appointmentId: appointment.id,
-                                amount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0),
+                                amount: finalAmount,
                                 tipAmount: tipAmount || 0,
-                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0),
+                                totalAmount: finalAmount,
+                                discountAmount: appliedDiscountCode ? discountAmount : 0,
+                                discountCode: appliedDiscountCode || null,
                                 method: 'card',
                                 status: 'pending', // Start as pending until terminal confirms
                                 type: 'appointment_payment',
@@ -998,7 +1242,7 @@ const AppointmentDetails = ({
                                 paymentStatus: 'pending', // Keep as pending until terminal confirms
                                 status: 'completed', // Service is completed but payment is pending
                                 tipAmount: tipAmount || 0,
-                                totalAmount: (appointment.totalAmount ?? appointment.service?.price ?? 0) + (tipAmount || 0)
+                                totalAmount: finalAmount
                               });
 
                               toast({
@@ -1033,99 +1277,72 @@ const AppointmentDetails = ({
             </CardContent>
           </Card>
 
-          {/* Notes */}
+          {/* Notes (read-only) */}
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">Notes</h3>
                 <div className="flex items-center gap-2">
-                  {!isEditingNotes && (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsNotesOpen(true)}
-                        className="flex items-center gap-2"
-                      >
-                        <MessageSquare className="h-4 w-4" />
-                        View Note History
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsFormsOpen(true)}
-                        className="flex items-center gap-2"
-                      >
-                        <FileText className="h-4 w-4" />
-                        View Client Forms
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleStartEditNotes}
-                        className="flex items-center gap-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit
-                      </Button>
-                    </>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsNotesOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    View Note History
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsFormsOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View Client Forms
+                  </Button>
                 </div>
               </div>
-              
-              {isEditingNotes ? (
-                <div className="space-y-4">
-                  <NoteInput
-                    value={editedNotes}
-                    onChange={setEditedNotes}
-                    placeholder="Add notes for this appointment..."
-                    category="appointment"
-                    showTemplateSelector={true}
-                    rows={4}
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveNotes}
-                      disabled={updateNotesMutation.isPending}
-                      className="flex items-center gap-2"
-                    >
-                      <Save className="h-4 w-4" />
-                      {updateNotesMutation.isPending ? "Saving..." : "Save"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleCancelEditNotes}
-                      disabled={updateNotesMutation.isPending}
-                      className="flex items-center gap-2"
-                    >
-                      <X className="h-4 w-4" />
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  {appointment.notes ? (
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
-                  ) : (
-                    <p className="text-sm text-gray-500 italic">No notes added yet</p>
-                  )}
-                </div>
-              )}
+              <div>
+                {appointment.notes ? (
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{appointment.notes}</p>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No notes added yet</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          {/* Progress Photos */}
+          {/* Treatment Photos (standalone section) */}
           <Card>
-            <CardContent className="pt-6">
-              <AppointmentPhotos 
-                appointmentId={appointmentId!} 
-                onPhotosUpdated={() => {
-                  // Optionally refresh appointment data if needed
-                }}
-              />
+            <CardContent>
+              <div className="flex items-center gap-2 mb-2">
+                <Camera className="h-4 w-4" />
+                <span className="text-sm font-medium">Treatment Photos</span>
+              </div>
+              {appointmentId && (
+                <AppointmentPhotos appointmentId={appointmentId!} onPhotosUpdated={() => {}} />
+              )}
+
+              {/* Notes and Templates for Photos Section */}
+              <div className="mt-4 space-y-3">
+                <div className="text-sm font-medium">Add a Note</div>
+                <NoteInput
+                  value={photoSectionNote}
+                  onChange={setPhotoSectionNote}
+                  placeholder="Add a note about these photos..."
+                  category="appointment"
+                  showTemplateSelector={true}
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={handleSavePhotoSectionNote} disabled={isSavingPhotoNote || !photoSectionNote.trim()} className="flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    {isSavingPhotoNote ? 'Saving...' : 'Save Note'}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setPhotoSectionNote("")}>Clear</Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -1167,15 +1384,16 @@ const AppointmentDetails = ({
               Edit
             </Button>
           )}
-          {onDelete && (
+          
+          {appointment?.status !== 'cancelled' && (
             <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
+              variant="outline"
+              onClick={handleCancel}
+              disabled={isCancelling}
               className="flex items-center gap-2"
             >
-              <Trash2 className="h-4 w-4" />
-              {isDeleting ? "Deleting..." : "Delete"}
+              <X className="h-4 w-4" />
+              {isCancelling ? 'Cancelling...' : 'Cancel Appointment'}
             </Button>
           )}
         </DialogFooter>
@@ -1183,7 +1401,7 @@ const AppointmentDetails = ({
     </Dialog>
     {client && (
       <Dialog open={isFormsOpen} onOpenChange={setIsFormsOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -1209,10 +1427,250 @@ const AppointmentDetails = ({
               Notes for {client.firstName} {client.lastName}
             </DialogDescription>
           </DialogHeader>
+          {/* Removed edit trigger from Note History dialog */}
           <ClientNoteHistory clientId={client.id} clientName={`${client.firstName} ${client.lastName}`} />
         </DialogContent>
       </Dialog>
     )}
+    {client && (
+      <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCog className="h-4 w-4" />
+              Edit Client Information
+            </DialogTitle>
+            <DialogDescription>
+              Update {client.firstName} {client.lastName}'s information
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editClientForm}>
+            <form onSubmit={editClientForm.handleSubmit(handleEditClient)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editClientForm.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editClientForm.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editClientForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editClientForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editClientForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={editClientForm.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editClientForm.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editClientForm.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditClientOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateClientMutation.isPending}>
+                  {updateClientMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    )}
+    {service && (
+      <Dialog open={isEditServiceOpen} onOpenChange={setIsEditServiceOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Edit Service Information
+            </DialogTitle>
+            <DialogDescription>
+              Update service details
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editServiceForm}>
+            <form onSubmit={editServiceForm.handleSubmit(handleEditService)} className="space-y-4">
+              <FormField
+                control={editServiceForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editServiceForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editServiceForm.control}
+                  name="duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration (minutes)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editServiceForm.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price ($)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          {...field} 
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editServiceForm.control}
+                name="color"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Color</FormLabel>
+                    <FormControl>
+                      <Input type="color" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setIsEditServiceOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateServiceMutation.isPending}>
+                  {updateServiceMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    )}
+    {/* Edit Staff dialog removed per request */}
     </>
   );
 };

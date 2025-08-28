@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
 import {
@@ -26,12 +26,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const roomFormSchema = z.object({
   name: z.string().min(1, "Room name is required"),
   description: z.string().optional(),
   capacity: z.coerce.number().min(1, "Capacity must be at least 1").optional(),
   isActive: z.boolean().default(true),
+  locationId: z.coerce.number({ required_error: "Location is required" }),
 });
 
 type RoomFormValues = z.infer<typeof roomFormSchema>;
@@ -53,6 +55,16 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
       description: "",
       capacity: 1,
       isActive: true,
+      locationId: undefined as unknown as number,
+    },
+  });
+
+  // Locations for assignment
+  const { data: locations = [] } = useQuery<any[]>({
+    queryKey: ["/api/locations"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/locations");
+      return res.json();
     },
   });
 
@@ -65,6 +77,7 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
           description: room.description || "",
           capacity: room.capacity || 1,
           isActive: room.isActive ?? true,
+          locationId: room.locationId ?? undefined,
         });
       } else {
         form.reset({
@@ -72,6 +85,7 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
           description: "",
           capacity: 1,
           isActive: true,
+          locationId: undefined as unknown as number,
         });
       }
     }
@@ -199,6 +213,34 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
                       placeholder="1" 
                       {...field} 
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="locationId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl>
+                    <Select
+                      value={field.value ? String(field.value) : ""}
+                      onValueChange={(v) => field.onChange(parseInt(v))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.isArray(locations) && locations.map((loc: any) => (
+                          <SelectItem key={loc.id} value={String(loc.id)}>
+                            {loc.name || `Location ${loc.id}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

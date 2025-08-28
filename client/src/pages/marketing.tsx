@@ -66,6 +66,7 @@ import {
   ArrowRight,
   Edit,
   Trash2,
+  Save,
   AlertTriangle,
   Eye,
   Users,
@@ -198,6 +199,7 @@ const MarketingPage = () => {
   const [showEmailEditor, setShowEmailEditor] = useState(false);
   const emailEditorRef = useRef<EmailTemplateEditorRef>(null);
   const [optOutSearchQuery, setOptOutSearchQuery] = useState("");
+  
   const [selectedClients, setSelectedClients] = useState<Client[]>([]);
   const [clientSearchQuery, setClientSearchQuery] = useState("");
   const [showClientSelector, setShowClientSelector] = useState(false);
@@ -499,8 +501,11 @@ const MarketingPage = () => {
       
       console.log('API payload:', payload);
       
-      const response = await fetch('/api/promo-codes', {
-        method: 'POST',
+      const isEdit = Boolean((promoForm as any)._editId);
+      const endpoint = isEdit ? `/api/promo-codes/${(promoForm as any)._editId}` : '/api/promo-codes';
+      const method = isEdit ? 'PUT' : 'POST';
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -523,10 +528,11 @@ const MarketingPage = () => {
       console.log('Mutation success, closing dialog and resetting form');
       queryClient.invalidateQueries({ queryKey: ['/api/promo-codes'] });
       toast({
-        title: "Promo code created",
-        description: "Your promo code has been created successfully.",
+        title: (promoForm as any)._editId ? "Promo code updated" : "Promo code created",
+        description: (promoForm as any)._editId ? "Your promo code has been updated successfully." : "Your promo code has been created successfully.",
       });
       setIsPromoFormOpen(false);
+      (promoForm as any)._editId = undefined;
       promoForm.reset();
     },
     onError: (error: any) => {
@@ -972,7 +978,21 @@ const MarketingPage = () => {
                                 variant="ghost"
                                 size="default"
                                 className="min-h-[44px] min-w-[44px] p-3"
-                                onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code editing will be available soon!" })}
+                                onClick={() => {
+                                  // Prefill form with selected promo and open dialog for editing
+                                  promoForm.reset({
+                                    code: promo.code,
+                                    type: promo.type,
+                                    value: promo.value,
+                                    service: promo.service || '',
+                                    expirationDate: promo.expirationDate?.slice(0,10) || '',
+                                    usageLimit: promo.usageLimit,
+                                    active: !!promo.active,
+                                  });
+                                  // Attach an internal field for edit mode
+                                  (promoForm as any)._editId = promo.id;
+                                  setIsPromoFormOpen(true);
+                                }}
                               >
                                 <Edit className="h-4 w-4 text-gray-600" />
                               </Button>
@@ -980,7 +1000,19 @@ const MarketingPage = () => {
                                 variant="ghost"
                                 size="default"
                                 className="min-h-[44px] min-w-[44px] p-3 text-destructive"
-                                onClick={() => toast({ title: "Feature Coming Soon", description: "Promo code deletion will be available soon!" })}
+                                onClick={async () => {
+                                  try {
+                                    const resp = await apiRequest('DELETE', `/api/promo-codes/${promo.id}`);
+                                    if (!resp.ok) {
+                                      const err = await resp.json().catch(() => ({}));
+                                      throw new Error(err.error || 'Failed to delete promo code');
+                                    }
+                                    queryClient.invalidateQueries({ queryKey: ['/api/promo-codes'] });
+                                    toast({ title: 'Deleted', description: 'Promo code deleted successfully.' });
+                                  } catch (e: any) {
+                                    toast({ title: 'Delete failed', description: e?.message || 'Unable to delete promo code', variant: 'destructive' });
+                                  }
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
@@ -1006,6 +1038,59 @@ const MarketingPage = () => {
                             </div>
                           </div>
                           
+                          <div className="mt-4 text-sm">
+                            <span className="font-medium">Test this code:</span>
+                            <div className="mt-2 flex gap-2">
+                              <Input
+                                placeholder="Enter amount"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    (async () => {
+                                      const target = e.target as HTMLInputElement;
+                                      const amount = parseFloat(target.value || '0') || 0;
+                                      try {
+                                        const resp = await apiRequest('POST', '/api/promo-codes/validate', { code: promo.code, amount });
+                                        const data = await resp.json();
+                                        if (resp.ok && data.valid) {
+                                          toast({ title: 'Valid', description: `Discount: $${(data.discountAmount || 0).toFixed(2)} | New total: $${(data.newTotal || 0).toFixed(2)}` });
+                                        } else {
+                                          toast({ title: 'Invalid', description: data?.message || 'Code not valid for this amount', variant: 'destructive' });
+                                        }
+                                      } catch {
+                                        toast({ title: 'Error', description: 'Failed to validate code', variant: 'destructive' });
+                                      }
+                                    })();
+                                  }
+                                }}
+                                className="w-40"
+                              />
+                              <Button
+                                variant="outline"
+                                onClick={async (ev) => {
+                                  const container = (ev.currentTarget.parentElement as HTMLElement);
+                                  const input = container.querySelector('input') as HTMLInputElement | null;
+                                  const amount = input ? (parseFloat(input.value || '0') || 0) : 0;
+                                  try {
+                                    const resp = await apiRequest('POST', '/api/promo-codes/validate', { code: promo.code, amount });
+                                    const data = await resp.json();
+                                    if (resp.ok && data.valid) {
+                                      toast({ title: 'Valid', description: `Discount: $${(data.discountAmount || 0).toFixed(2)} | New total: $${(data.newTotal || 0).toFixed(2)}` });
+                                    } else {
+                                      toast({ title: 'Invalid', description: data?.message || 'Code not valid for this amount', variant: 'destructive' });
+                                    }
+                                  } catch {
+                                    toast({ title: 'Error', description: 'Failed to validate code', variant: 'destructive' });
+                                  }
+                                }}
+                              >
+                                Test
+                              </Button>
+                            </div>
+                          </div>
+
                           {(promo.usedCount || 0) / promo.usageLimit > 0.8 && (
                             <div className="mt-4 flex items-center text-amber-600 dark:text-amber-500">
                               <AlertTriangle className="h-4 w-4 mr-1" />

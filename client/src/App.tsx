@@ -37,6 +37,7 @@ const Schedule = lazy(() => import("@/pages/schedule"));
 const StaffSchedule = lazy(() => import("@/pages/staff-schedule"));
 const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail"));
 const ClientBooking = lazy(() => import("@/pages/client-booking"));
+const ClientBookingTest = lazy(() => import("@/pages/appointments"));
 const PointOfSale = lazy(() => import("@/pages/pos"));
 const Products = lazy(() => import("@/pages/products"));
 const EmailTest = lazy(() => import("@/pages/email-test"));
@@ -44,6 +45,8 @@ const GiftCertificatesPage = lazy(() => import("@/pages/gift-certificates"));
 const PhonePage = lazy(() => import("@/pages/phone"));
 const FormsPage = lazy(() => import("@/pages/forms"));
 const FormDisplay = lazy(() => import("@/pages/form-display"));
+const DocumentsPage = lazy(() => import("@/pages/documents"));
+const DocumentDisplay = lazy(() => import("@/pages/document-display"));
 const AIMessagingPage = lazy(() => import("@/pages/ai-messaging"));
 const PayrollPage = lazy(() => import("@/pages/payroll"));
 const Locations = lazy(() => import("@/pages/locations"));
@@ -78,6 +81,7 @@ function Router() {
           <Route path="/reset-password" component={ResetPassword} />
           <Route path="/booking" component={ClientBooking} />
           <Route path="/forms/:id" component={FormDisplay} />
+          <Route path="/documents/:id" component={DocumentDisplay} />
           <Route path="/" component={Login} />
           <Route component={Login} />
         </Switch>
@@ -92,7 +96,7 @@ function Router() {
         <Switch>
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/booking" component={ClientBooking} />
+          <Route path="/booking-test" component={ClientBookingTest} />
           <Route path="/services" component={Services} />
           <Route path="/clients" component={Clients} />
           <Route path="/clients/:clientId" component={Clients} />
@@ -111,6 +115,7 @@ function Router() {
           <Route path="/note-templates" component={NoteTemplates} />
           <Route path="/phone" component={PhonePage} />
           <Route path="/forms" component={FormsPage} />
+          <Route path="/documents" component={DocumentsPage} />
           <Route path="/ai-messaging" component={AIMessagingPage} />
           <Route path="/payroll" component={PayrollPage} />
           <Route path="/locations" component={Locations} />
@@ -129,12 +134,16 @@ function Router() {
 
 export default function App() {
   const [location] = useLocation();
+  // Normalize away any query string for public route detection
+  const pathOnly = location.split('?')[0];
   // Check if we're on a public form route
-  const isPublicFormRoute = !!location.match(/^\/forms\/\d+$/);
+  const isPublicFormRoute = /^\/forms\/\d+$/.test(pathOnly);
+  // Public document viewer route (string id like doc_123...)
+  const isPublicDocumentRoute = /^\/documents\/[A-Za-z0-9_-]+$/.test(pathOnly);
   // Always treat reset-password as a standalone public page (no MainLayout/header)
   const isResetPasswordRoute = location.startsWith('/reset-password');
-  // Treat booking as a minimal page (no MainLayout/header)
-  const isBookingRoute = location.startsWith('/booking');
+  // Treat only /booking as minimal page (no MainLayout/header). Do not include /booking-test
+  const isBookingRoute = location === '/booking';
 
   if (isResetPasswordRoute) {
     return (
@@ -178,6 +187,20 @@ export default function App() {
         <TooltipProvider>
           <Suspense fallback={<PageLoading />}>
             <FormDisplay />
+          </Suspense>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  // For public document routes, render without AuthProvider
+  if (isPublicDocumentRoute) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Suspense fallback={<PageLoading />}>
+            <DocumentDisplay />
           </Suspense>
           <Toaster />
         </TooltipProvider>

@@ -474,6 +474,21 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        // Include non-sensitive contact/profile fields so client edit dialogs populate correctly
+        phone: (user as any).phone ?? null,
+        address: (user as any).address ?? null,
+        city: (user as any).city ?? null,
+        state: (user as any).state ?? null,
+        zipCode: (user as any).zipCode ?? null,
+        notes: (user as any).notes ?? null,
+        profilePicture: (user as any).profilePicture ?? null,
+        birthday: (user as any).birthday ?? null,
+        emailAccountManagement: (user as any).emailAccountManagement ?? true,
+        emailAppointmentReminders: (user as any).emailAppointmentReminders ?? true,
+        emailPromotions: (user as any).emailPromotions ?? false,
+        smsAccountManagement: (user as any).smsAccountManagement ?? false,
+        smsAppointmentReminders: (user as any).smsAppointmentReminders ?? true,
+        smsPromotions: (user as any).smsPromotions ?? false,
         createdAt: user.createdAt,
       };
 

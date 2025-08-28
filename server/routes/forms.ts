@@ -5,6 +5,7 @@ import { insertFormSchema } from "../../shared/schema.js";
 import { asyncHandler } from "../utils/errors.js";
 import { validateRequest } from "../middleware/error-handler.js";
 import { sendSMS } from "../sms.js";
+import { sendEmail } from "../email.js";
 import { getFormPublicUrl } from "../utils/url.js";
 
 // Schema for form submission (public endpoint)
@@ -47,6 +48,48 @@ export function registerFormsRoutes(app: Express, storage: IStorage) {
     if (!form) {
       return res.status(404).json({ error: "Form not found" });
     }
+    // Soft-upgrade signature fields for legacy forms that used a text field
+    try {
+      let fields: any[] | undefined;
+      const raw = (form as any).fields;
+      if (Array.isArray(raw)) {
+        fields = raw as any[];
+      } else if (typeof raw === 'string') {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) fields = parsed as any[];
+        } catch {}
+      }
+
+      if (Array.isArray(fields)) {
+        const upgraded = fields.map((f: any) => {
+          const typeLower = String(f?.type || '').toLowerCase();
+          const label = String(f?.config?.label || f?.label || '').toLowerCase();
+          const placeholder = String(f?.config?.placeholder || f?.placeholder || '').toLowerCase();
+          const idLower = String(f?.id || '').toLowerCase();
+          const looksLikeSignature =
+            typeLower.includes('signature') ||
+            label.includes('signature') ||
+            placeholder.includes('signature') ||
+            idLower.includes('signature') ||
+            /\bsign\b/.test(label) ||
+            /\bsign\b/.test(placeholder);
+
+          if (!looksLikeSignature) return f;
+
+          const cfg = {
+            ...(f?.config || {}),
+            label: f?.config?.label || f?.label || 'Signature',
+            required: (f?.config?.required ?? f?.required) ?? false,
+            penColor: f?.config?.penColor || '#000000',
+            backgroundColor: f?.config?.backgroundColor || '#ffffff',
+          };
+          return { ...f, type: 'signature', config: cfg };
+        });
+        (form as any).fields = upgraded;
+      }
+    } catch {}
+
     res.json(form);
   }));
 
@@ -164,6 +207,111 @@ export function registerFormsRoutes(app: Express, storage: IStorage) {
     }
 
     res.json({ success: true, messageId: result.messageId });
+  }));
+
+  // Send form link via Email
+  app.post("/api/forms/:id/send-email", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid form id" });
+    }
+
+    const emailSchema = z.object({
+      clientId: z.union([z.number(), z.string().regex(/^\d+$/)]).optional(),
+      email: z.string().email().optional(),
+      subject: z.string().optional(),
+      customMessage: z.string().optional(),
+    }).refine((data) => !!(data.clientId || data.email), {
+      message: "Either clientId or email is required",
+    });
+
+    const parseResult = emailSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid request payload", details: parseResult.error.flatten() });
+    }
+
+    const { clientId, email, subject, customMessage } = parseResult.data as any;
+
+    let destinationEmail: string | undefined = email;
+    let resolvedClientId: number | undefined = undefined;
+
+    if (clientId) {
+      const numericClientId = Number(clientId);
+      const user = await storage.getUser(numericClientId);
+      if (!user || !user.email) {
+        return res.status(400).json({ error: "Selected client does not have an email address" });
+      }
+      destinationEmail = user.email;
+      resolvedClientId = numericClientId;
+    }
+
+    if (!destinationEmail) {
+      return res.status(400).json({ error: "No destination email provided" });
+    }
+
+    const publicUrl = getFormPublicUrl(id, resolvedClientId);
+    const effectiveSubject = subject && subject.trim().length > 0
+      ? subject.trim()
+      : "New form to complete";
+
+    const baseMessage = customMessage && customMessage.trim().length > 0
+      ? customMessage.trim()
+      : "You have a new form to complete.";
+
+    const html = `${baseMessage}<br/><br/><a href="${publicUrl}" target="_blank" rel="noopener noreferrer">Click here to open the form</a>`;
+    const text = `${baseMessage}\n\nOpen the form: ${publicUrl}`;
+
+    await sendEmail({
+      to: destinationEmail,
+      from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+      subject: effectiveSubject,
+      html,
+      text,
+    });
+
+    res.json({ success: true });
+  }));
+
+  // List all unclaimed form submissions (not attached to any client)
+  app.get("/api/form-submissions/unclaimed", asyncHandler(async (_req: Request, res: Response) => {
+    const unclaimed = await (storage as any).getUnclaimedFormSubmissions();
+    res.json(unclaimed || []);
+  }));
+
+  // Attach a specific form submission to a client
+  app.post("/api/form-submissions/:id/attach", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ error: "Invalid submission id" });
+    }
+
+    const bodySchema = z.object({
+      clientId: z.union([z.number(), z.string().regex(/^\d+$/)])
+    });
+    const parsed = bodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid payload", details: parsed.error.flatten() });
+    }
+    const clientId = Number((parsed.data as any).clientId);
+
+    const attached = await (storage as any).attachFormSubmissionToClient(id, clientId);
+
+    // Create a lightweight note history entry for the client's profile
+    try {
+      const submittedOn = new Date(attached.submittedAt).toLocaleString();
+      // Include a structured submission tag so we can hide this item from future unclaimed lists
+      const content = `Form attached [submission:${id}]: ${attached.formTitle || 'Form'} (type: ${attached.formType || 'form'}) on ${submittedOn}`;
+      await (storage as any).createNoteHistory({
+        clientId: clientId,
+        appointmentId: null,
+        noteContent: content,
+        noteType: 'form',
+        createdBy: 1,
+        createdByRole: 'staff'
+      });
+    } catch {}
+
+    res.json(attached);
   }));
 }
 

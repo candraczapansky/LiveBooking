@@ -3,17 +3,19 @@ import { z } from 'zod';
 import { HelcimTerminalService } from '../services/helcim-terminal-service.js';
 import type { IStorage } from '../storage.js';
 import { TerminalConfigService } from '../services/terminal-config-service.js';
-import { log } from '../vite.js';
+import { log } from '../log.js';
+import { triggerAfterPayment } from '../automation-triggers.js';
 
 // Factory to create router with storage dependency
 export default function createTerminalRoutes(storage: IStorage) {
   const router = Router();
   const configService = new TerminalConfigService(storage);
-  const terminalService = new HelcimTerminalService(configService);
+  const terminalService: any = (storage as any).__terminalService || new HelcimTerminalService(configService);
+  (storage as any).__terminalService = terminalService;
 
   // Schema for terminal initialization
   const InitializeTerminalSchema = z.object({
-    terminalId: z.string().optional(),
+    terminalId: z.string(),
     locationId: z.string(),
     deviceCode: z.string(),
     apiToken: z.string(),
@@ -38,7 +40,7 @@ const PaymentRequestSchema = z.object({
       const data = InitializeTerminalSchema.parse(req.body);
 
       const success = await terminalService.initializeTerminal({
-        terminalId: data.terminalId || data.deviceCode,
+        terminalId: data.terminalId,
         locationId: data.locationId,
         deviceCode: data.deviceCode,
         apiToken: data.apiToken,
@@ -71,14 +73,13 @@ router.post('/payment/start', async (req, res) => {
       data.locationId,
       data.amount,
       {
-        tipAmount: data.tipAmount,
-        reference: data.reference,
         description: data.description,
       }
     );
 
     // Normalize response for client expectations
-    const pid = (result as any).paymentId || (result as any).transactionId || (result as any).id || (result as any).invoiceNumber || null;
+    // Prefer our app-generated invoiceNumber as the canonical identifier
+    const pid = (result as any).invoiceNumber || (result as any).paymentId || (result as any).transactionId || (result as any).id || null;
     res.json({
       success: true,
       paymentId: pid,
@@ -103,6 +104,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
+    // Do NOT auto-complete via force/global markers in production. Status must come from webhook cache.
     // Force bypass of conditional requests to prevent 304 during active polling
     try {
       delete (req as any).headers['if-none-match'];
@@ -121,7 +123,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     
     // Fast-path: webhook cache. If pending, attempt refresh via transactionId
     try {
-      const cached: any = (terminalService as any).checkWebhookCache?.(paymentId);
+      const cached: any = (terminalService as any).checkWebhookCache?.(paymentId) || (terminalService as any).getCachedWebhookStatus?.(paymentId);
       if (cached) {
         if (cached.status !== 'completed' && cached.transactionId) {
           try {
@@ -144,17 +146,25 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       }
     } catch {}
 
-    const status = await terminalService.checkPaymentStatus(locationId, paymentId);
+    let status = await terminalService.checkPaymentStatus(locationId, paymentId);
     try {
-      console.log('🔎 Terminal status debug', { locationId, paymentId, raw: status });
+      console.log('🔎 Terminal status result:', { 
+        locationId, 
+        paymentId, 
+        status: (status as any)?.status,
+        transactionId: (status as any)?.transactionId
+      });
     } catch {}
     // Normalize response with fallbacks
-    const s = (status as any) || {};
+    let s = (status as any) || {};
+
+    // Strict mode: do not auto-complete without a matching webhook entry.
     res.status(200).json({
       success: s.status === 'completed',
       status: s.status || 'pending',
-      message: s.message || 'Processing payment... ',
+      message: s.message || 'Processing payment...',
       last4: s.last4 || s.cardLast4 || undefined,
+      cardLast4: s.last4 || s.cardLast4 || undefined,
       transactionId: s.transactionId || paymentId,
       terminalId: s.terminalId || undefined,
     });
@@ -164,6 +174,60 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       success: false, 
       message: error.message || 'Failed to check payment status' 
     });
+  }
+});
+
+// Location-agnostic alias: allow polling without providing locationId
+router.get('/payment/:paymentId', async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+    try { console.log('🟡 GET /api/terminal/payment/:paymentId', { paymentId }); } catch {}
+    try { log('🟡 GET /api/terminal/payment/:paymentId'); } catch {}
+    // Strict mode: no force/global acceptance.
+    // Bypass conditional requests to prevent 304 during active polling
+    try {
+      delete (req as any).headers['if-none-match'];
+      delete (req as any).headers['if-modified-since'];
+    } catch {}
+    try {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+      try { res.removeHeader('ETag'); } catch {}
+      try { res.removeHeader('Last-Modified'); } catch {}
+    } catch {}
+
+    // Fast-path: webhook cache
+    try {
+      const cached: any = (terminalService as any).checkWebhookCache?.(paymentId) || (terminalService as any).getCachedWebhookStatus?.(paymentId);
+      if (cached) {
+        return res.json({
+          success: cached.status === 'completed',
+          status: cached.status,
+          last4: cached.last4,
+          transactionId: cached.transactionId || paymentId,
+        });
+      }
+    } catch {}
+
+    // Fallback: check status without relying on location
+    let status = await terminalService.checkPaymentStatus('', paymentId);
+    let s = (status as any) || {};
+
+    // Strict mode: do not correlate loosely; rely on explicit cache matches only.
+    return res.status(200).json({
+      success: s.status === 'completed',
+      status: s.status || 'pending',
+      message: s.message || 'Processing payment...',
+      last4: s.last4 || s.cardLast4 || undefined,
+      cardLast4: s.last4 || s.cardLast4 || undefined,
+      transactionId: s.transactionId || paymentId,
+      terminalId: s.terminalId || undefined,
+    });
+  } catch (error: any) {
+    console.error('❌ Error checking payment status (no location):', error);
+    return res.status(500).json({ success: false, message: error.message || 'Failed to check payment status' });
   }
 });
 
@@ -185,7 +249,6 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
         success: status.status === 'completed',
         status: status.status,
         cardLast4: status.last4,
-        paymentMethod: status.paymentMethod,
         transactionId: status.transactionId,
       };
       return res.json(normalized);
@@ -303,12 +366,33 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
               await storage.updateAppointment(numericAppointmentId, {
                 paymentStatus: 'paid',
               } as any);
+              // Fire automation after payment
+              try {
+                const appt = await storage.getAppointment(numericAppointmentId);
+                if (appt) {
+                  await triggerAfterPayment(appt, storage);
+                }
+              } catch (e) {
+                try { console.error('⚠️ Failed to trigger after_payment automation (terminal complete)', e); } catch {}
+              }
             }
           }
         } catch (updateError: any) {
           // Log but do not fail the response if DB updates have issues
           console.error('⚠️ Error updating payment/appointment after terminal completion:', updateError);
         }
+
+        // Ensure subsequent polling returns completed by caching a synthetic webhook
+        try {
+          await (terminalService as any).handleWebhook({
+            id: String(transactionId),
+            transactionId: String(transactionId),
+            invoiceNumber: String(transactionId),
+            type: 'cardTransaction',
+            approved: true,
+            status: 'approved',
+          });
+        } catch {}
       }
 
       return res.json({ 
@@ -357,6 +441,15 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
             const numericAppointmentId = typeof appointmentId === 'string' ? parseInt(appointmentId, 10) : appointmentId;
             if (!Number.isNaN(numericAppointmentId)) {
               await storage.updateAppointment(numericAppointmentId, { paymentStatus: 'paid' } as any);
+              // Fire automation after payment
+              try {
+                const appt = await storage.getAppointment(numericAppointmentId);
+                if (appt) {
+                  await triggerAfterPayment(appt, storage);
+                }
+              } catch (e) {
+                try { console.error('⚠️ Failed to trigger after_payment automation (terminal complete-by-invoice)', e); } catch {}
+              }
             }
           }
         } catch {}
@@ -393,15 +486,26 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
         console.log('📥 Terminal webhook raw', { headers: (req as any).headers, payload });
         console.log('📥 Terminal webhook maybe', { maybe });
       } catch {}
-      // Map common Helcim fields to our cache format
+      // Map common Helcim fields to our cache format (include type so service can detect minimal webhooks)
       const normalized = {
         // Helcim docs: cardTransaction webhook can be { id, type: 'cardTransaction' }
         // We map id->transactionId and enrich later in service
-        invoiceNumber: maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
+        invoiceNumber: (req as any)?.query?.invoiceNumber || (req as any)?.query?.inv || (req as any)?.query?.reference || maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
         transactionId: maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || payload?.id,
         last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
         status: maybe?.status || maybe?.result || maybe?.outcome,
+        type: maybe?.type || maybe?.transactionType,
       };
+      // Record a global last-completed marker so the app can accept minimal confirmations
+      try {
+        (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
+          status: 'completed',
+          transactionId: normalized.transactionId,
+          invoiceNumber: normalized.invoiceNumber,
+          last4: normalized.last4,
+          updatedAt: Date.now(),
+        };
+      } catch {}
       // Best-effort: if only {id,type} is provided, log clearly
       try {
         if (normalized.transactionId && !normalized.status && !normalized.invoiceNumber) {
@@ -443,7 +547,7 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       try {
         res.setHeader('Cache-Control', 'no-store');
       } catch {}
-      const snapshot = (terminalService as any).debugSnapshot?.() || { sessions: [], webhooks: [] };
+      const snapshot = (terminalService as any).getDebugSnapshot?.() || { sessions: [], webhooks: [] };
       return res.json(snapshot);
     } catch (e: any) {
       return res.status(500).json({ error: e?.message || 'Failed to load debug snapshot' });

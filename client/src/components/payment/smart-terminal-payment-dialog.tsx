@@ -86,10 +86,18 @@ export default function SmartTerminalPaymentDialog({
       setMessage('Payment initiated. Please follow instructions on terminal.');
 
       // Start polling for status
+      // Poll every 2 seconds with a hard stop after 2 minutes
+      const startedAt = Date.now();
       const interval = setInterval(() => {
-        if (paymentIdRef.current) {
-          checkPaymentStatus(paymentIdRef.current);
+        if (!paymentIdRef.current) return;
+        const elapsedMs = Date.now() - startedAt;
+        if (elapsedMs > 120000) {
+          clearInterval(interval);
+          setPollingInterval(null);
+          handlePaymentFailure('Unable to confirm payment. Please verify on the terminal.');
+          return;
         }
+        checkPaymentStatus(paymentIdRef.current);
       }, 2000);
       setPollingInterval(interval);
 

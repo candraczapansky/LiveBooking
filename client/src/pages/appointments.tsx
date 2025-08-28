@@ -886,6 +886,63 @@ const AppointmentsPage = () => {
         /* Let page control height; remove forced calendar heights */
         .appointments-calendar-container { height: auto !important; }
 
+        /* Fix month view date alignment - override the default right-align */
+        .rbc-month-view .rbc-date-cell {
+          flex: 1 1 0 !important;
+          min-width: 0 !important;
+          padding: 5px !important;
+          text-align: center !important;
+          padding-right: 5px !important; /* Override the default right padding */
+        }
+        
+        /* Ensure all cells in a row are equal width */
+        .rbc-month-view .rbc-row-content {
+          display: flex !important;
+        }
+        
+        /* Make day backgrounds match the date cell layout */
+        .rbc-month-view .rbc-day-bg {
+          flex: 1 1 0 !important;
+          min-width: 0 !important;
+        }
+        
+        /* Keep rows properly structured */
+        .rbc-month-view .rbc-row-bg {
+          display: flex !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+        }
+        
+        /* Ensure the date numbers themselves are centered */
+        .rbc-month-view .rbc-date-cell > a,
+        .rbc-month-view .rbc-date-cell > span {
+          display: block !important;
+          text-align: center !important;
+        }
+        
+        /* Fix selected cell and today highlights to align with centered dates */
+        .rbc-month-view .rbc-selected-cell {
+          background-color: rgba(0, 0, 0, 0.05) !important;
+        }
+        
+        .rbc-month-view .rbc-today {
+          background-color: #eaf6ff !important;
+        }
+        
+        /* Force all month cells to have consistent sizing */
+        .rbc-month-view .rbc-row {
+          display: flex !important;
+          position: relative !important;
+        }
+        
+        .rbc-month-view .rbc-row-segment {
+          flex: 1 1 0 !important;
+          padding: 0 !important;
+        }
+
         /* Compact mini calendar styles (left sidebar) */
         .appointments-mini-calendar .rdp { width: 100% !important; }
         .appointments-mini-calendar .rdp-months,
@@ -899,30 +956,42 @@ const AppointmentsPage = () => {
         }
         .appointments-mini-calendar .rdp-head_cell,
         .appointments-mini-calendar .rdp-cell {
-          padding: 2px !important;
+          padding: 0 !important;
           text-align: center !important;
           vertical-align: middle !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
         }
         .appointments-mini-calendar .rdp-day {
           width: 36px !important;
           height: 36px !important;
           padding: 0 !important;
           margin: 0 auto !important;
-          display: inline-flex !important;
+          display: flex !important;
           align-items: center !important;
           justify-content: center !important;
           border-radius: 0.375rem !important;
-          box-sizing: border-box !important; /* Keep borders inside fixed box to stay centered */
+          box-sizing: border-box !important;
+        }
+
+        /* Force exact centering of mini-calendar day buttons (and their borders) */
+        .appointments-mini-calendar .rdp-cell { position: relative !important; }
+        .appointments-mini-calendar .rdp-day {
+          position: absolute !important;
+          inset: 0 !important;
+          margin: auto !important;
         }
 
         /* Mini calendar: highlight the selected date when in day view */
         .appointments-mini-calendar[data-mini-mode='day'] .rdp-day[aria-selected='true'] {
           border: 2px solid hsl(var(--primary)) !important;
-          box-shadow: inset 0 0 0 1px hsl(var(--primary));
           color: hsl(var(--primary)) !important;
           background: transparent !important;
           border-radius: 0.375rem !important;
-          box-sizing: border-box !important; /* Prevent border from shifting box */
+          box-sizing: border-box !important;
+          width: 36px !important;
+          height: 36px !important;
         }
 
         /* Fallback for DayPicker's selected class */
@@ -932,6 +1001,8 @@ const AppointmentsPage = () => {
           background: transparent !important;
           border-radius: 0.375rem !important;
           box-sizing: border-box !important;
+          width: 36px !important;
+          height: 36px !important;
         }
 
         /* Force highlight if library uses button[aria-pressed] internally */
@@ -941,6 +1012,8 @@ const AppointmentsPage = () => {
           background: transparent !important;
           border-radius: 0.375rem !important;
           box-sizing: border-box !important;
+          width: 36px !important;
+          height: 36px !important;
         }
       `}</style>
       <style>{`
@@ -951,6 +1024,8 @@ const AppointmentsPage = () => {
           background: transparent !important;
           border-radius: 0.375rem !important;
           box-sizing: border-box !important;
+          width: 36px !important;
+          height: 36px !important;
         }
       `}</style>
       <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />

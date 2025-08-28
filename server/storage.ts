@@ -54,7 +54,7 @@ import {
   phoneCalls, PhoneCall, InsertPhoneCall
 } from "../shared/schema.js";
 import { db } from "./db.js";
-import { eq, and, or, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ne, gte, lte, desc, asc, isNull, count, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -108,6 +108,24 @@ export interface IStorage {
   getPopularServices(limit: number, periodDays: number): Promise<Service[]>;
   getServiceStatistics(serviceId: number, startDate: Date, endDate: Date): Promise<any>;
   getServicesByStatus(isActive: boolean): Promise<Service[]>;
+
+  // Add-on mapping operations
+  getAddOnMapping(): Promise<Record<string, number[]>>;
+  setAddOnMapping(map: Record<string, number[]>): Promise<void>;
+  getBaseServicesForAddOn(addOnServiceId: number): Promise<number[]>;
+  setBaseServicesForAddOn(addOnServiceId: number, baseServiceIds: number[]): Promise<void>;
+  addBaseServiceToAddOn(addOnServiceId: number, baseServiceId: number): Promise<void>;
+  removeBaseServiceFromAddOn(addOnServiceId: number, baseServiceId: number): Promise<void>;
+  getBaseServiceObjectsForAddOn(addOnServiceId: number): Promise<Service[]>;
+
+  // Appointment add-ons mapping operations
+  getAppointmentAddOnMapping(): Promise<Record<string, number[]>>;
+  setAppointmentAddOnMapping(map: Record<string, number[]>): Promise<void>;
+  getAddOnsForAppointment(appointmentId: number): Promise<number[]>;
+  setAddOnsForAppointment(appointmentId: number, addOnServiceIds: number[]): Promise<void>;
+  addAddOnToAppointment(appointmentId: number, addOnServiceId: number): Promise<void>;
+  removeAddOnFromAppointment(appointmentId: number, addOnServiceId: number): Promise<void>;
+  getAddOnServiceObjectsForAppointment(appointmentId: number): Promise<Service[]>;
 
   // Product operations
   createProduct(product: InsertProduct): Promise<Product>;
@@ -359,6 +377,24 @@ export interface IStorage {
     ipAddress?: string;
     userAgent?: string;
   }>>;
+  getUnclaimedFormSubmissions(): Promise<Array<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+    submitterName?: string;
+  }>>;
+  attachFormSubmissionToClient(submissionId: number, clientId: number): Promise<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    submittedAt: string;
+    clientId: number;
+  }>;
 
   // Business Knowledge
   getBusinessKnowledge(categories?: string[]): Promise<any[]>;
@@ -499,6 +535,23 @@ export class DatabaseStorage implements IStorage {
       // Test database connection
       await db.select().from(users).limit(1);
       console.log('Database connection established successfully');
+      
+      // Add missing columns if they don't exist (migration)
+      try {
+        await sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false`;
+        console.log('Ensured is_hidden column exists in services table');
+        // Ensure add-on mapping container exists in system_config
+        try {
+          const existing: any = await sql`SELECT 1 FROM system_config WHERE key = 'service_add_on_mapping' LIMIT 1`;
+          if (!existing?.rows || existing.rows.length === 0) {
+            await sql`INSERT INTO system_config (key, value, description, category) VALUES ('service_add_on_mapping', '{}', 'JSON mapping of add-on serviceId -> [baseServiceIds]', 'services')`;
+            console.log('Initialized service_add_on_mapping in system_config');
+          }
+        } catch {}
+      } catch (migrationError) {
+        // Column might already exist, which is fine
+        console.log('Migration check completed');
+      }
     } catch (error) {
       console.error('Database connection failed:', error);
       // Don't throw error to prevent server startup failure
@@ -1512,6 +1565,108 @@ Glo Head Spa`,
       }
       throw err;
     }
+  }
+
+  // -----------------------------
+  // Add-on mapping operations
+  // Stored as JSON in system_config under key 'service_add_on_mapping'
+  // Shape: { [addOnServiceId: string]: number[] }
+  async getAddOnMapping(): Promise<Record<string, number[]>> {
+    try {
+      const cfg = await this.getSystemConfig('service_add_on_mapping');
+      const raw = cfg?.value || '{}';
+      try { return JSON.parse(raw) as Record<string, number[]>; } catch { return {}; }
+    } catch {
+      return {};
+    }
+  }
+
+  async setAddOnMapping(map: Record<string, number[]>): Promise<void> {
+    const value = JSON.stringify(map);
+    await this.updateSystemConfig('service_add_on_mapping', value, 'JSON mapping of add-on -> base services');
+  }
+
+  async getBaseServicesForAddOn(addOnServiceId: number): Promise<number[]> {
+    const map = await this.getAddOnMapping();
+    return map[String(addOnServiceId)] || [];
+  }
+
+  async setBaseServicesForAddOn(addOnServiceId: number, baseServiceIds: number[]): Promise<void> {
+    const map = await this.getAddOnMapping();
+    map[String(addOnServiceId)] = Array.from(new Set(baseServiceIds.map((n) => Number(n))));
+    await this.setAddOnMapping(map);
+  }
+
+  async addBaseServiceToAddOn(addOnServiceId: number, baseServiceId: number): Promise<void> {
+    const current = await this.getBaseServicesForAddOn(addOnServiceId);
+    if (!current.includes(Number(baseServiceId))) {
+      current.push(Number(baseServiceId));
+      await this.setBaseServicesForAddOn(addOnServiceId, current);
+    }
+  }
+
+  async removeBaseServiceFromAddOn(addOnServiceId: number, baseServiceId: number): Promise<void> {
+    const current = await this.getBaseServicesForAddOn(addOnServiceId);
+    const next = current.filter((id) => Number(id) !== Number(baseServiceId));
+    await this.setBaseServicesForAddOn(addOnServiceId, next);
+  }
+
+  async getBaseServiceObjectsForAddOn(addOnServiceId: number): Promise<Service[]> {
+    const ids = await this.getBaseServicesForAddOn(addOnServiceId);
+    const all = await this.getAllServices();
+    const idSet = new Set(ids.map(Number));
+    return all.filter((s) => idSet.has(Number(s.id)));
+  }
+
+  // -----------------------------
+  // Appointment add-on mapping operations
+  // Stored as JSON in system_config under key 'appointment_add_on_mapping'
+  // Shape: { [appointmentId: string]: number[] }
+  async getAppointmentAddOnMapping(): Promise<Record<string, number[]>> {
+    try {
+      const cfg = await this.getSystemConfig('appointment_add_on_mapping');
+      const raw = cfg?.value || '{}';
+      try { return JSON.parse(raw) as Record<string, number[]>; } catch { return {}; }
+    } catch {
+      return {};
+    }
+  }
+
+  async setAppointmentAddOnMapping(map: Record<string, number[]>): Promise<void> {
+    const value = JSON.stringify(map);
+    await this.updateSystemConfig('appointment_add_on_mapping', value, 'JSON mapping of appointmentId -> [addOnServiceIds]');
+  }
+
+  async getAddOnsForAppointment(appointmentId: number): Promise<number[]> {
+    const map = await this.getAppointmentAddOnMapping();
+    return map[String(appointmentId)] || [];
+  }
+
+  async setAddOnsForAppointment(appointmentId: number, addOnServiceIds: number[]): Promise<void> {
+    const map = await this.getAppointmentAddOnMapping();
+    map[String(appointmentId)] = Array.from(new Set(addOnServiceIds.map((n) => Number(n))));
+    await this.setAppointmentAddOnMapping(map);
+  }
+
+  async addAddOnToAppointment(appointmentId: number, addOnServiceId: number): Promise<void> {
+    const current = await this.getAddOnsForAppointment(appointmentId);
+    if (!current.includes(Number(addOnServiceId))) {
+      current.push(Number(addOnServiceId));
+      await this.setAddOnsForAppointment(appointmentId, current);
+    }
+  }
+
+  async removeAddOnFromAppointment(appointmentId: number, addOnServiceId: number): Promise<void> {
+    const current = await this.getAddOnsForAppointment(appointmentId);
+    const next = current.filter((id) => Number(id) !== Number(addOnServiceId));
+    await this.setAddOnsForAppointment(appointmentId, next);
+  }
+
+  async getAddOnServiceObjectsForAppointment(appointmentId: number): Promise<Service[]> {
+    const ids = await this.getAddOnsForAppointment(appointmentId);
+    const all = await this.getAllServices();
+    const idSet = new Set(ids.map(Number));
+    return all.filter((s) => idSet.has(Number(s.id)));
   }
 
   // Staff operations
@@ -3416,6 +3571,7 @@ Glo Head Spa`,
   async getFormSubmissions(formId: number): Promise<Array<{
     id: string;
     formId: number;
+    clientId?: number | null;
     formData: Record<string, any>;
     submittedAt: string;
     ipAddress?: string;
@@ -3430,6 +3586,7 @@ Glo Head Spa`,
     return submissions.map(submission => ({
       id: submission.id.toString(),
       formId: submission.formId,
+      clientId: (submission as any).clientId ?? null,
       formData: JSON.parse(submission.formData),
       submittedAt: submission.submittedAt.toISOString(),
       ipAddress: submission.ipAddress || undefined,
@@ -3473,6 +3630,174 @@ Glo Head Spa`,
       ipAddress: submission.ipAddress || undefined,
       userAgent: submission.userAgent || undefined,
     }));
+  }
+
+  async getUnclaimedFormSubmissions(): Promise<Array<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    submittedAt: string;
+    ipAddress?: string;
+    userAgent?: string;
+    submitterName?: string;
+  }>> {
+    const rows = await db
+      .select({
+        id: formSubmissions.id,
+        formId: formSubmissions.formId,
+        formTitle: forms.title,
+        formType: forms.type,
+        submittedAt: formSubmissions.submittedAt,
+        ipAddress: formSubmissions.ipAddress,
+        userAgent: formSubmissions.userAgent,
+        linkedUserId: users.id,
+      })
+      .from(formSubmissions)
+      .innerJoin(forms, eq(formSubmissions.formId, forms.id))
+      .leftJoin(users, eq(formSubmissions.clientId, users.id))
+      .where(or(
+        isNull(formSubmissions.clientId),
+        eq(formSubmissions.clientId, 0 as any),
+        isNull(users.id),
+        ne(users.role, 'client' as any)
+      ))
+      .orderBy(desc(formSubmissions.submittedAt));
+
+    // Try to derive submitter name from common fields in the stored payload
+    // We only selected metadata above for speed; load form_data for these ids in one go
+    const ids = rows.map(r => r.id);
+    let dataById = new Map<number, any>();
+    if (ids.length > 0) {
+      const dataRows = await db
+        .select({ id: formSubmissions.id, formData: formSubmissions.formData })
+        .from(formSubmissions)
+        .where(inArray(formSubmissions.id, ids));
+      dataById = new Map(dataRows.map(dr => [dr.id, dr.formData]));
+    }
+
+    function extractName(rawJson?: string | null): string | undefined {
+      if (!rawJson) return undefined;
+      try {
+        const data = JSON.parse(rawJson);
+        if (typeof data !== 'object' || !data) return undefined;
+        const first = data.firstName || data.first_name || data.firstname || data["name_first"];
+        const last = data.lastName || data.last_name || data.lastname || data["name_last"];
+        const fullFromParts = `${first || ''} ${last || ''}`.trim();
+        if (fullFromParts) return fullFromParts;
+        const single = data.fullName || data.full_name || data.name || data.clientName || data.customerName;
+        if (typeof single === 'string' && single.trim()) return single.trim();
+        // Sometimes name fields are nested under keys like field_..._first/last
+        const keys = Object.keys(data);
+        const firstKey = keys.find(k => /first/i.test(k));
+        const lastKey = keys.find(k => /last/i.test(k));
+        const maybe = `${(firstKey && data[firstKey]) || ''} ${(lastKey && data[lastKey]) || ''}`.trim();
+        if (maybe) return maybe;
+
+        // As a final heuristic, scan all string values for one that looks like a personal name
+        const stringVals = Object.values(data).filter(v => typeof v === 'string') as string[];
+        const looksLikeName = (val: string) => {
+          const t = val.trim();
+          if (!t) return false;
+          if (t.length < 2 || t.length > 60) return false;
+          if (/^https?:/i.test(t)) return false;
+          if (t.startsWith('data:')) return false;
+          if (/@/.test(t)) return false; // likely email
+          if (/\.(pdf|png|jpg|jpeg|webp|gif|svg)$/i.test(t)) return false; // likely file
+          // allow letters and spaces, a single hyphen or apostrophe common in names
+          if (!/^[a-zA-Z\s'\-]+$/.test(t)) return false;
+          // prefer values with at least one space (first last)
+          return /\s/.test(t);
+        };
+        const candidate = stringVals.find(looksLikeName) || stringVals.find(s => /^[a-zA-Z]+$/.test(s.trim()));
+        return candidate?.trim() || undefined;
+      } catch {
+        return undefined;
+      }
+    }
+
+    return rows.map(r => {
+      const raw = dataById.get(r.id) as string | undefined;
+      const submitterName = extractName(raw);
+      return {
+        id: r.id.toString(),
+        formId: r.formId,
+        formTitle: r.formTitle,
+        formType: r.formType,
+        submittedAt: r.submittedAt.toISOString(),
+        ipAddress: r.ipAddress || undefined,
+        userAgent: r.userAgent || undefined,
+        submitterName,
+      };
+    });
+  }
+
+  async attachFormSubmissionToClient(submissionId: number, clientId: number): Promise<{
+    id: string;
+    formId: number;
+    formTitle: string;
+    formType: string;
+    submittedAt: string;
+    clientId: number;
+  }> {
+    // Load current row to enforce single-attach policy
+    const [existing] = await db
+      .select()
+      .from(formSubmissions)
+      .where(eq(formSubmissions.id, submissionId));
+
+    if (!existing) {
+      throw new Error('not_found');
+    }
+
+    if (existing.clientId && Number(existing.clientId) !== 0) {
+      // Already attached to a client
+      throw new Error('already_attached');
+    }
+
+    // Update clientId on the submission
+    const updated = await db
+      .update(formSubmissions)
+      .set({ clientId })
+      .where(eq(formSubmissions.id, submissionId))
+      .returning();
+
+    const row = updated?.[0];
+
+    // Fetch with form details
+    const [joined] = await db
+      .select({
+        id: formSubmissions.id,
+        formId: formSubmissions.formId,
+        formTitle: forms.title,
+        formType: forms.type,
+        submittedAt: formSubmissions.submittedAt,
+        clientId: formSubmissions.clientId,
+      })
+      .from(formSubmissions)
+      .innerJoin(forms, eq(formSubmissions.formId, forms.id))
+      .where(eq(formSubmissions.id, submissionId));
+
+    if (!joined) {
+      // Fallback to minimal data
+      return {
+        id: row.id.toString(),
+        formId: row.formId,
+        formTitle: '',
+        formType: '',
+        submittedAt: row.submittedAt.toISOString(),
+        clientId: clientId,
+      };
+    }
+
+    return {
+      id: joined.id.toString(),
+      formId: joined.formId,
+      formTitle: joined.formTitle,
+      formType: joined.formType,
+      submittedAt: joined.submittedAt.toISOString(),
+      clientId: clientId,
+    };
   }
 
   // Business Knowledge methods
