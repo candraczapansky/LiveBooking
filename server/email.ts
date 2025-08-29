@@ -23,6 +23,7 @@ import Handlebars from 'handlebars';
 interface EmailParams {
   to: string | string[];
   from: string;
+  fromName?: string;
   subject: string;
   text?: string;
   html?: string;
@@ -131,7 +132,7 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     
     const msg: any = {
       to: params.to,
-      from: finalFromEmail,
+      from: params.fromName ? { email: finalFromEmail, name: params.fromName } : finalFromEmail,
       subject: params.subject,
     };
 

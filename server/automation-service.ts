@@ -2,6 +2,9 @@ import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
 import type { IStorage } from './storage.js';
 import type { AutomationRule } from '../shared/schema.js';
+import { db } from './db.js';
+import { locations } from '../shared/schema.js';
+import { eq } from 'drizzle-orm';
 
 export interface AutomationContext {
   appointmentId: number;
@@ -216,9 +219,55 @@ export class AutomationService {
         return;
       }
 
-      // Process template
-      const processedTemplate = this.replaceTemplateVariables(rule.template, variables);
-      const processedSubject = rule.subject ? this.replaceTemplateVariables(rule.subject, variables) : 'Notification from Glo Head Spa';
+      // Build per-rule variables, overriding {salon_name} based on rule location tag or appointment location
+      let variablesForRule = { ...variables };
+      try {
+        // 1) Try to infer location from rule tags like [location:ID] or @location:ID or name
+        const parseLocationToken = (text?: string | null): string | null => {
+          try {
+            if (!text) return null;
+            const m = /(?:\[location:([^\]]+)\]|@location:([^\s]+))/i.exec(text);
+            if (!m) return null;
+            const token = (m[1] || m[2] || '').toString().trim();
+            return token || null;
+          } catch { return null; }
+        };
+        const token = parseLocationToken(rule.name) || parseLocationToken((rule as any).subject);
+        let locationIdFromRule: number | null = null;
+        if (token) {
+          const n = parseInt(token, 10);
+          locationIdFromRule = Number.isNaN(n) ? null : n;
+        }
+
+        let resolvedLocation: any = null;
+        if (locationIdFromRule != null) {
+          // Use storage helpers if available
+          try { resolvedLocation = await (this.storage as any).getLocation?.(locationIdFromRule); } catch {}
+          if (!resolvedLocation) { try { resolvedLocation = await (this.storage as any).getLocationById?.(locationIdFromRule); } catch {} }
+          if (!resolvedLocation) { try { const rows = await db.select().from(locations).where(eq(locations.id, locationIdFromRule)).limit(1); resolvedLocation = (rows as any[])?.[0] || null; } catch {} }
+        }
+
+        // 2) If no rule tag location, try appointment location via context.appointmentId
+        if (!resolvedLocation) {
+          try {
+            const apptId = (variables as any)?.appointmentId || null; // Not present in variables; fallback to client context isn't available here
+          } catch {}
+        }
+
+        // Since we don't have context here, attempt to use client's latest appointment location is too heavy; skip.
+        // Rely on rule tag when present; otherwise variables already carry defaults.
+
+        if (resolvedLocation?.name) {
+          variablesForRule.salon_name = String(resolvedLocation.name);
+          if (resolvedLocation.phone) variablesForRule.salon_phone = String(resolvedLocation.phone);
+          const addrParts = [resolvedLocation.address, resolvedLocation.city, resolvedLocation.state, resolvedLocation.zipCode].filter(Boolean);
+          if (addrParts.length) variablesForRule.salon_address = addrParts.join(', ');
+        }
+      } catch {}
+
+      // Process template with per-rule variables
+      const processedTemplate = this.replaceTemplateVariables(rule.template, variablesForRule);
+      const processedSubject = rule.subject ? this.replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from Glo Head Spa';
 
       // Send the automation
       if (rule.type === 'email') {

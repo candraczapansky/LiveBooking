@@ -61,6 +61,37 @@ export class HelcimService {
   async verifyPayment(transactionId: string) {
     return this.makeRequest(`/payments/${transactionId}`, 'GET');
   }
+
+  // Create or update a Helcim customer profile
+  async createCustomer(params: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+  }) {
+    const payload: any = {
+      firstName: params.firstName,
+      lastName: params.lastName,
+      email: params.email,
+      phone: params.phone,
+    };
+    return this.makeRequest('/customers', 'POST', payload);
+  }
+
+  // Save a card on file for a Helcim customer using a Pay.js token
+  async saveCardToCustomer(params: { customerId: string; token: string }) {
+    const payload: any = {
+      customerId: params.customerId,
+      token: params.token,
+    };
+    // Some environments may require /customers/{id}/cards; try /cards with customerId
+    try {
+      return await this.makeRequest('/cards', 'POST', payload);
+    } catch (e) {
+      // Fallback to scoped endpoint if available
+      return this.makeRequest(`/customers/${params.customerId}/cards`, 'POST', { token: params.token });
+    }
+  }
 }
 
 export const helcimService = new HelcimService();

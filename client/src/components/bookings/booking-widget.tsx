@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import SaveCardModal from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -93,6 +94,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const [showSaveCard, setShowSaveCard] = useState(false);
+  const [savedCard, setSavedCard] = useState<any | null>(null);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -518,7 +521,14 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     // Validate just the fields for the current step
     form.trigger(currentFields as any[]).then((isValid) => {
       if (isValid) {
-        setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
+        const next = Math.min(currentStep + 1, steps.length - 1);
+        setCurrentStep(next);
+        if (next === steps.length - 1) {
+          // On entering final step, prompt to save a card if logged-in user present
+          if (userId && !savedCard) {
+            setShowSaveCard(true);
+          }
+        }
       }
     });
   };
@@ -1045,6 +1055,17 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             </Button>
           )}
         </DialogFooter>
+
+        {userId && (
+          <SaveCardModal
+            open={showSaveCard}
+            onOpenChange={setShowSaveCard}
+            clientId={userId}
+            customerEmail={form.watch('email') || undefined}
+            customerName={`${form.watch('firstName') || ''} ${form.watch('lastName') || ''}`.trim() || undefined}
+            onSaved={(pm) => setSavedCard(pm)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

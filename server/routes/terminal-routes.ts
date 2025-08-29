@@ -78,13 +78,13 @@ router.post('/payment/start', async (req, res) => {
     );
 
     // Normalize response for client expectations
-    // Prefer our app-generated invoiceNumber as the canonical identifier
-    const pid = (result as any).invoiceNumber || (result as any).paymentId || (result as any).transactionId || (result as any).id || null;
+    // Prefer real transactionId when available so polling matches webhook cache
+    const pid = (result as any).transactionId || (result as any).paymentId || (result as any).invoiceNumber || (result as any).id || null;
     res.json({
       success: true,
       paymentId: pid,
       transactionId: (result as any).transactionId || pid,
-      invoiceNumber: (result as any).invoiceNumber || pid,
+      invoiceNumber: (result as any).invoiceNumber || undefined,
       status: (result as any).status || 'pending'
     });
   } catch (error: any) {
@@ -158,7 +158,36 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     // Normalize response with fallbacks
     let s = (status as any) || {};
 
-    // Strict mode: do not auto-complete without a matching webhook entry.
+    // Strict mode default: do not auto-complete without a matching webhook entry.
+    // Limited, safe fallback: if polling by invoice (POS-*) and there's exactly one
+    // recently completed webhook in cache, return that transactionId so the client
+    // can switch to polling by the real id and complete.
+    try {
+      const looksLikeInvoice = typeof paymentId === 'string' && paymentId.startsWith('POS-');
+      if ((s.status === 'pending' || !s.status) && looksLikeInvoice) {
+        const snapshot = (terminalService as any).getDebugSnapshot?.() || { sessions: [], webhooks: [] };
+        if (Array.isArray(snapshot.webhooks)) {
+          const recentMs = Date.now() - 2 * 60 * 1000; // last 2 minutes
+          const candidates = snapshot.webhooks.filter((w: any) => {
+            const keyOk = String(w?.key || '').toLowerCase() !== '__global_last_completed__';
+            const statusOk = w?.status === 'completed';
+            const recentOk = (w?.updatedAt || 0) >= recentMs;
+            const hasId = !!(w?.transactionId || w?.key);
+            return keyOk && statusOk && recentOk && hasId;
+          });
+          if (candidates.length >= 1) {
+            // Choose the most recent candidate
+            const winner = candidates.sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+            s = {
+              status: 'completed',
+              transactionId: winner.transactionId || winner.key || paymentId,
+              last4: winner.last4,
+              cardLast4: winner.last4,
+            } as any;
+          }
+        }
+      }
+    } catch {}
     res.status(200).json({
       success: s.status === 'completed',
       status: s.status || 'pending',
@@ -215,7 +244,33 @@ router.get('/payment/:paymentId', async (req, res) => {
     let status = await terminalService.checkPaymentStatus('', paymentId);
     let s = (status as any) || {};
 
-    // Strict mode: do not correlate loosely; rely on explicit cache matches only.
+    // Strict mode default: rely on explicit cache matches only.
+    // Apply the same limited fallback for the location-agnostic alias.
+    try {
+      const looksLikeInvoice = typeof paymentId === 'string' && paymentId.startsWith('POS-');
+      if ((s.status === 'pending' || !s.status) && looksLikeInvoice) {
+        const snapshot = (terminalService as any).getDebugSnapshot?.() || { sessions: [], webhooks: [] };
+        if (Array.isArray(snapshot.webhooks)) {
+          const recentMs = Date.now() - 2 * 60 * 1000; // last 2 minutes
+          const candidates = snapshot.webhooks.filter((w: any) => {
+            const keyOk = String(w?.key || '').toLowerCase() !== '__global_last_completed__';
+            const statusOk = w?.status === 'completed';
+            const recentOk = (w?.updatedAt || 0) >= recentMs;
+            const hasId = !!(w?.transactionId || w?.key);
+            return keyOk && statusOk && recentOk && hasId;
+          });
+          if (candidates.length >= 1) {
+            const winner = candidates.sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
+            s = {
+              status: 'completed',
+              transactionId: winner.transactionId || winner.key || paymentId,
+              last4: winner.last4,
+              cardLast4: winner.last4,
+            } as any;
+          }
+        }
+      }
+    } catch {}
     return res.status(200).json({
       success: s.status === 'completed',
       status: s.status || 'pending',

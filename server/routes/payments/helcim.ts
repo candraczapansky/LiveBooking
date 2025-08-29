@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { randomBytes } from 'crypto';
 import { helcimService } from '../../services/helcim-service.js';
+import type { Request, Response } from 'express';
 
-const router = Router();
+function createHelcimPaymentsRouter(storage?: any) {
+  const router = Router();
 
 // Initialize Helcim Pay.js session (real Helcim initialization)
 router.post('/initialize', async (req, res) => {
@@ -142,6 +143,80 @@ router.post('/verify', async (req, res) => {
   }
 });
 
-export default router;
+// Create Helcim customer for a client (if not already created) and persist helcimCustomerId
+router.post('/create-customer', async (req: Request, res: Response) => {
+  try {
+    const { firstName, lastName, email, phone } = req.body || {};
+    const created = await helcimService.createCustomer({
+      firstName,
+      lastName,
+      email,
+      phone,
+    });
+    const helcimCustomerId = created?.id || created?.customerId || created?.customer?.id;
+    if (!helcimCustomerId) {
+      return res.status(502).json({ success: false, message: 'Failed to create Helcim customer', details: created });
+    }
+    res.json({ success: true, customerId: String(helcimCustomerId) });
+  } catch (error: any) {
+    console.error('Helcim create-customer error:', error);
+    res.status(500).json({ success: false, message: error?.message || 'Failed to create Helcim customer' });
+  }
+});
+
+// Save card on file for a client via HelcimPay.js token; persist minimal card meta in DB
+router.post('/save-card', async (req: Request, res: Response) => {
+  try {
+    const { token, customerId, customerEmail, customerName } = req.body || {};
+    if (!token) {
+      return res.status(400).json({ success: false, message: 'token is required' });
+    }
+
+    let helcimCustomerId: string | null = customerId || null;
+    if (!helcimCustomerId) {
+      // Attempt to create a customer with provided info
+      const firstName = (customerName || '').split(' ')[0] || undefined;
+      const lastName = (customerName || '').split(' ').slice(1).join(' ') || undefined;
+      const created = await helcimService.createCustomer({
+        firstName,
+        lastName,
+        email: customerEmail,
+      });
+      helcimCustomerId = String(created?.id || created?.customerId || created?.customer?.id || '');
+      if (!helcimCustomerId) {
+        return res.status(502).json({ success: false, message: 'Failed to create Helcim customer' });
+      }
+    }
+
+    const saved = await helcimService.saveCardToCustomer({ customerId: helcimCustomerId, token });
+    const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id;
+    const brand = saved?.brand || saved?.cardBrand;
+    const last4 = saved?.last4 || saved?.cardLast4;
+    const expMonth = saved?.expMonth || saved?.cardExpMonth;
+    const expYear = saved?.expYear || saved?.cardExpYear;
+
+    if (!helcimCardId) {
+      return res.status(502).json({ success: false, message: 'Failed to save card in Helcim', details: saved });
+    }
+
+    res.status(201).json({
+      success: true,
+      helcimCustomerId,
+      helcimCardId: String(helcimCardId),
+      cardBrand: brand || 'card',
+      cardLast4: last4 || '****',
+      cardExpMonth: Number(expMonth || 0),
+      cardExpYear: Number(expYear || 0),
+    });
+  } catch (error: any) {
+    console.error('Helcim save-card error:', error);
+    res.status(500).json({ success: false, message: error?.message || 'Failed to save card' });
+  }
+});
+
+  return router;
+}
+
+export default createHelcimPaymentsRouter;
 
 

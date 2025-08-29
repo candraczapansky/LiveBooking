@@ -374,6 +374,7 @@ export async function triggerAutomations(
         const emailSent = await sendEmail({
           to: toEmail,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+          fromName: variablesForRule.salon_name || variables.salon_name,
           subject,
           text: processedTemplate,
           html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`

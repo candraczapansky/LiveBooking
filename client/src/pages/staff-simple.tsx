@@ -368,117 +368,21 @@ const StaffPageSimple = () => {
               </p>
             </Card>
           ) : (
-            <div className="flex flex-col gap-6">
-              {filteredStaff?.map((staffMember: StaffMember) => (
-                <Card key={staffMember.id} className="p-6 w-full shadow-sm border border-gray-200 rounded-xl hover:shadow-lg transition-all duration-200">
-                  {/* Mobile-optimized layout */}
-                  <div className="space-y-4">
-                    {/* Avatar and basic info section */}
-                    <div className="flex items-start gap-4">
-                      <Avatar className="w-20 h-20 flex-shrink-0 ring-2 ring-gray-200">
-                        {staffMember.photoUrl ? (
-                          <img
-                            src={staffMember.photoUrl}
-                            alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                            className="w-full h-full object-cover rounded-full"
-                          />
-                        ) : (
-                          <AvatarFallback className="text-xl font-semibold bg-[hsl(var(--primary)/0.1)] text-primary">
-                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <h3 className="text-xl font-bold text-gray-900 leading-tight">
-                          {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                        </h3>
-                        <p className="text-base text-gray-700 font-medium">
-                          {staffMember.title}
-                        </p>
-                        <p className="text-sm text-gray-500 break-all">
-                          {staffMember.user?.email}
-                        </p>
-                        <p className="text-xs text-gray-500 break-all">
-                          Username: {staffMember.user?.username || '-'}
-                        </p>
-                        <div>
-                          <div className="text-xs text-gray-500 mb-0.5">Default Pay</div>
-                          <div className="inline-flex items-center px-2 py-1 rounded-full bg-[hsl(var(--primary)/0.1)] text-primary text-sm font-medium">
-                            {formatPayRate(staffMember)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Assigned Services Section */}
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <StaffServices staffId={staffMember.id} />
-                    </div>
-
-                    {/* Available Services (editable commissions) */}
-                    <div className="mt-4 pt-4 border-t border-gray-100">
-                      <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value={`available-${staffMember.id}`}>
-                          <AccordionTrigger>
-                            <div className="flex items-center gap-2">
-                              <Briefcase className="w-4 h-4 text-primary" />
-                              <span className="text-sm font-medium text-gray-700">Available Services</span>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent>
-                            <StaffAvailableServices staffId={staffMember.id} />
-                          </AccordionContent>
-                        </AccordionItem>
-                      </Accordion>
-                    </div>
-                    
-                    {/* Action buttons - optimized for mobile touch */}
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                      <Button
-                        variant="outline"
-                        onClick={() => handleEditStaff(staffMember.id)}
-                        className="h-14 px-4 text-base font-medium border-2 border-primary text-primary hover:bg-[hsl(var(--primary)/0.1)] active:bg-[hsl(var(--primary)/0.2)] transition-colors"
-                      >
-                        <Edit className="w-5 h-5 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => openDeleteDialog(staffMember)}
-                        className="h-14 px-4 text-base font-medium border-2 border-red-300 text-red-700 hover:bg-red-50 active:bg-red-100 transition-colors"
-                      >
-                        <Trash2 className="w-5 h-5 mr-2" />
-                        Delete
-                      </Button>
-                    </div>
-
-                    {/* Create Login / Send Password Link */}
-                    <div className="w-full mt-2 flex gap-2">
-                      <Button
-                        variant="default"
-                        onClick={() => handleSendLoginLinkFor(staffMember)}
-                        disabled={sendLoginLinkMutation.isPending}
-                        className="h-12 flex-1 text-base font-medium"
-                        title="Create Login / Send Login Link"
-                        aria-label="Create Login / Send Login Link"
-                      >
-                        {sendLoginLinkMutation.isPending ? "Sending…" : "Create Login / Send Login Link"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        onClick={() => handleSendLoginLinkFor(staffMember)}
-                        disabled={sendLoginLinkMutation.isPending}
-                        className="h-12 px-4"
-                        title="Create Login / Send Login Link"
-                        aria-label="Create Login / Send Login Link"
-                      >
-                        <Key className="w-5 h-5" />
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {filteredStaff?.map((staffMember: StaffMember) => (
+                  <button
+                    key={staffMember.id}
+                    type="button"
+                    onClick={() => handleEditStaff(staffMember.id)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
+                  >
+                    <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
+                      {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

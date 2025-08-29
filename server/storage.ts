@@ -941,6 +941,7 @@ Glo Head Spa`,
 
   async searchUsers(query: string): Promise<User[]> {
     const searchTerm = `%${query}%`;
+    const fullNameTerm = `%${query.trim().replace(/\s+/g, ' ')}%`;
     return await db
       .select()
       .from(users)
@@ -950,7 +951,11 @@ Glo Head Spa`,
           sql`LOWER(${users.firstName}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${users.lastName}) LIKE LOWER(${searchTerm})`,
           sql`LOWER(${users.email}) LIKE LOWER(${searchTerm})`,
-          sql`LOWER(${users.phone}) LIKE LOWER(${searchTerm})`
+          sql`LOWER(${users.phone}) LIKE LOWER(${searchTerm})`,
+          // Match full name queries like "First Last"
+          sql`LOWER(COALESCE(${users.firstName}, '') || ' ' || COALESCE(${users.lastName}, '')) LIKE LOWER(${fullNameTerm})`,
+          // Also match reversed order just in case ("Last First")
+          sql`LOWER(COALESCE(${users.lastName}, '') || ' ' || COALESCE(${users.firstName}, '')) LIKE LOWER(${fullNameTerm})`
         )
       )
       .limit(20);

@@ -122,8 +122,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Enable helcim payment routes; load dynamically to avoid missing compiled file in some builds
   try {
     const helcimModule = await import('./routes/payments/helcim.js');
-    const helcimPaymentsRouter = helcimModule?.default || helcimModule;
-    app.use('/api/payments/helcim', helcimPaymentsRouter);
+    const modDefault = helcimModule?.default || helcimModule;
+    if (typeof modDefault === 'function') {
+      // Factory that accepts storage and returns a Router
+      const helcimPaymentsRouter = modDefault(storage);
+      app.use('/api/payments/helcim', helcimPaymentsRouter);
+    } else {
+      app.use('/api/payments/helcim', modDefault);
+    }
   } catch (e) {
     console.warn('Helcim payments routes not available:', (e as any)?.message || e);
   }

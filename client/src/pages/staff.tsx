@@ -185,7 +185,7 @@ const StaffPage = () => {
   });
 
   // Fetch all services for assignment UI
-  const { data: allServices } = useQuery({
+  const { data: _allServices } = useQuery({
     queryKey: ['/api/services'],
     queryFn: async () => {
       const response = await fetch('/api/services');
@@ -405,7 +405,7 @@ const StaffPage = () => {
               </div>
             </div>
             
-            {/* Staff Cards */}
+            {/* Staff List */}
             {isLoading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
@@ -415,125 +415,21 @@ const StaffPage = () => {
                 No staff members found. {searchQuery ? 'Try a different search term.' : 'Add your first staff member!'}
               </div>
             ) : (
-              <div className="space-y-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-6 lg:space-y-0">
-                {filteredStaff?.map((staffMember: StaffMember) => (
-                  <div key={staffMember.id} className="bg-white dark:bg-gray-800 rounded-lg p-3 lg:p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center space-x-3">
-                      <Avatar className="h-10 w-10 lg:h-12 lg:w-12 flex-shrink-0">
-                        {staffMember.photoUrl ? (
-                          <img
-                            src={staffMember.photoUrl}
-                            alt={getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                            className="h-full w-full object-cover rounded-full"
-                          />
-                        ) : (
-                          <AvatarFallback className="text-sm">
-                            {getInitials(staffMember.user?.firstName, staffMember.user?.lastName)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0 flex-1">
-                            <h3 className="text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-100 truncate">
-                              {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="outline" className="text-xs px-2 py-0">
-                                {staffMember.title}
-                              </Badge>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                {(staffMember.commissionRate * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex space-x-1 ml-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditStaff(staffMember.id)}
-                              className="h-7 w-7 p-0"
-                            >
-                              <Edit className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleSendLoginLinkFor(staffMember)}
-                              className="h-7 w-7 p-0"
-                              title="Create Login / Send Login Link"
-                              aria-label="Create Login / Send Login Link"
-                              disabled={sendLoginLinkMutation.isPending}
-                            >
-                              <Key className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openDeleteDialog(staffMember)}
-                              className="h-7 w-7 p-0 text-red-500 hover:text-red-600"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="mt-2 space-y-1">
-                          <div className="text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Username:</span>
-                            <span className="ml-1 text-gray-700 dark:text-gray-300 text-xs break-all">
-                              {staffMember.user?.username || '-'}
-                            </span>
-                          </div>
-                          <div className="text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Email:</span>
-                            <span className="ml-1 text-gray-700 dark:text-gray-300 text-xs break-all">
-                              {staffMember.user?.email || "-"}
-                            </span>
-                          </div>
-                          <div className="text-xs">
-                            <span className="text-gray-500 dark:text-gray-400">Phone:</span>
-                            <span className="ml-1 text-gray-700 dark:text-gray-300">
-                              {staffMember.user?.phone || "-"}
-                            </span>
-                          </div>
-                          {staffMember.bio && (
-                            <div className="text-xs mt-1">
-                              <p className="text-gray-600 dark:text-gray-400 line-clamp-2">
-                                {staffMember.bio}
-                              </p>
-                            </div>
-                          )}
-                          <div className="pt-2">
-                            <Button
-                              variant="default"
-                              onClick={() => handleSendLoginLinkFor(staffMember)}
-                              disabled={sendLoginLinkMutation.isPending}
-                              className="h-8 px-3 text-xs"
-                            >
-                              {sendLoginLinkMutation.isPending ? 'Sending…' : 'Create Login / Send Login Link'}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Services Assignment Section */}
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Assign Services</h4>
-
-                      {/* Current assigned services badges */}
-                      <AssignedServicesBadges staffId={staffMember.id} />
-
-                      {/* Add/Remove service control */}
-                      <div className="mt-3">
-                        <ServiceAssignmentControls staffId={staffMember.id} allServices={allServices || []} />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                  {filteredStaff?.map((staffMember: StaffMember) => (
+                    <button
+                      key={staffMember.id}
+                      type="button"
+                      onClick={() => handleEditStaff(staffMember.id)}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
+                    >
+                      <span className="text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-100">
+                        {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             </div>

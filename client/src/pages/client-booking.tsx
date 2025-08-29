@@ -284,7 +284,8 @@ const ClientBookingPage = () => {
             </div>
             <BookingWidget 
               open={isBookingOpen} 
-              onOpenChange={handleOpenChange} 
+              onOpenChange={handleOpenChange}
+              userId={user?.id}
             />
           </>
         )}
