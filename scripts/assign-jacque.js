@@ -21,11 +21,30 @@ async function http(method, path, body) {
 function normalizeName(name) {
   return String(name)
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[“”‘’"']/g, '')
+    .replace(/&/g, 'and')
     .replace(/\*+/g, '')
     .replace(/\([^)]*\)/g, '')
     .replace(/\$\s*\d+(?:\.\d{1,2})?/g, '')
+    .replace(/[\/_-]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+function stripTrailingNonWord(text) {
+  return text.replace(/[^a-z0-9]+$/g, '').trim();
+}
+
+function buildServiceIndex(services) {
+  const index = new Map();
+  for (const svc of services) {
+    const key = normalizeName(svc.name);
+    if (key && !index.has(key)) index.set(key, svc);
+    const trimmed = stripTrailingNonWord(key);
+    if (trimmed && !index.has(trimmed)) index.set(trimmed, svc);
+  }
+  return index;
 }
 
 async function findStaffByFullName(targetFullName) {

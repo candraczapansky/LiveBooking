@@ -194,9 +194,14 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
           ? Array.from(new Set((schedules as any[]).map((sch: any) => sch.staffId)))
           : [];
 
+        const staffIdsAtLocation = (Array.isArray(staff) && selectedLocationId)
+          ? (staff as any[])
+              .filter((s: any) => String(s.locationId) === String(selectedLocationId))
+              .map((s: any) => s.id)
+          : [];
         const staffIdsToUse: number[] = staffIdsFromSchedules.length > 0
           ? staffIdsFromSchedules
-          : (Array.isArray(staff) ? (staff as any[]).map((s: any) => s.id) : []);
+          : staffIdsAtLocation;
 
         if (staffIdsToUse.length === 0) {
           setAllowedServices([]);
@@ -316,11 +321,12 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const useScheduleFilter = staffIdsFromSchedulesSet.size > 0;
   const availableStaff = Array.isArray(staff) && selectedServiceId
     ? (staff as any[]).filter((s: any) => {
+        const matchesLocation = selectedLocationId ? String((s as any).locationId) === String(selectedLocationId) : true;
         const matchesSchedule = useScheduleFilter ? staffIdsFromSchedulesSet.has(s.id) : true;
         const svcSet = staffServiceIdsMap.get(s.id);
         const svcIdNum = parseInt(selectedServiceId);
         const matchesService = svcSet ? svcSet.has(svcIdNum) : false;
-        return matchesSchedule && matchesService;
+        return matchesLocation && matchesSchedule && matchesService;
       })
     : [];
 

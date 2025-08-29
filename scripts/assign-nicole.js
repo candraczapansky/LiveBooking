@@ -21,11 +21,30 @@ async function http(method, path, body) {
 function normalizeName(name) {
   return String(name)
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[“”‘’"']/g, '')
+    .replace(/&/g, 'and')
     .replace(/\*+/g, '')
-    .replace(/\([^)]*\)/g, '') // remove any parenthetical markers like (South)
-    .replace(/\$\s*\d+(?:\.\d{1,2})?/g, '') // remove $ amounts
+    .replace(/\([^)]*\)/g, '')
+    .replace(/\$\s*\d+(?:\.\d{1,2})?/g, '')
+    .replace(/[\/_-]+/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+function stripTrailingNonWord(text) {
+  return text.replace(/[^a-z0-9]+$/g, '').trim();
+}
+
+function buildServiceIndex(services) {
+  const index = new Map();
+  for (const svc of services) {
+    const key = normalizeName(svc.name);
+    if (key && !index.has(key)) index.set(key, svc);
+    const trimmed = stripTrailingNonWord(key);
+    if (trimmed && !index.has(trimmed)) index.set(trimmed, svc);
+  }
+  return index;
 }
 
 async function findStaffByFullName(targetFullName) {
@@ -161,9 +180,16 @@ async function findStaffByFullName(targetFullName) {
   let addedCount = 0;
   const missingServices = [];
 
+  const serviceIndex = buildServiceIndex(allServices);
+
   for (const desired of desiredServices) {
     const targetName = normalizeName(desired.name);
-    const service = allServices.find((s) => normalizeName(s.name) === targetName);
+    let service = serviceIndex.get(targetName);
+    if (!service) {
+      // Targeted aliasing for near-identical names
+      const alias1 = targetName.replace(/\bthreading\b/g, 'thread');
+      service = serviceIndex.get(alias1) || serviceIndex.get(stripTrailingNonWord(alias1));
+    }
     if (!service) {
       missingServices.push(desired.name);
       continue;

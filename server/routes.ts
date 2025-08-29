@@ -305,6 +305,17 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Create a room
   app.post("/api/rooms", async (req: Request, res: Response) => {
     try {
+      // Ensure rooms table has required columns even if server wasn't restarted after migrations
+      try {
+        const { db } = await import("./db.js");
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description TEXT`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 1`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+      } catch {}
+
       let payload: any;
       try {
         payload = insertRoomSchema.parse(req.body);
@@ -334,7 +345,37 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         payload = normalized;
       }
 
-      const created = await storage.createRoom(payload as any);
+      let created: any;
+      try {
+        created = await storage.createRoom(payload as any);
+      } catch (e: any) {
+        const msg = String(e?.message || e || "");
+        // If the storage layer failed due to missing columns (e.g., description), perform a minimal insert
+        if (/column\s+\"?description\"?.*does\s+not\s+exist/i.test(msg) || /does\s+not\s+exist/i.test(msg)) {
+          try {
+            const { db } = await import("./db.js");
+            const { sql } = await import("drizzle-orm");
+            // Ensure table exists
+            await db.execute(sql`CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
+            // Insert with just the required column(s)
+            const res: any = await db.execute(sql`INSERT INTO rooms (name) VALUES (${payload.name}) RETURNING id, name`);
+            const rows = (res?.rows ?? res) as any[];
+            created = rows?.[0];
+            // Best-effort: update optional columns if they exist
+            try { await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`); } catch {}
+            try { await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 1`); } catch {}
+            try { await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description TEXT`); } catch {}
+            try { await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`); } catch {}
+            try {
+              await db.execute(sql`UPDATE rooms SET is_active = ${!!payload.isActive}, capacity = ${Number(payload.capacity || 1)}, description = ${payload.description ?? null} WHERE id = ${Number(created?.id)}`);
+            } catch {}
+          } catch {
+            throw e;
+          }
+        } else {
+          throw e;
+        }
+      }
 
       // If a locationId was provided but didn't persist (older schema insert path), try to persist it now
       if (payload.locationId && (created as any)?.locationId == null) {

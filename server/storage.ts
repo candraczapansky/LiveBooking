@@ -557,6 +557,10 @@ export class DatabaseStorage implements IStorage {
       // Add missing columns if they don't exist (migration)
       try {
         await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false`);
+        // Ensure rooms table has required columns for current app schema
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description TEXT`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 1`);
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
         // Ensure rooms table has location_id for room-to-location linkage
         await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
         // Ensure services table has room_id for room-capacity enforcement on services

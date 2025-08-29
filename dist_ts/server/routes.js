@@ -254,8 +254,57 @@ export async function registerRoutes(app, storage, autoRenewalService) {
     // Create a room
     app.post("/api/rooms", async (req, res) => {
         try {
-            const payload = insertRoomSchema.parse(req.body);
-            const created = await storage.createRoom(payload);
+            // Ensure minimal columns exist (runtime safe for older DBs)
+            try {
+                const { db } = await import("../db.js");
+                const { sql } = await import("drizzle-orm");
+                await db.execute(sql`CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, name TEXT NOT NULL)`);
+                await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS description TEXT`);
+                await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 1`);
+                await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
+                await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+            }
+            catch { }
+            let payload;
+            try {
+                payload = insertRoomSchema.parse(req.body);
+            }
+            catch (e) {
+                // Fallback: sanitize input without optional columns
+                const body = req.body || {};
+                const name = typeof body.name === 'string' ? body.name.trim() : '';
+                if (!name)
+                    throw e;
+                payload = { name };
+            }
+            let created;
+            try {
+                created = await storage.createRoom(payload);
+            }
+            catch (e) {
+                const msg = String(e?.message || e || "");
+                if (/does\s+not\s+exist/i.test(msg)) {
+                    try {
+                        const { db } = await import("../db.js");
+                        const { sql } = await import("drizzle-orm");
+                        const inserted = await db.execute(sql`INSERT INTO rooms (name) VALUES (${payload.name}) RETURNING id, name`);
+                        created = (inserted?.rows ?? inserted)[0];
+                        // Best-effort: set optional fields if columns exist
+                        try { await db.execute(sql`UPDATE rooms SET is_active = TRUE WHERE id = ${Number(created?.id)}`); }
+                        catch { }
+                        if (req.body?.locationId) {
+                            try { await db.execute(sql`UPDATE rooms SET location_id = ${Number(req.body.locationId)} WHERE id = ${Number(created?.id)}`); }
+                            catch { }
+                        }
+                    }
+                    catch {
+                        throw e;
+                    }
+                }
+                else {
+                    throw e;
+                }
+            }
             res.status(201).json(created);
         }
         catch (error) {
