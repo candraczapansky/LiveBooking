@@ -12,6 +12,8 @@ export function formatPrice(price: number): string {
   }).format(price);
 }
 
+const CENTRAL_TZ = 'America/Chicago';
+
 export function formatDate(date: Date | string): string {
   if (typeof date === 'string') {
     date = new Date(date);
@@ -20,6 +22,7 @@ export function formatDate(date: Date | string): string {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: CENTRAL_TZ,
   }).format(date);
 }
 
@@ -30,7 +33,8 @@ export function formatTime(date: Date | string): string {
   return new Intl.DateTimeFormat('en-US', {
     hour: 'numeric',
     minute: 'numeric',
-    hour12: true
+    hour12: true,
+    timeZone: CENTRAL_TZ,
   }).format(date);
 }
 
@@ -76,4 +80,27 @@ export function debounce<F extends (...args: any[]) => any>(func: F, waitFor: nu
       timeout = setTimeout(() => resolve(func(...args)), waitFor);
     });
   };
+}
+
+// Convert a Date or ISO string to a Date that reflects the same wall-clock time in Central Time.
+export function toCentralWallTime(input: Date | string): Date {
+  const date = typeof input === 'string' ? new Date(input) : input;
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: CENTRAL_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find(p => p.type === type)?.value || 0);
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  const hour = get('hour');
+  const minute = get('minute');
+  const second = get('second');
+  return new Date(year, month - 1, day, hour, minute, second, 0);
 }

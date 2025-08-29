@@ -13,6 +13,9 @@ import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
 import { triggerCancellation } from "../automation-triggers.js";
+import { db } from "../db.js";
+import { locations as locationsTable } from "../../shared/schema.js";
+import { eq } from "drizzle-orm";
 
 // Minimal helper to replace template variables like {client_name}
 function replaceTemplateVariables(template: string, variables: Record<string, string>): string {

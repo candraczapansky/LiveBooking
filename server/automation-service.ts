@@ -109,7 +109,7 @@ export class AutomationService {
 
       // Process each automation rule
       for (const rule of rules) {
-        await this.processAutomationRule(rule, client, variables);
+        await this.processAutomationRule(rule, client, variables, context);
       }
 
       console.log(`✅ AutomationService: Completed processing ${rules.length} rules for trigger: ${trigger}`);
@@ -208,7 +208,8 @@ export class AutomationService {
   private async processAutomationRule(
     rule: AutomationRule,
     client: ClientData,
-    variables: Record<string, string>
+    variables: Record<string, string>,
+    context: AutomationContext
   ): Promise<void> {
     console.log(`📧 Processing automation rule: ${rule.name} (${rule.type})`);
 
@@ -265,13 +266,32 @@ export class AutomationService {
         }
       } catch {}
 
+      // 3) If still not resolved, try appointment's location
+      try {
+        if (variablesForRule.salon_name === 'Glo Head Spa' && context?.appointmentId) {
+          const appt: any = await (this.storage as any).getAppointment?.(context.appointmentId);
+          const apptLocId = appt?.locationId;
+          if (apptLocId) {
+            let loc: any = null;
+            try { loc = await (this.storage as any).getLocation?.(apptLocId); } catch {}
+            if (!loc) { try { const rows = await db.select().from(locations).where(eq(locations.id, Number(apptLocId))).limit(1); loc = (rows as any[])?.[0] || null; } catch {} }
+            if (loc?.name) {
+              variablesForRule.salon_name = String(loc.name);
+              if (loc.phone) variablesForRule.salon_phone = String(loc.phone);
+              const addrParts = [loc.address, loc.city, loc.state, loc.zipCode].filter(Boolean);
+              if (addrParts.length) variablesForRule.salon_address = addrParts.join(', ');
+            }
+          }
+        }
+      } catch {}
+
       // Process template with per-rule variables
       const processedTemplate = this.replaceTemplateVariables(rule.template, variablesForRule);
-      const processedSubject = rule.subject ? this.replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from Glo Head Spa';
+      const processedSubject = rule.subject ? this.replaceTemplateVariables(rule.subject, variablesForRule) : `Notification from ${variablesForRule.salon_name || 'Your Salon'}`;
 
       // Send the automation
       if (rule.type === 'email') {
-        await this.sendEmailAutomation(rule, client, processedSubject, processedTemplate);
+        await this.sendEmailAutomation(rule, client, processedSubject, processedTemplate, variablesForRule.salon_name);
       } else if (rule.type === 'sms') {
         await this.sendSMSAutomation(rule, client, processedTemplate);
       }
@@ -361,7 +381,8 @@ export class AutomationService {
     rule: AutomationRule,
     client: ClientData,
     subject: string,
-    template: string
+    template: string,
+    fromName?: string
   ): Promise<void> {
     console.log(`📧 Sending email automation: ${rule.name}`);
     console.log(`📧 To: ${client.email}`);
@@ -371,6 +392,7 @@ export class AutomationService {
       const emailResult = await sendEmail({
         to: client.email!,
         from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+        fromName,
         subject,
         text: template,
         html: `<p>${template.replace(/\n/g, '<br>')}</p>`

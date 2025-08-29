@@ -399,6 +399,73 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
     })
   );
 
+  // Password reset via SMS: accept phone, if user exists generate token and SMS link
+  app.post("/api/auth/password-reset/sms",
+    asyncHandler(async (req: Request, res: Response) => {
+      try {
+        const { phone } = req.body || {};
+        const context = getLogContext(req);
+
+        const rawPhone = typeof phone === 'string' ? phone.trim() : '';
+        if (!rawPhone) {
+          return res.json({ success: true, message: "If the phone exists, a reset SMS has been sent." });
+        }
+
+        // Normalize phone: strip non-digits, ensure E.164 if possible
+        const normalized = rawPhone.replace(/[^0-9]/g, '');
+        const candidate = normalized.length === 10 ? `+1${normalized}` : (normalized.startsWith('+') ? normalized : `+${normalized}`);
+
+        const users = await storage.getAllUsers();
+        const user = users.find(u => (u.phone || '').replace(/[^0-9+]/g, '') === candidate.replace(/[^0-9+]/g, ''));
+
+        if (!user) {
+          LoggerService.warn("Password reset SMS attempt for non-existent phone", { ...context, phone: candidate });
+          return res.json({ success: true, message: "If the phone exists, a reset SMS has been sent." });
+        }
+
+        // Generate reset token
+        const resetToken = (globalThis as any).crypto && typeof (globalThis as any).crypto.randomUUID === 'function'
+          ? (globalThis as any).crypto.randomUUID().replace(/-/g, '')
+          : Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+        const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
+
+        await storage.updateUser(user.id, { resetToken, resetTokenExpiry });
+
+        // Build reset link similar to email flow
+        const replitDomain = process.env.REPLIT_DOMAINS
+          ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
+          : undefined;
+        const requestOrigin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
+        const defaultDomain = 'https://gloupheadspa.app';
+        const baseUrl = (process.env.FRONTEND_URL
+          || process.env.CUSTOM_DOMAIN
+          || replitDomain
+          || requestOrigin
+          || defaultDomain).replace(/\/$/, '');
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
+
+        try {
+          if (!isTwilioConfigured()) {
+            throw new Error('Twilio not configured');
+          }
+          await sendSMS(user.phone!, `Reset your password: ${resetLink}`);
+          LoggerService.logAuthentication("password_reset_sms_requested", user.id, context);
+        } catch (err: any) {
+          LoggerService.warn("Password reset SMS send failed; continuing with generic success", {
+            ...context,
+            userId: user.id,
+            error: err?.message || String(err),
+          });
+        }
+
+        return res.json({ success: true, message: "If the phone exists, a reset SMS has been sent." });
+      } catch (routeError: any) {
+        LoggerService.warn("Password reset SMS route error; returning generic success", { error: routeError?.message || String(routeError) });
+        return res.json({ success: true, message: "If the phone exists, a reset SMS has been sent." });
+      }
+    })
+  );
+
   // Change password (authenticated users)
   app.post("/api/auth/change-password", 
     validateInput(passwordChangeSchema),

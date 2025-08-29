@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import BigCalendar from "@/components/calendar/BigCalendar";
 import { Calendar as MiniCalendar } from "@/components/ui/calendar";
 import { startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
+import { toCentralWallTime } from "@/lib/utils";
 
 const AppointmentsPage = () => {
   useDocumentTitle("Client Appointments | Glo Head Spa");
@@ -573,19 +574,7 @@ const AppointmentsPage = () => {
               const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
               const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
               
-              // Get existing appointments for this staff on this day (location-filtered)
-              const staffAppointments = filteredAppointments.filter((apt: any) => {
-                try {
-                  if (!apt || !apt.startTime) return false;
-                  const aptDate = new Date(apt.startTime);
-                  return !isNaN(aptDate.getTime()) && 
-                         apt.staffId === s.id && 
-                         aptDate.toDateString() === date.toDateString();
-                } catch (e) {
-                  console.warn('Error filtering appointment:', e);
-                  return false;
-                }
-              });
+              // Note: appointments are rendered separately as interactive events; no need to overlay booked blocks
               
               // If no schedule at all, gray out the whole day
               if (allStaffSchedules.length === 0) {
@@ -685,36 +674,7 @@ const AppointmentsPage = () => {
                       });
                     }
                     
-                    // Gray out booked appointments
-                    staffAppointments.forEach((apt: any) => {
-                      try {
-                        if (!apt.startTime) return;
-                        
-                        const aptStart = new Date(apt.startTime);
-                        const aptEnd = apt.endTime ? new Date(apt.endTime) : new Date(aptStart.getTime() + 3600000);
-                        
-                        if (isNaN(aptStart.getTime()) || isNaN(aptEnd.getTime())) {
-                          console.warn('Invalid appointment times:', aptStart, aptEnd);
-                          return;
-                        }
-                        
-                        // Only gray out if the appointment is within working hours
-                        if (aptStart >= workStart && aptEnd <= workEnd) {
-                          events.push({
-                            start: aptStart,
-                            end: aptEnd,
-                            resourceId: s.id,
-                            allDay: false,
-                            title: 'Booked',
-                            type: 'unavailable',
-                            style: { backgroundColor: '#9ca3af', opacity: 0.7 },
-                            isBackground: true,
-                          });
-                        }
-                      } catch (error) {
-                        console.warn('Error processing appointment:', error);
-                      }
-                    });
+                    // Do not overlay booked appointment times as unavailable; let appointment events render and handle clicks/colors
                   } catch (error) {
                     console.warn('Error processing available schedule:', error);
                   }
@@ -1195,7 +1155,8 @@ const AppointmentsPage = () => {
                                 let endDate: Date;
                                 
                                 try {
-                                  startDate = new Date(apt.startTime);
+                                  // Interpret appointment timestamps in Central Time for display
+                                  startDate = toCentralWallTime(apt.startTime);
                                   // Ensure it's a valid date
                                   if (isNaN(startDate.getTime())) {
                                     console.warn('Invalid start date:', apt.startTime);
@@ -1207,7 +1168,7 @@ const AppointmentsPage = () => {
                                 }
                                 
                                 try {
-                                  endDate = apt.endTime ? new Date(apt.endTime) : new Date(startDate.getTime() + 3600000); // Default to 1 hour if no end time
+                                  endDate = apt.endTime ? toCentralWallTime(apt.endTime) : new Date(startDate.getTime() + 3600000); // Default to 1 hour if no end time
                                   // Ensure it's a valid date
                                   if (isNaN(endDate.getTime())) {
                                     console.warn('Invalid end date:', apt.endTime);

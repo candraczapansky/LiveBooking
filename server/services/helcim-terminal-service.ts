@@ -662,9 +662,29 @@ export class HelcimTerminalService {
         }
       }
 
-      // Skip all API enrichment calls since they return 404
-      // We'll trust the webhook data as received
-      console.log('🚀 Skipping API enrichment - trusting webhook data directly');
+      // If Helcim omitted invoiceNumber, enrich by querying the transaction by id
+      if (transactionId && !invoiceNumber) {
+        try {
+          let apiToken: string | undefined;
+          try {
+            const cfg = await this.configService.getAnyActiveTerminalConfig();
+            apiToken = cfg?.apiToken || process.env.HELCIM_API_TOKEN;
+          } catch {
+            apiToken = process.env.HELCIM_API_TOKEN;
+          }
+          if (apiToken) {
+            const resp = await this.makeRequest('GET', `/card-transactions/${transactionId}`, undefined, apiToken);
+            const t = (resp?.data as any) || {};
+            const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || t?.reference || undefined;
+            const l4 = t?.cardLast4 || t?.last4 || t?.card?.last4 || last4;
+            if (inv) invoiceNumber = String(inv);
+            if (l4) last4 = String(l4);
+            console.log('🧩 Enriched webhook via API', { invoiceNumber, last4 });
+          }
+        } catch (e) {
+          console.log('ℹ️ Transaction enrichment failed; proceeding with minimal webhook', String((e as any)?.message || e));
+        }
+      }
 
       // If Helcim omitted invoiceNumber but our sessions include an entry whose transactionId matches, backfill invoiceNumber
       if (!invoiceNumber && transactionId) {

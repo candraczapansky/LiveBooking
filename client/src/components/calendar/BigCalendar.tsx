@@ -50,6 +50,7 @@ interface BigCalendarProps {
 const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate }) => {
   // Limit visible time range to reduce internal scrolling and show more calendar content
   const today = new Date();
+  // Keep a consistent visible window that matches Central hours. These are wall-clock hours.
   const minTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 6, 0, 0);
   const maxTime = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 22, 0, 0);
 
@@ -112,7 +113,10 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
           // Handle background events (unavailable times)
           if ((event as any).type === 'unavailable' || (event as any).isBackground) {
             return {
-              style: (event as any).style || { backgroundColor: '#e5e7eb', opacity: 0.5 },
+              style: {
+                pointerEvents: 'none',
+                ...( (event as any).style || { backgroundColor: '#e5e7eb', opacity: 0.5 } )
+              },
               className: 'bg-gray-200',
             };
           }

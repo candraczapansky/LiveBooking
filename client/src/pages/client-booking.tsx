@@ -180,6 +180,27 @@ const ClientBookingPage = () => {
                     </div>
                   </form>
                 </Form>
+                <div className="mt-4">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Forgot your password?</div>
+                  <div className="mt-2 flex flex-col sm:flex-row gap-1">
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="h-8 w-fit px-2 text-xs text-primary hover:text-primary/80"
+                      onClick={() => navigate("/forgot-password")}
+                    >
+                      Reset via Email
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="h-8 w-fit px-2 text-xs text-primary hover:text-primary/80"
+                      onClick={() => navigate("/forgot-password-sms")}
+                    >
+                      Reset via SMS
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <>
@@ -269,6 +290,27 @@ const ClientBookingPage = () => {
                     </div>
                   </form>
                 </Form>
+                <div className="mt-4">
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Forgot your password?</div>
+                  <div className="mt-2 flex flex-col sm:flex-row gap-1">
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="h-8 w-fit px-2 text-xs text-primary hover:text-primary/80"
+                      onClick={() => navigate("/forgot-password")}
+                    >
+                      Reset via Email
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      className="h-8 w-fit px-2 text-xs text-primary hover:text-primary/80"
+                      onClick={() => navigate("/forgot-password-sms")}
+                    >
+                      Reset via SMS
+                    </Button>
+                  </div>
+                </div>
               </>
             )}
           </div>

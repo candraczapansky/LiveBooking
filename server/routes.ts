@@ -576,6 +576,62 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.post("/api/schedules", async (req: Request, res: Response) => {
     try {
       const data = insertStaffScheduleSchema.parse(req.body);
+
+      // Validate basic time ordering
+      const toMinutes = (t: string) => {
+        const [h, m] = String(t).split(":").map((n) => parseInt(n, 10));
+        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+      };
+      const newStartMin = toMinutes(data.startTime);
+      const newEndMin = toMinutes(data.endTime);
+      if (newEndMin <= newStartMin) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      const toDate = (d: any) => (d ? new Date(d) : undefined);
+      const rangeOverlaps = (
+        aStart?: Date,
+        aEnd?: Date | null,
+        bStart?: Date,
+        bEnd?: Date | null
+      ) => {
+        const aS = aStart ? new Date(aStart) : undefined;
+        const aE = aEnd ? new Date(aEnd) : new Date("9999-12-31");
+        const bS = bStart ? new Date(bStart) : undefined;
+        const bE = bEnd ? new Date(bEnd) : new Date("9999-12-31");
+        if (!aS || !bS) return true; // if either start missing, treat as overlapping
+        return aS <= (bE as Date) && bS <= (aE as Date);
+      };
+
+      // Prevent overlapping schedules on the same day for the same staff/location
+      const allSchedules = await storage.getAllStaffSchedules();
+      const hasOverlap = (allSchedules || []).some((s: any) => {
+        if (s.staffId !== data.staffId) return false;
+        if (s.locationId !== data.locationId) return false;
+        if (String(s.dayOfWeek) !== String(data.dayOfWeek)) return false;
+
+        // Check date range overlap
+        const datesOverlap = rangeOverlaps(
+          toDate(s.startDate),
+          s.endDate ? toDate(s.endDate) : null,
+          toDate(data.startDate),
+          data.endDate ? toDate(data.endDate) : null
+        );
+        if (!datesOverlap) return false;
+
+        // Time overlap (treat as half-open intervals to allow back-to-back)
+        const sStart = toMinutes(s.startTime);
+        const sEnd = toMinutes(s.endTime);
+        const timeOverlap = sStart < newEndMin && sEnd > newStartMin;
+        return timeOverlap;
+      });
+
+      if (hasOverlap) {
+        return res.status(409).json({
+          error: "Schedule conflicts with an existing schedule for this day",
+        });
+      }
+
       const created = await storage.createStaffSchedule(data as any);
       return res.status(201).json(created);
     } catch (error) {
@@ -592,6 +648,76 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       // Allow partial updates
       const partialSchema = insertStaffScheduleSchema.partial();
       const updateData = partialSchema.parse(req.body);
+
+      const existing = await (storage as any).getStaffSchedule?.(id);
+      if (!existing) {
+        return res.status(404).json({ error: "Schedule not found" });
+      }
+
+      // Build effective schedule after update
+      const effective = {
+        staffId: updateData.staffId ?? existing.staffId,
+        locationId: updateData.locationId ?? existing.locationId,
+        dayOfWeek: updateData.dayOfWeek ?? existing.dayOfWeek,
+        startTime: updateData.startTime ?? existing.startTime,
+        endTime: updateData.endTime ?? existing.endTime,
+        startDate: updateData.startDate ?? existing.startDate,
+        endDate: updateData.endDate ?? existing.endDate,
+        isBlocked: updateData.isBlocked ?? existing.isBlocked,
+      } as any;
+
+      const toMinutes = (t: string) => {
+        const [h, m] = String(t).split(":").map((n) => parseInt(n, 10));
+        return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+      };
+      const effStart = toMinutes(effective.startTime);
+      const effEnd = toMinutes(effective.endTime);
+      if (effEnd <= effStart) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      const toDate = (d: any) => (d ? new Date(d) : undefined);
+      const rangeOverlaps = (
+        aStart?: Date,
+        aEnd?: Date | null,
+        bStart?: Date,
+        bEnd?: Date | null
+      ) => {
+        const aS = aStart ? new Date(aStart) : undefined;
+        const aE = aEnd ? new Date(aEnd) : new Date("9999-12-31");
+        const bS = bStart ? new Date(bStart) : undefined;
+        const bE = bEnd ? new Date(bEnd) : new Date("9999-12-31");
+        if (!aS || !bS) return true;
+        return aS <= (bE as Date) && bS <= (aE as Date);
+      };
+
+      const allSchedules = await storage.getAllStaffSchedules();
+      const hasOverlap = (allSchedules || []).some((s: any) => {
+        if (s.id === id) return false; // exclude self
+        if (s.staffId !== effective.staffId) return false;
+        if (s.locationId !== effective.locationId) return false;
+        if (String(s.dayOfWeek) !== String(effective.dayOfWeek)) return false;
+
+        const datesOverlap = rangeOverlaps(
+          toDate(s.startDate),
+          s.endDate ? toDate(s.endDate) : null,
+          toDate(effective.startDate),
+          effective.endDate ? toDate(effective.endDate) : null
+        );
+        if (!datesOverlap) return false;
+
+        const sStart = toMinutes(s.startTime);
+        const sEnd = toMinutes(s.endTime);
+        const timeOverlap = sStart < effEnd && sEnd > effStart;
+        return timeOverlap;
+      });
+
+      if (hasOverlap) {
+        return res.status(409).json({
+          error: "Updated schedule conflicts with an existing schedule for this day",
+        });
+      }
+
       const updated = await storage.updateStaffSchedule(id, updateData as any);
       return res.json(updated);
     } catch (error) {

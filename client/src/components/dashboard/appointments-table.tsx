@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { formatTime, getInitials } from "@/lib/utils";
+import { formatTime, getInitials, toCentralWallTime } from "@/lib/utils";
 
 const getStatusBadgeStyle = (status: string) => {
   switch(status) {
@@ -49,11 +49,12 @@ const AppointmentsTable = () => {
 
   // Filter today's appointments
   const today = new Date();
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  const centralToday = toCentralWallTime(today);
+  const todayStart = new Date(centralToday.getFullYear(), centralToday.getMonth(), centralToday.getDate());
+  const todayEnd = new Date(centralToday.getFullYear(), centralToday.getMonth(), centralToday.getDate() + 1);
 
   const todayAppointments = (allAppointments as any[])?.filter((apt: any) => {
-    const aptDate = new Date(apt.startTime);
+    const aptDate = toCentralWallTime(apt.startTime);
     return aptDate >= todayStart && aptDate < todayEnd;
   }) || [];
 
