@@ -1,15 +1,78 @@
 import express from 'express';
 import { db } from '../db.js';
 import { locations, appointments, insertLocationSchema, updateLocationSchema } from '../../shared/schema.js';
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, sql } from 'drizzle-orm';
 import { requireAuth } from '../middleware/error-handler.js';
 
 const router = express.Router();
 
+async function ensureLocationsSchema() {
+  // Ensure locations table exists
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS locations (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        address TEXT,
+        city TEXT,
+        state TEXT,
+        zip_code TEXT,
+        phone TEXT,
+        email TEXT,
+        timezone TEXT DEFAULT 'America/New_York',
+        is_active BOOLEAN DEFAULT true,
+        is_default BOOLEAN DEFAULT false,
+        description TEXT,
+        business_hours TEXT,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+  } catch {}
+
+  // Add any missing columns to be compatible with current app schema without dropping data
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS timezone TEXT DEFAULT 'America/New_York'`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS description TEXT`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS business_hours TEXT`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT false`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW()`); } catch {}
+  try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`); } catch {}
+}
+
 // Get all locations
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const allLocations = await db.select().from(locations).orderBy(desc(locations.id));
+    // Ensure schema compatibility in case of older databases
+    await ensureLocationsSchema();
+
+    let allLocations = await db.select().from(locations).orderBy(desc(locations.id));
+
+    // Safety net: if no locations exist, create a sensible default to keep the app functional
+    if (allLocations.length === 0) {
+      try {
+        const inserted = await db
+          .insert(locations)
+          .values({
+            name: 'Main Location',
+            address: '123 Main St',
+            city: 'New York',
+            state: 'NY',
+            zipCode: '10001',
+            phone: '555-123-4567',
+            email: 'info@example.com',
+            timezone: 'America/New_York',
+            isActive: true,
+            isDefault: true,
+            description: 'Primary business location',
+          })
+          .returning();
+        allLocations = inserted;
+      } catch (e) {
+        // If insert fails for any reason, fall through and return the (empty) list
+      }
+    }
+
     res.json(allLocations);
   } catch (error) {
     console.error('Error fetching locations:', error);

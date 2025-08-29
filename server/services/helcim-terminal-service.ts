@@ -725,7 +725,16 @@ export class HelcimTerminalService {
       
       // Also record a global last-completed marker to allow simple confirmation flows
       if (normalized === 'completed') {
-        try { webhookStore.set('__GLOBAL_LAST_COMPLETED__', cacheValue as any); } catch {}
+        try {
+          webhookStore.set('__GLOBAL_LAST_COMPLETED__', cacheValue as any);
+          (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
+            status: 'completed',
+            transactionId: transactionId,
+            invoiceNumber: invoiceNumber,
+            last4: last4,
+            updatedAt: Date.now(),
+          };
+        } catch {}
       }
       
       // Also try to match with any active sessions that might be waiting

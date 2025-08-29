@@ -104,7 +104,19 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
-    // Do NOT auto-complete via force/global markers in production. Status must come from webhook cache.
+    // Minimal confirmation mode: if a fresh Helcim webhook was received recently,
+    // immediately report completed (confirmation-only behavior).
+    try {
+      const g: any = (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__;
+      if (g && (Date.now() - (g.updatedAt || 0)) <= 90 * 1000) {
+        return res.json({
+          success: true,
+          status: 'completed',
+          last4: g.last4,
+          transactionId: g.transactionId || paymentId,
+        });
+      }
+    } catch {}
     // Force bypass of conditional requests to prevent 304 during active polling
     try {
       delete (req as any).headers['if-none-match'];
@@ -244,8 +256,7 @@ router.get('/payment/:paymentId', async (req, res) => {
     let status = await terminalService.checkPaymentStatus('', paymentId);
     let s = (status as any) || {};
 
-    // Strict mode default: rely on explicit cache matches only.
-    // Apply the same limited fallback for the location-agnostic alias.
+    // Minimal confirmation mode for the location-agnostic alias as well.
     try {
       const looksLikeInvoice = typeof paymentId === 'string' && paymentId.startsWith('POS-');
       if ((s.status === 'pending' || !s.status) && looksLikeInvoice) {

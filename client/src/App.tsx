@@ -140,8 +140,10 @@ export default function App() {
   const isPublicFormRoute = /^\/forms\/\d+$/.test(pathOnly);
   // Public document viewer route (string id like doc_123...)
   const isPublicDocumentRoute = /^\/documents\/[A-Za-z0-9_-]+$/.test(pathOnly);
-  // Always treat reset-password as a standalone public page (no MainLayout/header)
+  // Always treat reset/forgot as standalone public pages (no MainLayout/header)
   const isResetPasswordRoute = location.startsWith('/reset-password');
+  const isForgotPasswordRoute = location.startsWith('/forgot-password');
+  const isForgotPasswordSmsRoute = location.startsWith('/forgot-password-sms');
   // Treat only /booking as minimal page (no MainLayout/header). Do not include /booking-test
   const isBookingRoute = location === '/booking';
 
@@ -151,6 +153,32 @@ export default function App() {
         <TooltipProvider>
           <Suspense fallback={<PageLoading />}>
             <ResetPassword />
+          </Suspense>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  if (isForgotPasswordRoute) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Suspense fallback={<PageLoading />}>
+            <ForgotPassword />
+          </Suspense>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  if (isForgotPasswordSmsRoute) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Suspense fallback={<PageLoading />}>
+            <ForgotPasswordSMS />
           </Suspense>
           <Toaster />
         </TooltipProvider>

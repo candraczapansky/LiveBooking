@@ -452,6 +452,21 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       const staffRecord = await storage.getStaff(newAppointment.staffId);
       const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
       const service = await storage.getService(newAppointment.serviceId);
+      // Resolve appointment location for messaging
+      let appointmentLocation: any = null;
+      try {
+        const locId = (newAppointment as any).locationId;
+        if (locId != null) {
+          const rows = await db
+            .select()
+            .from(locationsTable)
+            .where(eq(locationsTable.id, Number(locId)))
+            .limit(1);
+          appointmentLocation = (rows as any[])?.[0] || null;
+        }
+      } catch (_e) {
+        appointmentLocation = null;
+      }
 
       LoggerService.info("Client data retrieved", {
         ...context,
@@ -532,9 +547,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 appointment_date: dateStr,
                 appointment_time: timeStr,
                 appointment_datetime: `${dateStr} ${timeStr}`,
-                salon_name: 'Glo Head Spa',
-                salon_phone: '(555) 123-4567',
-                salon_address: '123 Beauty Street, City, State 12345'
+                salon_name: appointmentLocation?.name || 'Glo Head Spa',
+                salon_phone: appointmentLocation?.phone || '(555) 123-4567',
+                salon_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', '),
+                location_name: appointmentLocation?.name || '',
+                location_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', ')
               };
               const subject = emailRule.subject ? replaceTemplateVariables(emailRule.subject, variables) : 'Appointment Confirmation - Glo Head Spa';
               const body = replaceTemplateVariables(emailRule.template, variables);
@@ -568,6 +585,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                       <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
                       <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
+                      ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
                     </ul>
                     <p>We look forward to seeing you!</p>
                   </div>
@@ -604,6 +622,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                       <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
                       <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+                      ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
                     </ul>
                     <p>This is a test email to verify the email service is working.</p>
                   </div>
@@ -642,6 +661,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                       <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
                       <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+                      ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
                     </ul>
                     <p>We look forward to seeing you!</p>
                   </div>
@@ -691,14 +711,21 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 appointment_date: dateStr,
                 appointment_time: timeStr,
                 appointment_datetime: `${dateStr} ${timeStr}`,
-                salon_name: 'Glo Head Spa',
-                salon_phone: '(555) 123-4567',
-                salon_address: '123 Beauty Street, City, State 12345'
+                salon_name: appointmentLocation?.name || 'Glo Head Spa',
+                salon_phone: appointmentLocation?.phone || '(555) 123-4567',
+                salon_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', '),
+                location_name: appointmentLocation?.name || '',
+                location_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', ')
               };
               smsMessage = replaceTemplateVariables(smsRule.template, variables);
             }
           } catch (_e) {
             // Non-fatal, use default smsMessage
+          }
+          // Append location if present for default SMS text (non-template)
+          if (appointmentLocation && (!smsMessage || !/Location:/i.test(smsMessage))) {
+            const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
+            smsMessage += ` Location: ${locText}.`;
           }
           await sendSMS(client.phone, smsMessage);
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
@@ -944,11 +971,26 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const client = await storage.getUser(appointment.clientId);
     const staff = await storage.getUser(appointment.staffId);
     const service = await storage.getService(appointment.serviceId);
+    // Resolve appointment location for resend
+    let appointmentLocation: any = null;
+    try {
+      const locId = (appointment as any).locationId;
+      if (locId != null) {
+        const rows = await db
+          .select()
+          .from(locationsTable)
+          .where(eq(locationsTable.id, Number(locId)))
+          .limit(1);
+        appointmentLocation = (rows as any[])?.[0] || null;
+      }
+    } catch (_e) {
+      appointmentLocation = null;
+    }
 
     if (!client || !staff || !service) {
       throw new NotFoundError("Appointment details");
     }
-
+    
     let reminderSent = false;
 
     // Send email reminder
@@ -1096,6 +1138,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const staff = await storage.getUser(appointment.staffId);
     const service = await storage.getService(appointment.serviceId);
 
+    // Resolve appointment location for messaging
+    let appointmentLocation: any = null;
+    try {
+      const locId = (appointment as any).locationId;
+      if (locId != null) {
+        const rows = await db.select().from(locationsTable).where(eq(locationsTable.id, Number(locId))).limit(1);
+        appointmentLocation = (rows as any[])?.[0] || null;
+      }
+    } catch (_e) {
+      appointmentLocation = null;
+    }
+
     if (!client || !service) {
       throw new NotFoundError("Appointment details");
     }
@@ -1124,6 +1178,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
                 <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
                 <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+                ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
               </ul>
               <p>We look forward to seeing you!</p>
             </div>
@@ -1139,7 +1194,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send SMS confirmation if allowed
     if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
       try {
-        const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        let message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        if (appointmentLocation) {
+          const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
+          message += ` Location: ${locText}.`;
+        }
         await sendSMS(client.phone, message);
         LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
         smsSent = true;
@@ -1181,6 +1240,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const staff = await storage.getUser(appointment.staffId);
     const service = await storage.getService(appointment.serviceId);
 
+    // Resolve appointment location for messaging
+    let appointmentLocation: any = null;
+    try {
+      const locId = (appointment as any).locationId;
+      if (locId != null) {
+        const rows = await db.select().from(locationsTable).where(eq(locationsTable.id, Number(locId))).limit(1);
+        appointmentLocation = (rows as any[])?.[0] || null;
+      }
+    } catch (_e) {
+      appointmentLocation = null;
+    }
+
     if (!client || !service) {
       throw new NotFoundError("Appointment details");
     }
@@ -1207,6 +1278,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
                 <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
                 <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
+                ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
               </ul>
               <p>We look forward to seeing you!</p>
             </div>
@@ -1221,7 +1293,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
       try {
-        const message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        let message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        if (appointmentLocation) {
+          const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
+          message += ` Location: ${locText}.`;
+        }
         await sendSMS(client.phone, message);
         LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
         smsSent = true;
