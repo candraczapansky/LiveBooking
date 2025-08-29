@@ -6,6 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -849,7 +856,7 @@ export default function Products() {
                                 
                                 <div className="flex items-center justify-between text-sm">
                                   <div className="flex items-center gap-3">
-                                    <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                                    <Badge variant="default" className="text-xs">{product.category}</Badge>
                                     <span className="font-semibold text-lg">${product.price.toFixed(2)}</span>
                                   </div>
                                   <div className="flex items-center gap-2">
@@ -898,7 +905,7 @@ export default function Products() {
                                     </div>
                                   </TableCell>
                                   <TableCell>
-                                    <Badge variant="secondary">{product.category}</Badge>
+                                    <Badge variant="default">{product.category}</Badge>
                                   </TableCell>
                                   <TableCell>${product.price.toFixed(2)}</TableCell>
                                   <TableCell>

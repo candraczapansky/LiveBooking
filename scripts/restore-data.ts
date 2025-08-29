@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { neon } from '@neondatabase/serverless';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -8,7 +9,10 @@ import bcrypt from 'bcrypt';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { users, locations, serviceCategories, services, staff, staffSchedules, rooms } from '../server/schema';
 
-const DATABASE_URL = "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
+const { DATABASE_URL } = process.env as Record<string, string>;
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL must be set');
+}
 
 async function restoreData() {
   try {

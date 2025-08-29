@@ -23,7 +23,8 @@ export const config = {
   
   // Database Configuration
   database: {
-    url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/salon_management',
+    // Avoid insecure hard-coded defaults. Use env var; production boot will validate in server/db.ts
+    url: process.env.DATABASE_URL || '',
   },
   
   // Server Configuration

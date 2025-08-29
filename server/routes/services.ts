@@ -179,16 +179,43 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     // Attempt to create the service. If the DB is missing optional columns
     // due to an older schema, gracefully retry without them.
     let newService;
-    try {
-      newService = await storage.createService(safeServiceData);
-    } catch (err: any) {
-      const message = typeof err?.message === 'string' ? err.message : '';
-      if (/column\s+"description"\s+does\s+not\s+exist/i.test(message)) {
-        console.warn('Service creation failed due to missing description column. Retrying without description.');
-        newService = await storage.createService(safeServiceData);
-      } else {
+    let attemptData: any = { ...safeServiceData };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        newService = await storage.createService(attemptData);
+        break;
+      } catch (err: any) {
+        const message = typeof err?.message === 'string' ? err.message : '';
+        // Handle missing columns defensively
+        const missingColMatch = message.match(/column\s+\"([a-z_]+)\"\s+of\s+relation\s+\"services\"\s+does\s+not\s+exist/i);
+        if (missingColMatch) {
+          const missingCol = missingColMatch[1];
+          const colToProp: Record<string, string> = {
+            location_id: 'locationId',
+            room_id: 'roomId',
+            buffer_time_before: 'bufferTimeBefore',
+            buffer_time_after: 'bufferTimeAfter',
+            is_hidden: 'isHidden',
+            color: 'color',
+            description: 'description',
+          };
+          const prop = colToProp[missingCol];
+          if (prop && prop in attemptData) {
+            console.warn(`Service creation failed due to missing column ${missingCol}. Retrying without ${prop}.`);
+            const { [prop]: _removed, ...rest } = attemptData;
+            attemptData = rest;
+            continue;
+          }
+        }
+        if (/column\s+\"description\"\s+does\s+not\s+exist/i.test(message)) {
+          // Already dropped above, but keep for explicit clarity
+          continue;
+        }
         throw err;
       }
+    }
+    if (!newService) {
+      throw new Error('Failed to create service after removing optional fields');
     }
 
     // Invalidate relevant caches

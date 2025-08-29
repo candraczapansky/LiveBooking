@@ -84,9 +84,19 @@ export class ProductionConfig {
   private validateEnvironment(): void {
     const requiredVars = ['DATABASE_URL', 'JWT_SECRET'];
     const missing = requiredVars.filter(varName => !process.env[varName]);
-    
     if (missing.length > 0) {
       throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    }
+    const url = String(process.env.DATABASE_URL || '');
+    const lower = url.toLowerCase();
+    if (!/postgres/.test(lower)) {
+      throw new Error('DATABASE_URL must be a Postgres connection string');
+    }
+    // Require TLS in production
+    if ((process.env.NODE_ENV || 'production') === 'production') {
+      if (!/sslmode=require|ssl=true|options=.+sslmode/gi.test(lower) && !/neon\.tech/.test(lower)) {
+        throw new Error('DATABASE_URL must enforce SSL/TLS in production (e.g., add ?sslmode=require)');
+      }
     }
   }
 

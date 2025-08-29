@@ -2475,7 +2475,7 @@ const TimeClockReport = ({ }: {
   customEndDate?: string; 
 }) => {
   const { data: timeEntries = [], isLoading, refetch } = useQuery({ 
-    queryKey: ["/api/time-clock-entries"],
+    queryKey: ["/api/time-clock/entries"],
     refetchInterval: 15000, // Refetch every 15 seconds for time clock data
     refetchOnWindowFocus: true,
     refetchOnMount: true,
@@ -2487,10 +2487,8 @@ const TimeClockReport = ({ }: {
   const handleSync = async () => {
     setSyncing(true);
     try {
-      const response = await fetch('/api/time-clock-sync', { method: 'POST' });
-      const result = await response.json();
-      console.log('Sync result:', result);
-      refetch(); // Refresh the data
+      // No external sync endpoint; simply refetch from our API
+      await refetch();
     } catch (error) {
       console.error('Sync failed:', error);
     } finally {
@@ -2710,7 +2708,7 @@ const ReportsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["/api/services"] });
       queryClient.invalidateQueries({ queryKey: ["/api/payments"] });
       queryClient.invalidateQueries({ queryKey: ["/api/staff"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/time-clock-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/time-clock/entries"] });
     }, 30000); // Refresh every 30 seconds
 
     return () => clearInterval(refreshInterval);

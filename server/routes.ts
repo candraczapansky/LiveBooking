@@ -54,6 +54,7 @@ import { registerMembershipRoutes } from "./routes/memberships.js";
 import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
 import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerTimeClockRoutes } from "./routes/time-clock.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -110,6 +111,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
   registerReportRoutes(app, storage);
+  // Time clock routes
+  registerTimeClockRoutes(app, storage);
   // Register external API routes (health, services, staff availability, webhook)
   registerExternalRoutes(app, storage);
 

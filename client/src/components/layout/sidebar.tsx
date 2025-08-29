@@ -266,6 +266,16 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                             onClick={handleItemClick}
                           />
                         </div>
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Time Clock"
+                            href="/time-clock"
+                            isActive={location === "/time-clock"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

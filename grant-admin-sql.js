@@ -1,9 +1,13 @@
+import 'dotenv/config';
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
 import { sql } from 'drizzle-orm';
 
-// Get database URL from environment or use default
-const DATABASE_URL = "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
+// Get database URL from environment
+const { DATABASE_URL } = process.env;
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL must be set');
+}
 
 // Initialize database connection
 const client = neon(DATABASE_URL);

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useLocation } from "wouter";
-import Papa from "papaparse";
+// Defer loading of heavy CSV parser to avoid blocking page load
 
 
 import {
@@ -651,7 +651,7 @@ const ClientsPage = () => {
     }
   };
 
-  const handleImportCSV = () => {
+  const handleImportCSV = async () => {
     if (!importFile) {
       toast({
         title: "No file selected",
@@ -662,6 +662,7 @@ const ClientsPage = () => {
     }
 
     setIsImporting(true);
+    const Papa = (await import('papaparse')).default;
     
         // First try with headers
     Papa.parse(importFile as any, {
@@ -935,7 +936,7 @@ const ClientsPage = () => {
     setIsImportDialogOpen(false);
   };
 
-  const downloadSampleCSV = () => {
+  const downloadSampleCSV = async () => {
     const sampleData = [
       {
         firstName: 'John',
@@ -969,6 +970,7 @@ const ClientsPage = () => {
       }
     ];
 
+    const Papa = (await import('papaparse')).default;
     const csv = Papa.unparse(sampleData);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -1045,9 +1047,12 @@ const ClientsPage = () => {
   const filteredClients = clients?.filter((client: Client) => {
     // Basic search filter
     const q = searchQuery.toLowerCase();
+    // Guard against missing username/email to avoid runtime errors
+    const usernameLc = (client.username || "").toLowerCase();
+    const emailLc = (client.email || "").toLowerCase();
     const matchesSearch = !q ||
-      client.username.toLowerCase().includes(q) ||
-      client.email.toLowerCase().includes(q) ||
+      usernameLc.includes(q) ||
+      emailLc.includes(q) ||
       (client.firstName && client.firstName.toLowerCase().includes(q)) ||
       (client.lastName && client.lastName.toLowerCase().includes(q)) ||
       (client.phone && client.phone.includes(searchQuery));

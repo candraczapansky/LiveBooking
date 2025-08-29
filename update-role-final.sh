@@ -1,7 +1,11 @@
 #!/bin/bash
 
-# Get database URL from environment or use default
-DATABASE_URL="postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require"
+set -euo pipefail
+
+if [[ -z "${DATABASE_URL:-}" ]]; then
+  echo "DATABASE_URL must be set" >&2
+  exit 1
+fi
 
 # First, check current user info
 psql "$DATABASE_URL" -c "SELECT id, username, first_name, last_name, role FROM users WHERE id = 1;"

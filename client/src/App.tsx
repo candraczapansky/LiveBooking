@@ -51,6 +51,7 @@ const AIMessagingPage = lazy(() => import("@/pages/ai-messaging"));
 const PayrollPage = lazy(() => import("@/pages/payroll"));
 const Locations = lazy(() => import("@/pages/locations"));
 const PermissionsPage = lazy(() => import("@/pages/permissions"));
+const TimeClockPage = lazy(() => import("@/pages/time-clock"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -120,6 +121,7 @@ function Router() {
           <Route path="/payroll" component={PayrollPage} />
           <Route path="/locations" component={Locations} />
           <Route path="/permissions" component={PermissionsPage} />
+          <Route path="/time-clock" component={TimeClockPage} />
           <Route path="/email-test" component={EmailTest} />
           <Route path="/settings" component={Settings} />
           <Route path="/schedule" component={Schedule} />

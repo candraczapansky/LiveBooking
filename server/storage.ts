@@ -1,5 +1,5 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+// Removed direct Neon/drizzle client construction from this module to centralize
+// DB connection handling in server/db.ts and avoid hard-coded URLs.
 import {
   users, User, InsertUser,
   serviceCategories, ServiceCategory, InsertServiceCategory,
@@ -528,9 +528,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   private async initializeConnection() {
-    const DATABASE_URL = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
-    const sql = neon(DATABASE_URL as string, { arrayMode: false, fullResults: false } as any);
-    const db = drizzle(sql as any, { schema: (await import("../shared/schema.js")) as any });
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      throw new Error("DATABASE_URL must be set");
+    }
     try {
       // Test database connection
       await db.select().from(users).limit(1);
@@ -538,13 +539,14 @@ export class DatabaseStorage implements IStorage {
       
       // Add missing columns if they don't exist (migration)
       try {
-        await sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false`;
+        await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false`);
         console.log('Ensured is_hidden column exists in services table');
         // Ensure add-on mapping container exists in system_config
         try {
-          const existing: any = await sql`SELECT 1 FROM system_config WHERE key = 'service_add_on_mapping' LIMIT 1`;
-          if (!existing?.rows || existing.rows.length === 0) {
-            await sql`INSERT INTO system_config (key, value, description, category) VALUES ('service_add_on_mapping', '{}', 'JSON mapping of add-on serviceId -> [baseServiceIds]', 'services')`;
+          const existing: any = await db.execute(sql`SELECT 1 FROM system_config WHERE key = 'service_add_on_mapping' LIMIT 1`);
+          const rows = (existing?.rows ?? existing) as any[];
+          if (!rows || rows.length === 0) {
+            await db.execute(sql`INSERT INTO system_config (key, value, description, category) VALUES ('service_add_on_mapping', '{}', 'JSON mapping of add-on serviceId -> [baseServiceIds]', 'services')`);
             console.log('Initialized service_add_on_mapping in system_config');
           }
         } catch {}
@@ -1432,8 +1434,34 @@ Glo Head Spa`,
 
   // Service operations
   async createService(service: InsertService): Promise<Service> {
-    const [created] = await db.insert(services).values(service as any).returning();
-    return created;
+    try {
+      const [created] = await db.insert(services).values(service as any).returning();
+      return created;
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/does\s+not\s+exist/i.test(message)) {
+        // Fallback to minimal raw SQL insert for older schemas missing optional columns
+        // Required columns: name, duration, price, category_id
+        const name = (service as any).name;
+        const duration = Number((service as any).duration);
+        const price = Number((service as any).price);
+        const categoryId = Number((service as any).categoryId);
+
+        if (!name || !Number.isFinite(duration) || !Number.isFinite(price) || !Number.isFinite(categoryId)) {
+          throw err;
+        }
+
+        const result: any = await db.execute(sql`
+          INSERT INTO services (name, duration, price, category_id)
+          VALUES (${name}, ${duration}, ${price}, ${categoryId})
+          RETURNING id, name, duration, price, category_id AS "categoryId"
+        `);
+        const rows = (result?.rows ?? result) as any[];
+        if (!rows?.[0]) throw err;
+        return rows[0] as Service;
+      }
+      throw err;
+    }
   }
 
   async getService(id: number): Promise<Service | undefined> {

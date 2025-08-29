@@ -1,8 +1,12 @@
+import 'dotenv/config';
 import { neon } from '@neondatabase/serverless';
 import { promises as fs } from 'fs';
 import { join } from 'path';
 
-const DATABASE_URL = "postgresql://neondb_owner:npg_DlO6hZu7nMUE@ep-lively-moon-a63jgei9.us-west-2.aws.neon.tech/neondb?sslmode=require";
+const { DATABASE_URL } = process.env;
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL must be set');
+}
 
 async function runMigration() {
   try {
