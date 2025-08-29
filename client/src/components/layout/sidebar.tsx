@@ -140,7 +140,7 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
   const [isBusinessExpanded, setIsBusinessExpanded] = useState<boolean>(isInBusinessSection);
   const isInClientsSection = location === '/clients' || location === '/forms' || location === '/note-templates' || location === '/memberships' || location === '/booking-test';
   const [isClientsExpanded, setIsClientsExpanded] = useState<boolean>(isInClientsSection);
-  const isInServicesSection = location === '/services' || location === '/devices' || location === '/rooms';
+  const isInServicesSection = location === '/services' || location === '/devices' || location === '/rooms' || location === '/classes';
   const [isServicesExpanded, setIsServicesExpanded] = useState<boolean>(isInServicesSection);
 
   useEffect(() => {
@@ -550,6 +550,16 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                           isOpen={isOpen}
                           onClick={handleItemClick}
                         />
+                        <div className="mt-1">
+                          <SidebarItem
+                            icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Classes"
+                            href="/classes"
+                            isActive={location === "/classes"}
+                            isOpen={isOpen}
+                            onClick={handleItemClick}
+                          />
+                        </div>
                         <div className="mt-1">
                           <SidebarItem
                             icon={<Monitor className="w-5 h-5" strokeWidth={1.75} />}

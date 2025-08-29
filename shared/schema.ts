@@ -276,6 +276,51 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
 });
 
+// Classes schema
+export const classes = pgTable("classes", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  locationId: integer("location_id").references(() => locations.id),
+  roomId: integer("room_id"),
+  instructorStaffId: integer("instructor_staff_id").references(() => staff.id),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  capacity: integer("capacity").default(1),
+  price: doublePrecision("price").default(0),
+  color: text("color").default("#22C55E"),
+  status: text("status").default("scheduled"), // scheduled, cancelled, completed
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClassSchema = createInsertSchema(classes).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  startTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+});
+
+export type Class = typeof classes.$inferSelect;
+export type InsertClass = z.infer<typeof insertClassSchema>;
+
+// Class Enrollments schema
+export const classEnrollments = pgTable("class_enrollments", {
+  id: serial("id").primaryKey(),
+  classId: integer("class_id").notNull(),
+  clientId: integer("client_id").notNull().references(() => users.id),
+  status: text("status").default("enrolled"), // enrolled, waitlisted, cancelled
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertClassEnrollmentSchema = createInsertSchema(classEnrollments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ClassEnrollment = typeof classEnrollments.$inferSelect;
+export type InsertClassEnrollment = z.infer<typeof insertClassEnrollmentSchema>;
+
 // Appointment History schema - tracks all changes to appointments
 export const appointmentHistory = pgTable("appointment_history", {
   id: serial("id").primaryKey(),

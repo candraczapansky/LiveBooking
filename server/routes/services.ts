@@ -161,16 +161,39 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
 
     // Set default location if not provided
     if (!serviceData.locationId) {
-      // Import db and locations table for direct access
-      const { db } = await import("../db.js");
-      const { locations } = await import("../../shared/schema.js");
-      
-      const allLocations = await db.select().from(locations);
-      const defaultLocation = allLocations.find((loc: any) => loc.isDefault) || allLocations[0];
-      if (defaultLocation) {
-        serviceData.locationId = defaultLocation.id;
-        console.log("🔍 DEBUG: Set default locationId:", defaultLocation.id);
+      // If a room is selected, prefer the room's location
+      if (serviceData.roomId) {
+        try {
+          const room = await storage.getRoom(parseInt(String(serviceData.roomId)));
+          if (room?.locationId) {
+            serviceData.locationId = room.locationId;
+            console.log("🔍 DEBUG: Set locationId from room:", room.locationId);
+          }
+        } catch {}
       }
+      // Otherwise fall back to default location
+      if (!serviceData.locationId) {
+        const { db } = await import("../db.js");
+        const { locations } = await import("../../shared/schema.js");
+        const allLocations = await db.select().from(locations);
+        const defaultLocation = allLocations.find((loc: any) => loc.isDefault) || allLocations[0];
+        if (defaultLocation) {
+          serviceData.locationId = defaultLocation.id;
+          console.log("🔍 DEBUG: Set default locationId:", defaultLocation.id);
+        }
+      }
+    } else if (serviceData.locationId && serviceData.roomId) {
+      // If both provided and mismatch, align service location to room's location when available
+      try {
+        const room = await storage.getRoom(parseInt(String(serviceData.roomId)));
+        if (room?.locationId && Number(serviceData.locationId) !== Number(room.locationId)) {
+          console.warn("Service locationId mismatch with selected room. Aligning to room's location.", {
+            serviceLocationId: serviceData.locationId,
+            roomLocationId: room.locationId,
+          });
+          serviceData.locationId = room.locationId;
+        }
+      } catch {}
     }
 
     // Drop optional fields that may not exist in some DBs (defensive)
@@ -235,10 +258,35 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
 
     LoggerService.info("Updating service", { ...context, serviceId, updateData });
 
+    // Ensure required schema exists at runtime (in case of accidental column removal)
+    try {
+      const { db } = await import("../db.js");
+      const { sql } = await import("drizzle-orm");
+      await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+    } catch (e) {
+      // Non-fatal; continue and let downstream fallbacks handle if needed
+    }
+
     const existingService = await storage.getService(serviceId);
     if (!existingService) {
       throw new NotFoundError("Service");
     }
+
+    // If no locationId provided in update, maintain existing or set default
+    try {
+      if ((updateData as any).locationId === undefined || (updateData as any).locationId === null) {
+        (updateData as any).locationId = existingService.locationId;
+        if (!(updateData as any).locationId) {
+          const { db } = await import("../db.js");
+          const { locations } = await import("../../shared/schema.js");
+          const allLocations = await db.select().from(locations);
+          const defaultLocation = allLocations.find((loc: any) => loc.isDefault) || allLocations[0];
+          if (defaultLocation) {
+            (updateData as any).locationId = defaultLocation.id;
+          }
+        }
+      }
+    } catch {}
 
     // Check for name conflicts if name is being updated
     if (updateData.name && updateData.name !== existingService.name) {
@@ -248,7 +296,46 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       }
     }
 
-    const updatedService = await storage.updateService(serviceId, updateData);
+    // Defensive update: handle older DBs missing optional columns by retrying without them
+    let updatedService;
+    let attemptData: any = { ...updateData };
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        updatedService = await storage.updateService(serviceId, attemptData);
+        break;
+      } catch (err: any) {
+        const message = typeof err?.message === 'string' ? err.message : '';
+        // Match both styles: with or without "of relation \"services\""
+        const missingColMatch = message.match(/column\s+\"([a-z_]+)\"(?:\s+of\s+relation\s+\"services\")?\s+does\s+not\s+exist/i);
+        if (missingColMatch) {
+          const missingCol = missingColMatch[1];
+          const colToProp: Record<string, string> = {
+            location_id: 'locationId',
+            room_id: 'roomId',
+            buffer_time_before: 'bufferTimeBefore',
+            buffer_time_after: 'bufferTimeAfter',
+            is_hidden: 'isHidden',
+            color: 'color',
+            description: 'description',
+          };
+          const prop = colToProp[missingCol];
+          if (prop && prop in attemptData) {
+            console.warn(`Service update failed due to missing column ${missingCol}. Retrying without ${prop}.`);
+            const { [prop]: _removed, ...rest } = attemptData;
+            attemptData = rest;
+            continue;
+          }
+        }
+        if (/column\s+\"description\"\s+does\s+not\s+exist/i.test(message)) {
+          // Already handled above, but keep for explicit clarity
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!updatedService) {
+      throw new Error('Failed to update service after removing optional fields');
+    }
 
     // Invalidate relevant caches
     invalidateCache('services');

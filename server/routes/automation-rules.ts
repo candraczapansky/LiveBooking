@@ -55,6 +55,7 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
     const bodySchema = z.object({
       appointmentId: z.number().optional(),
       testEmail: z.string().email().optional(),
+      ruleId: z.number().optional(),
       trigger: z.enum([
         "booking_confirmation",
         "appointment_reminder",
@@ -69,7 +70,7 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
       message: 'appointmentId or testEmail is required'
     });
 
-    const { appointmentId, testEmail, trigger, customTriggerName } = bodySchema.parse(req.body);
+    const { appointmentId, testEmail, trigger, customTriggerName, ruleId } = bodySchema.parse(req.body);
     const locationIdRaw = (req.body as any)?.locationId;
     const locationId = locationIdRaw != null ? parseInt(String(locationIdRaw)) : undefined;
 
@@ -90,6 +91,7 @@ export function registerAutomationRuleRoutes(app: Express, storage: IStorage) {
         status: 'test',
         testEmail,
         locationId: Number.isFinite(locationId as any) ? (locationId as number) : undefined,
+        __testRuleId: Number.isFinite(ruleId as any) ? (ruleId as number) : undefined,
       } as any, storage, customTriggerName);
       return res.json({ success: true, trigger: resolvedTrigger, testEmail });
     }

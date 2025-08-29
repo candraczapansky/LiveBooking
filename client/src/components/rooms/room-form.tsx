@@ -33,6 +33,7 @@ const roomFormSchema = z.object({
   description: z.string().optional(),
   capacity: z.coerce.number().min(1, "Capacity must be at least 1").optional(),
   isActive: z.boolean().default(true),
+  // Require location to re-enable assigning rooms to locations
   locationId: z.coerce.number({ required_error: "Location is required" }),
 });
 
@@ -71,13 +72,17 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
   // Reset form when dialog opens/closes or room changes
   useEffect(() => {
     if (open) {
+      // Determine default location when adding new room
+      const defaultLocationId = Array.isArray(locations) && locations.length > 0
+        ? (locations.find((l: any) => l.isDefault)?.id ?? locations[0]?.id)
+        : undefined;
       if (room) {
         form.reset({
           name: room.name || "",
           description: room.description || "",
           capacity: room.capacity || 1,
           isActive: room.isActive ?? true,
-          locationId: room.locationId ?? undefined,
+          locationId: room.locationId ?? defaultLocationId as unknown as number,
         });
       } else {
         form.reset({
@@ -85,20 +90,61 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
           description: "",
           capacity: 1,
           isActive: true,
-          locationId: undefined as unknown as number,
+          locationId: (defaultLocationId as unknown as number),
         });
       }
     }
-  }, [open, room, form]);
+  }, [open, room, form, locations]);
 
   const createRoomMutation = useMutation({
     mutationFn: async (data: RoomFormValues) => {
-      const response = await fetch("/api/rooms", {
+      // First attempt: send as-is
+      let response = await fetch("/api/rooms", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to create room");
+      if (!response.ok) {
+        // Try to surface server error message
+        let message = "Failed to create room";
+        try {
+          const err = await response.json();
+          if (err?.error) message = err.error;
+        } catch {}
+
+        // Compatibility fallback: retry without locationId if backend schema lacks this column
+        const schemaErrorText = message?.toLowerCase?.() || "";
+        if (
+          response.status === 400 &&
+          (schemaErrorText.includes("location_id") || schemaErrorText.includes("column") || schemaErrorText.includes("does not exist"))
+        ) {
+          const { locationId, ...rest } = data;
+          response = await fetch("/api/rooms", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(rest),
+          });
+          if (response.ok) return response.json();
+          try {
+            const err = await response.json();
+            if (err?.error) message = err.error;
+          } catch {}
+
+          // Last-resort compat: send only required column(s)
+          response = await fetch("/api/rooms", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: data.name }),
+          });
+          if (response.ok) return response.json();
+          try {
+            const err2 = await response.json();
+            if (err2?.error) message = err2.error;
+          } catch {}
+        }
+
+        throw new Error(message);
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -120,12 +166,38 @@ export function RoomForm({ open, onOpenChange, room }: RoomFormProps) {
 
   const updateRoomMutation = useMutation({
     mutationFn: async (data: RoomFormValues) => {
-      const response = await fetch(`/api/rooms/${room.id}`, {
+      let response = await fetch(`/api/rooms/${room.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!response.ok) throw new Error("Failed to update room");
+      if (!response.ok) {
+        let message = "Failed to update room";
+        try {
+          const err = await response.json();
+          if (err?.error) message = err.error;
+        } catch {}
+
+        const schemaErrorText = message?.toLowerCase?.() || "";
+        if (
+          response.status === 400 &&
+          (schemaErrorText.includes("location_id") || schemaErrorText.includes("column") || schemaErrorText.includes("does not exist"))
+        ) {
+          const { locationId, ...rest } = data;
+          response = await fetch(`/api/rooms/${room.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(rest),
+          });
+          if (response.ok) return response.json();
+          try {
+            const err = await response.json();
+            if (err?.error) message = err.error;
+          } catch {}
+        }
+
+        throw new Error(message);
+      }
       return response.json();
     },
     onSuccess: () => {

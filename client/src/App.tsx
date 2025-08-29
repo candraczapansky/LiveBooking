@@ -29,6 +29,7 @@ const Devices = lazy(() => import("@/pages/devices"));
 const Appointments = lazy(() => import("@/pages/appointments"));
 const Memberships = lazy(() => import("@/pages/memberships"));
 const Reports = lazy(() => import("@/pages/reports"));
+const Classes = lazy(() => import("@/pages/classes"));
 const Marketing = lazy(() => import("@/pages/marketing"));
 const Automations = lazy(() => import("@/pages/automations"));
 const NoteTemplates = lazy(() => import("@/pages/note-templates"));
@@ -109,6 +110,7 @@ function Router() {
           <Route path="/rooms" component={Rooms} />
           <Route path="/devices" component={Devices} />
           <Route path="/appointments" component={Appointments} />
+          <Route path="/classes" component={Classes} />
           <Route path="/memberships" component={Memberships} />
           <Route path="/reports" component={Reports} />
           <Route path="/marketing" component={Marketing} />

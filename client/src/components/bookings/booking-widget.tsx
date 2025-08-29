@@ -89,6 +89,9 @@ type BookingFormValues = z.infer<typeof bookingSchema>;
 
 const steps = ["Location", "Service", "Staff", "Time", "Details"];
 
+// Special sentinel value representing "Any available staff"
+const ANY_STAFF_ID = "any";
+
 const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -365,40 +368,40 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   // Compute available time slots based on staff schedule and existing appointments
   const getAvailableTimeSlots = () => {
-    if (!selectedStaffId || !selectedFormDate) return timeSlots;
+    if (!selectedFormDate) return timeSlots;
 
     const dayName = getDayName(selectedFormDate);
-    const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
-      const currentDateString = formatDateForComparison(selectedFormDate);
-      const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
-      const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+    const svc: any = selectedService;
 
-      return schedule.staffId === parseInt(selectedStaffId) &&
-        schedule.dayOfWeek === dayName &&
-        startDateString <= currentDateString &&
-        (!endDateString || endDateString >= currentDateString) &&
-        !schedule.isBlocked;
-    });
+    const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
+      const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
+        const currentDateString = formatDateForComparison(selectedFormDate);
+        const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+        const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
 
-    if (staffSchedules.length === 0) return [];
+        return schedule.staffId === staffIdNum &&
+          schedule.dayOfWeek === dayName &&
+          startDateString <= currentDateString &&
+          (!endDateString || endDateString >= currentDateString) &&
+          !schedule.isBlocked;
+      });
 
-    const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
-      .filter((apt: any) => apt.staffId === parseInt(selectedStaffId))
-      .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
-      .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-    const filtered = timeSlots.filter(slot => {
-      const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
+      if (staffSchedules.length === 0) return false;
+      const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slotValue, schedule.startTime, schedule.endTime));
       if (!withinSchedule) return false;
 
-      const svc: any = selectedService;
       if (!svc) return true;
 
-      const [hours, minutes] = slot.value.split(':').map(Number);
+      const [hours, minutes] = String(slotValue).split(':').map(Number);
       const appointmentStart = new Date(selectedFormDate);
       appointmentStart.setHours(hours, minutes, 0, 0);
       const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
       const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+
+      const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+        .filter((apt: any) => apt.staffId === staffIdNum)
+        .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
+        .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
       for (const apt of staffAppointments) {
         const existingStart = new Date(apt.startTime);
@@ -408,9 +411,20 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         }
       }
       return true;
-    });
+    };
 
-    return filtered;
+    if (selectedStaffId && selectedStaffId !== ANY_STAFF_ID) {
+      const staffIdNum = parseInt(selectedStaffId);
+      return timeSlots.filter(slot => isStaffAvailableForSlot(staffIdNum, slot.value));
+    }
+
+    if (selectedStaffId === ANY_STAFF_ID) {
+      const staffList: any[] = Array.isArray(availableStaff) ? (availableStaff as any[]) : [];
+      if (!selectedServiceId || staffList.length === 0) return [];
+      return timeSlots.filter(slot => staffList.some(s => isStaffAvailableForSlot(Number(s.id), slot.value)));
+    }
+
+    return timeSlots;
   };
 
   const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointments, timeSlots]);
@@ -419,52 +433,38 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const availableDatesSet = useMemo(() => {
     const result = new Set<string>();
     try {
-      if (!selectedStaffId || !selectedServiceId) return result;
+      if (!selectedServiceId) return result;
 
-      const staffIdNum = parseInt(selectedStaffId);
       const svc: any = selectedService;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const max = addDays(today, 30);
 
-      const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
-        .filter((schedule: any) => schedule.staffId === staffIdNum && !schedule.isBlocked);
-
-      if (staffSchedules.length === 0) return result;
-
-      const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
-        .filter((apt: any) => apt.staffId === staffIdNum);
-
-      for (let d = new Date(today); d <= max; d.setDate(d.getDate() + 1)) {
-        const day = new Date(d);
+      const staffHasAvailabilityOnDay = (staffIdNum: number, day: Date) => {
         const dayName = getDayName(day);
         const currentDateString = formatDateForComparison(day);
+        const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
+          .filter((schedule: any) => schedule.staffId === staffIdNum && !schedule.isBlocked)
+          .filter((schedule: any) => {
+            const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+            const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+            return schedule.dayOfWeek === dayName && startDateString <= currentDateString && (!endDateString || endDateString >= currentDateString);
+          });
+        if (staffSchedules.length === 0) return false;
 
-        const schedulesForDay = staffSchedules.filter((schedule: any) => {
-          const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
-          const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
-          return schedule.dayOfWeek === dayName &&
-            startDateString <= currentDateString &&
-            (!endDateString || endDateString >= currentDateString);
-        });
-
-        if (schedulesForDay.length === 0) continue;
-
-        const appointmentsForDay = staffAppointments
+        const appointmentsForDay = (Array.isArray(appointments) ? (appointments as any[]) : [])
+          .filter((apt: any) => apt.staffId === staffIdNum)
           .filter((apt: any) => new Date(apt.startTime).toDateString() === day.toDateString())
           .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-        let dayHasAvailability = false;
         for (const slot of timeSlots) {
-          const withinSchedule = schedulesForDay.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
+          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
           if (!withinSchedule) continue;
-
           const [hours, minutes] = String(slot.value).split(':').map(Number);
           const appointmentStart = new Date(day);
           appointmentStart.setHours(hours, minutes, 0, 0);
           const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
           const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
-
           let overlaps = false;
           for (const apt of appointmentsForDay) {
             const existingStart = new Date(apt.startTime);
@@ -474,16 +474,26 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               break;
             }
           }
+          if (!overlaps) return true;
+        }
+        return false;
+      };
 
-          if (!overlaps) {
-            result.add(currentDateString);
-            dayHasAvailability = true;
-            break;
+      if (selectedStaffId && selectedStaffId !== ANY_STAFF_ID) {
+        const staffIdNum = parseInt(selectedStaffId);
+        for (let d = new Date(today); d <= max; d.setDate(d.getDate() + 1)) {
+          const day = new Date(d);
+          if (staffHasAvailabilityOnDay(staffIdNum, day)) {
+            result.add(formatDateForComparison(day));
           }
         }
-
-        if (!dayHasAvailability) {
-          // no-op; keep day without marker
+      } else if (selectedStaffId === ANY_STAFF_ID) {
+        const staffList: any[] = Array.isArray(availableStaff) ? (availableStaff as any[]) : [];
+        if (staffList.length === 0) return result;
+        for (let d = new Date(today); d <= max; d.setDate(d.getDate() + 1)) {
+          const day = new Date(d);
+          const anyHas = staffList.some(s => staffHasAvailabilityOnDay(Number(s.id), day));
+          if (anyHas) result.add(formatDateForComparison(day));
         }
       }
     } catch {
@@ -549,10 +559,59 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         endTime.setMinutes(endTime.getMinutes() + selectedService.duration);
       }
       
+      // Resolve actual staff if "Any" selection was made
+      let staffIdToUse: number | null = null;
+      if (values.staffId === ANY_STAFF_ID) {
+        const svc: any = selectedService;
+        if (!svc) throw new Error('Service not selected');
+        const staffList: any[] = Array.isArray(availableStaff) ? (availableStaff as any[]) : [];
+        const dayName = getDayName(date);
+        for (const s of staffList) {
+          const staffIdNum = Number(s.id);
+          const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
+            const currentDateString = formatDateForComparison(date);
+            const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+            const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+            return schedule.staffId === staffIdNum &&
+              schedule.dayOfWeek === dayName &&
+              startDateString <= currentDateString &&
+              (!endDateString || endDateString >= currentDateString) &&
+              !schedule.isBlocked;
+          });
+          if (staffSchedules.length === 0) continue;
+          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(values.time, schedule.startTime, schedule.endTime));
+          if (!withinSchedule) continue;
+          const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
+          const appointmentEnd = new Date(date.getTime() + totalDuration * 60000);
+          const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+            .filter((apt: any) => apt.staffId === staffIdNum)
+            .filter((apt: any) => new Date(apt.startTime).toDateString() === date.toDateString())
+            .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+          let overlaps = false;
+          for (const apt of staffAppointments) {
+            const existingStart = new Date(apt.startTime);
+            const existingEnd = new Date(apt.endTime);
+            if (date < existingEnd && appointmentEnd > existingStart) {
+              overlaps = true;
+              break;
+            }
+          }
+          if (!overlaps) {
+            staffIdToUse = staffIdNum;
+            break;
+          }
+        }
+        if (!staffIdToUse) {
+          throw new Error('Selected time is no longer available. Please choose another time.');
+        }
+      } else {
+        staffIdToUse = parseInt(values.staffId);
+      }
+
       const appointmentData = {
         clientId: userId || 1, // Use the logged-in user or default to 1 for demo
         serviceId: parseInt(values.serviceId),
-        staffId: parseInt(values.staffId),
+        staffId: Number(staffIdToUse),
         startTime: date.toISOString(),
         endTime: endTime.toISOString(),
         status: "pending",
@@ -785,6 +844,29 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                     <FormItem className="space-y-1">
                       <FormControl>
                         <div className="grid grid-cols-1 gap-4">
+                          {selectedServiceId && (availableStaff as any[]).length > 0 && (
+                            <Card
+                              key="any-staff"
+                              className={`cursor-pointer transition-all hover:shadow-md ${
+                                field.value === ANY_STAFF_ID
+                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                              }`}
+                              onClick={() => field.onChange(ANY_STAFF_ID)}
+                            >
+                              <CardContent className="p-4">
+                                <div className="flex items-center">
+                                  <div className="h-12 w-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center font-medium text-lg">
+                                    *
+                                  </div>
+                                  <div className="ml-4">
+                                    <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">Any available staff</h4>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">We'll assign a qualified staff member for this service.</p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          )}
                           {(availableStaff as any[]).map((staffMember: Staff) => (
                             <Card
                               key={staffMember.id}

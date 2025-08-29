@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ENV_FILE=${ENV_FILE:-/home/runner/workspace/.env}
-if [[ -f "$ENV_FILE" ]]; then
+if [[ -z "${DATABASE_URL:-}" && -f "$ENV_FILE" ]]; then
   set +u
   set -a
   # shellcheck disable=SC1090
@@ -18,9 +18,12 @@ mkdir -p "$BACKUP_DIR"
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
 out="$BACKUP_DIR/globals-$ts.sql"
 pg_dumpall --globals-only "$DATABASE_URL" > "$out"
-# Optional S3 upload
-if command -v aws >/dev/null 2>&1 && [[ -n "${S3_BUCKET:-}" ]]; then
-  aws s3 cp "$out" "s3://$S3_BUCKET/postgres/$(basename "$out")" --sse AES256 || true
+# Optional S3 upload using Node uploader
+if [[ -n "${S3_BUCKET:-}" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    node /home/runner/workspace/scripts/s3-upload.js \
+      "$out" "$S3_BUCKET" "postgres/$(basename "$out")" || true
+  fi
 fi
 # Retention: delete globals older than 60 days
 find "$BACKUP_DIR" -type f -name "globals-*.sql" -mtime +60 -delete

@@ -34,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { useLocation } from "@/contexts/LocationContext";
 
 const serviceFormSchema = z.object({
   // Required fields only
@@ -76,6 +77,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const { selectedLocation, defaultLocation } = useLocation();
 
   const { data: serviceCategories } = useQuery({
     queryKey: ['/api/service-categories'],
@@ -131,6 +133,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       duration: 30,
       price: 0,
       categoryId: undefined, // Will be set by user selection
+      locationId: undefined,
       roomId: null,
       bufferTimeBefore: 0,
       bufferTimeAfter: 0,
@@ -177,6 +180,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
             duration: serviceData.duration,
             price: serviceData.price,
             categoryId: serviceData.categoryId,
+            locationId: serviceData.locationId,
             roomId: serviceData.roomId || undefined,
             bufferTimeBefore: serviceData.bufferTimeBefore || 0,
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
@@ -205,6 +209,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         duration: 30,
         price: 0,
         categoryId: undefined,
+        locationId: undefined,
         roomId: null,
         bufferTimeBefore: 0,
         bufferTimeAfter: 0,
@@ -353,6 +358,14 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       console.log("Frontend sending data:", JSON.stringify(filteredServiceData, null, 2));
 
       // Update base service fields first
+      // Ensure locationId is always sent on update to satisfy validators/backends expecting it
+      if ((filteredServiceData as any).locationId === undefined || (filteredServiceData as any).locationId === null) {
+        const fallbackLocId = form.getValues('locationId') || selectedLocation?.id || defaultLocation?.id;
+        if (fallbackLocId) {
+          (filteredServiceData as any).locationId = Number(fallbackLocId);
+        }
+      }
+
       const response = await apiRequest("PUT", `/api/services/${serviceId}`, filteredServiceData);
       const service = await response.json();
 

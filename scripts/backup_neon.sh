@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ENV_FILE=${ENV_FILE:-/home/runner/workspace/.env}
-if [[ -f "$ENV_FILE" ]]; then
+if [[ -z "${DATABASE_URL:-}" && -f "$ENV_FILE" ]]; then
   set +u
   set -a
   # shellcheck disable=SC1090
@@ -19,11 +19,20 @@ ts="$(date -u +%Y%m%dT%H%M%SZ)"
 out="$BACKUP_DIR/neondb-$ts.dump"
 PGOPTIONS="-c statement_timeout=0" pg_dump --format=custom --file "$out" "$DATABASE_URL"
 ln -sfn "$out" "$BACKUP_DIR/latest.dump"
-# Optional S3 upload if configured
-if command -v aws >/dev/null 2>&1 && [[ -n "${S3_BUCKET:-}" ]]; then
-  aws s3 cp "$out" "s3://$S3_BUCKET/postgres/$(basename "$out")" --sse AES256 || true
-  if [[ -n "${S3_BUCKET_LATEST:-}" ]]; then
-    aws s3 cp "$out" "s3://$S3_BUCKET_LATEST/postgres/latest.dump" --sse AES256 || true
+# Optional S3 upload if configured (uses Node uploader; no AWS CLI required)
+if [[ -n "${S3_BUCKET:-}" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    node /home/runner/workspace/scripts/s3-upload.js \
+      "$out" "$S3_BUCKET" "postgres/$(basename "$out")" "postgres/latest.dump" || true
+  else
+    echo "Node not found; skipping S3 upload" >&2
+  fi
+fi
+# Optional: also upload latest to a separate bucket if provided
+if [[ -n "${S3_BUCKET_LATEST:-}" ]]; then
+  if command -v node >/dev/null 2>&1; then
+    node /home/runner/workspace/scripts/s3-upload.js \
+      "$out" "$S3_BUCKET_LATEST" "postgres/latest.dump" || true
   fi
 fi
 # Retention: delete dumps older than 14 days

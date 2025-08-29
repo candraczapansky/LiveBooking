@@ -553,8 +553,10 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 location_name: appointmentLocation?.name || '',
                 location_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', ')
               };
-              const subject = emailRule.subject ? replaceTemplateVariables(emailRule.subject, variables) : 'Appointment Confirmation - Glo Head Spa';
-              const body = replaceTemplateVariables(emailRule.template, variables);
+              const subjectBase = emailRule.subject ? replaceTemplateVariables(emailRule.subject, variables) : `Appointment Confirmation - ${variables.salon_name}`;
+              const subject = subjectBase.replace(/\bGlo Head Spa\b/g, variables.salon_name || '');
+              const bodyBase = replaceTemplateVariables(emailRule.template, variables);
+              const body = bodyBase.replace(/\bGlo Head Spa\b/g, variables.salon_name || '');
               await sendEmail({
                 to: client.email,
                 from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
@@ -574,7 +576,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               await sendEmail({
                 to: client.email,
                 from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-                subject: 'Appointment Confirmation - Glo Head Spa',
+                subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #333;">Appointment Confirmation</h2>
@@ -611,7 +613,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               await sendEmail({
                 to: client.email,
                 from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-                subject: 'TEST - Appointment Confirmation - Glo Head Spa',
+                subject: `TEST - Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #333;">TEST - Appointment Confirmation</h2>
@@ -650,7 +652,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               await sendEmail({
                 to: client.email,
                 from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-                subject: 'Appointment Confirmation - Glo Head Spa',
+                subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                     <h2 style="color: #333;">Appointment Confirmation</h2>
@@ -690,7 +692,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         });
         
         try {
-          let smsMessage = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} (Central Time) has been confirmed.`;
+          let smsMessage = `Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} (Central Time) has been confirmed.`;
           try {
             const rules = await storage.getAllAutomationRules();
             const smsRule = Array.isArray(rules) ? rules.find((r: any) => r.active && r.type === 'sms' && r.trigger === 'booking_confirmation') : null;
@@ -999,7 +1001,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         await sendEmail({
           to: client.email,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: 'Appointment Reminder - Glo Head Spa',
+          subject: `Appointment Reminder - ${appointmentLocation?.name || 'Glo Head Spa'}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Reminder</h2>
@@ -1025,7 +1027,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send SMS reminder
     if (client.smsAppointmentReminders && client.phone) {
       try {
-        const message = `Reminder: Your Glo Head Spa appointment for ${service.name} is tomorrow at ${appointment.startTime}.`;
+        const message = `Reminder: Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service.name} is tomorrow at ${appointment.startTime}.`;
         await sendSMS(client.phone, message);
         LoggerService.logCommunication("sms", "appointment_reminder_sent", { ...context, userId: client.id });
         reminderSent = true;
@@ -1065,10 +1067,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         // Send email reminder
         if (client.emailAppointmentReminders && client.email) {
           try {
+            const locationName = 'Glo Head Spa';
             await sendEmail({
               to: client.email,
               from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-              subject: 'Appointment Reminder - Glo Head Spa',
+              subject: `Appointment Reminder - ${locationName}`,
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                   <h2 style="color: #333;">Appointment Reminder</h2>
@@ -1091,7 +1094,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         // Send SMS reminder
         if (client.smsAppointmentReminders && client.phone) {
           try {
-            const message = `Reminder: Your Glo Head Spa appointment is tomorrow at ${appointment.startTime}.`;
+            const locationName = 'Glo Head Spa';
+            const message = `Reminder: Your ${locationName} appointment is tomorrow at ${appointment.startTime}.`;
             await sendSMS(client.phone, message);
             reminderSent = true;
           } catch (error) {
@@ -1167,7 +1171,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         await sendEmail({
           to: client.email,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: 'Appointment Confirmation - Glo Head Spa',
+          subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Confirmation</h2>
@@ -1194,7 +1198,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send SMS confirmation if allowed
     if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
       try {
-        let message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        let message = `Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
         if (appointmentLocation) {
           const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
           message += ` Location: ${locText}.`;
@@ -1267,7 +1271,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         await sendEmail({
           to: client.email,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: 'Appointment Confirmation - Glo Head Spa',
+          subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Confirmation</h2>
@@ -1293,7 +1297,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     if (sendSmsRequested && client.smsAppointmentReminders && client.phone) {
       try {
-        let message = `Your Glo Head Spa appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
+        let message = `Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service?.name || 'your service'} on ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} at ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} (Central Time) has been confirmed.`;
         if (appointmentLocation) {
           const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
           message += ` Location: ${locText}.`;
@@ -1382,10 +1386,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         console.log("✅ DEBUG: Email conditions met, sending email...");
         
         try {
+          const locationName = 'Glo Head Spa';
           await sendEmail({
             to: simulatedClient.email,
             from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-            subject: 'DEBUG TEST - Appointment Confirmation - Glo Head Spa',
+            subject: `DEBUG TEST - Appointment Confirmation - ${locationName}`,
             html: `
               <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
                 <h2 style="color: #333;">DEBUG TEST - Appointment Confirmation</h2>

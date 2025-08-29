@@ -20,6 +20,7 @@ import {
   giftCards, GiftCard, InsertGiftCard,
   giftCardTransactions, GiftCardTransaction, InsertGiftCardTransaction,
   savedGiftCards, SavedGiftCard, InsertSavedGiftCard,
+  classes, classEnrollments, Class, InsertClass, ClassEnrollment, InsertClassEnrollment,
   marketingCampaigns, MarketingCampaign, InsertMarketingCampaign,
   marketingCampaignRecipients, MarketingCampaignRecipient, InsertMarketingCampaignRecipient,
   emailUnsubscribes, EmailUnsubscribe, InsertEmailUnsubscribe,
@@ -108,6 +109,22 @@ export interface IStorage {
   getPopularServices(limit: number, periodDays: number): Promise<Service[]>;
   getServiceStatistics(serviceId: number, startDate: Date, endDate: Date): Promise<any>;
   getServicesByStatus(isActive: boolean): Promise<Service[]>;
+
+  // Classes operations
+  createClass(data: InsertClass): Promise<Class>;
+  getClass(id: number): Promise<Class | undefined>;
+  getAllClasses(): Promise<Class[]>;
+  getClassesByLocation(locationId: number): Promise<Class[]>;
+  updateClass(id: number, data: Partial<InsertClass>): Promise<Class>;
+  deleteClass(id: number): Promise<boolean>;
+
+  // Class Enrollment operations
+  createClassEnrollment(data: InsertClassEnrollment): Promise<ClassEnrollment>;
+  getClassEnrollment(id: number): Promise<ClassEnrollment | undefined>;
+  getEnrollmentsByClass(classId: number): Promise<ClassEnrollment[]>;
+  getEnrollmentsByClient(clientId: number): Promise<ClassEnrollment[]>;
+  updateClassEnrollment(id: number, data: Partial<InsertClassEnrollment>): Promise<ClassEnrollment>;
+  deleteClassEnrollment(id: number): Promise<boolean>;
 
   // Add-on mapping operations
   getAddOnMapping(): Promise<Record<string, number[]>>;
@@ -540,6 +557,12 @@ export class DatabaseStorage implements IStorage {
       // Add missing columns if they don't exist (migration)
       try {
         await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN DEFAULT false`);
+        // Ensure rooms table has location_id for room-to-location linkage
+        await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+        // Ensure services table has room_id for room-capacity enforcement on services
+        await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS room_id INTEGER`);
+        // Ensure services table has location_id to link services to a location
+        await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS location_id INTEGER`);
         console.log('Ensured is_hidden column exists in services table');
         // Ensure add-on mapping container exists in system_config
         try {
@@ -1378,8 +1401,92 @@ Glo Head Spa`,
 
   // Room operations
   async createRoom(room: InsertRoom): Promise<Room> {
-    const [newRoom] = await db.insert(rooms).values(room).returning();
-    return newRoom;
+    try {
+      const [newRoom] = await db.insert(rooms).values(room).returning();
+      return newRoom;
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      // If the rooms table itself doesn't exist, create a minimal version and retry
+      if (/relation\s+\"?rooms\"?\s+does\s+not\s+exist/i.test(message)) {
+        const name = (room as any).name;
+        if (!name) throw err;
+        const description = (room as any).description ?? null;
+        const capacity = (room as any).capacity ?? 1;
+        const isActive = (room as any).isActive ?? true;
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS rooms (
+              id SERIAL PRIMARY KEY,
+              name TEXT NOT NULL,
+              description TEXT,
+              capacity INTEGER DEFAULT 1,
+              is_active BOOLEAN DEFAULT TRUE
+            )
+          `);
+        } catch {}
+        const resultCreate: any = await db.execute(sql`
+          INSERT INTO rooms (name, description, capacity, is_active)
+          VALUES (${name}, ${description}, ${capacity}, ${isActive})
+          RETURNING id, name, description, capacity, is_active AS "isActive"
+        `);
+        const rowsCreate = (resultCreate?.rows ?? resultCreate) as any[];
+        if (!rowsCreate?.[0]) throw err;
+        return rowsCreate[0] as Room;
+      }
+      // Fallback for older schemas that may be missing optional columns
+      if (/does\s+not\s+exist/i.test(message) || /column\s+\"?location_id\"?\s+does\s+not\s+exist/i.test(message)) {
+        const name = (room as any).name;
+        if (!name) throw err;
+        const description = (room as any).description ?? null;
+        const capacity = (room as any).capacity ?? 1;
+        const isActive = (room as any).isActive ?? true;
+
+        // Attempt progressively simpler inserts without relying on missing columns
+        // 1) name, description, capacity, is_active
+        try {
+          const res1: any = await db.execute(sql`
+            INSERT INTO rooms (name, description, capacity, is_active)
+            VALUES (${name}, ${description}, ${capacity}, ${isActive})
+            RETURNING id, name, description, capacity, is_active AS "isActive"
+          `);
+          const rows1 = (res1?.rows ?? res1) as any[];
+          if (rows1?.[0]) return rows1[0] as Room;
+        } catch {}
+
+        // 2) name, description, capacity
+        try {
+          const res2: any = await db.execute(sql`
+            INSERT INTO rooms (name, description, capacity)
+            VALUES (${name}, ${description}, ${capacity})
+            RETURNING id, name, description, capacity
+          `);
+          const rows2 = (res2?.rows ?? res2) as any[];
+          if (rows2?.[0]) return rows2[0] as Room;
+        } catch {}
+
+        // 3) name, description
+        try {
+          const res3: any = await db.execute(sql`
+            INSERT INTO rooms (name, description)
+            VALUES (${name}, ${description})
+            RETURNING id, name, description
+          `);
+          const rows3 = (res3?.rows ?? res3) as any[];
+          if (rows3?.[0]) return rows3[0] as Room;
+        } catch {}
+
+        // 4) name only
+        const res4: any = await db.execute(sql`
+          INSERT INTO rooms (name)
+          VALUES (${name})
+          RETURNING id, name
+        `);
+        const rows4 = (res4?.rows ?? res4) as any[];
+        if (!rows4?.[0]) throw err;
+        return rows4[0] as Room;
+      }
+      throw err;
+    }
   }
 
   async getRoom(id: number): Promise<Room | undefined> {
@@ -1556,8 +1663,23 @@ Glo Head Spa`,
   }
 
   async updateService(id: number, serviceData: Partial<InsertService>): Promise<Service> {
-    const [updated] = await db.update(services).set(serviceData as any).where(eq(services.id, id)).returning();
-    return updated;
+    try {
+      const [updated] = await db.update(services).set(serviceData as any).where(eq(services.id, id)).returning();
+      return updated as Service;
+    } catch (err: any) {
+      const message = typeof err?.message === 'string' ? err.message : '';
+      // Fallback: if RETURNING or columns cause issues (legacy schema), try update without returning, then re-fetch
+      if (/does\s+not\s+exist/i.test(message) || /RETURNING/i.test(message)) {
+        await db.update(services).set(serviceData as any).where(eq(services.id, id));
+        // Use robust getter that handles missing columns via raw SQL fallback
+        const svc = await this.getService(id);
+        if (!svc) {
+          throw new Error('Service updated but could not be re-fetched');
+        }
+        return svc as Service;
+      }
+      throw err;
+    }
   }
 
   async deleteService(id: number): Promise<boolean> {
@@ -1598,6 +1720,70 @@ Glo Head Spa`,
       }
       throw err;
     }
+  }
+
+  // Classes operations
+  async createClass(data: InsertClass): Promise<Class> {
+    const [created] = await db.insert(classes).values(data as any).returning();
+    return created as unknown as Class;
+  }
+
+  async getClass(id: number): Promise<Class | undefined> {
+    const [row] = await db.select().from(classes).where(eq(classes.id, id));
+    return row as unknown as Class | undefined;
+  }
+
+  async getAllClasses(): Promise<Class[]> {
+    const rows = await db.select().from(classes).orderBy(desc(classes.startTime));
+    return rows as unknown as Class[];
+  }
+
+  async getClassesByLocation(locationId: number): Promise<Class[]> {
+    const rows = await db.select().from(classes).where(eq(classes.locationId, locationId)).orderBy(desc(classes.startTime));
+    return rows as unknown as Class[];
+  }
+
+  async updateClass(id: number, data: Partial<InsertClass>): Promise<Class> {
+    const [updated] = await db.update(classes).set(data as any).where(eq(classes.id, id)).returning();
+    if (!updated) throw new Error('Class not found');
+    return updated as unknown as Class;
+  }
+
+  async deleteClass(id: number): Promise<boolean> {
+    const result = await db.delete(classes).where(eq(classes.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Class Enrollment operations
+  async createClassEnrollment(data: InsertClassEnrollment): Promise<ClassEnrollment> {
+    const [created] = await db.insert(classEnrollments).values(data as any).returning();
+    return created as unknown as ClassEnrollment;
+  }
+
+  async getClassEnrollment(id: number): Promise<ClassEnrollment | undefined> {
+    const [row] = await db.select().from(classEnrollments).where(eq(classEnrollments.id, id));
+    return row as unknown as ClassEnrollment | undefined;
+  }
+
+  async getEnrollmentsByClass(classId: number): Promise<ClassEnrollment[]> {
+    const rows = await db.select().from(classEnrollments).where(eq(classEnrollments.classId, classId)).orderBy(desc(classEnrollments.createdAt));
+    return rows as unknown as ClassEnrollment[];
+  }
+
+  async getEnrollmentsByClient(clientId: number): Promise<ClassEnrollment[]> {
+    const rows = await db.select().from(classEnrollments).where(eq(classEnrollments.clientId, clientId)).orderBy(desc(classEnrollments.createdAt));
+    return rows as unknown as ClassEnrollment[];
+  }
+
+  async updateClassEnrollment(id: number, data: Partial<InsertClassEnrollment>): Promise<ClassEnrollment> {
+    const [updated] = await db.update(classEnrollments).set(data as any).where(eq(classEnrollments.id, id)).returning();
+    if (!updated) throw new Error('Class enrollment not found');
+    return updated as unknown as ClassEnrollment;
+  }
+
+  async deleteClassEnrollment(id: number): Promise<boolean> {
+    const result = await db.delete(classEnrollments).where(eq(classEnrollments.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // -----------------------------

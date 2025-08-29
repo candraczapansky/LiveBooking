@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { SidebarController } from "@/components/layout/sidebar";
+import { useSidebar as useSidebarContext } from "@/contexts/SidebarContext";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,10 @@ const smsRuleSchema = z.object({
 });
 
 // Types inferred from zod; using any with react-hook-form to avoid strict resolver generics friction
+// Note: inferred form value types are unused intentionally to avoid strict generics friction
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type EmailRuleFormValues = z.infer<typeof emailRuleSchema>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 type SMSRuleFormValues = z.infer<typeof smsRuleSchema>;
 
 export default function Automations() {
@@ -116,6 +120,7 @@ export default function Automations() {
     try {
       setIsTesting(true);
       await apiRequest("POST", "/api/automation-rules/trigger", {
+        ruleId: testingRule.id,
         trigger: testingRule.trigger,
         customTriggerName: testingRule.trigger === 'custom' ? testingRule.customTriggerName : undefined,
         testEmail: email,
@@ -185,7 +190,7 @@ export default function Automations() {
   };
 
   // Fetch automation rules from API
-  const { data: automationRules = [], isLoading, refetch } = useQuery<any[]>({
+  const { data: automationRules = [], refetch } = useQuery<any[]>({
     queryKey: ["/api/automation-rules"],
   });
 
@@ -393,7 +398,7 @@ export default function Automations() {
       type: "email" as const,
       trigger: "booking_confirmation",
       timing: "immediately",
-      subject: "Appointment Confirmation - Glo Head Spa",
+      subject: "Appointment Confirmation - {salon_name}",
       template: `Hi {client_name},
 
 Your appointment has been confirmed!
@@ -406,7 +411,7 @@ Staff: {staff_name}
 We look forward to seeing you!
 
 Best regards,
-Glo Head Spa`,
+{salon_name}`,
       active: true,
       customTriggerName: undefined
     };
@@ -432,7 +437,7 @@ Glo Head Spa`,
       type: "sms" as const,
       trigger: "booking_confirmation",
       timing: "immediately",
-      template: `Hi {client_name}! Your {service_name} appointment is confirmed for {appointment_date} at {appointment_time}. We look forward to seeing you! - Glo Head Spa`,
+      template: `Hi {client_name}! Your {service_name} appointment is confirmed for {appointment_date} at {appointment_time}. We look forward to seeing you! - {salon_name}`,
       active: true,
       customTriggerName: undefined
     };
@@ -453,13 +458,14 @@ Glo Head Spa`,
   };
 
   // Optional: quick-create default cancellation email rule
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const createDefaultCancellationEmail = async () => {
     const ruleData = {
       name: "Cancellation Email",
       type: "email" as const,
       trigger: "cancellation",
       timing: "immediately",
-      subject: "Your appointment has been cancelled - Glo Head Spa",
+      subject: "Your appointment has been cancelled - {salon_name}",
       template: `Hi {client_name},\n\nYour appointment for {service_name} on {appointment_date} at {appointment_time} has been cancelled.\n\nIf you didn’t request this or would like to reschedule, please contact us.\n\n- {salon_name}`,
       active: true,
       customTriggerName: undefined
@@ -538,7 +544,17 @@ Glo Head Spa`,
 
   return (
     <div className="min-h-screen bg-background">
-      <SidebarController />
+      {/* Provide required props to SidebarController to satisfy types */}
+      {(() => {
+        try {
+          const ctx = (useSidebarContext as any)();
+          const isOpen = !!ctx?.isOpen;
+          const isMobileSidebar = !!ctx?.isMobile;
+          return <SidebarController isOpen={isOpen} isMobile={isMobileSidebar} />;
+        } catch {
+          return <SidebarController isOpen={false} isMobile={false} />;
+        }
+      })()}
       <div className={`transition-all duration-300 ease-in-out ${isMobile ? 'ml-0' : 'ml-16'}`}>
         <main className="p-6">
           <div className="max-w-6xl mx-auto">
@@ -793,6 +809,27 @@ Glo Head Spa`,
                               <FormDescription>
                                 If set, this rule only runs for appointments at the selected location.
                               </FormDescription>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                                  <Button
+                                    key={`email-locbtn-${loc.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant={selectedEmailLocationId === String(loc.id) ? 'default' : 'secondary'}
+                                    onClick={() => setSelectedEmailLocationId(String(loc.id))}
+                                  >
+                                    {loc.name}
+                                  </Button>
+                                ))}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={selectedEmailLocationId === '' ? 'default' : 'secondary'}
+                                  onClick={() => setSelectedEmailLocationId('')}
+                                >
+                                  All
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
@@ -1128,6 +1165,27 @@ Glo Head Spa`,
                               <FormDescription>
                                 If set, this rule only runs for appointments at the selected location.
                               </FormDescription>
+                              <div className="flex flex-wrap gap-2 pt-1">
+                                {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                                  <Button
+                                    key={`sms-locbtn-${loc.id}`}
+                                    type="button"
+                                    size="sm"
+                                    variant={selectedSMSLocationId === String(loc.id) ? 'default' : 'secondary'}
+                                    onClick={() => setSelectedSMSLocationId(String(loc.id))}
+                                  >
+                                    {loc.name}
+                                  </Button>
+                                ))}
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={selectedSMSLocationId === '' ? 'default' : 'secondary'}
+                                  onClick={() => setSelectedSMSLocationId('')}
+                                >
+                                  All
+                                </Button>
+                              </div>
                             </div>
                           </div>
 
@@ -1366,6 +1424,27 @@ Glo Head Spa`,
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500">If your rule has a location tag (e.g., [location:2]), set the matching location here for testing.</p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {(Array.isArray(locations) ? locations : []).map((loc: any) => (
+                      <Button
+                        key={`test-locbtn-${loc.id}`}
+                        type="button"
+                        size="sm"
+                        variant={testLocationId === String(loc.id) ? 'default' : 'secondary'}
+                        onClick={() => setTestLocationId(String(loc.id))}
+                      >
+                        {loc.name}
+                      </Button>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={testLocationId === '' ? 'default' : 'secondary'}
+                      onClick={() => setTestLocationId('')}
+                    >
+                      All
+                    </Button>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsTestDialogOpen(false)} disabled={isTesting}>Cancel</Button>

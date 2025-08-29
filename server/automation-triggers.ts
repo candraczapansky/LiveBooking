@@ -20,6 +20,18 @@ function replaceTemplateVariables(template: string, variables: Record<string, st
   return result;
 }
 
+// Backward-compatible branding: replace any hardcoded default salon name
+function applySalonBranding(text: string, salonName?: string): string {
+  try {
+    if (!text) return text;
+    const name = (salonName || '').toString().trim();
+    if (!name) return text;
+    return text.replace(/\bGlo Head Spa\b/g, name);
+  } catch {
+    return text;
+  }
+}
+
 // Check if email should be sent based on client preferences
 function shouldSendEmail(rule: AutomationRule, client: any): boolean {
   console.log(`Checking email preferences for trigger: ${rule.trigger}`, {
@@ -167,6 +179,7 @@ export async function triggerAutomations(
 
   // Test mode: allow direct email testing without requiring an appointment/client
   const testEmail: string | undefined = (appointmentData as any)?.testEmail;
+  const testRuleId: number | undefined = (appointmentData as any)?.__testRuleId;
   if (testEmail) {
     try {
       // Prepare minimal variables for testing
@@ -215,19 +228,64 @@ export async function triggerAutomations(
         total_amount: '0'
       };
 
-      // In test mode, ignore location tags so you can preview any rule
-      const rulesToRun = relevantRules;
+      // In test mode, optionally filter to a single rule if ruleId provided
+      const rulesToRun = typeof testRuleId === 'number' ? relevantRules.filter(r => r.id === testRuleId) : relevantRules;
       for (const rule of rulesToRun) {
         try {
           if (rule.type !== 'email') continue; // Only send emails in test mode
-          const processedTemplate = replaceTemplateVariables(rule.template, variables);
-          const subject = rule.subject ? replaceTemplateVariables(rule.subject, variables) : 'Automation Test';
+          // Determine branding for this rule: prefer request locationId; else rule tag
+          let ruleSalonName = salonName;
+          let ruleSalonPhone = salonPhone;
+          let ruleSalonAddress = salonAddress;
+          try {
+            const reqLocId = (appointmentData as any)?.locationId;
+            if (reqLocId == null) {
+              const token = ((): string | null => {
+                try {
+                  const t1 = parseLocationToken((rule as any)?.name);
+                  const t2 = parseLocationToken((rule as any)?.subject);
+                  return t1 || t2;
+                } catch { return null; }
+              })();
+              if (token) {
+                const maybeNum = parseInt(String(token));
+                const resolvedId = !Number.isNaN(maybeNum) ? maybeNum : ((): number | null => {
+                  const key = String(token).trim().toLowerCase();
+                  return locNameToId.get(key) ?? null;
+                })();
+                if (resolvedId != null) {
+                  try {
+                    const allLocs = await (storage as any).getAllLocations?.();
+                    const location = Array.isArray(allLocs) ? allLocs.find((l: any) => String(l.id) === String(resolvedId)) : null;
+                    if (location) {
+                      if (location.name) ruleSalonName = String(location.name);
+                      if (location.phone) ruleSalonPhone = String(location.phone);
+                      const addrParts = [location.address, location.city, location.state, location.zipCode].filter(Boolean);
+                      if (addrParts.length) ruleSalonAddress = addrParts.join(', ');
+                    }
+                  } catch {}
+                }
+              }
+            }
+          } catch {}
+
+          const variablesForRule: Record<string, string> = {
+            ...variables,
+            salon_name: ruleSalonName,
+            salon_phone: ruleSalonPhone,
+            salon_address: ruleSalonAddress,
+          };
+
+          const processedTemplate = replaceTemplateVariables(rule.template, variablesForRule);
+          const brandedTemplate = applySalonBranding(processedTemplate, variablesForRule.salon_name);
+          const subjectRaw = rule.subject ? replaceTemplateVariables(rule.subject, variablesForRule) : 'Automation Test';
+          const subject = applySalonBranding(subjectRaw, variablesForRule.salon_name);
           await sendEmail({
             to: testEmail,
             from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
             subject,
-            text: processedTemplate,
-            html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`
+            text: brandedTemplate,
+            html: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>`
           });
           const newSentCount = (rule.sentCount || 0) + 1;
           await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
@@ -357,6 +415,7 @@ export async function triggerAutomations(
       } catch {}
 
       const processedTemplate = replaceTemplateVariables(rule.template, variablesForRule);
+      const brandedTemplate = applySalonBranding(processedTemplate, variablesForRule.salon_name || variables.salon_name);
       
       // Check client preferences before sending
       const overrideEmail = (appointmentData as any)?.testEmail as string | undefined;
@@ -369,15 +428,16 @@ export async function triggerAutomations(
           emailPromotions: client.emailPromotions
         });
         
-        const subject = rule.subject ? replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from BeautyBook Salon';
+        const subjectRaw = rule.subject ? replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from BeautyBook Salon';
+        const subject = applySalonBranding(subjectRaw, variablesForRule.salon_name || variables.salon_name);
         
         const emailSent = await sendEmail({
           to: toEmail,
           from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
           fromName: variablesForRule.salon_name || variables.salon_name,
           subject,
-          text: processedTemplate,
-          html: `<p>${processedTemplate.replace(/\n/g, '<br>')}</p>`
+          text: brandedTemplate,
+          html: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>`
         });
 
         if (emailSent) {
@@ -392,9 +452,8 @@ export async function triggerAutomations(
           smsPromotions: client.smsPromotions
         });
         
-  
-        
-        const smsResult = await sendSMS(client.phone, processedTemplate);
+        const brandedSMS = applySalonBranding(processedTemplate, variablesForRule.salon_name || variables.salon_name);
+        const smsResult = await sendSMS(client.phone, brandedSMS);
         
         console.log(`SMS sending result for ${rule.name}:`, smsResult);
         

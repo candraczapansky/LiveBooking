@@ -55,6 +55,7 @@ import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
 import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerReportRoutes } from "./routes/reports.js";
 import { registerTimeClockRoutes } from "./routes/time-clock.js";
+import { registerClassRoutes } from "./routes/classes.js";
 
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
@@ -113,6 +114,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerReportRoutes(app, storage);
   // Time clock routes
   registerTimeClockRoutes(app, storage);
+  // Classes routes
+  registerClassRoutes(app, storage);
   // Register external API routes (health, services, staff availability, webhook)
   registerExternalRoutes(app, storage);
 
@@ -302,8 +305,56 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Create a room
   app.post("/api/rooms", async (req: Request, res: Response) => {
     try {
-      const payload = insertRoomSchema.parse(req.body);
+      let payload: any;
+      try {
+        payload = insertRoomSchema.parse(req.body);
+      } catch (e: any) {
+        // Fallback: coerce and sanitize incoming data, then proceed
+        const body = req.body || {};
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        if (!name) {
+          throw e;
+        }
+        const description = body.description ?? null;
+        const capacity = body.capacity != null && !Number.isNaN(Number(body.capacity)) ? Number(body.capacity) : 1;
+        const isActive = body.isActive === undefined ? true : !!body.isActive;
+        const normalized: any = { name, description, capacity, isActive };
+        // Prefer provided location; if omitted, pick default location if available
+        if (body.locationId !== undefined && body.locationId !== null && !Number.isNaN(Number(body.locationId))) {
+          normalized.locationId = Number(body.locationId);
+        } else {
+          try {
+            const { db } = await import("./db.js");
+            const { locations } = await import("../shared/schema.js");
+            const locs = await db.select().from(locations);
+            const defaultLoc = locs.find((l: any) => l.isDefault) || locs[0];
+            if (defaultLoc) normalized.locationId = defaultLoc.id;
+          } catch {}
+        }
+        payload = normalized;
+      }
+
       const created = await storage.createRoom(payload as any);
+
+      // If a locationId was provided but didn't persist (older schema insert path), try to persist it now
+      if (payload.locationId && (created as any)?.locationId == null) {
+        try {
+          const { db } = await import("./db.js");
+          const { sql } = await import("drizzle-orm");
+          await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+          await db.execute(sql`UPDATE rooms SET location_id = ${Number(payload.locationId)} WHERE id = ${Number((created as any).id)}`);
+          // Re-fetch the room to include the new column
+          try {
+            const refreshed = await storage.getRoom((created as any).id);
+            if (refreshed) {
+              return res.status(201).json(refreshed);
+            }
+          } catch {}
+        } catch (e) {
+          console.warn('Failed to backfill room location_id after creation:', (e as any)?.message || e);
+        }
+      }
+
       res.status(201).json(created);
     } catch (error) {
       console.error("Error creating room:", error);
