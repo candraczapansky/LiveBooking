@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -90,6 +90,25 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
     }), [schedule, defaultStaffId]),
   });
 
+  // Watch selected staff and location to filter available categories by location and staff capabilities
+  const watchLocationId = form.watch('locationId');
+  const watchStaffId = form.watch('staffId');
+
+  // Show all service categories (no location/staff filtering)
+  const visibleCategories = useMemo(() => {
+    return (serviceCategories as any[]) || [];
+  }, [serviceCategories]);
+
+  // Prune selected categories if the location or available set changes
+  useEffect(() => {
+    const selected: string[] = (form.getValues('serviceCategories') || []) as any;
+    const allowed = new Set<string>((visibleCategories as any[]).map((c: any) => String(c.id)));
+    const filtered = selected.filter((id) => allowed.has(String(id)));
+    if (filtered.length !== selected.length) {
+      form.setValue('serviceCategories', filtered);
+    }
+  }, [visibleCategories, form]);
+
   const createScheduleMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await apiRequest("POST", "/api/schedules", data);
@@ -164,9 +183,10 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (schedule) {
       // For editing, keep the original day and update other fields
+      const effectiveDay = (data.daysOfWeek && data.daysOfWeek[0]) || schedule.dayOfWeek;
       const scheduleData = {
         ...data,
-        dayOfWeek: schedule.dayOfWeek, // Keep the original day when editing
+        dayOfWeek: effectiveDay,
         staffId: parseInt(data.staffId),
         locationId: parseInt(data.locationId),
         serviceCategories: data.serviceCategories || [],
@@ -302,51 +322,48 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
               render={() => (
                 <FormItem>
                   <FormLabel>Days of Week</FormLabel>
-                  {schedule ? (
-                    <div className="p-3 bg-muted rounded-md">
-                      <p className="text-sm text-muted-foreground">
-                        Editing schedule for: <strong>{schedule.dayOfWeek}</strong>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        To change the day, create a new schedule instead.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {daysOfWeek.map((day) => (
-                        <FormField
-                          key={day}
-                          control={form.control}
-                          name="daysOfWeek"
-                          render={({ field }) => {
-                            return (
-                              <FormItem
-                                key={day}
-                                className="flex flex-row items-start space-x-3 space-y-0"
-                              >
-                                <FormControl>
-                                  <Checkbox
-                                    checked={field.value?.includes(day)}
-                                    onCheckedChange={(checked) => {
-                                      return checked
-                                        ? field.onChange([...(field.value || []), day])
-                                        : field.onChange(
-                                            field.value?.filter(
-                                              (value: string) => value !== day
-                                            )
-                                        )
-                                    }}
-                                  />
-                                </FormControl>
-                                <FormLabel className="text-sm font-normal">
-                                  {day}
-                                </FormLabel>
-                              </FormItem>
-                            )
-                          }}
-                        />
-                      ))}
-                    </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {daysOfWeek.map((day) => (
+                      <FormField
+                        key={day}
+                        control={form.control}
+                        name="daysOfWeek"
+                        render={({ field }) => {
+                          const isChecked = (field.value || []).includes(day);
+                          return (
+                            <FormItem
+                              key={day}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={(checked) => {
+                                    const current: string[] = field.value || [];
+                                    if (checked) {
+                                      // When editing an existing schedule, allow only one day selection
+                                      if (schedule) {
+                                        field.onChange([day]);
+                                      } else {
+                                        field.onChange([...current.filter((d) => d !== day), day]);
+                                      }
+                                    } else {
+                                      field.onChange(current.filter((d) => d !== day));
+                                    }
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="text-sm font-normal">
+                                {day}
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {schedule && (
+                    <p className="text-xs text-muted-foreground mt-1">Select a single day to update this schedule.</p>
                   )}
                   <FormMessage />
                 </FormItem>
@@ -403,6 +420,63 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Service Categories (show all) */}
+            <FormField
+              control={form.control}
+              name="serviceCategories"
+              render={() => (
+                <FormItem>
+                  <FormLabel>Service categories</FormLabel>
+                  {visibleCategories.length === 0 ? (
+                    <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                      No categories available for the selected location.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => {
+                          const ids = (visibleCategories as any[]).map((c: any) => String(c.id));
+                          form.setValue('serviceCategories', ids);
+                        }}>Select all</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => form.setValue('serviceCategories', [])}>Clear</Button>
+                      </div>
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                        {(visibleCategories as any[]).map((cat: any) => (
+                          <FormField
+                            key={cat.id}
+                            control={form.control}
+                            name="serviceCategories"
+                            render={({ field }) => {
+                              const value: string[] = field.value || [];
+                              const id = String(cat.id);
+                              const checked = value.includes(id);
+                              return (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={checked}
+                                      onCheckedChange={(isChecked) => {
+                                        const next = isChecked
+                                          ? [...value, id]
+                                          : value.filter((v) => v !== id);
+                                        field.onChange(next);
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="text-sm font-normal">{cat.name}</FormLabel>
+                                </FormItem>
+                              );
+                            }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}

@@ -6,7 +6,9 @@
     "dev": "NODE_ENV=development DISABLE_AUTOMATIC_SERVICE_CREATION=true tsx server/index.ts",
     "build": "rm -rf dist && rm -f node_modules/typescript/tsbuildinfo && vite build && tsc",
     "start": "NODE_ENV=production node --experimental-specifier-resolution=node dist/server/index.js",
-    "start-clean": "rm -rf node_modules && npm install && npm run dev"
+    "start-clean": "rm -rf node_modules && npm install && npm run dev",
+    "fix:rooms": "node scripts/fix-rooms-table.mjs",
+    "fix:services": "node scripts/fix-services-columns.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.878.0",

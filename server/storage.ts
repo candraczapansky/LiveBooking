@@ -1687,6 +1687,15 @@ Glo Head Spa`,
   }
 
   async deleteService(id: number): Promise<boolean> {
+    // Ensure we remove any staff-service assignments referencing this service
+    // before deleting the service to satisfy potential FK constraints.
+    try {
+      await db.delete(staffServices).where(eq(staffServices.serviceId, id));
+    } catch (err) {
+      // Non-fatal: proceed to attempt service deletion; database will enforce constraints if any remain
+      console.warn('Warning: Failed to pre-delete staff_services for service', { serviceId: id, err });
+    }
+
     const result = await db.delete(services).where(eq(services.id, id));
     return (result.rowCount ?? 0) > 0;
   }

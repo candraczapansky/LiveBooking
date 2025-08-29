@@ -364,6 +364,39 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       throw new ConflictError("Cannot delete service that has associated appointments");
     }
 
+    // Detach any staff-service assignments referencing this service to satisfy FK constraints
+    try {
+      const assignments = await storage.getStaffServicesByService(serviceId);
+      for (const assignment of assignments) {
+        await storage.removeServiceFromStaff(assignment.staffId as any, assignment.serviceId as any);
+      }
+    } catch (err) {
+      // Log and continue; if FK persists, DB will surface error and be handled by error middleware
+      console.warn("Failed to detach some staff-service assignments before service deletion", { serviceId, err });
+    }
+
+    // Clean up add-on mappings if they reference this service (either as add-on or base)
+    try {
+      const addOnMap = await storage.getAddOnMapping();
+      let changed = false;
+      // If the service is an add-on, remove its mapping entirely
+      if (addOnMap[String(serviceId)]) {
+        delete addOnMap[String(serviceId)];
+        changed = true;
+      }
+      // If the service appears as a base service for any add-on, remove it from those arrays
+      for (const key of Object.keys(addOnMap)) {
+        const before = addOnMap[key].length;
+        addOnMap[key] = addOnMap[key].filter((id) => Number(id) !== Number(serviceId));
+        if (addOnMap[key].length !== before) changed = true;
+      }
+      if (changed) {
+        await storage.setAddOnMapping(addOnMap);
+      }
+    } catch (err) {
+      console.warn("Failed to clean add-on service mapping before service deletion", { serviceId, err });
+    }
+
     await storage.deleteService(serviceId);
 
     // Invalidate relevant caches
