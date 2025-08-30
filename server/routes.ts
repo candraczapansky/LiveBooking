@@ -252,6 +252,18 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
       // Map to full service objects and include assignment metadata
       const isPublic = String((req.query as any)?.public) === 'true';
+      // Build add-on set from mapping so we can flag add-ons and optionally filter them out for public
+      let addOnIdSet = new Set<number>();
+      try {
+        const addOnMap = await (storage as any).getAddOnMapping?.();
+        if (addOnMap && typeof addOnMap === 'object') {
+          for (const key of Object.keys(addOnMap)) {
+            const id = parseInt(key, 10);
+            if (!Number.isNaN(id)) addOnIdSet.add(id);
+          }
+        }
+      } catch {}
+
       const services = (
         await Promise.all(assignments.map(async (assignment) => {
           const service = await storage.getService(assignment.serviceId);
@@ -262,12 +274,16 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             staffId: assignment.staffId,
             customRate: assignment.customRate ?? null,
             customCommissionRate: assignment.customCommissionRate ?? null,
+            // Expose separate flags
+            isHidden: !!(service as any)?.isHidden,
+            isAddOn: addOnIdSet.has(assignment.serviceId),
           };
         }))
       ).filter(Boolean);
 
       const filtered = isPublic
-        ? (services as any[]).filter((s: any) => !s.isHidden && (s.isActive !== false))
+        // Public booking should not include add-ons; also exclude hidden and inactive
+        ? (services as any[]).filter((s: any) => !s.isAddOn && !s.isHidden && (s.isActive !== false))
         : services;
 
       return res.json(filtered);

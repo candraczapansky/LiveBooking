@@ -48,7 +48,9 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       // Basic duplicate checks
       const existingEmail = await storage.getUserByEmail(data.email);
       if (existingEmail) {
-        return res.status(409).json({ error: "Email already exists" });
+        // Instead of blocking on duplicate email, return the existing user as a successful response
+        const { password, ...safeExisting } = existingEmail as any;
+        return res.status(200).json(safeExisting);
       }
 
       // Generate a username from email or name
@@ -335,6 +337,118 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
       if (search && typeof search === 'string') {
         // Search users by name, email, or phone
         users = await storage.searchUsers(search);
+
+        // If search resembles an email, prioritize exact email match at the top
+        const looksLikeEmail = /@/.test(search);
+        if (looksLikeEmail) {
+          try {
+            const exact = await storage.getUserByEmail(search);
+            if (exact) {
+              const withoutExact = users.filter((u: any) => u.id !== exact.id);
+              users = [exact, ...withoutExact];
+            }
+          } catch (e) {
+            // keep original users on error
+          }
+        }
+
+        // If role filter is also provided, filter results in-memory to avoid changing storage API
+        if (role && typeof role === 'string') {
+          users = users.filter((u: any) => u.role === role);
+        }
+
+        // Tokenized multi-word name fallback to surface strong matches like "first last"
+        // This helps queries such as "bridgett ball" to show up reliably
+        const containsSpace = /\s/.test(search);
+        if (role && typeof role === 'string' && containsSpace) {
+          try {
+            const normalizedQuery = String(search).toLowerCase().trim().replace(/\s+/g, ' ');
+            const tokens = normalizedQuery.split(' ').filter(Boolean);
+
+            // Consider all users for strong matching, in case some were not labeled as client
+            const candidateUsers: any[] = await storage.getAllUsers();
+
+            type Scored = { user: any; score: number };
+            const scored: Scored[] = [];
+
+            for (const u of candidateUsers) {
+              const first = (u.firstName || '').toLowerCase().trim();
+              const last = (u.lastName || '').toLowerCase().trim();
+              const full = `${first} ${last}`.trim().replace(/\s+/g, ' ');
+              const reversed = `${last} ${first}`.trim().replace(/\s+/g, ' ');
+              const emailLocal = String(u.email || '')
+                .toLowerCase()
+                .split('@')[0]
+                .replace(/[._+\-]+/g, ' ')
+                .trim()
+                .replace(/\s+/g, ' ');
+
+              const candidateStrings = [full, reversed, emailLocal].filter(Boolean);
+
+              let score = 0;
+              if (candidateStrings.length && normalizedQuery) {
+                if (full && full === normalizedQuery) {
+                  score = 100;
+                } else if (full && full.startsWith(normalizedQuery)) {
+                  score = 90;
+                } else if (tokens.length >= 2) {
+                  const firstToken = tokens[0];
+                  const lastToken = tokens[tokens.length - 1];
+                  const bothPrefix = (first.startsWith(firstToken) && last.startsWith(lastToken)) ||
+                                     (first.startsWith(lastToken) && last.startsWith(firstToken));
+                  if (bothPrefix) {
+                    score = 80;
+                  } else if (tokens.every(t => candidateStrings.some(s => s.includes(t)))) {
+                    score = 60;
+                  }
+                } else if (tokens.length === 1) {
+                  const t0 = tokens[0];
+                  if (candidateStrings.some(s => s.startsWith(t0))) {
+                    score = 50;
+                  } else if (candidateStrings.some(s => s.includes(t0))) {
+                    score = 40;
+                  }
+                }
+              }
+
+              if (score > 0) {
+                scored.push({ user: u, score });
+              }
+            }
+
+            if (scored.length > 0) {
+              scored.sort((a, b) => b.score - a.score);
+              const strongMatchesUnfiltered = scored.map(s => s.user);
+              let strongMatches = strongMatchesUnfiltered;
+
+              // If role filter is present, try to keep only that role first
+              if (role && typeof role === 'string') {
+                const byRole = strongMatches.filter((u: any) => u.role === role);
+                // If none remain after filtering by role, fall back to unfiltered strong matches
+                strongMatches = byRole.length > 0 ? byRole : strongMatchesUnfiltered;
+              }
+
+              // Merge strong matches to the top, deduplicating by id
+              const seen = new Set<number>();
+              const merged: any[] = [];
+              for (const u of strongMatches) {
+                if (!seen.has(u.id)) {
+                  seen.add(u.id);
+                  merged.push(u);
+                }
+              }
+              for (const u of users) {
+                if (!seen.has(u.id)) {
+                  seen.add(u.id);
+                  merged.push(u);
+                }
+              }
+              users = merged;
+            }
+          } catch (e) {
+            // On any failure, keep the original users array
+          }
+        }
       } else if (role && typeof role === 'string') {
         // Filter users by role
         users = await storage.getUsersByRole(role);

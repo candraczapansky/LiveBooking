@@ -85,10 +85,44 @@ export function ClientCreationDialog({ open, onOpenChange, onClientCreated }: Cl
         onClientCreated(newClient);
       }
     },
-    onError: (error: any) => {
+    onError: async (error: any) => {
+      const status = error?.response?.status;
+      const message = (error?.response?.data?.error || error?.message || '').toString();
+
+      // Gracefully handle duplicate email by fetching existing user and treating as success
+      if (status === 409 || /email already exists/i.test(message)) {
+        try {
+          const emailVal = form.getValues('email');
+          const res = await apiRequest("GET", `/api/users?search=${encodeURIComponent(emailVal)}`);
+          const list = await res.json();
+          const existing = Array.isArray(list) ? list.find((u: any) => (u.email || '').toLowerCase() === (emailVal || '').toLowerCase()) : null;
+          if (existing) {
+            // Invalidate and refetch client data
+            queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+            queryClient.invalidateQueries({ queryKey: ['/api/users?role=client'] });
+            queryClient.removeQueries({ queryKey: ['/api/users?role=client'] });
+            queryClient.refetchQueries({ queryKey: ['/api/users?role=client'] });
+
+            toast({
+              title: "Client Found",
+              description: "Existing client matched by email and selected.",
+            });
+
+            form.reset();
+            onOpenChange(false);
+            if (onClientCreated) {
+              onClientCreated(existing);
+            }
+            return;
+          }
+        } catch (e) {
+          // fall through to default error toast
+        }
+      }
+
       toast({
         title: "Error",
-        description: `Failed to create client: ${error.message}`,
+        description: `Failed to create client: ${message || 'Unknown error'}`,
         variant: "destructive",
       });
     }

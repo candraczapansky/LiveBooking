@@ -58,6 +58,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [colorPreferencesApplied, setColorPreferencesApplied] = useState(false);
 
+  // Helper to refresh the current user from the server using the token when available
+  const refreshUserFromServer = async (fallbackUserId?: number): Promise<User | null> => {
+    try {
+      const token = localStorage.getItem('token');
+      // Try auth verify first when token exists
+      if (token) {
+        const verifyRes = await fetch('/api/auth/verify', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (verifyRes.ok) {
+          const data = await verifyRes.json();
+          const verifiedUser: User | null = data?.user || null;
+          if (verifiedUser) {
+            setUser(verifiedUser);
+            localStorage.setItem('user', JSON.stringify(verifiedUser));
+            window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: verifiedUser }));
+            return verifiedUser;
+          }
+        }
+      }
+
+      // Fallback to direct user fetch by id
+      const storedUser = localStorage.getItem('user');
+      const id = fallbackUserId || (storedUser ? (JSON.parse(storedUser) as User).id : undefined);
+      if (!id) return null;
+      const res = await fetch(`/api/users/${id}`);
+      if (!res.ok) return null;
+      const fresh = (await res.json()) as User;
+      setUser(fresh);
+      localStorage.setItem('user', JSON.stringify(fresh));
+      window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: fresh }));
+      return fresh;
+    } catch {
+      return null;
+    }
+  };
+
   // Function to fetch fresh user data from database
   const fetchFreshUserData = async (userId: number): Promise<User | null> => {
     try {
@@ -298,8 +335,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const token = localStorage.getItem("token");
 
         if (!storedUser || !token) {
-          setLoading(false);
-          return;
+          // If we at least have a stored user, populate minimal state and try a best-effort refresh
+          if (storedUser) {
+            const userData: User = JSON.parse(storedUser);
+            setUser(userData);
+            setIsAuthenticated(true);
+            // Best-effort refresh from server to sync any name/email changes
+            await refreshUserFromServer(userData.id);
+            await loadAndApplyColorPreferences(userData.id);
+            setLoading(false);
+            return;
+          } else {
+            setLoading(false);
+            return;
+          }
         }
 
         const userData: User = JSON.parse(storedUser);
@@ -309,24 +358,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(true);
 
         try {
-          // Try to fetch fresh user data
-          const freshUserData = await fetchFreshUserData(userData.id);
-          
-          if (freshUserData) {
-            // Update with fresh data
-            setUser(freshUserData);
-            localStorage.setItem('user', JSON.stringify(freshUserData));
-            
-            if (freshUserData.profilePicture) {
-              localStorage.setItem('profilePicture', freshUserData.profilePicture);
-            }
-            
-            window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: freshUserData }));
-            await loadAndApplyColorPreferences(freshUserData.id);
-          }
+          // Prefer verify endpoint to ensure latest server-side user values (names, email, etc.)
+          const verified = await refreshUserFromServer(userData.id);
+          await loadAndApplyColorPreferences((verified || userData).id);
         } catch (error) {
-          console.error('Error fetching fresh user data:', error);
-          // Continue with localStorage data
+          console.error('Error refreshing user:', error);
           await loadAndApplyColorPreferences(userData.id);
         }
       } catch (error) {
@@ -341,6 +377,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     initializeAuth();
+  }, []);
+
+  // Light-weight sync: refresh user when window gains focus to keep header/menu in sync with settings
+  useEffect(() => {
+    const onFocus = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const parsed: User = JSON.parse(storedUser);
+        refreshUserFromServer(parsed.id);
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   // Apply color preferences whenever user data changes

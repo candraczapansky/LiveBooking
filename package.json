@@ -6,7 +6,9 @@
     "dev": "NODE_ENV=development DISABLE_AUTOMATIC_SERVICE_CREATION=true tsx server/index.ts",
     "build": "rm -rf dist && rm -f node_modules/typescript/tsbuildinfo && vite build && tsc",
     "start": "NODE_ENV=production node --experimental-specifier-resolution=node dist/server/index.js",
+    "seed:review-sms": "tsx scripts/create-review-sms-rules.ts",
     "start-clean": "rm -rf node_modules && npm install && npm run dev",
+    "ensure-admin": "tsx scripts/ensure-admin.mjs | cat",
     "fix:rooms": "node scripts/fix-rooms-table.mjs",
     "fix:services": "node scripts/fix-services-columns.mjs"
   },
@@ -43,6 +45,7 @@
     "bcrypt": "^6.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",

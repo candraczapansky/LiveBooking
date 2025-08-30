@@ -75,7 +75,32 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
         throw new AuthenticationError("Invalid credentials");
       }
 
-      const isValidPassword = await bcrypt.compare(sanitizedPassword, user.password);
+      // Support legacy plaintext passwords by auto-migrating to bcrypt on successful match
+      let isValidPassword = false;
+      const storedPassword = user.password || '';
+      const isBcryptHash = storedPassword.startsWith('$2a$') || storedPassword.startsWith('$2b$') || storedPassword.startsWith('$2y$');
+
+      if (isBcryptHash) {
+        isValidPassword = await bcrypt.compare(sanitizedPassword, storedPassword);
+      } else {
+        // Plaintext fallback
+        if (sanitizedPassword === storedPassword) {
+          isValidPassword = true;
+          // Best-effort migrate plaintext password to bcrypt
+          try {
+            const hashed = await bcrypt.hash(sanitizedPassword, 10);
+            await storage.updateUser(user.id, { password: hashed });
+            LoggerService.logAuthentication("password_migrated", user.id, context);
+          } catch (migrateErr) {
+            LoggerService.warn("Password auto-migration failed (continuing login)", {
+              ...context,
+              userId: user.id,
+              error: (migrateErr as any)?.message || String(migrateErr)
+            });
+          }
+        }
+      }
+
       if (!isValidPassword) {
         LoggerService.warn("Login attempt with invalid password", { 
           ...context, 

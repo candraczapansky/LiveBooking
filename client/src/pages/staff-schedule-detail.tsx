@@ -118,6 +118,23 @@ export default function StaffScheduleDetailPage() {
     return location?.name || 'Unknown Location';
   };
 
+  // Format HH:mm strings as h:mm AM/PM in Central Time (wall-clock)
+  const formatCentralTime = (timeStr?: string) => {
+    try {
+      if (!timeStr) return '';
+      const [hRaw, mRaw] = String(timeStr).split(":");
+      const hours = Number(hRaw);
+      const minutes = Number(mRaw);
+      if (Number.isNaN(hours) || Number.isNaN(minutes)) return String(timeStr);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const hour12 = ((hours + 11) % 12) + 1;
+      const mm = String(minutes).padStart(2, '0');
+      return `${hour12}:${mm} ${period}`;
+    } catch {
+      return String(timeStr || '');
+    }
+  };
+
   if (!staffMember) {
     return (
       <div className="container mx-auto p-6">
@@ -245,7 +262,7 @@ export default function StaffScheduleDetailPage() {
                             <Badge variant="outline">{schedule.dayOfWeek}</Badge>
                             <div className="flex items-center gap-2 text-sm">
                               <Clock className="h-4 w-4 text-muted-foreground" />
-                              {schedule.startTime} - {schedule.endTime}
+                              {formatCentralTime(schedule.startTime)} - {formatCentralTime(schedule.endTime)}
                             </div>
                             <div className="flex items-center gap-2 text-sm">
                               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -307,7 +324,7 @@ export default function StaffScheduleDetailPage() {
                             <div className="flex items-center gap-4">
                               <div className="flex items-center gap-2 text-sm">
                                 <Clock className="h-4 w-4 text-muted-foreground" />
-                                {schedule.startTime} - {schedule.endTime}
+                                {formatCentralTime(schedule.startTime)} - {formatCentralTime(schedule.endTime)}
                               </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -368,7 +385,7 @@ export default function StaffScheduleDetailPage() {
                       <div>
                         <CardTitle className="text-xl">{schedule.dayOfWeek}</CardTitle>
                         <CardDescription>
-                          {schedule.startTime} - {schedule.endTime}
+                          {formatCentralTime(schedule.startTime)} - {formatCentralTime(schedule.endTime)}
                         </CardDescription>
                       </div>
                       <div className="flex gap-2">
@@ -393,7 +410,7 @@ export default function StaffScheduleDetailPage() {
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        Duration: {schedule.startTime} - {schedule.endTime}
+                        Duration: {formatCentralTime(schedule.startTime)} - {formatCentralTime(schedule.endTime)}
                       </div>
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />

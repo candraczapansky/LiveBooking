@@ -41,7 +41,8 @@ export function registerUserRoutes(app, storage) {
             // Basic duplicate checks
             const existingEmail = await storage.getUserByEmail(data.email);
             if (existingEmail) {
-                return res.status(409).json({ error: "Email already exists" });
+                const { password: _pw, ...safeExisting } = existingEmail;
+                return res.status(200).json(safeExisting);
             }
             // Generate a username from email or name
             const baseFromEmail = (data.email || "").split("@")[0] || "client";

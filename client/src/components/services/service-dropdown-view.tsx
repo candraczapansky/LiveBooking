@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatDuration, formatPrice } from "@/lib/utils";
 import ServiceForm from "./service-form";
+import CategoryList from "./category-list";
 import { Edit, Trash2, PlusCircle, Eye, EyeOff, Check } from "lucide-react";
 
 import {
@@ -53,6 +54,7 @@ type Service = {
   categoryId: number;
   color: string;
   isHidden?: boolean;
+  isAddOn?: boolean;
   category?: {
     id: number;
     name: string;
@@ -102,11 +104,12 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
     }
   });
 
-  // Fetch all services
+  // Fetch services; when a category is selected, fetch server-filtered list for consistency
   const { data: allServices = [], isLoading: servicesLoading } = useQuery({
-    queryKey: ['/api/services'],
+    queryKey: ['/api/services', selectedCategoryId],
     queryFn: async () => {
-      const response = await fetch('/api/services');
+      const url = selectedCategoryId !== 'all' ? `/api/services?categoryId=${selectedCategoryId}` : '/api/services';
+      const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     }
@@ -133,8 +136,8 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
   // Filter services based on selections and view mode
   const filteredServices = allServices.filter((service: Service) => {
     // Filter by view mode (services vs add-ons)
-    if (viewMode === "addons" && !service.isHidden) return false;
-    if (viewMode === "services" && service.isHidden) return false;
+    if (viewMode === "addons" && !service.isAddOn) return false;
+    if (viewMode === "services" && service.isAddOn) return false;
 
     // Filter by category
     if (selectedCategoryId !== "all" && service.categoryId !== Number(selectedCategoryId)) {
@@ -164,7 +167,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
       if (!res.ok) throw new Error('Failed to fetch add-on mapping');
       return res.json();
     },
-    enabled: !!selectedService && !!selectedService.isHidden
+    enabled: !!selectedService && !!(selectedService as any).isAddOn
   });
 
   // Initialize selected base services when data loads or selection changes
@@ -241,6 +244,8 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
       });
       setIsEditingAppliesTo(false);
       refetchAddOnBases();
+      // Refresh service list so items move between tabs immediately
+      queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     },
     onError: (error) => {
       toast({
@@ -391,6 +396,17 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
         </CardContent>
       </Card>
 
+      {/* Categories Panel - view and edit categories inline */}
+      <CategoryList
+        selectedCategoryId={selectedCategoryId === "all" ? null : Number(selectedCategoryId)}
+        onCategorySelect={(id: number | null) => {
+          setSelectedCategoryId(id === null ? "all" : String(id));
+          setSelectedServiceId("");
+        }}
+        collapsible
+        defaultOpen={false}
+      />
+
       {/* Selected Service Details */}
       {selectedService && (
         <Card>
@@ -398,7 +414,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 {selectedService.name}
-                {selectedService.isHidden && (
+                {(selectedService as any).isAddOn && (
                   <Badge variant="secondary">Add-On</Badge>
                 )}
               </CardTitle>
@@ -417,13 +433,13 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
                   <p className="text-sm font-medium">{selectedService.name}</p>
                 </div>
                 <div>
-                  <Label>{selectedService.isHidden ? "Cost" : "Price"}</Label>
+                  <Label>{(selectedService as any).isAddOn ? "Cost" : "Price"}</Label>
                   <p className="text-sm font-medium">{formatPrice(selectedService.price)}</p>
                 </div>
                 <div>
-                  <Label>{selectedService.isHidden ? "Additional Time" : "Duration"}</Label>
+                  <Label>{(selectedService as any).isAddOn ? "Additional Time" : "Duration"}</Label>
                   <p className="text-sm font-medium">
-                    {selectedService.isHidden 
+                    {(selectedService as any).isAddOn 
                       ? (selectedService.duration > 0 ? formatDuration(selectedService.duration) : "None")
                       : formatDuration(selectedService.duration)
                     }
@@ -446,7 +462,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
                   {(() => {
                     const svcId = Number(selectedService.id);
                     let assigned: any[] = [];
-                    if (selectedService.isHidden) {
+                    if ((selectedService as any).isAddOn) {
                       const baseIds: number[] = (addOnBasesData?.baseServiceIds || []).map((n: any) => Number(n));
                       assigned = Array.isArray(staffServices)
                         ? (staffServices as any[]).filter((a) => a && baseIds.includes(Number(a.serviceId)))
@@ -472,7 +488,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
               </div>
 
               {/* Applies to (base services) - for add-ons only */}
-              {selectedService.isHidden && (
+              {(selectedService as any).isAddOn && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <Label>Applies To</Label>
@@ -501,7 +517,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
                   {isEditingAppliesTo ? (
                     <div className="border rounded-lg p-3 space-y-2 max-h-48 overflow-y-auto">
                       {allServices
-                        .filter((s: Service) => !s.isHidden)
+                        .filter((s: Service) => !(s as any).isAddOn)
                         .map((service: Service) => (
                           <div key={service.id} className="flex items-center space-x-2">
                             <Checkbox
@@ -611,7 +627,7 @@ const ServiceDropdownView = ({ initialCategoryId }: ServiceDropdownViewProps) =>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {service.name}
-                        {service.isHidden && (
+                        {(service as any).isAddOn && (
                           <Badge variant="secondary" className="text-xs">Add-On</Badge>
                         )}
                       </div>

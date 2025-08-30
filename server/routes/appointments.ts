@@ -12,6 +12,7 @@ import LoggerService, { getLogContext } from "../utils/logger.js";
 import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { sendLocationMessage, upsertLocationTemplate } from "../location-messenger.js";
 import { triggerCancellation } from "../automation-triggers.js";
 import { db } from "../db.js";
 import { locations as locationsTable } from "../../shared/schema.js";
@@ -463,6 +464,11 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             .where(eq(locationsTable.id, Number(locId)))
             .limit(1);
           appointmentLocation = (rows as any[])?.[0] || null;
+          try {
+            if (appointmentLocation?.name) {
+              upsertLocationTemplate(String(locId), { name: String(appointmentLocation.name) });
+            }
+          } catch {}
         }
       } catch (_e) {
         appointmentLocation = null;
@@ -528,74 +534,39 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         // Send email confirmation
         if (client.emailAppointmentReminders && client.email) {
           try {
-            const rules = await storage.getAllAutomationRules();
-            const emailRule = Array.isArray(rules) ? rules.find((r: any) => r.active && r.type === 'email' && r.trigger === 'booking_confirmation') : null;
-            if (emailRule) {
-              const apptStart = new Date(newAppointment.startTime);
-              const dateStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(apptStart);
-              const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(apptStart);
-              const staffName = `${staff.firstName} ${staff.lastName}`.trim();
-              const clientFullName = client.firstName && client.lastName ? `${client.firstName} ${client.lastName}` : (client.firstName || client.username || 'Client');
-              const variables: Record<string, string> = {
-                client_name: clientFullName,
-                client_first_name: client.firstName || 'Client',
-                client_last_name: client.lastName || '',
-                client_email: client.email || '',
-                client_phone: client.phone || '',
-                service_name: service.name,
-                staff_name: staffName || 'Your stylist',
-                appointment_date: dateStr,
-                appointment_time: timeStr,
-                appointment_datetime: `${dateStr} ${timeStr}`,
-                salon_name: appointmentLocation?.name || 'Glo Head Spa',
-                salon_phone: appointmentLocation?.phone || '(555) 123-4567',
-                salon_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', '),
-                location_name: appointmentLocation?.name || '',
-                location_address: [appointmentLocation?.address, appointmentLocation?.city, appointmentLocation?.state, appointmentLocation?.zipCode].filter(Boolean).join(', ')
-              };
-              const subjectBase = emailRule.subject ? replaceTemplateVariables(emailRule.subject, variables) : `Appointment Confirmation - ${variables.salon_name}`;
-              const subject = subjectBase.replace(/\bGlo Head Spa\b/g, variables.salon_name || '');
-              const bodyBase = replaceTemplateVariables(emailRule.template, variables);
-              const body = bodyBase.replace(/\bGlo Head Spa\b/g, variables.salon_name || '');
-              await sendEmail({
-                to: client.email,
-                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-                subject,
-                html: `<p>${body.replace(/\n/g, '<br>')}</p>`
-              });
-              LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
-              LoggerService.info("Email confirmation sent successfully (automation template)", { ...context, appointmentId: newAppointment.id });
-            } else {
-              LoggerService.info("Sending email confirmation", {
-                ...context,
-                appointmentId: newAppointment.id,
-                to: client.email,
-                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com'
-              });
-              
-              await sendEmail({
-                to: client.email,
-                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            LoggerService.info("Sending email confirmation", {
+              ...context,
+              appointmentId: newAppointment.id,
+              to: client.email,
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com'
+            });
+
+            await sendLocationMessage({
+              messageType: 'confirmation',
+              locationId: String((newAppointment as any).locationId ?? 'global'),
+              channel: 'email',
+              to: { email: client.email, name: client.firstName || client.username },
+              overrides: {
                 subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
-                html: `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">Appointment Confirmation</h2>
-                    <p>Hello ${client.firstName || client.username},</p>
-                    <p>Your appointment has been confirmed:</p>
-                    <ul>
-                      <li><strong>Service:</strong> ${service.name}</li>
-                      <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
-                      <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
-                      <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
-                      ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
-                    </ul>
-                    <p>We look forward to seeing you!</p>
-                  </div>
-                `
-              });
-              LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
-              LoggerService.info("Email confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
-            }
+                body: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #333;">Appointment Confirmation</h2>
+                  <p>Hello ${client.firstName || client.username},</p>
+                  <p>Your appointment has been confirmed:</p>
+                  <ul>
+                    <li><strong>Service:</strong> ${service.name}</li>
+                    <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
+                    <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
+                    <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
+                    ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
+                  </ul>
+                  <p>We look forward to seeing you!</p>
+                </div>
+              `
+              }
+            });
+            LoggerService.logCommunication("email", "appointment_confirmation_sent", { ...context, userId: client.id });
+            LoggerService.info("Email confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
           } catch (emailError) {
             LoggerService.error("Failed to send email confirmation", { ...context, appointmentId: newAppointment.id }, emailError as Error);
           }
@@ -610,25 +581,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           if (client.email) {
             console.log("🧪 TEST: Forcing email send for debugging...");
             try {
-              await sendEmail({
-                to: client.email,
-                from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-                subject: `TEST - Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
-                html: `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #333;">TEST - Appointment Confirmation</h2>
-                    <p>Hello ${client.firstName || client.username},</p>
-                    <p>This is a TEST email to verify email functionality:</p>
-                    <ul>
-                      <li><strong>Service:</strong> ${service.name}</li>
-                      <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
-                      <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
-                      <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
-                      ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
-                    </ul>
-                    <p>This is a test email to verify the email service is working.</p>
-                  </div>
-                `
+              // Send a normal non-test confirmation using location-aware defaults
+              await sendLocationMessage({
+                messageType: 'confirmation',
+                locationId: String((newAppointment as any).locationId ?? 'global'),
+                channel: 'email',
+                to: { email: client.email, name: client.firstName || client.username },
+                context: {
+                  serviceName: service.name,
+                  appointmentDate: new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime)),
+                  appointmentTime: new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime)),
+                  staffName: staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'
+                }
               });
               console.log("✅ TEST EMAIL SENT SUCCESSFULLY ✅");
             } catch (testEmailError) {
@@ -729,7 +693,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
             smsMessage += ` Location: ${locText}.`;
           }
-          await sendSMS(client.phone, smsMessage);
+          await sendLocationMessage({
+            messageType: 'confirmation',
+            locationId: String((newAppointment as any).locationId ?? 'global'),
+            channel: 'sms',
+            to: { phone: client.phone, name: client.firstName || client.username },
+            overrides: { body: smsMessage }
+          });
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
           LoggerService.info("SMS confirmation sent successfully", { ...context, appointmentId: newAppointment.id });
         } catch (smsError) {
@@ -882,6 +852,61 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       LoggerService.error("Failed to trigger cancellation automation", { ...context, appointmentId }, autoErr as Error);
     }
 
+    // If date/time changed, send reschedule notifications (location-aware)
+    try {
+      const timeChanged = (updateData.startTime && new Date(updateData.startTime).toISOString() !== new Date(existingAppointment.startTime).toISOString())
+        || (updateData.endTime && new Date(updateData.endTime).toISOString() !== new Date(existingAppointment.endTime).toISOString());
+      if (timeChanged) {
+        const client = await storage.getUser(updatedAppointment.clientId);
+        const staffUser = await storage.getUser(updatedAppointment.staffId);
+        const service = await storage.getService(updatedAppointment.serviceId);
+        // Resolve appointment location
+        let appointmentLocation: any = null;
+        try {
+          const locId = (updatedAppointment as any).locationId;
+          if (locId != null) {
+            const rows = await db.select().from(locationsTable).where(eq(locationsTable.id, Number(locId))).limit(1);
+            appointmentLocation = (rows as any[])?.[0] || null;
+            try { if (appointmentLocation?.name) upsertLocationTemplate(String(locId), { name: String(appointmentLocation.name) }); } catch {}
+          }
+        } catch {}
+        const startDt = new Date(updatedAppointment.startTime);
+        const dateStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(startDt);
+        const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(startDt);
+        if (client?.emailAppointmentReminders && client.email) {
+          await sendLocationMessage({
+            messageType: 'reschedule',
+            locationId: String((updatedAppointment as any).locationId ?? 'global'),
+            channel: 'email',
+            to: { email: client.email, name: client.firstName || client.username },
+            context: {
+              serviceName: service?.name || 'Service',
+              appointmentDate: dateStr,
+              appointmentTime: timeStr,
+              staffName: staffUser ? `${staffUser.firstName} ${staffUser.lastName}`.trim() : 'Your stylist'
+            },
+            overrides: undefined
+          });
+        }
+        if (client?.smsAppointmentReminders && client.phone) {
+          await sendLocationMessage({
+            messageType: 'reschedule',
+            locationId: String((updatedAppointment as any).locationId ?? 'global'),
+            channel: 'sms',
+            to: { phone: client.phone, name: client.firstName || client.username },
+            context: {
+              serviceName: service?.name || 'Service',
+              appointmentDate: dateStr,
+              appointmentTime: timeStr,
+              staffName: staffUser ? `${staffUser.firstName} ${staffUser.lastName}`.trim() : 'Your stylist'
+            }
+          });
+        }
+      }
+    } catch (reschedErr) {
+      LoggerService.error("Failed to send reschedule notifications", { ...context, appointmentId }, reschedErr as Error);
+    }
+
     res.json(updatedAppointment);
   }));
 
@@ -998,11 +1023,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send email reminder
     if (client.emailAppointmentReminders && client.email) {
       try {
-        await sendEmail({
-          to: client.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: `Appointment Reminder - ${appointmentLocation?.name || 'Glo Head Spa'}`,
-          html: `
+        await sendLocationMessage({
+          messageType: 'reminder',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'email',
+          to: { email: client.email, name: client.firstName || client.username },
+          overrides: {
+            subject: `Appointment Reminder - ${appointmentLocation?.name || 'Glo Head Spa'}`,
+            body: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Reminder</h2>
               <p>Hello ${client.firstName || client.username},</p>
@@ -1016,6 +1044,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>We look forward to seeing you!</p>
             </div>
           `
+          }
         });
         LoggerService.logCommunication("email", "appointment_reminder_sent", { ...context, userId: client.id });
         reminderSent = true;
@@ -1028,7 +1057,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     if (client.smsAppointmentReminders && client.phone) {
       try {
         const message = `Reminder: Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service.name} is tomorrow at ${appointment.startTime}.`;
-        await sendSMS(client.phone, message);
+        await sendLocationMessage({
+          messageType: 'reminder',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'sms',
+          to: { phone: client.phone, name: client.firstName || client.username },
+          overrides: { body: message }
+        });
         LoggerService.logCommunication("sms", "appointment_reminder_sent", { ...context, userId: client.id });
         reminderSent = true;
       } catch (error) {
@@ -1067,14 +1102,26 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         // Send email reminder
         if (client.emailAppointmentReminders && client.email) {
           try {
-            const locationName = 'Glo Head Spa';
-            await sendEmail({
-              to: client.email,
-              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-              subject: `Appointment Reminder - ${locationName}`,
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #333;">Appointment Reminder</h2>
+            // Resolve location for each appointment
+            let apptLoc: any = null;
+            try {
+              const locId = (appointment as any).locationId;
+              if (locId != null) {
+                const rows = await db.select().from(locationsTable).where(eq(locationsTable.id, Number(locId))).limit(1);
+                apptLoc = (rows as any[])?.[0] || null;
+                try { if (apptLoc?.name) upsertLocationTemplate(String(locId), { name: String(apptLoc.name) }); } catch {}
+              }
+            } catch {}
+            await sendLocationMessage({
+              messageType: 'reminder',
+              locationId: String((appointment as any).locationId ?? 'global'),
+              channel: 'email',
+              to: { email: client.email, name: client.firstName || client.username },
+              overrides: {
+                subject: `Appointment Reminder - ${apptLoc?.name || 'Glo Head Spa'}`,
+                body: `
+                <div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">
+                  <h2 style=\"color: #333;\">Appointment Reminder</h2>
                   <p>Hello ${client.firstName || client.username},</p>
                   <p>This is a reminder for your upcoming appointment tomorrow:</p>
                   <ul>
@@ -1084,6 +1131,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                   <p>We look forward to seeing you!</p>
                 </div>
               `
+              }
             });
             reminderSent = true;
           } catch (error) {
@@ -1094,9 +1142,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         // Send SMS reminder
         if (client.smsAppointmentReminders && client.phone) {
           try {
-            const locationName = 'Glo Head Spa';
-            const message = `Reminder: Your ${locationName} appointment is tomorrow at ${appointment.startTime}.`;
-            await sendSMS(client.phone, message);
+            const message = `Reminder: Your ${'Glo Head Spa'} appointment is tomorrow at ${appointment.startTime}.`;
+            await sendLocationMessage({
+              messageType: 'reminder',
+              locationId: String((appointment as any).locationId ?? 'global'),
+              channel: 'sms',
+              to: { phone: client.phone, name: client.firstName || client.username },
+              overrides: { body: message }
+            });
             reminderSent = true;
           } catch (error) {
             LoggerService.error("Failed to send SMS reminder", { ...context, userId: client.id, appointmentId: appointment.id }, error as Error);
@@ -1168,11 +1221,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send email confirmation if allowed
     if (sendEmailRequested && client.emailAppointmentReminders && client.email) {
       try {
-        await sendEmail({
-          to: client.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
-          html: `
+        await sendLocationMessage({
+          messageType: 'confirmation',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'email',
+          to: { email: client.email, name: client.firstName || client.username || '' },
+          overrides: {
+            subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
+            body: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Confirmation</h2>
               <p>Hello ${client.firstName || client.username || ''},</p>
@@ -1187,6 +1243,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>We look forward to seeing you!</p>
             </div>
           `
+          }
         });
         LoggerService.logCommunication("email", "appointment_confirmation_resent", { ...context, userId: client.id });
         emailSent = true;
@@ -1203,7 +1260,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
           message += ` Location: ${locText}.`;
         }
-        await sendSMS(client.phone, message);
+        await sendLocationMessage({
+          messageType: 'confirmation',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'sms',
+          to: { phone: client.phone, name: client.firstName || client.username },
+          overrides: { body: message }
+        });
         LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
         smsSent = true;
       } catch (error) {
@@ -1268,11 +1331,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     if (sendEmailRequested && client.emailAppointmentReminders && client.email) {
       try {
-        await sendEmail({
-          to: client.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
-          html: `
+        await sendLocationMessage({
+          messageType: 'confirmation',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'email',
+          to: { email: client.email, name: client.firstName || client.username || '' },
+          overrides: {
+            subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
+            body: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #333;">Appointment Confirmation</h2>
               <p>Hello ${client.firstName || client.username || ''},</p>
@@ -1287,6 +1353,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>We look forward to seeing you!</p>
             </div>
           `
+          }
         });
         LoggerService.logCommunication("email", "appointment_confirmation_resent", { ...context, userId: client.id });
         emailSent = true;
@@ -1302,7 +1369,13 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           const locText = `${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}`;
           message += ` Location: ${locText}.`;
         }
-        await sendSMS(client.phone, message);
+        await sendLocationMessage({
+          messageType: 'confirmation',
+          locationId: String((appointment as any).locationId ?? 'global'),
+          channel: 'sms',
+          to: { phone: client.phone, name: client.firstName || client.username },
+          overrides: { body: message }
+        });
         LoggerService.logCommunication("sms", "appointment_confirmation_resent", { ...context, userId: client.id });
         smsSent = true;
       } catch (error) {

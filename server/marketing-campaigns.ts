@@ -1,4 +1,5 @@
 import { sendEmail } from './email.js';
+import { sendLocationMessage, upsertLocationTemplate } from './location-messenger.js';
 import { sendSMS } from './sms.js';
 let getPublicUrl: (path: string) => string = (p) => p;
 try {
@@ -266,6 +267,18 @@ export class MarketingCampaignService {
     let failedCount = 0;
 
     const perMessageDelayMs = parseInt(process.env.EMAIL_DRIP_PER_MESSAGE_DELAY_MS || '250', 10);
+    // Determine if campaign has a location scope from system_config (set by route when sending with locationId)
+    let campaignLocationId: number | null = null;
+    try {
+      // @ts-ignore
+      const cfg = await this.storage.getSystemConfig?.(`marketing_campaign_location:${campaign.id}`);
+      const raw = (cfg?.value || cfg) as any;
+      if (raw != null) {
+        const n = parseInt(String((cfg?.value ?? raw)));
+        if (!Number.isNaN(n)) campaignLocationId = n;
+      }
+    } catch {}
+
     for (const rec of batch) {
       try {
         const user = await this.storage.getUser((rec as any).userId);
@@ -308,13 +321,45 @@ export class MarketingCampaignService {
         const html = generateRawMarketingEmailHTML(editorHtml, templateData.unsubscribeUrl);
         const text = htmlToText(html);
 
-        const emailSent = await sendEmail({
-          to: user.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: campaign.subject || campaign.name,
-          html,
-          text
-        });
+        let emailSent = false;
+        if (campaignLocationId != null) {
+          try {
+            // Attempt to register location display name
+            try {
+              // @ts-ignore
+              const rows = await this.storage.getAllLocations?.();
+              const loc = Array.isArray(rows) ? rows.find((l: any) => String(l.id) === String(campaignLocationId)) : null;
+              if (loc?.name) upsertLocationTemplate(String(campaignLocationId), { name: String(loc.name) });
+            } catch {}
+            const res = await sendLocationMessage({
+              messageType: 'marketing',
+              locationId: String(campaignLocationId),
+              channel: 'email',
+              to: { email: user.email, name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username },
+              overrides: {
+                subject: campaign.subject || campaign.name,
+                body: html
+              }
+            });
+            emailSent = !!res.success;
+          } catch {
+            emailSent = await sendEmail({
+              to: user.email,
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+              subject: campaign.subject || campaign.name,
+              html,
+              text
+            });
+          }
+        } else {
+          emailSent = await sendEmail({
+            to: user.email,
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            subject: campaign.subject || campaign.name,
+            html,
+            text
+          });
+        }
 
         if (emailSent) {
           sentCount++;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Edit, Trash2, FolderPlus } from "lucide-react";
+import { Edit, Trash2, FolderPlus, ChevronDown } from "lucide-react";
 
 import {
   Card,
@@ -52,6 +52,8 @@ type ServiceCategory = {
 type CategoryListProps = {
   selectedCategoryId: number | null; // Allow null for "All Categories"
   onCategorySelect: (categoryId: number | null) => void; // Allow null for "All Categories"
+  collapsible?: boolean;
+  defaultOpen?: boolean;
 };
 
 const categoryFormSchema = z.object({
@@ -61,9 +63,10 @@ const categoryFormSchema = z.object({
 
 type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 
-const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProps) => {
+const CategoryList = ({ selectedCategoryId, onCategorySelect, collapsible = false, defaultOpen = true }: CategoryListProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [isOpen, setIsOpen] = useState<boolean>(defaultOpen);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -202,7 +205,20 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
       <Card className="border rounded-lg overflow-hidden">
         <CardHeader className="bg-gray-50 dark:bg-gray-800 px-4 py-3 border-b">
           <div className="flex items-center justify-between">
-            <CardTitle className="font-medium text-base">Categories</CardTitle>
+            <div className="flex items-center gap-1">
+              {collapsible && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => setIsOpen(!isOpen)}
+                  aria-label={isOpen ? "Collapse" : "Expand"}
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? "" : "-rotate-90"}`} />
+                </Button>
+              )}
+              <CardTitle className="font-medium text-base">Categories</CardTitle>
+            </div>
             <Button 
               variant="outline" 
               size="sm" 
@@ -214,7 +230,8 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="p-0">
+        {(!collapsible || isOpen) && (
+          <CardContent className="p-0">
           <div className="divide-y">
             {isLoading ? (
               <div className="px-4 py-3 text-center text-sm text-muted-foreground">
@@ -279,7 +296,8 @@ const CategoryList = ({ selectedCategoryId, onCategorySelect }: CategoryListProp
               </>
             )}
           </div>
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
       {/* Add Category Dialog */}

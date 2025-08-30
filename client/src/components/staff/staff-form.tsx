@@ -1070,18 +1070,32 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
                   <Select value={selectedServiceId} onValueChange={setSelectedServiceId}>
                     <SelectTrigger>
-                      <SelectValue placeholder={(allServices || []).length === 0 ? 'No services available' : 'Select a service'} />
+                      <SelectValue
+                        placeholder={(() => {
+                          const currentAssignedIds = new Set(((assignedServices || []) as any[]).map((s: any) => s.id));
+                          const available = ((allServices || []) as any[]).filter((svc: any) => !currentAssignedIds.has(svc.id));
+                          if ((allServices || []).length === 0) return 'No services available';
+                          if (available.length === 0) return 'All available services are already assigned';
+                          return 'Select a service';
+                        })()}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {(allServices || []).length === 0 ? (
-                        <div className="px-2 py-1.5 text-sm text-gray-500">No services available</div>
-                      ) : (
-                        (allServices || []).map((svc: any) => (
+                      {(() => {
+                        const currentAssignedIds = new Set(((assignedServices || []) as any[]).map((s: any) => s.id));
+                        const available = ((allServices || []) as any[]).filter((svc: any) => !currentAssignedIds.has(svc.id));
+                        if ((allServices || []).length === 0) {
+                          return <div className="px-2 py-1.5 text-sm text-gray-500">No services available</div>;
+                        }
+                        if (available.length === 0) {
+                          return <div className="px-2 py-1.5 text-sm text-gray-500">All available services are already assigned.</div>;
+                        }
+                        return available.map((svc: any) => (
                           <SelectItem key={svc.id} value={svc.id.toString()}>
                             {svc.name}
                           </SelectItem>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </SelectContent>
                   </Select>
                   <Input

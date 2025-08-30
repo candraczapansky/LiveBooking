@@ -11,6 +11,7 @@ import LoggerService, { getLogContext } from "../utils/logger.js";
 import { validateRequest, requireAuth } from "../middleware/error-handler.js";
 import { sendEmail } from "../email.js";
 import { sendSMS, isTwilioConfigured } from "../sms.js";
+import { sendLocationMessage, upsertLocationTemplate } from "../location-messenger.js";
 import { getPublicUrl } from "../utils/url.js";
 import { redisCache } from "../utils/redis-cache.js";
 import { insertMarketingCampaignSchema, insertPromoCodeSchema } from "../../shared/schema.js";
@@ -242,6 +243,18 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
 
     // Send campaign based on type
     if (campaign.type === 'email') {
+      // If sending emails for a specific location, persist that locationId in system_config for the drip processor
+      try {
+        if (targetLocationId != null) {
+          await storage.setSystemConfig({
+            key: `marketing_campaign_location:${campaignId}`,
+            value: String(targetLocationId),
+            description: `Location scope for campaign ${campaignId}`,
+            isEncrypted: false,
+            isActive: true
+          } as any);
+        }
+      } catch {}
       // Queue recipients for email drip sending (like SMS)
       const existing = await (storage as any).getMarketingCampaignRecipients?.(campaignId) || [];
       const existingByUser = new Set<number>((existing as any[]).map(r => r.userId));
@@ -378,7 +391,32 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
                 continue;
               }
               const smsContent = ensureSmsMarketingCompliance((campaign.content || '').toString());
-              const sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
+              // Wire through location-aware sender when targetLocationId is provided
+              let sendResult: any = { success: false, messageId: undefined, error: 'skipped' };
+              try {
+                if (targetLocationId != null) {
+                  // Try to register location name for display
+                  try {
+                    const rows = await (storage as any).getAllLocations?.();
+                    const loc = Array.isArray(rows) ? rows.find((l: any) => String(l.id) === String(targetLocationId)) : null;
+                    if (loc?.name) upsertLocationTemplate(String(targetLocationId), { name: String(loc.name) });
+                  } catch {}
+                  const r = await sendLocationMessage({
+                    messageType: 'marketing',
+                    locationId: String(targetLocationId),
+                    channel: 'sms',
+                    to: { phone: user.phone, name: user.firstName || user.username },
+                    overrides: { body: smsContent },
+                    photoUrl: photoUrlForSending
+                  });
+                  sendResult = { success: r.success, messageId: r.id, error: r.error };
+                } else {
+                  // Preserve legacy behavior when not filtering by location
+                  sendResult = await sendSMS(user.phone, smsContent, photoUrlForSending);
+                }
+              } catch (err: any) {
+                sendResult = { success: false, error: err?.message || 'send_failed' };
+              }
               if (sendResult.success) {
                 immediateSent++;
                 await (storage as any).updateMarketingCampaignRecipient?.((rec as any).id, { status: 'sent', sentAt: new Date() } as any);
@@ -567,6 +605,14 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
   app.post("/api/marketing/send-promotional-email", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
     const { recipientIds, subject, message, templateId } = req.body;
+    const targetLocationId = (() => {
+      try {
+        const v = (req.body?.locationId ?? req.query?.locationId) as any;
+        if (v == null || v === '') return null;
+        const n = parseInt(String(v));
+        return Number.isNaN(n) ? null : n;
+      } catch { return null; }
+    })();
 
     LoggerService.info("Sending promotional email", { ...context, recipientCount: recipientIds.length });
 
@@ -601,12 +647,40 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
           }
         } catch {}
 
-        await sendEmail({
-          to: recipient.email,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          subject: subject || 'Glo Head Spa - Special Offer',
-          html: emailContent,
-        });
+        if (targetLocationId != null) {
+          try {
+            // Try to register location name for display
+            try {
+              const rows = await (storage as any).getAllLocations?.();
+              const loc = Array.isArray(rows) ? rows.find((l: any) => String(l.id) === String(targetLocationId)) : null;
+              if (loc?.name) upsertLocationTemplate(String(targetLocationId), { name: String(loc.name) });
+            } catch {}
+            await sendLocationMessage({
+              messageType: 'marketing',
+              locationId: String(targetLocationId),
+              channel: 'email',
+              to: { email: recipient.email, name: `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() || recipient.username },
+              overrides: {
+                subject: subject || 'Glo Head Spa - Special Offer',
+                body: emailContent
+              }
+            });
+          } catch {
+            await sendEmail({
+              to: recipient.email,
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+              subject: subject || 'Glo Head Spa - Special Offer',
+              html: emailContent,
+            });
+          }
+        } else {
+          await sendEmail({
+            to: recipient.email,
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            subject: subject || 'Glo Head Spa - Special Offer',
+            html: emailContent,
+          });
+        }
 
         sentCount++;
         LoggerService.logCommunication("email", "promotional_sent", { ...context, userId: recipientId });
@@ -960,7 +1034,31 @@ export function registerMarketingRoutes(app: Express, storage: IStorage) {
         if (phoneKey) seenPhones.add(phoneKey);
 
         const smsContent = ensureSmsMarketingCompliance(message);
-        await sendSMS(recipient.phone, smsContent);
+        // Optional: accept locationId in request to brand messages by location
+        const targetLocationId = (() => {
+          try {
+            const v = (req.body?.locationId ?? req.query?.locationId) as any;
+            if (v == null || v === '') return null;
+            const n = parseInt(String(v));
+            return Number.isNaN(n) ? null : n;
+          } catch { return null; }
+        })();
+        if (targetLocationId != null) {
+          try {
+            const rows = await (storage as any).getAllLocations?.();
+            const loc = Array.isArray(rows) ? rows.find((l: any) => String(l.id) === String(targetLocationId)) : null;
+            if (loc?.name) upsertLocationTemplate(String(targetLocationId), { name: String(loc.name) });
+          } catch {}
+          await sendLocationMessage({
+            messageType: 'marketing',
+            locationId: String(targetLocationId),
+            channel: 'sms',
+            to: { phone: recipient.phone, name: recipient.firstName || recipient.username },
+            overrides: { body: smsContent }
+          });
+        } else {
+          await sendSMS(recipient.phone, smsContent);
+        }
         sentCount++;
         LoggerService.logCommunication("sms", "promotional_sent", { ...context, userId: recipientId });
 

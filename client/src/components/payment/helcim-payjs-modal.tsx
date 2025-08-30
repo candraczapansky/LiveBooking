@@ -1,11 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useEffect, useCallback, useRef } from 'react';
+// Using a custom lightweight modal here to avoid transform/focus issues with cross-origin iframes
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -41,6 +35,7 @@ export default function HelcimPayJsModal({
   const [isInitialized, setIsInitialized] = useState(false);
   const [paymentToken, setPaymentToken] = useState<string | null>(null);
   const { toast } = useToast();
+  const mountedRef = useRef(false);
 
   // Provide loose typings for global objects
   declare global {
@@ -102,7 +97,8 @@ export default function HelcimPayJsModal({
   // Initialize Helcim Pay.js and mount form when dialog opens
   useEffect(() => {
     if (!open) return;
-    if (isInitialized) return;
+    if (mountedRef.current) return;
+    mountedRef.current = true;
     (async () => {
       try {
         setIsLoading(true);
@@ -121,19 +117,24 @@ export default function HelcimPayJsModal({
         }
         setPaymentToken(initData.token);
 
-        // Wait for Pay.js render helper
-        await waitFor(() => window.appendHelcimPayIframe, 12000, 100);
-
-        // Always render the Helcim Pay.js iframe inside our container for full width
-        const container = document.getElementById('helcim-payment-container');
+        // Use inline helcimPay mount only to avoid overlay conflicts
+        await waitFor(() => window.helcimPay, 20000, 100);
         try {
-          if (container && window.appendHelcimPayIframe) {
-            window.appendHelcimPayIframe!(initData.token, { elementId: 'helcim-payment-container' });
-          } else if (window.appendHelcimPayIframe) {
-            window.appendHelcimPayIframe!(initData.token);
+          // @ts-ignore - helcimPay injected by script
+          await window.helcimPay.initialize({
+            accountId: (import.meta as any).env?.VITE_HELCIM_ACCOUNT_ID,
+            terminalId: (import.meta as any).env?.VITE_HELCIM_TERMINAL_ID,
+            token: initData.token,
+            test: process.env.NODE_ENV !== 'production',
+          });
+          const container = document.getElementById('helcim-payment-container');
+          const alreadyMounted = container?.querySelector('iframe');
+          if (!alreadyMounted) {
+            // @ts-ignore
+            window.helcimPay.mount('helcim-payment-container');
           }
         } catch (err) {
-          console.error('appendHelcimPayIframe failed:', err);
+          console.error('helcimPay.initialize/mount failed:', err);
           throw err;
         }
 
@@ -195,6 +196,21 @@ export default function HelcimPayJsModal({
     })();
   }, [open, isInitialized, amount, description, customerEmail, customerName]);
 
+  // Cleanup on close/unmount: unmount helcimPay if present
+  useEffect(() => {
+    if (!open) return;
+    return () => {
+      try {
+        // @ts-ignore
+        if (window.helcimPay) {
+          // @ts-ignore
+          window.helcimPay.unmount?.();
+        }
+      } catch {}
+      mountedRef.current = false;
+    };
+  }, [open]);
+
   // Pay.js handles submission inside iframe; we only display and listen for result.
 
   const handlePaymentSuccess = async (_response: any) => {
@@ -221,39 +237,45 @@ export default function HelcimPayJsModal({
     setPaymentToken(null);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[900px] w-[95vw]">
-        <DialogHeader>
-          <DialogTitle>Process Payment</DialogTitle>
-          <DialogDescription>
-            Complete your payment securely with Helcim
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
-          {isLoading ? (
-            <div className="flex items-center justify-center p-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-          ) : (
-            <div id="helcim-payment-container" className="min-h-[400px] w-full overflow-x-hidden">
-              {/* Helcim.js will inject the payment form here */}
-            </div>
-          )}
-        </div>
+  if (!open) return null;
 
-        <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-            }}
-          >
-            Cancel
-          </Button>
+  return (
+    <div className="fixed inset-0 z-[9999]">
+      <div className="absolute inset-0 bg-black/80 z-[0] pointer-events-none" />
+      <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-auto">
+        <div
+          className={"pointer-events-auto bg-background w-[95vw] sm:max-w-[900px] max-h-[95vh] p-6 rounded-lg shadow-lg z-[2] isolate"}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Process Payment</h2>
+            <p className="text-sm text-muted-foreground">Complete your payment securely with Helcim</p>
+          </div>
+
+          <div className="grid gap-4 py-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center p-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+              </div>
+            ) : (
+              <div id="helcim-payment-container" className="min-h-[400px] w-full overflow-x-hidden relative z-[2] touch-manipulation pointer-events-auto" style={{ WebkitOverflowScrolling: 'auto', overscrollBehavior: 'contain' }}>
+                {/* Helcim.js will inject the payment form here */}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

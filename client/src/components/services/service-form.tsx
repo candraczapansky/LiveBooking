@@ -35,6 +35,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "@/contexts/LocationContext";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const serviceFormSchema = z.object({
   // Required fields only
@@ -51,6 +53,8 @@ const serviceFormSchema = z.object({
   bufferTimeAfter: z.coerce.number().min(0, "Buffer time must be 0 or greater").optional(),
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "Please enter a valid hex color code").optional(),
   isHidden: z.boolean().optional(),
+  // Frontend-only flag: controls add-on behavior and mapping
+  isAddOn: z.boolean().optional(),
   
   // These are handled separately and not sent to the service creation endpoint
   assignedStaff: z.array(z.object({
@@ -61,6 +65,8 @@ const serviceFormSchema = z.object({
   requiredDevices: z.array(z.number()).optional().default([]),
   // Add-on mapping (not sent to base service create endpoint)
   appliesToServiceIds: z.array(z.number()).optional().default([]),
+  // Locations restriction (frontend-only; saved via dedicated endpoints)
+  locationIds: z.array(z.number()).optional().default([]),
 });
 
 type ServiceFormValues = z.infer<typeof serviceFormSchema>;
@@ -115,6 +121,16 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
     }
   });
 
+  // All locations for selection
+  const { data: allLocations = [] } = useQuery({
+    queryKey: ['/api/locations'],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/locations');
+      const body = await response.json();
+      return Array.isArray(body) ? body : body?.data ?? [];
+    }
+  });
+
   // All services (for selecting which base services an add-on applies to)
   const { data: allServices } = useQuery({
     queryKey: ['/api/services'],
@@ -126,7 +142,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
   });
 
   const form = useForm<ServiceFormValues>({
-    resolver: zodResolver(serviceFormSchema),
+    resolver: zodResolver(serviceFormSchema) as any,
     defaultValues: {
       name: "",
       description: "",
@@ -139,9 +155,11 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       bufferTimeAfter: 0,
       color: "#3B82F6",
       isHidden: false,
+      isAddOn: false,
       assignedStaff: [],
       requiredDevices: [],
       appliesToServiceIds: [],
+      locationIds: [],
     },
   });
 
@@ -160,8 +178,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         fetch(`/api/services/${serviceId}`).then(res => res.json()),
         // Fallback approach: fetch all staff-service assignments and filter by serviceId
         fetch(`/api/staff-services`).then(res => res.json()),
+        fetch(`/api/services/${serviceId}/locations`).then(res => res.json()).catch(() => ({ locationIds: [], isRestricted: false })),
       ])
-        .then(([serviceData, allAssignments]) => {
+        .then(([serviceData, allAssignments, locationsPayload]) => {
           const assignmentsForService = Array.isArray(allAssignments)
             ? allAssignments.filter((a: any) => a && a.serviceId === serviceId)
             : [];
@@ -186,8 +205,10 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
             bufferTimeAfter: serviceData.bufferTimeAfter || 0,
             color: serviceData.color || "#3B82F6",
             isHidden: !!serviceData.isHidden,
+            isAddOn: !!(serviceData as any)?.isAddOn,
             assignedStaff: assignedStaff,
             requiredDevices: serviceData.requiredDevices || [],
+            locationIds: Array.isArray(locationsPayload?.locationIds) ? locationsPayload.locationIds.map((n: any) => Number(n)) : [],
           });
           setIsLoading(false);
         })
@@ -214,17 +235,19 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         bufferTimeBefore: 0,
         bufferTimeAfter: 0,
         color: "#3B82F6",
-        isHidden: !!defaultIsHidden,
+        isHidden: false,
+        isAddOn: !!defaultIsHidden,
         assignedStaff: [],
         requiredDevices: [],
         appliesToServiceIds: [],
+        locationIds: selectedLocation?.id ? [selectedLocation.id] : [],
       });
     }
   }, [serviceId, open]);
 
   const createServiceMutation = useMutation({
     mutationFn: async (data: ServiceFormValues) => {
-      const { assignedStaff, requiredDevices, appliesToServiceIds } = data;
+      const { assignedStaff, appliesToServiceIds } = data;
       
       // Validate required fields
       if (!data.name || !data.duration || data.price === undefined || !data.categoryId) {
@@ -232,7 +255,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       }
       
       // Start with ONLY the absolutely required fields
-      const cleanServiceData = {
+      let cleanServiceData: any = {
         name: data.name.trim(),
         duration: Number(data.duration),
         price: Number(data.price),
@@ -289,11 +312,20 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
           }
         }
 
-        // If creating an add-on, save mapping to base services
-        if ((data.isHidden || defaultIsHidden) && Array.isArray(appliesToServiceIds) && appliesToServiceIds.length > 0) {
+        // If creating an add-on, save mapping to base services.
+        // Always create mapping when marked as add-on, even if empty, so it appears in Add-On list.
+        if (data.isAddOn || defaultIsHidden) {
           await apiRequest("POST", `/api/services/${service.id}/add-on-bases`, {
-            baseServiceIds: appliesToServiceIds,
+            baseServiceIds: Array.isArray(appliesToServiceIds) ? appliesToServiceIds : [],
           });
+        }
+
+        // Save locations restriction mapping (empty array clears restriction)
+        try {
+          const locIds = Array.isArray(form.getValues('locationIds')) ? form.getValues('locationIds') : [];
+          await apiRequest("POST", `/api/services/${service.id}/locations`, { locationIds: locIds });
+        } catch (e) {
+          console.warn("Failed to save locations mapping for service", e);
         }
         
         return service;
@@ -348,6 +380,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         Object.entries(serviceData).filter(([_, value]) => value !== undefined && value !== null && value !== "")
       );
 
+      // Remove frontend-only field
+      delete (filteredServiceData as any).isAddOn;
+
       // Ensure roomId is not included if it's undefined/null
       if ((filteredServiceData as any).roomId === undefined || (filteredServiceData as any).roomId === null) {
         delete (filteredServiceData as any).roomId;
@@ -365,6 +400,8 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
           (filteredServiceData as any).locationId = Number(fallbackLocId);
         }
       }
+
+      // Do not force isHidden when isAddOn is checked; these are independent controls
 
       const response = await apiRequest("PUT", `/api/services/${serviceId}`, filteredServiceData);
       const service = await response.json();
@@ -407,6 +444,31 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
       } catch (err) {
         console.warn("Failed to sync staff assignments; continuing.", err);
       }
+
+      // Sync add-on mapping based on isAddOn toggle
+      try {
+        if ((data as any)?.isAddOn) {
+          // Ensure mapping exists (even if empty) and reflects selected base services
+          await apiRequest("POST", `/api/services/${serviceId}/add-on-bases`, {
+            baseServiceIds: Array.isArray((data as any).appliesToServiceIds) ? (data as any).appliesToServiceIds : [],
+          });
+        } else {
+          // If no longer an add-on, remove mapping entirely
+          await apiRequest("DELETE", `/api/services/${serviceId}/add-on-bases`);
+        }
+      } catch (e) {
+        console.warn("Failed to update add-on mapping on edit; service update will proceed", e);
+      }
+
+      // Save locations restriction mapping (empty array clears restriction)
+      try {
+        const locIds = Array.isArray(form.getValues('locationIds')) ? form.getValues('locationIds') : [];
+        await apiRequest("POST", `/api/services/${serviceId}/locations`, { locationIds: locIds });
+      } catch (e) {
+        console.warn("Failed to save locations mapping on edit; continuing", e);
+      }
+
+      // Do not mutate isHidden optimistically based on isAddOn; keep flags independent
 
       return service;
     },
@@ -508,7 +570,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[560px] max-h-[85vh] p-3 sm:p-4 gap-2 overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{serviceId ? "Edit Service" : "Add New Service"}</DialogTitle>
           <DialogDescription>
@@ -518,404 +580,521 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
           </DialogDescription>
         </DialogHeader>
 
-        <div className="mt-4">
+        <div className="flex-1 overflow-y-auto pr-1">
           <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Service Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Haircut & Style" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the service..."
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="duration"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Duration (minutes)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="1" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Buffer Time Settings */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="bufferTimeBefore"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Buffer Time Before (minutes)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="bufferTimeAfter"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Buffer Time After (minutes)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min="0" placeholder="0" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      value={typeof field.value === 'number' ? String(field.value) : (field.value || '')}
-                      onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {!serviceCategories || serviceCategories.length === 0 ? (
-                          <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
-                            No categories available
-                          </div>
-                        ) : (
-                          serviceCategories.map((category: any) => (
-                            <SelectItem key={category.id} value={category.id.toString()}>
-                              {category.name}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Only show room field for regular services, not add-ons */}
-              {!form.watch('isHidden') && (
-                <FormField
-                  control={form.control}
-                  name="roomId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Room (Optional)</FormLabel>
-                      <Select
-                        value={field.value === null || field.value === undefined ? 'none' : String(field.value)}
-                        onValueChange={(value) => field.onChange(value === 'none' ? null : parseInt(value))}
-                      >
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-2">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="details">
+                <AccordionTrigger className="text-sm">Basic Details</AccordionTrigger>
+                <AccordionContent>
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Service Name</FormLabel>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a room" />
-                          </SelectTrigger>
+                          <Input placeholder="Haircut & Style" {...field} />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No room assigned</SelectItem>
-                          {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
-                            <SelectItem key={room.id} value={room.id.toString()}>
-                              {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-            </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-            {/* Applies To (for Add-Ons only) */}
-            {form.watch('isHidden') && (
-              <FormField
-                control={form.control}
-                name="appliesToServiceIds"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Applies To Services</FormLabel>
-                    <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                      {Array.isArray(allServices) && allServices.filter((s: any) => !s.isHidden).map((svc: any) => {
-                        const checked = (field.value || []).includes(svc.id);
-                        return (
-                          <div key={svc.id} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`applies-${svc.id}`}
-                              checked={checked}
-                              onCheckedChange={(isChecked) => {
-                                const current = field.value || [];
-                                if (isChecked) {
-                                  field.onChange([...current, svc.id]);
-                                } else {
-                                  field.onChange(current.filter((id: number) => id !== svc.id));
-                                }
-                              }}
-                            />
-                            <label htmlFor={`applies-${svc.id}`} className="text-sm cursor-pointer">
-                              {svc.name}
-                            </label>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Select the main services this add-on can be added to.</div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Required Devices */}
-            <FormField
-              control={form.control}
-              name="requiredDevices"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Required Devices</FormLabel>
-                  <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg">
-                    {!devices || devices.length === 0 ? (
-                      <div className="col-span-2 text-sm text-gray-500 dark:text-gray-400 text-center py-4">
-                        No devices available
-                      </div>
-                    ) : (
-                      devices.filter((device: any) => device.isActive).map((device: any) => (
-                        <div key={device.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`device-${device.id}`}
-                            checked={field.value?.includes(device.id) || false}
-                            onCheckedChange={(checked) => {
-                              const currentIds = field.value || [];
-                              if (checked) {
-                                field.onChange([...currentIds, device.id]);
-                              } else {
-                                field.onChange(currentIds.filter((id: number) => id !== device.id));
-                              }
-                            }}
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the service..."
+                            {...field}
+                            value={field.value || ""}
+                            className="min-h-24"
                           />
-                          <Label 
-                            htmlFor={`device-${device.id}`}
-                            className="text-sm font-normal cursor-pointer"
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="duration"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Duration (minutes)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="1" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Price ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" step="0.01" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="timing">
+                <AccordionTrigger className="text-sm">Timing & Buffers</AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="bufferTimeBefore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Buffer Time Before (minutes)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="bufferTimeAfter"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Buffer Time After (minutes)</FormLabel>
+                          <FormControl>
+                            <Input type="number" min="0" placeholder="0" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="category-room">
+                <AccordionTrigger className="text-sm">Category & Room</AccordionTrigger>
+                <AccordionContent>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name="categoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select
+                            value={typeof field.value === 'number' ? String(field.value) : (field.value || '')}
+                            onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
                           >
-                            {device.name}
-                          </Label>
-                        </div>
-                      ))
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a category" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {!serviceCategories || serviceCategories.length === 0 ? (
+                                <div className="relative px-2 py-1.5 text-sm text-muted-foreground">
+                                  No categories available
+                                </div>
+                              ) : (
+                                serviceCategories.map((category: any) => (
+                                  <SelectItem key={category.id} value={category.id.toString()}>
+                                    {category.name}
+                                  </SelectItem>
+                                ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Only show room field for regular services, not add-ons */}
+                    {!form.watch('isAddOn') && (
+                      <FormField
+                        control={form.control}
+                        name="roomId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Room (Optional)</FormLabel>
+                            <Select
+                              value={field.value === null || field.value === undefined ? 'none' : String(field.value)}
+                              onValueChange={(value) => field.onChange(value === 'none' ? null : parseInt(value))}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select a room" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No room assigned</SelectItem>
+                                {rooms?.filter((room: any) => room.isActive)?.map((room: any) => (
+                                  <SelectItem key={room.id} value={room.id.toString()}>
+                                    {room.name} {room.capacity > 1 ? `(${room.capacity} capacity)` : ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     )}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Select devices that are required for this service
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
-            {/* Service Color */}
-            <FormField
-              control={form.control}
-              name="color"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Service Color</FormLabel>
-                  <div className="flex items-center gap-3">
-                    <FormControl>
-                      <Input 
-                        type="color" 
-                        {...field} 
-                        className="w-16 h-10 p-1 border rounded cursor-pointer"
-                      />
-                    </FormControl>
-                    <FormControl>
-                      <Input 
-                        type="text" 
-                        placeholder="#3B82F6" 
-                        {...field}
-                        className="flex-1 font-mono uppercase"
-                      />
-                    </FormControl>
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Staff Assignment */}
-            <FormField
-              control={form.control}
-              name="assignedStaff"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Assign Staff Members</FormLabel>
-                  {staffMembers && staffMembers.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto border rounded-md p-3">
-                      {staffMembers.map((staff: any) => {
-                        const isAssigned = field.value?.some((assignment: any) => assignment.staffId === staff.id) || false;
-                        const currentAssignment = field.value?.find((assignment: any) => assignment.staffId === staff.id);
-                        
-                        return (
-                          <div key={staff.id} className="border rounded-lg p-3 space-y-3">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`staff-${staff.id}`}
-                                checked={isAssigned}
-                                onCheckedChange={(checked) => {
-                                  const currentValue = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...currentValue, { 
-                                      staffId: staff.id,
-                                      customRate: undefined,
-                                      customCommissionRate: undefined
-                                    }]);
-                                  } else {
-                                    field.onChange(currentValue.filter((assignment: any) => assignment.staffId !== staff.id));
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor={`staff-${staff.id}`}
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                              >
-                                {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
-                              </label>
-                            </div>
-                            
-                            {isAssigned && (
-                              <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs text-gray-600 mb-1 block">
-                                    Custom Rate (${staff.hourlyRate || staff.fixedRate || 0}/hr default)
-                                  </label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder={`Default: $${staff.hourlyRate || staff.fixedRate || 0}`}
-                                    value={currentAssignment?.customRate || ""}
-                                    onChange={(e) => {
-                                      const newValue = field.value?.map((assignment: any) => 
-                                        assignment.staffId === staff.id 
-                                          ? { ...assignment, customRate: e.target.value ? parseFloat(e.target.value) : undefined }
-                                          : assignment
-                                      );
-                                      field.onChange(newValue);
+            {/* Applies To (for Add-Ons only) */}
+            {form.watch('isAddOn') && (
+              <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="addon">
+                  <AccordionTrigger className="text-sm">Add-On Settings</AccordionTrigger>
+                  <AccordionContent>
+                    <FormField
+                      control={form.control}
+                      name="appliesToServiceIds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Applies To Services</FormLabel>
+                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                            {Array.isArray(allServices) && allServices.filter((s: any) => !s.isAddOn).map((svc: any) => {
+                              const checked = (field.value || []).includes(svc.id);
+                              return (
+                                <div key={svc.id} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`applies-${svc.id}`}
+                                    checked={checked}
+                                    onCheckedChange={(isChecked) => {
+                                      const current = field.value || [];
+                                      if (isChecked) {
+                                        field.onChange([...current, svc.id]);
+                                      } else {
+                                        field.onChange(current.filter((id: number) => id !== svc.id));
+                                      }
                                     }}
                                   />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600 mb-1 block">
-                                    Custom Commission ({staff.commissionRate || 0}% default)
+                                  <label htmlFor={`applies-${svc.id}`} className="text-sm cursor-pointer">
+                                    {svc.name}
                                   </label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder={`Default: ${staff.commissionRate || 0}%`}
-                                    value={currentAssignment?.customCommissionRate || ""}
-                                    onChange={(e) => {
-                                      const newValue = field.value?.map((assignment: any) => 
-                                        assignment.staffId === staff.id 
-                                          ? { ...assignment, customCommissionRate: e.target.value ? parseFloat(e.target.value) : undefined }
-                                          : assignment
-                                      );
-                                      field.onChange(newValue);
-                                    }}
-                                  />
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground p-4 border rounded-md bg-muted/50">
-                      No staff members available. Please create staff members first to assign them to services.
-                    </div>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Hide from online booking */}
-            <FormField
-              control={form.control}
-              name="isHidden"
-              render={({ field }) => (
-                <FormItem>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="is-hidden"
-                      checked={!!field.value}
-                      onCheckedChange={(checked) => field.onChange(!!checked)}
+                          <div className="text-xs text-gray-500 dark:text-gray-400">Select the main services this add-on can be added to.</div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
                     />
-                    <Label htmlFor="is-hidden" className="cursor-pointer">
-                      Hide from online booking
-                    </Label>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    When enabled, clients will not see this service in the booking page. Staff can still book it.
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            )}
 
-            <DialogFooter>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="devices-color">
+                <AccordionTrigger className="text-sm">Devices & Color</AccordionTrigger>
+                <AccordionContent>
+                  {/* Required Devices */}
+                  <FormField
+                    control={form.control}
+                    name="requiredDevices"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Required Devices</FormLabel>
+                        <div className="grid grid-cols-2 gap-2 p-3 border rounded-lg">
+                          {!devices || devices.length === 0 ? (
+                            <div className="col-span-2 text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                              No devices available
+                            </div>
+                          ) : (
+                            devices.filter((device: any) => device.isActive).map((device: any) => (
+                              <div key={device.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`device-${device.id}`}
+                                  checked={field.value?.includes(device.id) || false}
+                                  onCheckedChange={(checked) => {
+                                    const currentIds = field.value || [];
+                                    if (checked) {
+                                      field.onChange([...currentIds, device.id]);
+                                    } else {
+                                      field.onChange(currentIds.filter((id: number) => id !== device.id));
+                                    }
+                                  }}
+                                />
+                                <Label 
+                                  htmlFor={`device-${device.id}`}
+                                  className="text-sm font-normal cursor-pointer"
+                                >
+                                  {device.name}
+                                </Label>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Select devices that are required for this service
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Service Color */}
+                  <FormField
+                    control={form.control}
+                    name="color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Service Color</FormLabel>
+                        <div className="flex items-center gap-3">
+                          <FormControl>
+                            <Input 
+                              type="color" 
+                              {...field} 
+                              className="w-16 h-10 p-1 border rounded cursor-pointer"
+                            />
+                          </FormControl>
+                          <FormControl>
+                            <Input 
+                              type="text" 
+                              placeholder="#3B82F6" 
+                              {...field}
+                              className="flex-1 font-mono uppercase"
+                            />
+                          </FormControl>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="staff-assignment">
+                <AccordionTrigger className="text-sm">Staff Assignment</AccordionTrigger>
+                <AccordionContent>
+                  {/* Staff Assignment */}
+                  <FormField
+                    control={form.control}
+                    name="assignedStaff"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assign Staff Members</FormLabel>
+                        {staffMembers && staffMembers.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-4 max-h-96 overflow-y-auto border rounded-md p-3">
+                            {staffMembers.map((staff: any) => {
+                              const isAssigned = field.value?.some((assignment: any) => assignment.staffId === staff.id) || false;
+                              const currentAssignment = field.value?.find((assignment: any) => assignment.staffId === staff.id);
+                              return (
+                                <div key={staff.id} className="border rounded-lg p-3 space-y-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`staff-${staff.id}`}
+                                      checked={isAssigned}
+                                      onCheckedChange={(checked) => {
+                                        const currentValue = field.value || [];
+                                        if (checked) {
+                                          field.onChange([...currentValue, { 
+                                            staffId: staff.id,
+                                            customRate: undefined,
+                                            customCommissionRate: undefined
+                                          }]);
+                                        } else {
+                                          field.onChange(currentValue.filter((assignment: any) => assignment.staffId !== staff.id));
+                                        }
+                                      }}
+                                    />
+                                    <label htmlFor={`staff-${staff.id}`} className="text-sm font-medium cursor-pointer">
+                                      {staff.user?.firstName} {staff.user?.lastName} - {staff.title}
+                                    </label>
+                                  </div>
+                                  {isAssigned && (
+                                    <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">Custom Rate (${staff.hourlyRate || staff.fixedRate || 0}/hr default)</label>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder={`Default: $${staff.hourlyRate || staff.fixedRate || 0}`}
+                                          value={currentAssignment?.customRate || ""}
+                                          onChange={(e) => {
+                                            const newValue = field.value?.map((assignment: any) => 
+                                              assignment.staffId === staff.id 
+                                                ? { ...assignment, customRate: e.target.value ? parseFloat(e.target.value) : undefined }
+                                                : assignment
+                                            );
+                                            field.onChange(newValue);
+                                          }}
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="text-xs text-gray-600 mb-1 block">Custom Commission ({staff.commissionRate || 0}% default)</label>
+                                        <Input
+                                          type="number"
+                                          step="0.01"
+                                          placeholder={`Default: ${staff.commissionRate || 0}%`}
+                                          value={currentAssignment?.customCommissionRate || ""}
+                                          onChange={(e) => {
+                                            const newValue = field.value?.map((assignment: any) => 
+                                              assignment.staffId === staff.id 
+                                                ? { ...assignment, customCommissionRate: e.target.value ? parseFloat(e.target.value) : undefined }
+                                                : assignment
+                                            );
+                                            field.onChange(newValue);
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground p-4 border rounded-md bg-muted/50">
+                            No staff members available. Please create staff members first to assign them to services.
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="visibility">
+                <AccordionTrigger className="text-sm">Visibility & Add-On</AccordionTrigger>
+                <AccordionContent>
+                  {/* Add-On toggle (frontend only) */}
+                  <FormField
+                    control={form.control}
+                    name="isAddOn"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="is-addon"
+                            checked={!!field.value}
+                            onCheckedChange={(checked) => {
+                              const isChecked = !!checked;
+                              field.onChange(isChecked);
+                              // Do not auto-toggle isHidden here; let user control visibility separately
+                            }}
+                          />
+                          <Label htmlFor="is-addon" className="cursor-pointer">
+                            Mark as Add-On
+                          </Label>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Add-ons appear under Add-On Services and can be attached to selected base services. They are typically not booked alone.
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {/* Hide from online booking (controls visibility on client booking site) */}
+                  <FormField
+                    control={form.control}
+                    name="isHidden"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="is-hidden"
+                            checked={!!field.value}
+                            onCheckedChange={(checked) => field.onChange(!!checked)}
+                          />
+                          <Label htmlFor="is-hidden" className="cursor-pointer">
+                            Hide from online booking
+                          </Label>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          When enabled, this service is hidden from clients at the online booking page (`https://gloheadspa.app/booking`). Staff can still book it internally.
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="locations">
+                <AccordionTrigger className="text-sm">Locations</AccordionTrigger>
+                <AccordionContent>
+                  {/* Locations offering this service */}
+                  <FormField
+                    control={form.control}
+                    name="locationIds"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Locations offering this service</FormLabel>
+                        <FormControl>
+                          <ScrollArea className="h-32 w-full border rounded-md p-3">
+                            <div className="space-y-2">
+                              {Array.isArray(allLocations) && allLocations.length > 0 ? (
+                                allLocations.map((loc: any) => (
+                                  <div key={loc.id} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`loc-${loc.id}`}
+                                      checked={field.value?.includes(loc.id) || false}
+                                      onCheckedChange={(checked) => {
+                                        const current = field.value || [];
+                                        if (checked) {
+                                          field.onChange(Array.from(new Set([...current, loc.id])));
+                                        } else {
+                                          field.onChange(current.filter((id: number) => id !== loc.id));
+                                        }
+                                      }}
+                                    />
+                                    <label htmlFor={`loc-${loc.id}`} className="text-sm font-medium cursor-pointer">
+                                      {loc.name}
+                                    </label>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="text-sm text-gray-500">No locations found.</p>
+                              )}
+                            </div>
+                          </ScrollArea>
+                        </FormControl>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Leave empty to allow at all locations. Select one or more to restrict.</div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            <DialogFooter className="shrink-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

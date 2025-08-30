@@ -135,6 +135,14 @@ export interface IStorage {
   removeBaseServiceFromAddOn(addOnServiceId: number, baseServiceId: number): Promise<void>;
   getBaseServiceObjectsForAddOn(addOnServiceId: number): Promise<Service[]>;
 
+  // Service-Location mapping operations
+  getServiceLocationMapping(): Promise<Record<string, number[]>>;
+  setServiceLocationMapping(map: Record<string, number[]>): Promise<void>;
+  getLocationsForService(serviceId: number): Promise<number[]>;
+  setLocationsForService(serviceId: number, locationIds: number[]): Promise<void>;
+  addLocationToService(serviceId: number, locationId: number): Promise<void>;
+  removeLocationFromService(serviceId: number, locationId: number): Promise<void>;
+
   // Appointment add-ons mapping operations
   getAppointmentAddOnMapping(): Promise<Record<string, number[]>>;
   setAppointmentAddOnMapping(map: Record<string, number[]>): Promise<void>;
@@ -576,6 +584,12 @@ export class DatabaseStorage implements IStorage {
             await db.execute(sql`INSERT INTO system_config (key, value, description, category) VALUES ('service_add_on_mapping', '{}', 'JSON mapping of add-on serviceId -> [baseServiceIds]', 'services')`);
             console.log('Initialized service_add_on_mapping in system_config');
           }
+          const existingLoc: any = await db.execute(sql`SELECT 1 FROM system_config WHERE key = 'service_location_mapping' LIMIT 1`);
+          const rowsLoc = (existingLoc?.rows ?? existingLoc) as any[];
+          if (!rowsLoc || rowsLoc.length === 0) {
+            await db.execute(sql`INSERT INTO system_config (key, value, description, category) VALUES ('service_location_mapping', '{}', 'JSON mapping of serviceId -> [locationIds] where presence indicates restriction', 'services')`);
+            console.log('Initialized service_location_mapping in system_config');
+          }
         } catch {}
       } catch (migrationError) {
         // Column might already exist, which is fine
@@ -934,6 +948,28 @@ Glo Head Spa`,
             timing: 'immediate'
           });
           
+          // Create location-specific after-payment thank-you SMS (2 hours after)
+          const thankYouTemplate = `Hi there {client_first_name}! We want to thank you for visiting us today! If you were unsatisfied with your appointment in any way please call us so we can help! If you loved your service, would you please leave us a review if you have the time? {review_link}. {business_phone_number}`;
+
+          const ensureRule = async (name: string) => {
+            const existing = (existingRules as any[]).find((r: any) => String(r.name).toLowerCase() === String(name).toLowerCase());
+            if (!existing) {
+              await this.createAutomationRule({
+                name,
+                type: 'sms' as any,
+                trigger: 'after_payment' as any,
+                timing: '2_hours_after',
+                template: thankYouTemplate,
+                active: true,
+              } as any);
+            }
+          };
+
+          await ensureRule('Thank You SMS [location:Flutter]');
+          await ensureRule('Thank You SMS [location:The Extensionist]');
+          await ensureRule('Thank You SMS [location:GloUp]');
+          await ensureRule('Thank You SMS [location:Glo Head Spa]');
+
           console.log('Default automation rules created successfully');
         }
       } catch (error) {
@@ -1848,6 +1884,50 @@ Glo Head Spa`,
     const all = await this.getAllServices();
     const idSet = new Set(ids.map(Number));
     return all.filter((s) => idSet.has(Number(s.id)));
+  }
+
+  // -----------------------------
+  // Service-Location mapping operations
+  // Stored as JSON in system_config under key 'service_location_mapping'
+  // Shape: { [serviceId: string]: number[] } meaning: if present, only those locations offer the service.
+  async getServiceLocationMapping(): Promise<Record<string, number[]>> {
+    try {
+      const cfg = await this.getSystemConfig('service_location_mapping');
+      const raw = cfg?.value || '{}';
+      try { return JSON.parse(raw) as Record<string, number[]>; } catch { return {}; }
+    } catch {
+      return {};
+    }
+  }
+
+  async setServiceLocationMapping(map: Record<string, number[]>): Promise<void> {
+    const value = JSON.stringify(map);
+    await this.updateSystemConfig('service_location_mapping', value, 'JSON mapping of serviceId -> [locationIds]');
+  }
+
+  async getLocationsForService(serviceId: number): Promise<number[]> {
+    const map = await this.getServiceLocationMapping();
+    return map[String(serviceId)] || [];
+  }
+
+  async setLocationsForService(serviceId: number, locationIds: number[]): Promise<void> {
+    const map = await this.getServiceLocationMapping();
+    map[String(serviceId)] = Array.from(new Set(locationIds.map((n) => Number(n))));
+    await this.setServiceLocationMapping(map);
+  }
+
+  async addLocationToService(serviceId: number, locationId: number): Promise<void> {
+    const current = await this.getLocationsForService(serviceId);
+    if (!current.includes(Number(locationId))) {
+      current.push(Number(locationId));
+      await this.setLocationsForService(serviceId, current);
+    }
+  }
+
+  async removeLocationFromService(serviceId: number, locationId: number): Promise<void> {
+    const current = await this.getLocationsForService(serviceId);
+    const next = current.filter((id) => Number(id) !== Number(locationId));
+    await this.setLocationsForService(serviceId, next);
   }
 
   // -----------------------------

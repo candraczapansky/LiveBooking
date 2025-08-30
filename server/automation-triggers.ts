@@ -1,5 +1,6 @@
 import { sendEmail } from './email.js';
 import { sendSMS } from './sms.js';
+import { sendLocationMessage, upsertLocationTemplate } from './location-messenger.js';
 import type { IStorage } from './storage.js';
 import type { AutomationRule } from '../shared/schema.js';
 import { db } from './db.js';
@@ -77,7 +78,8 @@ function shouldSendSMS(rule: AutomationRule, client: any): boolean {
     case 'appointment_reminder':
       return client.smsAppointmentReminders === true;
     case 'cancellation':
-      return client.smsAccountManagement === true;
+      // Allow cancellation notices if either account management or appointment reminder SMS is enabled
+      return client.smsAccountManagement === true || client.smsAppointmentReminders === true;
     case 'follow_up':
       return client.smsPromotions === true;
     default:
@@ -179,8 +181,9 @@ export async function triggerAutomations(
 
   // Test mode: allow direct email testing without requiring an appointment/client
   const testEmail: string | undefined = (appointmentData as any)?.testEmail;
+  const testPhone: string | undefined = (appointmentData as any)?.testPhone;
   const testRuleId: number | undefined = (appointmentData as any)?.__testRuleId;
-  if (testEmail) {
+  if (testEmail || testPhone) {
     try {
       // Prepare minimal variables for testing
       const now = new Date();
@@ -212,7 +215,7 @@ export async function triggerAutomations(
         client_name: 'Test Recipient',
         client_first_name: 'Test',
         client_last_name: 'Recipient',
-        client_email: testEmail,
+        client_email: testEmail || '',
         client_phone: '',
         service_name: 'Service',
         service_duration: '60',
@@ -231,8 +234,8 @@ export async function triggerAutomations(
       // In test mode, optionally filter to a single rule if ruleId provided
       const rulesToRun = typeof testRuleId === 'number' ? relevantRules.filter(r => r.id === testRuleId) : relevantRules;
       for (const rule of rulesToRun) {
-        try {
-          if (rule.type !== 'email') continue; // Only send emails in test mode
+        if (rule.type === 'email' && testEmail) {
+          try {
           // Determine branding for this rule: prefer request locationId; else rule tag
           let ruleSalonName = salonName;
           let ruleSalonPhone = salonPhone;
@@ -290,8 +293,20 @@ export async function triggerAutomations(
           const newSentCount = (rule.sentCount || 0) + 1;
           await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
           console.log(`Test email sent for rule: ${rule.name} -> ${testEmail}`);
-        } catch (e) {
-          console.log(`Test email failed for rule: ${rule.name}`, e);
+          } catch (e) {
+            console.log(`Test email failed for rule: ${rule.name}`, e);
+          }
+        } else if (rule.type === 'sms' && testPhone) {
+          try {
+            const brandedSMS = applySalonBranding(replaceTemplateVariables(rule.template, variables), variables.salon_name);
+            const smsResult = await sendSMS(testPhone as string, brandedSMS);
+            if (smsResult.success) {
+              const newSentCount = (rule.sentCount || 0) + 1;
+              await storage.updateAutomationRuleSentCount(rule.id, newSentCount);
+            }
+          } catch (e) {
+            console.log(`Test SMS failed for rule: ${rule.name}`, e);
+          }
         }
       }
       return; // Do not proceed to real appointment flow in test mode
@@ -348,6 +363,7 @@ export async function triggerAutomations(
   let salonName = 'Glo Head Spa';
   let salonPhone = '(555) 123-4567';
   let salonAddress = '123 Beauty Street, City, State 12345';
+  let reviewLink: string | undefined;
   try {
     const locId = (appointmentData as any)?.locationId;
     if (locId != null) {
@@ -414,7 +430,29 @@ export async function triggerAutomations(
         }
       } catch {}
 
-      const processedTemplate = replaceTemplateVariables(rule.template, variablesForRule);
+      // Location-specific review links and business phones
+      const lowerSalon = String(variablesForRule.salon_name || '').toLowerCase();
+      const businessPhone = (
+        lowerSalon.includes('flutter') ? '918-940-2888' :
+        lowerSalon.includes('extensionist') ? '918-949-6299' :
+        lowerSalon.includes('gloup') ? '918-932-5396' :
+        lowerSalon.includes('glo head spa') ? '918-932-5396' :
+        variablesForRule.salon_phone
+      );
+      const reviewUrl = (
+        lowerSalon.includes('flutter') ? 'https://g.page/r/CVsPQrGuF_l1EAE/review' :
+        lowerSalon.includes('extensionist') ? 'https://g.page/r/Cb63DI0Siy4gEAE/review' :
+        lowerSalon.includes('gloup') ? 'https://g.page/r/CZgpVISFNvHDEAE/review' :
+        lowerSalon.includes('glo head spa') ? 'https://g.page/r/CY3ndFc_3Sm6EAE/review' :
+        undefined
+      );
+      const variablesAugmented = {
+        ...variablesForRule,
+        business_phone_number: businessPhone,
+        review_link: reviewUrl || ''
+      } as Record<string, string>;
+
+      const processedTemplate = replaceTemplateVariables(rule.template, variablesAugmented);
       const brandedTemplate = applySalonBranding(processedTemplate, variablesForRule.salon_name || variables.salon_name);
       
       // Check client preferences before sending
@@ -431,14 +469,42 @@ export async function triggerAutomations(
         const subjectRaw = rule.subject ? replaceTemplateVariables(rule.subject, variablesForRule) : 'Notification from BeautyBook Salon';
         const subject = applySalonBranding(subjectRaw, variablesForRule.salon_name || variables.salon_name);
         
-        const emailSent = await sendEmail({
-          to: toEmail,
-          from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
-          fromName: variablesForRule.salon_name || variables.salon_name,
-          subject,
-          text: brandedTemplate,
-          html: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>`
-        });
+        // Use location-aware sending for cancellation to include the location name automatically
+        let emailSent = false;
+        if (trigger === 'cancellation' || trigger === 'follow_up' || trigger === 'after_payment') {
+          try {
+            const locId = (appointmentData as any)?.locationId;
+            if (locId != null && variablesForRule.salon_name) {
+              try { upsertLocationTemplate(String(locId), { name: String(variablesForRule.salon_name) }); } catch {}
+            }
+            const res = await sendLocationMessage({
+              messageType: trigger === 'cancellation' ? 'cancellation' : (trigger === 'follow_up' ? 'follow_up' : 'after_payment'),
+              locationId: String((appointmentData as any)?.locationId ?? 'global'),
+              channel: 'email',
+              to: { email: toEmail, name: variablesForRule.client_name },
+              overrides: { subject, body: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>` }
+            });
+            emailSent = !!res.success;
+          } catch {
+            emailSent = await sendEmail({
+              to: toEmail,
+              from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+              fromName: variablesForRule.salon_name || variables.salon_name,
+              subject,
+              text: brandedTemplate,
+              html: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>`
+            });
+          }
+        } else {
+          emailSent = await sendEmail({
+            to: toEmail,
+            from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+            fromName: variablesForRule.salon_name || variables.salon_name,
+            subject,
+            text: brandedTemplate,
+            html: `<p>${brandedTemplate.replace(/\n/g, '<br>')}</p>`
+          });
+        }
 
         if (emailSent) {
           const newSentCount = (rule.sentCount || 0) + 1;
@@ -453,7 +519,28 @@ export async function triggerAutomations(
         });
         
         const brandedSMS = applySalonBranding(processedTemplate, variablesForRule.salon_name || variables.salon_name);
-        const smsResult = await sendSMS(client.phone, brandedSMS);
+        // Use location-aware sending for cancellation to include the location name automatically
+        let smsResult: any;
+        if (trigger === 'cancellation' || trigger === 'follow_up' || trigger === 'after_payment') {
+          try {
+            const locId = (appointmentData as any)?.locationId;
+            if (locId != null && variablesForRule.salon_name) {
+              try { upsertLocationTemplate(String(locId), { name: String(variablesForRule.salon_name) }); } catch {}
+            }
+            const r = await sendLocationMessage({
+              messageType: trigger === 'cancellation' ? 'cancellation' : (trigger === 'follow_up' ? 'follow_up' : 'after_payment'),
+              locationId: String((appointmentData as any)?.locationId ?? 'global'),
+              channel: 'sms',
+              to: { phone: client.phone, name: variablesForRule.client_name },
+              overrides: { body: brandedSMS }
+            });
+            smsResult = { success: r.success, error: r.error };
+          } catch (e: any) {
+            smsResult = await sendSMS(client.phone, brandedSMS);
+          }
+        } else {
+          smsResult = await sendSMS(client.phone, brandedSMS);
+        }
         
         console.log(`SMS sending result for ${rule.name}:`, smsResult);
         

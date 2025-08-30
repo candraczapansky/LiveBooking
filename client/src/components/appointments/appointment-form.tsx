@@ -35,13 +35,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { Clock, CreditCard, DollarSign, Loader2, User } from "lucide-react";
+import { Clock, CreditCard, DollarSign, Loader2, User, ChevronsUpDown, Check } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import CheckoutWithTerminal from "@/components/payment/checkout-with-terminal";
 import { Input } from "@/components/ui/input";
 import { NoteInput } from "@/components/ui/note-input";
 import { formatPrice } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 // Define the form schema
 const appointmentFormSchema = z.object({
@@ -75,8 +77,8 @@ const generateTimeSlots = () => {
     const hourFormatted = hour % 12 === 0 ? 12 : hour % 12;
     const period = hour < 12 ? "AM" : "PM";
     
-    // Add slots every 30 minutes
-    for (let minute of [0, 30]) {
+    // Add slots every 15 minutes
+    for (let minute of [0, 15, 30, 45]) {
       const minuteFormatted = minute === 0 ? "00" : minute.toString();
       const label = `${hourFormatted}:${minuteFormatted} ${period}`;
       const value = `${hour.toString().padStart(2, '0')}:${minuteFormatted}`;
@@ -157,6 +159,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const queryClient = useQueryClient();
   const { selectedLocation } = useLocation();
   const [debouncedClientSearch, setDebouncedClientSearch] = useState("");
+  const [serviceComboboxOpen, setServiceComboboxOpen] = useState(false);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -207,7 +210,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       const all = await (await apiRequest('GET', '/api/services')).json();
       const results: any[] = [];
       for (const svc of all) {
-        if (!svc?.isHidden) continue;
+        if (!svc?.isAddOn) continue;
         try {
           const mapping = await (await apiRequest('GET', `/api/services/${svc.id}/add-on-bases`)).json();
           const baseIds: number[] = (mapping?.baseServiceIds || []).map((n: any) => Number(n));
@@ -247,12 +250,34 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const { data: clients, refetch: refetchClients } = useQuery({
     queryKey: ['/api/users?role=client', debouncedClientSearch],
     queryFn: async () => {
-      const searchParam = debouncedClientSearch ? `&search=${encodeURIComponent(debouncedClientSearch)}` : '';
+      const searchTerm = debouncedClientSearch.trim();
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+
       const response = await apiRequest("GET", `/api/users?role=client${searchParam}`);
       const data = await response.json();
+
+      // If nothing found but we have a search term, fall back to a broader search without role filter
+      if ((Array.isArray(data) && data.length === 0) && searchTerm) {
+        try {
+          const fallbackRes = await apiRequest("GET", `/api/users?search=${encodeURIComponent(searchTerm)}`);
+          const fallbackData = await fallbackRes.json();
+          // De-duplicate by id, prefer primary results (even though empty) then append fallback
+          const seen = new Set((data || []).map((u: any) => u.id));
+          const merged = [...(data || []), ...(Array.isArray(fallbackData) ? fallbackData.filter((u: any) => !seen.has(u.id)) : [])];
+          console.log('📋 Fetched clients with fallback:', {
+            count: merged?.length,
+            searchTerm,
+            sample: merged?.slice(0, 3)
+          });
+          return merged;
+        } catch (e) {
+          console.log('Fallback search failed; returning primary data.', e);
+        }
+      }
+
       console.log('📋 Fetched clients:', {
         count: data?.length,
-        searchTerm: debouncedClientSearch,
+        searchTerm,
         firstClient: data?.[0],
         sampleClients: data?.slice(0, 3)
       });
@@ -848,6 +873,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                           field.onChange(value);
                           // Clear service selection when staff changes
                           form.setValue("serviceId", "");
+                          // Close combobox and clear selected service when staff changes
+                          setServiceComboboxOpen(false);
                         }} 
                         value={field.value}
                       >
@@ -879,36 +906,68 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   <FormItem>
                     <FormLabel>Service</FormLabel>
                     <FormControl>
-                      <Select 
-                        disabled={isLoading || isLoadingServices || !selectedStaffId} 
-                        onValueChange={field.onChange} 
-                        value={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue 
-                            placeholder={
-                              !selectedStaffId 
-                                ? "Select a staff member first" 
-                                : services?.length === 0 
-                                  ? "No services assigned to this staff member"
-                                  : "Select a service"
-                            } 
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {services?.filter((service: any, index: number, self: any[]) => 
-                            // Remove duplicates based on service ID
-                            index === self.findIndex((s: any) => s.id === service.id)
-                          ).map((service: any, index: number) => {
-                            console.log('Rendering service in dropdown:', service, 'index:', index);
-                            return (
-                              <SelectItem key={`${service.id}-${index}`} value={service.id.toString()}>
-                                {service.name} - {formatPrice(service.price)}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
+                      <Popover open={serviceComboboxOpen} onOpenChange={setServiceComboboxOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={serviceComboboxOpen}
+                            className="w-full justify-between"
+                            disabled={isLoading || !selectedStaffId}
+                          >
+                            {(() => {
+                              const svc = (services || []).find((s: any) => s.id.toString() === field.value);
+                              return svc ? `${svc.name} - ${formatPrice(svc.price)}` : (!selectedStaffId ? 'Select a staff member first' : (services?.length === 0 ? 'No services assigned to this staff member' : 'Select a service'));
+                            })()}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[--radix-popover-trigger-width] p-0 max-h-[70vh] overflow-hidden"
+                          style={{ zIndex: 1000 }}
+                          onWheel={(e) => e.stopPropagation()}
+                          onWheelCapture={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                        >
+                          <Command>
+                            <CommandInput placeholder="Search services..." />
+                            <CommandEmpty>{isLoadingServices ? 'Loading services...' : 'No matching services.'}</CommandEmpty>
+                            <CommandList
+                              className="max-h-[60vh] overflow-y-auto overscroll-contain"
+                              onWheel={(e) => e.stopPropagation()}
+                              onWheelCapture={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
+                            >
+                              <CommandGroup>
+                                {(() => {
+                                  const uniqueServices = (services || []).filter((service: any, index: number, self: any[]) =>
+                                    index === self.findIndex((s: any) => s.id === service.id)
+                                  );
+                                  if (uniqueServices.length === 0 && !isLoadingServices) {
+                                    return (
+                                      <div className="px-3 py-2 text-sm text-muted-foreground">No services assigned to this staff member</div>
+                                    );
+                                  }
+                                  return uniqueServices.map((svc: any, index: number) => (
+                                    <CommandItem
+                                      key={`${svc.id}-${index}`}
+                                      value={`${svc.name} ${formatPrice(svc.price)}`}
+                                      onSelect={() => {
+                                        field.onChange(svc.id.toString());
+                                        setServiceComboboxOpen(false);
+                                      }}
+                                    >
+                                      <Check className={`mr-2 h-4 w-4 ${field.value === svc.id.toString() ? 'opacity-100' : 'opacity-0'}`} />
+                                      <span>{svc.name} - {formatPrice(svc.price)}</span>
+                                    </CommandItem>
+                                  ));
+                                })()}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
                     </FormControl>
                     {!selectedStaffId && (
                       <FormDescription className="text-muted-foreground">

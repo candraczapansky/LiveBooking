@@ -20,6 +20,17 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
 
     LoggerService.debug("Fetching services", { ...context, filters: { category, categoryId, active, staffId, locationId } });
 
+    // Derive add-on services from mapping. We expose this as a separate `isAddOn` flag
+    // and do NOT conflate it with `isHidden` (which strictly controls online visibility).
+    const addOnIdSet = new Set<number>();
+    try {
+      const addOnMap = await storage.getAddOnMapping();
+      for (const key of Object.keys(addOnMap || {})) {
+        const id = parseInt(key, 10);
+        if (!Number.isNaN(id)) addOnIdSet.add(id);
+      }
+    } catch {}
+
     let services;
     // Support both 'category' and 'categoryId' parameters for backwards compatibility
     const filterCategoryId = categoryId || category;
@@ -29,6 +40,8 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       const categoryInfo = await storage.getServiceCategory(parseInt(filterCategoryId as string));
       services = categoryServices.map(service => ({
         ...service,
+        isHidden: !!(service as any)?.isHidden,
+        isAddOn: addOnIdSet.has((service as any)?.id),
         category: categoryInfo ? {
           id: categoryInfo.id,
           name: categoryInfo.name,
@@ -36,7 +49,11 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
         } : null
       }));
     } else if (active !== undefined) {
-      services = await storage.getServicesByStatus(active === 'true');
+      services = (await storage.getServicesByStatus(active === 'true')).map((service: any) => ({
+        ...service,
+        isHidden: !!service?.isHidden,
+        isAddOn: addOnIdSet.has(service?.id)
+      }));
     } else if (staffId) {
       const staffServices = await storage.getStaffServices(parseInt(staffId as string));
       // Get detailed service information for staff
@@ -48,7 +65,9 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
             staffId: staffService.staffId,
             customRate: staffService.customRate,
             customCommissionRate: staffService.customCommissionRate,
-            ...service
+            ...service,
+            isHidden: !!(service as any)?.isHidden,
+            isAddOn: addOnIdSet.has((service as any)?.id)
           };
         })
       );
@@ -67,12 +86,25 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       const base = filterCategoryId
         ? await storage.getServicesByCategory(parseInt(filterCategoryId as string))
         : await storage.getAllServices();
-      const filtered = base.filter((svc: any) => serviceIdsAtLocation.has(svc.id));
+      // First, only services that at least one staff at this location can perform
+      let filtered = base.filter((svc: any) => serviceIdsAtLocation.has(svc.id));
+      // Then, apply explicit service->locations restriction mapping (if configured)
+      try {
+        const locationMap = await storage.getServiceLocationMapping();
+        filtered = filtered.filter((svc: any) => {
+          const key = String(svc.id);
+          if (!Object.prototype.hasOwnProperty.call(locationMap, key)) return true; // unrestricted
+          const allowed = locationMap[key] || [];
+          return allowed.map(Number).includes(locId);
+        });
+      } catch {}
       services = await Promise.all(
         filtered.map(async (service: any) => {
           const category = await storage.getServiceCategory(service.categoryId);
           return {
             ...service,
+            isHidden: !!service?.isHidden,
+            isAddOn: addOnIdSet.has(service?.id),
             category: category ? {
               id: category.id,
               name: category.name,
@@ -89,6 +121,8 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
           const category = await storage.getServiceCategory(service.categoryId);
           return {
             ...service,
+            isHidden: !!(service as any)?.isHidden,
+            isAddOn: addOnIdSet.has((service as any)?.id),
             category: category ? {
               id: category.id,
               name: category.name,
@@ -115,7 +149,71 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Service");
     }
 
-    res.json(service);
+    // Also include derived isAddOn flag for editor UIs (presence of mapping entry)
+    let isAddOn = false;
+    try {
+      const map = await storage.getAddOnMapping();
+      isAddOn = Object.prototype.hasOwnProperty.call(map || {}, String(serviceId));
+    } catch {}
+
+    res.json({ ...service, isAddOn });
+  }));
+
+  // -----------------------------
+  // Service-Location mapping endpoints
+  // Returns array of locationIds that explicitly offer this service. If empty or missing,
+  // the service is considered offered at all locations, subject to staff availability.
+  app.get("/api/services/:id/locations", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const service = await storage.getService(id);
+    if (!service) throw new NotFoundError("Service");
+    const map = await storage.getServiceLocationMapping();
+    const hasRestriction = Object.prototype.hasOwnProperty.call(map, String(id));
+    const locs = map[String(id)] || [];
+    res.json({ serviceId: id, locationIds: locs, isRestricted: !!hasRestriction });
+  }));
+
+  // Replace locations offering this service
+  app.post("/api/services/:id/locations", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const { locationIds } = req.body || {};
+    if (!Array.isArray(locationIds)) {
+      throw new ValidationError("locationIds must be an array of IDs");
+    }
+    const service = await storage.getService(id);
+    if (!service) throw new NotFoundError("Service");
+    const parsed = locationIds.map((n: any) => parseInt(n)).filter((n: any) => !Number.isNaN(n));
+    if (parsed.length === 0) {
+      // Clearing restrictions (offer at all locations)
+      const map = await storage.getServiceLocationMapping();
+      if (Object.prototype.hasOwnProperty.call(map, String(id))) {
+        delete map[String(id)];
+        await storage.setServiceLocationMapping(map);
+      }
+      return res.json({ success: true, cleared: true });
+    }
+    await storage.setLocationsForService(id, parsed);
+    res.json({ success: true, cleared: false });
+  }));
+
+  // Add a single location to this service
+  app.post("/api/services/:id/locations/:locationId", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const locationId = parseInt(req.params.locationId);
+    const service = await storage.getService(id);
+    if (!service) throw new NotFoundError("Service");
+    await storage.addLocationToService(id, locationId);
+    res.json({ success: true });
+  }));
+
+  // Remove a single location from this service
+  app.delete("/api/services/:id/locations/:locationId", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    const locationId = parseInt(req.params.locationId);
+    const service = await storage.getService(id);
+    if (!service) throw new NotFoundError("Service");
+    await storage.removeLocationFromService(id, locationId);
+    res.json({ success: true });
   }));
 
   // Create new service
@@ -240,6 +338,8 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     if (!newService) {
       throw new Error('Failed to create service after removing optional fields');
     }
+
+    // Do not auto-create add-on mapping when a service is hidden; add-ons are managed explicitly via add-on endpoints
 
     // Invalidate relevant caches
     invalidateCache('services');
@@ -658,7 +758,22 @@ export function registerServiceRoutes(app: Express, storage: IStorage) {
     if (!Array.isArray(baseServiceIds)) {
       throw new ValidationError("baseServiceIds must be an array of IDs");
     }
-    await storage.setBaseServicesForAddOn(id, baseServiceIds.map((n: any) => parseInt(n)));
+    const parsed = baseServiceIds.map((n: any) => parseInt(n)).filter((n: any) => !Number.isNaN(n));
+    // Persist mapping even if empty; presence of mapping marks it as an add-on.
+    await storage.setBaseServicesForAddOn(id, parsed);
+    res.json({ success: true });
+  }));
+
+  // Remove add-on mapping entirely (service is no longer an add-on)
+  app.delete("/api/services/:id/add-on-bases", asyncHandler(async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    try {
+      const map = await storage.getAddOnMapping();
+      if (Object.prototype.hasOwnProperty.call(map, String(id))) {
+        delete map[String(id)];
+        await storage.setAddOnMapping(map);
+      }
+    } catch {}
     res.json({ success: true });
   }));
 

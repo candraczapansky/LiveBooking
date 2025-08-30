@@ -872,7 +872,7 @@ const AppointmentDetails = ({
                       Staff
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : 'Unknown Staff'}
+                      {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : (staff?.user ? `${staff.user.firstName} ${staff.user.lastName}` : 'Unknown Staff')}
                     </p>
                   </div>
                 </div>

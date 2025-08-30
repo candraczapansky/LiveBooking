@@ -1,7 +1,7 @@
 import { useState, useEffect, Suspense, lazy } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import { useLocation } from "@/contexts/LocationContext";
@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 const AppointmentForm = lazy(() => import("@/components/appointments/appointment-form"));
 const AppointmentCheckout = lazy(() => import("@/components/appointments/appointment-checkout"));
 const AppointmentDetails = lazy(() => import("@/components/appointments/appointment-details"));
+const AddEditScheduleDialog = lazy(() => import("@/components/staff/add-edit-schedule-dialog").then(m => ({ default: m.AddEditScheduleDialog })));
 import { Plus, Calendar, Filter, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,8 @@ import BigCalendar from "@/components/calendar/BigCalendar";
 import { Calendar as MiniCalendar } from "@/components/ui/calendar";
 import { startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { toCentralWallTime } from "@/lib/utils";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 const AppointmentsPage = () => {
   useDocumentTitle("Client Appointments | Glo Head Spa");
@@ -39,6 +42,13 @@ const AppointmentsPage = () => {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
+  const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
+  const [preSelectedResourceId, setPreSelectedResourceId] = useState<number | null>(null);
+  const [isQuickBlockedOpen, setIsQuickBlockedOpen] = useState(false);
+  const [quickSchedule, setQuickSchedule] = useState<any | null>(null);
+  const [quickStartTime, setQuickStartTime] = useState<string>("");
+  const [quickEndTime, setQuickEndTime] = useState<string>("");
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -357,6 +367,115 @@ const AppointmentsPage = () => {
   }, [calendarView]);
 
   // Handlers
+  // Helper: find a schedule for the clicked slot (returns the most specific match or null)
+  const findScheduleForSlot = (slotInfo: any) => {
+    try {
+      const resourceFromSlot = slotInfo?.resourceId ? Number(slotInfo.resourceId) : null;
+      const resourceId = resourceFromSlot || preSelectedResourceId || null;
+      const clickStart: Date | null = slotInfo?.start ? new Date(slotInfo.start) : null;
+      if (!clickStart || isNaN(clickStart.getTime())) return null;
+      const baseDate = clickStart;
+      const dayName = baseDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const dateString = baseDate.toISOString().slice(0, 10);
+
+      // Determine candidate staff: prefer the clicked resource; otherwise use currently visible resources
+      const candidateStaffIds: number[] = resourceId
+        ? [resourceId]
+        : ((filteredResources || []) as any[]).map((s: any) => Number(s.id)).filter((id) => !isNaN(id));
+
+      if (!candidateStaffIds || candidateStaffIds.length === 0) return null;
+
+      // Gather schedules for candidate staff on this day and active on this date
+      const daySchedules = (schedules as any[]).filter((sch: any) => {
+        try {
+          if (!sch || !candidateStaffIds.includes(Number(sch.staffId)) || sch.dayOfWeek !== dayName) return false;
+          if (selectedLocation?.id && sch.locationId !== selectedLocation.id) return false;
+
+          const startDateString = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+          const endDateString = sch.endDate
+            ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10))
+            : null;
+          const activeOnDate = startDateString <= dateString && (!endDateString || endDateString >= dateString);
+          if (!activeOnDate) return false;
+
+          return true;
+        } catch {
+          return false;
+        }
+      });
+
+      if (daySchedules.length === 0) return null;
+
+      // First try: match a blocked schedule whose time window includes the click
+      const blockedMatch = daySchedules.find((sch: any) => {
+        try {
+          if (!sch.isBlocked || !sch.startTime || !sch.endTime) return false;
+          const [sh, sm] = String(sch.startTime).split(':').map(Number);
+          const [eh, em] = String(sch.endTime).split(':').map(Number);
+          if ([sh, sm, eh, em].some((n) => isNaN(n))) return false;
+          const scheduleStart = setMinutes(setHours(startOfDay(baseDate), sh), sm);
+          const scheduleEnd = setMinutes(setHours(startOfDay(baseDate), eh), em);
+          return clickStart >= scheduleStart && clickStart < scheduleEnd;
+        } catch {
+          return false;
+        }
+      });
+      if (blockedMatch) return blockedMatch;
+
+      // No blocked schedule match. If exactly one working schedule exists for that staff/day, allow editing it directly.
+      const workingSchedules = daySchedules.filter((sch: any) => !sch.isBlocked);
+      if (workingSchedules.length === 1) return workingSchedules[0];
+
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const response = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
+      if (!response.ok) {
+        throw new Error('Failed to delete schedule');
+      }
+    },
+    onSuccess: () => {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+      } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('schedule-updated'));
+      } catch {}
+    },
+    onError: (error) => {
+      console.error('Failed to delete schedule:', error);
+    }
+  });
+
+  const updateBlockedScheduleMutation = useMutation({
+    mutationFn: async (payload: { id: number; data: any }) => {
+      const response = await apiRequest("PUT", `/api/schedules/${payload.id}`, payload.data);
+      if (!response.ok) {
+        throw new Error('Failed to update schedule');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+      } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('schedule-updated'));
+      } catch {}
+      setIsQuickBlockedOpen(false);
+      setQuickSchedule(null);
+    },
+    onError: (error) => {
+      console.error('Failed to update schedule:', error);
+    }
+  });
   const handleAddAppointment = () => {
     setSelectedAppointmentId(null);
     setIsFormOpen(true);
@@ -364,11 +483,30 @@ const AppointmentsPage = () => {
 
   // New: handle slot selection from calendar
   const handleSelectSlot = (slotInfo: any) => {
+    try {
+      if (slotInfo?.start) {
+        setSelectedDate(slotInfo.start);
+      }
+      // If inside a blocked schedule, open quick edit pre-filled with block day/time
+      const schedule = findScheduleForSlot(slotInfo);
+      if (schedule && schedule.isBlocked) {
+        const start: Date | null = slotInfo?.start ? new Date(slotInfo.start) : null;
+        if (start && !isNaN(start.getTime())) {
+          const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
+          setQuickSchedule({ ...schedule, dayOfWeek });
+          setQuickStartTime(String(schedule.startTime || ''));
+          setQuickEndTime(String(schedule.endTime || ''));
+          setIsQuickBlockedOpen(true);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('Error handling slot selection:', e);
+    }
+
+    // Fallback: create a new appointment (existing behavior)
     setSelectedAppointmentId(null);
     setIsFormOpen(true);
-    if (slotInfo.start) {
-      setSelectedDate(slotInfo.start);
-    }
   };
 
   const handleAppointmentClick = (appointmentId: number) => {
@@ -534,6 +672,7 @@ const AppointmentsPage = () => {
                   
                   const matchesStaff = sch.staffId === s.id;
                   const matchesDay = sch.dayOfWeek === dayName;
+                  const matchesLocation = !selectedLocation?.id || sch.locationId === selectedLocation.id;
                   
                   // Fix date comparison logic
                   const todayString = date.toISOString().slice(0, 10);
@@ -563,7 +702,7 @@ const AppointmentsPage = () => {
                   const matchesStartDate = startDateString <= todayString;
                   const matchesEndDate = !endDateString || endDateString >= todayString;
                   
-                  return matchesStaff && matchesDay && matchesStartDate && matchesEndDate;
+                  return matchesStaff && matchesDay && matchesLocation && matchesStartDate && matchesEndDate;
                 } catch (error) {
                   console.warn('Error filtering schedule:', error);
                   return false;
@@ -574,7 +713,7 @@ const AppointmentsPage = () => {
               const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
               const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
               
-              // Note: appointments are rendered separately as interactive events; no need to overlay booked blocks
+              // Note: appointments are rendered separately as interactive events; we also render a visible blocked event for interaction
               
               // If no schedule at all, gray out the whole day
               if (allStaffSchedules.length === 0) {
@@ -610,15 +749,27 @@ const AppointmentsPage = () => {
                       return;
                     }
                     
+                    // Non-interactive gray background mask
+                    events.push({
+                      start: blockStart,
+                      end: blockEnd,
+                      resourceId: s.id,
+                      allDay: false,
+                      title: '',
+                      type: 'unavailable',
+                      style: { backgroundColor: '#e5e7eb', opacity: 0.35 },
+                      isBackground: true,
+                    });
+
+                    // Clickable, visible blocked event in blue to match your UI
                     events.push({
                       start: blockStart,
                       end: blockEnd,
                       resourceId: s.id,
                       allDay: false,
                       title: 'Blocked',
-                      type: 'unavailable',
-                      style: { backgroundColor: '#6b7280', opacity: 0.8 },
-                      isBackground: true,
+                      type: 'blocked',
+                      resource: sch,
                     });
                   } catch (error) {
                     console.warn('Error processing blocked schedule:', error);
@@ -697,6 +848,66 @@ const AppointmentsPage = () => {
     }
   }
 
+  // Helper: Create clickable events for blocked schedules so clicks are captured reliably
+  function getClickableBlockedEvents() {
+    try {
+      if (!schedules || !staff) return [] as any[];
+      const events: any[] = [];
+
+      const baseDate = selectedDate || new Date();
+      const days = calendarView === 'week'
+        ? Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(baseDate);
+            d.setDate(baseDate.getDate() - d.getDay() + i);
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })
+        : [new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())];
+
+      const staffToInclude = (selectedStaffFilter !== "all")
+        ? staff.filter((s: any) => s.id === parseInt(selectedStaffFilter))
+        : filteredResources;
+
+      staffToInclude.forEach((s: any) => {
+        days.forEach((date) => {
+          const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+          const todaysSchedules = (schedules as any[]).filter((sch: any) => {
+            if (!sch || sch.staffId !== s.id || sch.dayOfWeek !== dayName) return false;
+            if (selectedLocation?.id && sch.locationId !== selectedLocation.id) return false;
+            const todayString = date.toISOString().slice(0, 10);
+            const startDateString = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+            const endDateString = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : null;
+            return startDateString <= todayString && (!endDateString || endDateString >= todayString);
+          });
+
+          const blocked = todaysSchedules.filter((sch: any) => sch.isBlocked);
+          blocked.forEach((sch: any) => {
+            if (!sch.startTime || !sch.endTime) return;
+            const [sh, sm] = String(sch.startTime).split(':').map(Number);
+            const [eh, em] = String(sch.endTime).split(':').map(Number);
+            if ([sh, sm, eh, em].some((n) => isNaN(n))) return;
+            const start = setMinutes(setHours(startOfDay(date), sh), sm);
+            const end = setMinutes(setHours(startOfDay(date), eh), em);
+            events.push({
+              id: `blocked-${sch.id}-${date.toISOString().slice(0,10)}`,
+              title: 'Blocked',
+              start,
+              end,
+              resourceId: s.id,
+              type: 'blocked',
+              resource: sch,
+            });
+          });
+        });
+      });
+
+      return events;
+    } catch (e) {
+      console.warn('Error generating clickable blocked events:', e);
+      return [] as any[];
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <style>{`
@@ -772,6 +983,13 @@ const AppointmentsPage = () => {
           }
         }
         
+        /* Trim event content so it doesn't visually overlap neighboring events */
+        .rbc-event-content {
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+        }
+
         /* Reduce internal calendar scrolling; let page scroll instead */
         .rbc-calendar { overflow: visible !important; }
         .rbc-time-view { overflow: visible !important; }
@@ -825,10 +1043,10 @@ const AppointmentsPage = () => {
         @media (max-width: 1024px) { .rbc-calendar { height: auto !important; } }
         @media (max-width: 768px) { .rbc-calendar { height: auto !important; } }
         
-        /* Ensure calendar events are properly scrollable */
+        /* Ensure calendar events do not visually overlap neighboring events */
         .rbc-event {
           cursor: pointer !important;
-          overflow: visible !important;
+          overflow: hidden !important; /* clip content to event bounds to prevent bleed-over */
         }
         
         /* Fix calendar grid scrolling */
@@ -1202,9 +1420,11 @@ const AppointmentsPage = () => {
                               }
                             }).filter(Boolean) || [];
                             
+                            const blockedEvents = getClickableBlockedEvents();
                             console.log('📅 Valid appointment events created:', appointmentEvents.length);
+                            console.log('⛔ Clickable blocked events created:', blockedEvents.length);
                             
-                            return appointmentEvents;
+                            return [...appointmentEvents, ...blockedEvents];
                           } catch (error) {
                             console.error('Error creating appointment events:', error);
                             return [];
@@ -1223,10 +1443,53 @@ const AppointmentsPage = () => {
                           resourceId: s.id,
                           resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
                         })) || []}
+                        onPreSelectResource={(rid) => {
+                          try {
+                            setPreSelectedResourceId(rid != null ? Number(rid) : null);
+                          } catch {
+                            setPreSelectedResourceId(null);
+                          }
+                        }}
+                        onInterceptSlotClick={({ date, resourceId }) => {
+                          try {
+                            if (!(date instanceof Date)) return false;
+                            const clicked = new Date(date);
+                            const blockedEvents = getClickableBlockedEvents();
+                            const match = blockedEvents.find((ev: any) => {
+                              if (resourceId != null && Number(ev.resourceId) !== Number(resourceId)) return false;
+                              return clicked >= (ev.start as Date) && clicked < (ev.end as Date);
+                            });
+                            if (match && match.resource) {
+                              const sch = match.resource;
+                              const dayOfWeek = clicked.toLocaleDateString('en-US', { weekday: 'long' });
+                              setQuickSchedule({ ...sch, dayOfWeek });
+                              setQuickStartTime(String(sch.startTime || ''));
+                              setQuickEndTime(String(sch.endTime || ''));
+                              setIsQuickBlockedOpen(true);
+                              return true; // prevent create card
+                            }
+                          } catch {}
+                          return false;
+                        }}
                         onSelectEvent={(event) => {
-                          // Only handle appointment events, not background events
-                          if (event.type === 'appointment') {
-                            handleAppointmentClick(event.id);
+                          if ((event as any).type === 'blocked') {
+                            const sch = (event as any).resource;
+                            if (sch) {
+                              // Open quick edit for blocked time using the exact day/time clicked
+                              const start: Date = (event as any).start;
+                              const end: Date = (event as any).end;
+                              const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
+                              setQuickSchedule({ ...sch, dayOfWeek });
+                              // Pre-fill with existing block window
+                              const pad = (n: number) => String(n).padStart(2, '0');
+                              setQuickStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
+                              setQuickEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
+                              setIsQuickBlockedOpen(true);
+                            }
+                            return;
+                          }
+                          if ((event as any).type === 'appointment') {
+                            handleAppointmentClick((event as any).id);
                           }
                         }}
                         onSelectSlot={handleSelectSlot}
@@ -1272,6 +1535,83 @@ const AppointmentsPage = () => {
           onDelete={handleDeleteAppointment}
         />
       </Suspense>
+
+      {/* Schedule Add/Edit Dialog */}
+      <Suspense fallback={null}>
+        <AddEditScheduleDialog
+          open={isScheduleDialogOpen}
+          onOpenChange={(open) => {
+            setIsScheduleDialogOpen(open);
+            if (!open) {
+              setEditingSchedule(null);
+            }
+          }}
+          schedule={editingSchedule || undefined}
+          onSuccess={() => {
+            try {
+              queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+              queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+            } catch {}
+          }}
+        />
+      </Suspense>
+
+      {/* Quick Edit/Delete for Blocked Time */}
+      <Dialog open={isQuickBlockedOpen} onOpenChange={setIsQuickBlockedOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Blocked Time</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Start Time</label>
+                <Input type="time" value={quickStartTime} onChange={(e) => setQuickStartTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">End Time</label>
+                <Input type="time" value={quickEndTime} onChange={(e) => setQuickEndTime(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsQuickBlockedOpen(false)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (quickSchedule?.id && window.confirm('Delete this blocked time?')) {
+                  deleteScheduleMutation.mutate(quickSchedule.id);
+                  setIsQuickBlockedOpen(false);
+                }
+              }}
+            >
+              Delete
+            </Button>
+            <Button
+              onClick={() => {
+                if (!quickSchedule?.id) return;
+                const payload = {
+                  id: quickSchedule.id,
+                  data: {
+                    staffId: Number(quickSchedule.staffId),
+                    locationId: Number(quickSchedule.locationId),
+                    dayOfWeek: quickSchedule.dayOfWeek,
+                    startTime: quickStartTime,
+                    endTime: quickEndTime,
+                    startDate: quickSchedule.startDate,
+                    endDate: quickSchedule.endDate || null,
+                    isBlocked: true,
+                    serviceCategories: quickSchedule.serviceCategories || [],
+                  },
+                };
+                updateBlockedScheduleMutation.mutate(payload);
+              }}
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Checkout Component */}
       <Suspense fallback={null}>
