@@ -123,7 +123,16 @@ export async function sendLocationMessage(input: SendLocationMessageInput): Prom
     }
     const tpl = getTemplate(locationId, messageType, 'sms') as SmsTemplate | null;
     const model = buildModel(locationId, to, context);
-    const body = renderTemplate(overrides?.body ?? tpl?.body ?? '', model);
+    let body = renderTemplate(overrides?.body ?? tpl?.body ?? '', model);
+    // Minimal, safe fallback for legacy single-brace placeholders that may slip through
+    try {
+      const safeName = (to?.name || '').toString().trim();
+      if (safeName) {
+        body = body
+          .replace(/\{client_first_name\}/g, safeName.split(' ')[0])
+          .replace(/\{client_name\}/g, safeName);
+      }
+    } catch {}
     const smsModule = await import('./sms.js');
     const result = await smsModule.sendSMS(to.phone, body, photoUrl);
     return { success: !!result?.success, id: result?.messageId, error: result?.error };

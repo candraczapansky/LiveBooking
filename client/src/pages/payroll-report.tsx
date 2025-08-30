@@ -134,16 +134,12 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     queryKey: ['/api/payments'],
   });
 
-  // Prefer authoritative sales records for appointment revenue when available
-  const { data: salesHistory, isLoading: salesLoading } = useQuery<any[]>({
-    queryKey: ['/api/sales-history'],
-  });
 
   const { data: staffServices = [] } = useQuery<any[]>({
     queryKey: ['/api/staff-services'],
   });
 
-  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading || salesLoading;
+  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading;
 
   // Refresh data function
   const refreshData = async () => {
@@ -226,37 +222,6 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       return statusOk && typeOk && positiveAmount && hasValidAppointmentId && dStr >= startStr && dStr <= endStr;
     });
 
-    // Build appointmentId -> completed sales (authoritative revenue source)
-    const completedSalesInRange = (salesHistory || []).filter((s: any) => {
-      const txType = s.transactionType || s.transaction_type;
-      if (txType !== 'appointment') return false;
-
-      const statusOk = (s.paymentStatus === 'completed' || s.payment_status === 'completed');
-      const apptId = s.appointmentId || s.appointment_id;
-      if (!apptId) return false;
-
-      const rawDate = s.transactionDate || s.transaction_date;
-      if (!rawDate) return false;
-      const d = new Date(rawDate);
-      if (Number.isNaN(d.getTime())) return false;
-      const dStr = formatYmdInTimeZone(d);
-
-      return statusOk && dStr >= startStr && dStr <= endStr;
-    });
-
-    const appointmentIdToSalesAmount = new Map<number, number>();
-    for (const s of completedSalesInRange) {
-      const apptId = (s.appointmentId || s.appointment_id) as number;
-      // Prefer serviceTotalAmount if available, otherwise totalAmount minus tips
-      const serviceTotal = s.serviceTotalAmount ?? s.service_total_amount;
-      const totalAmount = s.totalAmount ?? s.total_amount ?? 0;
-      const tip = s.tipAmount ?? s.tip_amount ?? 0;
-      const base = Number(serviceTotal ?? Math.max(Number(totalAmount) - Number(tip), 0));
-      if (base > 0) {
-        appointmentIdToSalesAmount.set(apptId, base);
-      }
-    }
-
     // Map appointmentId -> completed payments in range with positive amounts
     const appointmentIdToPayments = new Map<number, any[]>();
     for (const p of completedPaymentsInRange) {
@@ -283,11 +248,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       const isPaid = paymentStatusLower === 'paid';
       if (!(notCancelled && isCompleted && isPaid)) return false;
       
-      // Accept either a valid sales record or valid payments indicating positive revenue
-      const salesAmount = appointmentIdToSalesAmount.get(apt.id) || 0;
-      if (salesAmount > 0) return true;
-
-      // Fallback to payments check
+      // Must have associated completed payments mapped to this appointment
       const apptPayments = appointmentIdToPayments.get(apt.id) || [];
       if (apptPayments.length === 0) return false;
       const totalPaid = apptPayments.reduce((sum, p) => {
@@ -339,18 +300,20 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
           return;
         }
         
-        // Prefer authoritative sales amount if present for this appointment
-        const salesAmount = appointmentIdToSalesAmount.get(apt.id) || 0;
-        let serviceRevenue = Number(salesAmount || 0);
-        if (!(serviceRevenue > 0)) {
-          // Sum payment amounts - use ONLY the actual payment amounts, never the service price
-          const baseAmountSumFromPayments = appointmentPayments.reduce((sum: number, p: any) => {
-            const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
-            return sum + (base || 0);
-          }, 0);
-          // Revenue strictly from completed payments to avoid phantom amounts
-          serviceRevenue = baseAmountSumFromPayments;
-        }
+        // Use ONLY the latest completed payment amount for this appointment
+        const latestCompletedPayment = [...appointmentPayments]
+          .filter((p: any) => p.status === 'completed')
+          .sort((a: any, b: any) => {
+            const ad = getPaymentDate(a) || new Date(0);
+            const bd = getPaymentDate(b) || new Date(0);
+            return ad.getTime() - bd.getTime();
+          })
+          .pop();
+        const serviceRevenue = (() => {
+          if (!latestCompletedPayment) return 0;
+          const base = latestCompletedPayment.amount ?? Math.max((latestCompletedPayment.totalAmount || 0) - (latestCompletedPayment.tipAmount || 0), 0);
+          return base || 0;
+        })();
         
         // Skip this appointment if no actual revenue was collected
         if (serviceRevenue <= 0) {
@@ -410,9 +373,9 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             appointmentEarnings = 0;
         }
 
-        // Add tips (not included in commission calculations)
-        const tipsFromPayments = appointmentPayments.reduce((sum: number, p: any) => sum + (p.tipAmount || 0), 0);
-        totalTips += tipsFromPayments;
+        // Add tips from the latest completed payment only (avoid double-counting across retries)
+        const tipFromLatest = Number(latestCompletedPayment?.tipAmount || 0);
+        totalTips += tipFromLatest;
 
         totalCommission += appointmentEarnings;
       });
@@ -446,7 +409,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     })
     // Exclude staff with zero qualifying payments/revenue to avoid showing empty staff (e.g., Jamie with none)
     .filter((row) => (row.totalRevenue || 0) > 0 || (row.totalTips || 0) > 0 || (row.totalCommission || 0) > 0);
-  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate, payments, salesHistory]);
+  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate, payments]);
 
   // Filter by selected staff member
   const filteredPayrollData = selectedStaff === "all" 
@@ -1118,9 +1081,10 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         const notCancelled = statusLower !== 'cancelled';
         const isCompleted = statusLower === 'completed';
         const isPaid = paymentStatusLower === 'paid';
-        const getPaymentDate = (p: any) => new Date(
-          p.paymentDate || p.payment_date || p.processedAt || p.processed_at || p.createdAt || p.created_at || new Date()
-        );
+        const getPaymentDate = (p: any) => {
+          const raw = p.paymentDate || p.payment_date || p.processedAt || p.processed_at;
+          return raw ? new Date(raw) : null;
+        };
         // Get all valid payments for this appointment
         const validPaymentsForAppt = (payments || []).filter((p: any) => {
           // Only consider 'completed' status
@@ -1134,10 +1098,15 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
           
           // Must have a valid payment date in the date range
           const d = getPaymentDate(p);
+          if (!d || Number.isNaN(d.getTime())) return false;
           const dateInRange = d >= start && d <= end;
           
+          // Must have positive base amount (exclude tips)
+          const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
+          const positive = Number(base) > 0;
+          
           // All criteria must be met for a payment to be considered valid
-          return statusOk && typeOk && apptMatch && dateInRange;
+          return statusOk && typeOk && apptMatch && dateInRange && positive;
         });
         
         // Calculate the total payment amount (excluding tips)
@@ -1167,18 +1136,20 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         const client = (users || []).find((u: any) => u.id === clientId);
         // Use the pre-filtered valid payments we stored earlier
         const appointmentPayments = apt._validPayments || [];
-        // Calculate the actual amount paid from payment records, not service price
-        const baseAmountSum = appointmentPayments.reduce((sum: number, p: any) => {
-          // Only count completed payments
-          if (p.status !== 'completed') return sum;
-          
-          // Use amount directly if available, otherwise calculate from totalAmount minus tips
-          const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
-          return sum + (base || 0);
-        }, 0);
-        
-        // Use the actual payment amount, never the service price from the service object
-        const servicePrice = baseAmountSum;
+        // Use ONLY the latest completed payment amount for this appointment (exclude tips)
+        const latestCompletedPayment = [...appointmentPayments]
+          .filter((p: any) => p.status === 'completed')
+          .sort((a: any, b: any) => {
+            const ad = getPaymentDate(a) || new Date(0);
+            const bd = getPaymentDate(b) || new Date(0);
+            return ad.getTime() - bd.getTime();
+          })
+          .pop();
+        const servicePrice = (() => {
+          if (!latestCompletedPayment) return 0;
+          const base = latestCompletedPayment.amount ?? Math.max((latestCompletedPayment.totalAmount || 0) - (latestCompletedPayment.tipAmount || 0), 0);
+          return base || 0;
+        })();
         
         // Skip this appointment if no revenue was collected
         if (servicePrice <= 0) {
