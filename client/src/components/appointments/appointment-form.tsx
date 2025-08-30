@@ -829,6 +829,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // const handleCashPayment = async () => { /* unused; removed */ };
 
   const handleDelete = async () => {
+    if (appointment && appointment.paymentStatus === 'paid') {
+      toast({
+        title: "Cannot delete paid appointment",
+        description: "This appointment has been paid and cannot be deleted.",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!appointmentId || appointmentId <= 0) return;
     setIsDeleting(true);
     try {
@@ -1337,12 +1345,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
               )}
               
               <DialogFooter className="flex justify-between">
-                {appointmentId && appointmentId > 0 ? (
+                {appointmentId && appointmentId > 0 && appointment && appointment.paymentStatus !== 'paid' ? (
                   <Button 
                     type="button" 
                     variant="destructive"
                     onClick={handleDelete}
-                    disabled={isDeleting || isLoading}
+                    disabled={isDeleting || isLoading || (appointment?.paymentStatus === 'paid')}
                   >
                     {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Delete Appointment

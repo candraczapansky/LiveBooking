@@ -385,6 +385,8 @@ export async function triggerAutomations(
 
   const variables = {
     client_name: client.firstName || client.username,
+    client_first_name: client.firstName || client.username || '',
+    client_last_name: client.lastName || '',
     client_email: client.email,
     client_phone: client.phone || '',
     service_name: service?.name || 'Service',

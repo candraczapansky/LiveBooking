@@ -1390,7 +1390,7 @@ const AppointmentDetails = ({
             </Button>
           )}
           
-          {appointment?.status !== 'cancelled' && (
+          {appointment?.status !== 'cancelled' && appointment?.paymentStatus !== 'paid' && (
             <Button
               variant="outline"
               onClick={handleCancel}
