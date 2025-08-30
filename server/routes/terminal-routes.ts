@@ -117,6 +117,9 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
           status: 'completed',
           last4: g.last4,
           transactionId: g.transactionId || paymentId,
+          amount: g.amount,
+          tipAmount: g.tipAmount,
+          baseAmount: g.baseAmount,
         });
       }
     } catch {}
@@ -167,7 +170,10 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
         locationId, 
         paymentId, 
         status: (status as any)?.status,
-        transactionId: (status as any)?.transactionId
+        transactionId: (status as any)?.transactionId,
+        amount: (status as any)?.amount,
+        tipAmount: (status as any)?.tipAmount,
+        baseAmount: (status as any)?.baseAmount
       });
     } catch {}
     // Normalize response with fallbacks
@@ -213,6 +219,9 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
       cardLast4: s.last4 || s.cardLast4 || undefined,
       transactionId: s.transactionId || paymentId,
       terminalId: s.terminalId || undefined,
+      amount: s.amount,
+      tipAmount: s.tipAmount,
+      baseAmount: s.baseAmount,
     });
   } catch (error: any) {
     console.error('❌ Error checking payment status:', error);
@@ -714,6 +723,178 @@ router.post('/clear-cache', (req, res) => {
   } catch (error: any) {
     console.error('❌ Error clearing caches:', error);
     return res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Complete POS terminal payment (no appointment)
+ */
+router.post('/complete-pos', async (req, res) => {
+  try {
+    const { cardLast4, totalAmount, tipAmount, baseAmount, transactionId } = req.body;
+    
+    console.log('💳 Completing POS terminal payment:', { 
+      totalAmount, 
+      tipAmount, 
+      baseAmount,
+      transactionId 
+    });
+
+    // Get storage instance
+    const storage = req.app.get('storage');
+    if (!storage) {
+      throw new Error('Storage not available');
+    }
+
+    // Create a payment record for POS sale
+    const payment = await storage.createPayment({
+      clientId: 1, // Default client for walk-in POS sales
+      amount: baseAmount || totalAmount,
+      tipAmount: tipAmount || 0,
+      totalAmount: totalAmount || baseAmount,
+      method: 'terminal',
+      status: 'completed',
+      type: 'pos_payment',
+      description: 'POS Terminal Sale',
+      helcimPaymentId: transactionId,
+      processedAt: new Date(),
+      notes: cardLast4 ? `Terminal payment - Card ending in ${cardLast4}` : 'Terminal payment completed'
+    });
+
+    // Create sales history record for reports
+    const salesData = {
+      transactionType: 'pos_sale',
+      transactionDate: new Date(),
+      paymentId: payment.id,
+      totalAmount: totalAmount || baseAmount,
+      paymentMethod: 'terminal',
+      paymentStatus: 'completed',
+      clientId: null,
+      clientName: null,
+      staffId: null,
+      staffName: null,
+      appointmentId: null,
+      serviceIds: null,
+      serviceNames: null,
+      serviceTotalAmount: null,
+      productIds: null,
+      productNames: null,
+      productQuantities: null,
+      productUnitPrices: null,
+      productTotalAmount: baseAmount || (totalAmount && tipAmount ? totalAmount - tipAmount : totalAmount),
+      membershipId: null,
+      membershipName: null,
+      membershipDuration: null,
+      taxAmount: 0,
+      tipAmount: tipAmount || 0,
+      discountAmount: 0,
+      businessDate: new Date(),
+      dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()],
+      monthYear: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+      quarter: `${new Date().getFullYear()}-Q${Math.ceil((new Date().getMonth() + 1) / 3)}`,
+      helcimPaymentId: transactionId,
+      createdBy: null,
+      notes: 'POS Terminal Sale'
+    };
+
+    // Try to create sales history record
+    try {
+      await storage.createSalesHistory(salesData);
+      console.log('📊 Sales history record created for POS terminal payment');
+    } catch (e) {
+      console.log('Sales history creation skipped:', e);
+    }
+
+    return res.json({ 
+      success: true, 
+      payment,
+      message: 'POS payment completed successfully' 
+    });
+  } catch (error: any) {
+    console.error('❌ Error completing POS terminal payment:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to complete payment' 
+    });
+  }
+});
+
+/**
+ * Complete terminal payment and sync with calendar
+ */
+router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
+  try {
+    const { appointmentId, paymentId } = req.params;
+    const { cardLast4, totalAmount, tipAmount, baseAmount, transactionId } = req.body;
+    
+    console.log('💳 Completing terminal payment:', { 
+      appointmentId, 
+      paymentId, 
+      totalAmount, 
+      tipAmount, 
+      baseAmount,
+      transactionId 
+    });
+
+    // Get storage instance
+    const storage = req.app.get('storage');
+    if (!storage) {
+      throw new Error('Storage not available');
+    }
+
+    // Update payment with terminal details
+    const updatedPayment = await storage.updatePayment(parseInt(paymentId), {
+      status: 'completed',
+      helcimPaymentId: transactionId,
+      tipAmount: tipAmount || 0,
+      totalAmount: totalAmount || baseAmount,
+      processedAt: new Date(),
+      notes: cardLast4 ? `Terminal payment - Card ending in ${cardLast4}` : 'Terminal payment completed'
+    });
+
+    // Update appointment payment status
+    await storage.updateAppointment(parseInt(appointmentId), {
+      paymentStatus: 'paid',
+      tipAmount: tipAmount || 0,
+      totalAmount: totalAmount || baseAmount
+    });
+
+    // Create sales history record for reports
+    const appointment = await storage.getAppointment(parseInt(appointmentId));
+    if (appointment) {
+      const salesData = {
+        appointmentId: parseInt(appointmentId),
+        clientId: appointment.clientId,
+        staffId: appointment.staffId,
+        serviceId: appointment.serviceId,
+        amount: baseAmount || (totalAmount && tipAmount ? totalAmount - tipAmount : totalAmount),
+        tipAmount: tipAmount || 0,
+        totalAmount: totalAmount || baseAmount,
+        paymentMethod: 'terminal',
+        transactionId: transactionId,
+        date: new Date(),
+      };
+
+      // Try to create sales history record
+      try {
+        await storage.createSalesHistory(salesData);
+        console.log('📊 Sales history record created for terminal payment');
+      } catch (e) {
+        console.log('Sales history creation skipped:', e);
+      }
+    }
+
+    return res.json({ 
+      success: true, 
+      payment: updatedPayment,
+      message: 'Payment completed and synced with calendar' 
+    });
+  } catch (error: any) {
+    console.error('❌ Error completing terminal payment:', error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Failed to complete payment' 
+    });
   }
 });
 

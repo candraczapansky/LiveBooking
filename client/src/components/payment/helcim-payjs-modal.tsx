@@ -156,23 +156,98 @@ export default function HelcimPayJsModal({
         setPaymentToken(initData.token);
         setSecretToken(initData.secretToken);
         
+        // Set initialized state immediately to hide loading message
+        setIsInitialized(true);
+        
+        // Wait a moment then mount the iframe
+        setTimeout(() => {
+          if (typeof window.appendHelcimPayIframe === 'function') {
+            console.log('[HelcimPayJs] Mounting Helcim iframe');
+            
+            try {
+              // Clear any existing iframes and wrappers first
+              const existingWrappers = document.querySelectorAll('#helcim-iframe-wrapper');
+              existingWrappers.forEach(wrapper => {
+                console.log('[HelcimPayJs] Removing existing wrapper');
+                wrapper.remove();
+              });
+              
+              const existingFrames = document.querySelectorAll('#helcimPayIframe, iframe[src*="helcim"]');
+              existingFrames.forEach(frame => {
+                console.log('[HelcimPayJs] Removing existing iframe');
+                frame.remove();
+              });
+              
+              // Create a container div for the iframe with proper z-index
+              const iframeContainer = document.createElement('div');
+              iframeContainer.id = 'helcim-iframe-wrapper';
+              iframeContainer.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                z-index: 100000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+              `;
+              document.body.appendChild(iframeContainer);
+              
+              // Call the Helcim function to create the iframe
+              window.appendHelcimPayIframe(initData.token, {
+                allowExit: true,
+              });
+              
+              // Move and style the iframe properly
+              setTimeout(() => {
+                const iframe = document.getElementById('helcimPayIframe');
+                if (iframe && iframeContainer) {
+                  console.log('[HelcimPayJs] Moving and styling iframe');
+                  
+                  // Move iframe to our container
+                  iframeContainer.appendChild(iframe);
+                  
+                  // Style the iframe to be interactive and visible
+                  iframe.style.cssText = `
+                    width: 90%;
+                    max-width: 600px;
+                    height: 600px;
+                    border: none;
+                    border-radius: 8px;
+                    background-color: white;
+                    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                    pointer-events: auto;
+                    position: relative;
+                    z-index: 100001;
+                  `;
+                  
+                  // Make the container interactive for the iframe area
+                  iframeContainer.style.pointerEvents = 'auto';
+                }
+              }, 100);
+              
+              console.log('[HelcimPayJs] Payment form mounted successfully');
+            } catch (mountError) {
+              console.error('[HelcimPayJs] Error mounting iframe:', mountError);
+              setIsInitialized(false);
+              throw mountError;
+            }
+          }
+        }, 200);
+        
+        const waitForContainerAndMount = async () => {
+          // This function is now simplified since we're not moving DOM nodes
+          return Promise.resolve();
+        };
+        
         // Check if appendHelcimPayIframe is available
         if (typeof window.appendHelcimPayIframe === 'function') {
-          console.log('[HelcimPayJs] appendHelcimPayIframe function found, attempting to use it');
+          console.log('[HelcimPayJs] appendHelcimPayIframe function found, attempting to mount');
           
           try {
-            // Clear any existing iframe with id 'helcimPayIframe'
-            const existingFrame = document.getElementById('helcimPayIframe');
-            if (existingFrame) {
-              existingFrame.remove();
-            }
-            
-            // Use the official method to render the iframe
-            window.appendHelcimPayIframe(initData.token, {
-              allowExit: true,
-            });
-            
-            console.log('[HelcimPayJs] appendHelcimPayIframe called successfully');
+            await waitForContainerAndMount();
           } catch (mountError) {
             console.error('[HelcimPayJs] Error calling appendHelcimPayIframe:', mountError);
             // If embedding fails, use fallback URL
@@ -290,72 +365,169 @@ export default function HelcimPayJsModal({
 
   // Cleanup on close/unmount
   useEffect(() => {
-    if (!open) return;
-    return () => {
+    if (!open) {
+      // Clean up when modal closes
       try {
-        // Remove the Helcim iframe if it exists
+        const helcimIframe = document.getElementById('helcimPayIframe');
+        if (helcimIframe) {
+          console.log('[HelcimPayJs] Removing iframe on modal close');
+          helcimIframe.remove();
+        }
+        
+        const wrapper = document.getElementById('helcim-iframe-wrapper');
+        if (wrapper) {
+          console.log('[HelcimPayJs] Removing iframe wrapper');
+          wrapper.remove();
+        }
+        
+        // Reset states
+        setIsInitialized(false);
+        setFallbackUrl(null);
+        setFallbackLoaded(false);
+        setPaymentToken(null);
+        setSecretToken(null);
+        mountedRef.current = false;
+      } catch (error) {
+        console.error('[HelcimPayJs] Error during cleanup:', error);
+      }
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      try {
         const helcimIframe = document.getElementById('helcimPayIframe');
         if (helcimIframe) {
           helcimIframe.remove();
         }
         
-        // Legacy cleanup
-        if (window.helcimPay && typeof window.helcimPay.unmount === 'function') {
-          window.helcimPay.unmount();
+        const wrapper = document.getElementById('helcim-iframe-wrapper');
+        if (wrapper) {
+          wrapper.remove();
+        }
+        
+        if (fallbackTimerRef.current) {
+          clearTimeout(fallbackTimerRef.current);
         }
       } catch (error) {
-        console.error('[HelcimPayJs] Error during cleanup:', error);
+        console.error('[HelcimPayJs] Error during unmount cleanup:', error);
       }
-      
-      mountedRef.current = false;
-      if (fallbackTimerRef.current) {
-        clearTimeout(fallbackTimerRef.current);
-      }
-      setFallbackUrl(null);
-      setFallbackLoaded(false);
-      setPaymentToken(null);
-      setSecretToken(null);
     };
   }, [open]);
 
   if (!open) return null;
 
+  const handleClose = () => {
+    // Clean up iframe and wrapper before closing
+    const helcimIframe = document.getElementById('helcimPayIframe');
+    if (helcimIframe) {
+      helcimIframe.remove();
+    }
+    const wrapper = document.getElementById('helcim-iframe-wrapper');
+    if (wrapper) {
+      wrapper.remove();
+    }
+    onOpenChange(false);
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-[9999]">
-      <div className="absolute inset-0 bg-black/80 z-[0] pointer-events-none" />
-      <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-auto">
-        <div
-          className="pointer-events-auto bg-background w-[95vw] sm:max-w-[900px] max-h-[95vh] p-6 rounded-lg shadow-lg z-[2] isolate"
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold leading-none tracking-tight">Process Payment</h2>
-                <p className="text-sm text-muted-foreground">Complete your payment securely with Helcim</p>
+    <>
+      {/* Only show the modal backdrop and close button when iframe is initialized */}
+      {isInitialized && (
+        <div className="fixed inset-0 z-[99999]">
+          <div 
+            className="absolute inset-0 bg-black/60" 
+            onClick={handleClose}
+          />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="absolute top-4 right-4 z-[100002] bg-white hover:bg-gray-100 h-10 w-10 rounded-full shadow-lg"
+          >
+            <span className="sr-only">Close</span>
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </Button>
+        </div>
+      )}
+      
+      {/* Show loading modal only when not initialized */}
+      {!isInitialized && !fallbackUrl && (
+        <div className="fixed inset-0 z-[9999]">
+          <div 
+            className="absolute inset-0 bg-black/80 z-[0]" 
+            onClick={handleClose}
+          />
+          <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
+            <div
+              className="pointer-events-auto bg-background w-[95vw] sm:max-w-[600px] p-6 rounded-lg shadow-lg z-[2]"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold leading-none tracking-tight">Process Payment</h2>
+                    <p className="text-sm text-muted-foreground">Complete your payment securely with Helcim</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleClose}
+                    className="h-8 w-8"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </Button>
+                </div>
+                <div className="min-h-[200px] w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+                    <div className="text-gray-500">Loading payment form...</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="grid gap-4 py-4">
-            <div className="relative" style={{ minHeight: "400px" }}>
-              <div 
-                id="helcim-payment-container" 
-                className={`min-h-[400px] w-full overflow-x-hidden relative ${fallbackUrl ? 'hidden' : 'z-[2]'} touch-manipulation pointer-events-auto`} 
-                style={{ 
-                  height: "400px",
-                  display: fallbackUrl ? 'none' : 'block' 
-                }}
-                data-helcim-container="true"
-              >
-                {/* Helcim.js will inject the payment form here */}
-                <div className="py-4 text-center text-gray-500">Loading payment form...</div>
-              </div>
-              {fallbackUrl && (
+        </div>
+      )}
+      
+      {/* Show fallback option when URL is available */}
+      {fallbackUrl && (
+        <div className="fixed inset-0 z-[9999]">
+          <div 
+            className="absolute inset-0 bg-black/80 z-[0]" 
+            onClick={handleClose}
+          />
+          <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
+            <div
+              className="pointer-events-auto bg-background w-[95vw] sm:max-w-[600px] p-6 rounded-lg shadow-lg z-[2]"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold leading-none tracking-tight">Alternative Payment Method</h2>
+                    <p className="text-sm text-muted-foreground">Complete your payment securely with Helcim</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleClose}
+                    className="h-8 w-8"
+                  >
+                    <span className="sr-only">Close</span>
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </Button>
+                </div>
                 <div className="relative w-full h-[300px] border rounded flex items-center justify-center bg-gray-50">
                   <div className="text-center p-6">
                     <div className="mx-auto mb-4 text-5xl">🔒</div>
-                    <h3 className="text-lg font-medium mb-2">Alternative Payment Method</h3>
+                    <h3 className="text-lg font-medium mb-2">External Payment Required</h3>
                     <p className="mb-4">The embedded payment form is not available. Please use the external payment option.</p>
                     <p className="text-sm text-gray-500 mb-6">This will open Helcim's secure payment page in a new window.</p>
                     <Button 
@@ -382,27 +554,11 @@ export default function HelcimPayJsModal({
                     </Button>
                   </div>
                 </div>
-              )}
-              {isLoading && !fallbackUrl && (
-                <div className="absolute inset-0 grid place-items-center z-[3]">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
-
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              Cancel
-            </Button>
-          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   , document.body);
 }

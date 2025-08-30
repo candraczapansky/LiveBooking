@@ -11,6 +11,18 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { CreditCard, CheckCircle, XCircle } from 'lucide-react';
 
+interface PaymentResponse {
+  success: boolean;
+  status: string;
+  transactionId?: string;
+  last4?: string;
+  cardLast4?: string;
+  amount?: number;
+  tipAmount?: number;
+  baseAmount?: number;
+  paymentMethod?: string;
+}
+
 interface SmartTerminalPaymentProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +47,7 @@ export default function SmartTerminalPayment({
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [paymentDetails, setPaymentDetails] = useState<PaymentResponse | null>(null);
   const { toast } = useToast();
 
   const startPayment = async () => {
@@ -128,11 +141,13 @@ export default function SmartTerminalPayment({
           console.log('✅ Payment completed! Response:', data);
           setStatus('success');
           setMessage('Payment successful!');
-          handlePaymentSuccess({
+          const paymentData = {
             ...data,
             cardLast4: data.cardLast4 || data.last4,
-            paymentMethod: 'terminal'
-          });
+            paymentMethod: 'terminal',
+            baseAmount: data.baseAmount || (data.amount && data.tipAmount ? data.amount - data.tipAmount : amount)
+          };
+          handlePaymentSuccess(paymentData);
           return;
         } else if (data.status === 'failed') {
           console.log('❌ Payment failed:', data);
@@ -153,17 +168,22 @@ export default function SmartTerminalPayment({
     }
   };
 
-  const handlePaymentSuccess = (response: any) => {
+  const handlePaymentSuccess = (response: PaymentResponse) => {
+    setPaymentDetails(response);
+    const tipDisplay = response.tipAmount && response.tipAmount > 0 
+      ? ` (includes $${response.tipAmount.toFixed(2)} tip)` 
+      : '';
     toast({
       title: "Payment Successful",
-      description: "Your payment has been processed successfully.",
+      description: `Payment of $${(response.amount || amount).toFixed(2)} processed successfully${tipDisplay}`,
     });
     onSuccess?.(response);
     setTimeout(() => {
       onOpenChange(false);
       setStatus('idle');
       setMessage('');
-    }, 2000);
+      setPaymentDetails(null);
+    }, 3000);
   };
 
   const stringifyError = (err: any): string => {
@@ -226,7 +246,57 @@ export default function SmartTerminalPayment({
             {status === 'success' && (
               <>
                 <CheckCircle className="h-16 w-16 text-green-500" />
-                <p className="text-center text-gray-600">{message}</p>
+                <p className="text-center text-gray-600 font-semibold text-lg">Payment Complete!</p>
+                {paymentDetails && (
+                  <div className="w-full space-y-2 mt-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">Amount:</span>
+                      <span className="font-semibold">
+                        ${(paymentDetails.baseAmount || amount).toFixed(2)}
+                      </span>
+                    </div>
+                    {paymentDetails.tipAmount && paymentDetails.tipAmount > 0 && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Tip:</span>
+                          <span className="font-semibold text-green-600 dark:text-green-400">
+                            +${paymentDetails.tipAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="border-t pt-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-semibold">Total:</span>
+                            <span className="font-bold text-lg">
+                              ${(paymentDetails.amount || amount).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {!paymentDetails.tipAmount && (
+                      <div className="border-t pt-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-semibold">Total:</span>
+                          <span className="font-bold text-lg">
+                            ${(paymentDetails.amount || amount).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {(paymentDetails.last4 || paymentDetails.cardLast4) && (
+                      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 pt-2">
+                        <span>Card:</span>
+                        <span>****{paymentDetails.last4 || paymentDetails.cardLast4}</span>
+                      </div>
+                    )}
+                    {paymentDetails.transactionId && (
+                      <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                        <span>Transaction ID:</span>
+                        <span className="font-mono">{paymentDetails.transactionId}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
 

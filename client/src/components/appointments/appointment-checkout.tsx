@@ -119,10 +119,9 @@ export default function AppointmentCheckout({
       queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
 
       setIsSuccess(true);
-      setTimeout(() => {
-        onSuccess();
-        onClose();
-      }, 1500);
+      // Keep the success confirmation visible until the user closes it
+      // Notify parent that payment succeeded for any external updates
+      try { onSuccess(); } catch {}
     } catch (error: any) {
       console.error('Error completing appointment:', error);
       toast({
@@ -251,10 +250,11 @@ export default function AppointmentCheckout({
           ) : (
             <div className="text-center py-4">
               <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Appointment Completed!</h3>
-              <p className="text-sm text-gray-600">
-                The appointment has been successfully marked as completed.
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Payment Successful</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                The appointment has been successfully marked as completed and paid.
               </p>
+              <Button onClick={onClose} className="mt-2">Close</Button>
             </div>
           )}
         </CardContent>

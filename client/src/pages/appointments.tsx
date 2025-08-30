@@ -526,10 +526,9 @@ const AppointmentsPage = () => {
   };
 
   const handlePaymentSuccess = () => {
-    setIsCheckoutOpen(false);
-    setCheckoutAppointment(null);
+    // Leave the checkout overlay open so the success confirmation stays visible
+    // Only refresh appointments data
     refetch();
-    // toast notification removed (toast system is currently disabled)
   };
 
 

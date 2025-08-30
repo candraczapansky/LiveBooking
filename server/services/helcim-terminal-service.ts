@@ -16,6 +16,7 @@ const sessionStore = new Map<
     locationId: string; 
     deviceCode: string;
     totalAmount?: number;
+    baseAmount?: number;  // Base amount before tip
   }
 >();
 
@@ -76,12 +77,13 @@ export class HelcimTerminalService {
     // Generate unique invoice number if not provided; prefer client-provided reference
     const invoiceNumber = options.invoiceNumber || options.reference || `POS-${Date.now()}`;
 
-    // Store session for tracking
+    // Store session for tracking including base amount for tip calculation
     sessionStore.set(invoiceNumber, {
       startedAt: Date.now(),
       locationId,
       deviceCode: config.deviceCode,
       totalAmount,
+      baseAmount: totalAmount,  // Store the base amount before tip is added on terminal
     });
 
     // Clean up old sessions (older than 1 hour)
@@ -429,6 +431,9 @@ export class HelcimTerminalService {
         transactionId: cached.transactionId || paymentId,
         last4: cached.last4,
         cardLast4: cached.last4,
+        amount: (cached as any).amount,
+        tipAmount: (cached as any).tipAmount,
+        baseAmount: (cached as any).baseAmount,
       };
     }
     
@@ -552,6 +557,7 @@ export class HelcimTerminalService {
   async handleWebhook(payload: any) {
     try {
       console.log('🔍 Processing webhook payload:', JSON.stringify(payload, null, 2));
+      console.log('📌 Webhook has transactionId:', payload?.transactionId || payload?.id, 'type:', payload?.type);
       
       let invoiceNumber = payload?.invoiceNumber || payload?.invoice || payload?.referenceNumber || payload?.reference;
       const transactionId = payload?.transactionId || payload?.cardTransactionId || payload?.id || payload?.paymentId;
@@ -625,9 +631,9 @@ export class HelcimTerminalService {
       let enrichmentAttempted = false;
       let enrichmentSuccess = false;
       
-      // Try to find the session to get the invoice number if missing
+      // Try to find the session to get the invoice number and base amount
       let sessionKey: string | null = null;
-      let session: { startedAt: number; locationId: string; deviceCode: string } | null = null;
+      let session: { startedAt: number; locationId: string; deviceCode: string; baseAmount?: number } | null = null;
       if (invoiceNumber && sessionStore.has(String(invoiceNumber))) {
         sessionKey = String(invoiceNumber);
         session = sessionStore.get(sessionKey)!;
@@ -635,7 +641,7 @@ export class HelcimTerminalService {
         // Try to find session by recent time window
         const now = Date.now();
         let bestKey: string | null = null;
-        let best: { startedAt: number; locationId: string; deviceCode: string } | null = null;
+        let best: { startedAt: number; locationId: string; deviceCode: string; baseAmount?: number } | null = null;
         sessionStore.forEach((value, key) => {
           if (now - value.startedAt <= 10 * 60 * 1000) {
             if (!best || value.startedAt > best.startedAt) {
@@ -655,8 +661,9 @@ export class HelcimTerminalService {
       }
 
       // Try to enrich the webhook data by querying the transaction details
-      // This helps us get the invoice number and card last 4 digits
-      if (transactionId && (!invoiceNumber || !last4)) {
+      // This helps us get the invoice number, card last 4 digits, and tip amounts
+      // Always enrich if we have a transaction ID to get complete payment details including tips
+      if (transactionId) {
         enrichmentAttempted = true;
         try {
           let apiToken: string | undefined;
@@ -667,13 +674,46 @@ export class HelcimTerminalService {
             apiToken = process.env.HELCIM_API_TOKEN;
           }
           if (apiToken) {
+            console.log('🔄 Attempting to enrich transaction:', transactionId);
             const resp = await this.makeRequest('GET', `/card-transactions/${transactionId}`, undefined, apiToken);
             const t = (resp?.data as any) || {};
+            
+            // Log the full response to debug tip handling
+            console.log('💳 Full transaction details from Helcim:', JSON.stringify(t, null, 2));
+            
             const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || t?.reference || undefined;
             const l4 = t?.cardLast4 || t?.last4 || t?.card?.last4 || t?.cardNumber || last4;
+            
+            // Extract total amount from Helcim (includes tip)
+            const totalAmount = t?.amount || t?.totalAmount || t?.transactionAmount || t?.total || payload?.amount;
+            
+            // Helcim doesn't return tip as separate field, so calculate it from session data
+            let tipAmount = 0;
+            let baseAmount = totalAmount;
+            
+            // Try to get base amount from session to calculate tip
+            if (session && session.baseAmount && totalAmount) {
+              baseAmount = session.baseAmount;
+              tipAmount = Number((totalAmount - baseAmount).toFixed(2));
+              console.log('💰 Calculated tip from session:', { baseAmount, tipAmount, totalAmount });
+            }
+            
             if (inv) invoiceNumber = String(inv);
             if (l4) last4 = String(l4);
-            console.log('🧩 Enriched webhook via API', { invoiceNumber, last4, transactionId });
+            
+            // Store the amounts in the payload for caching
+            if (totalAmount) payload.amount = totalAmount;
+            if (tipAmount) payload.tipAmount = tipAmount;
+            if (baseAmount) payload.baseAmount = baseAmount;
+            
+            console.log('🧩 Enriched webhook via API', { 
+              invoiceNumber, 
+              last4, 
+              transactionId,
+              totalAmount,
+              tipAmount,
+              baseAmount
+            });
             enrichmentSuccess = true;
           }
         } catch (e) {
@@ -685,6 +725,8 @@ export class HelcimTerminalService {
             console.log('⚠️ Transaction enrichment failed:', errorMsg);
           }
         }
+      } else {
+        console.log('⚠️ No API token available for enrichment');
       }
 
       // If Helcim omitted invoiceNumber but our sessions include an entry whose transactionId matches, backfill invoiceNumber
@@ -703,12 +745,30 @@ export class HelcimTerminalService {
         } catch {}
       }
 
+      // If we didn't get tip amount from enrichment but have session with base amount, calculate it
+      if (!payload?.tipAmount && session?.baseAmount && payload?.amount) {
+        const totalAmount = payload.amount;
+        const baseAmount = session.baseAmount;
+        const tipAmount = Number((totalAmount - baseAmount).toFixed(2));
+        
+        payload.baseAmount = baseAmount;
+        payload.tipAmount = tipAmount;
+        
+        console.log('💰 Calculated tip from session (no enrichment):', { 
+          baseAmount, 
+          tipAmount, 
+          totalAmount 
+        });
+      }
+      
       // Cache under both keys so polling by either id can resolve
       const cacheValue = {
         status: normalized,
         transactionId,
         last4,
         amount: payload?.amount,
+        tipAmount: payload?.tipAmount,
+        baseAmount: payload?.baseAmount,
         updatedAt: Date.now(),
       } as const;
       
@@ -733,6 +793,9 @@ export class HelcimTerminalService {
             transactionId: transactionId,
             invoiceNumber: invoiceNumber,
             last4: last4,
+            amount: payload?.amount,
+            tipAmount: payload?.tipAmount,
+            baseAmount: payload?.baseAmount,
             updatedAt: Date.now(),
           };
         } catch {}

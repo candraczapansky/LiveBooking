@@ -479,55 +479,67 @@ export default function PointOfSale() {
     try {
       console.log('✅ Smart Terminal payment successful:', result);
       
+      // Use tip amount from terminal result if available, otherwise use POS tip
+      const terminalTipAmount = result.tipAmount || tipAmount || 0;
+      const terminalBaseAmount = result.baseAmount || getSubtotal();
+      const terminalTotalAmount = result.amount || getGrandTotal();
+      
+      console.log('💰 Terminal amounts:', {
+        baseAmount: terminalBaseAmount,
+        tipAmount: terminalTipAmount,
+        totalAmount: terminalTotalAmount,
+        originalResult: result
+      });
+      
       // Create transaction with terminal payment
       const transaction = {
         clientId: selectedClient?.id,
         items: cart,
-        subtotal: getSubtotal(),
+        subtotal: terminalBaseAmount,
         tax: getTax(),
-        tipAmount: tipAmount,
-        total: getGrandTotal(),
+        tipAmount: terminalTipAmount,
+        total: terminalTotalAmount,
         paymentMethod: "terminal",
       };
       
-      // Use the new complete-payment endpoint to sync with calendar
+      // Use the complete-pos endpoint to save payment with tip
       try {
-        const completeResponse = await fetch('/api/terminal/complete-payment', {
+        const completeResponse = await fetch('/api/terminal/complete-pos', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
             transactionId: result.transactionId,
-            deviceCode: 'HF1N',
-            paymentId: null // No specific payment ID for POS transactions
+            cardLast4: result.cardLast4 || result.last4,
+            totalAmount: terminalTotalAmount,
+            tipAmount: terminalTipAmount,
+            baseAmount: terminalBaseAmount
           }),
         });
 
         const completeResult = await completeResponse.json();
         
         if (completeResult.success) {
-          console.log('✅ Terminal payment completed and calendar synced successfully');
+          console.log('✅ Terminal payment completed and saved to reports');
           
-          // Process the transaction with terminal payment
-          const response = await apiRequest("POST", "/api/transactions", {
-            ...transaction,
-            paymentId: result.transactionId,
-            helcimTransactionId: result.transactionId,
-            cardLast4: result.cardLast4,
-            terminalPaymentMethod: result.paymentMethod
-          });
-          const transactionResult = await response.json();
+          // Use the payment result from complete-pos
+          const transactionResult = {
+            success: true,
+            transactionId: result.transactionId,
+            payment: completeResult.payment,
+            total: terminalTotalAmount
+          };
           
           // Store transaction details for receipt
           setLastTransaction({
             ...transactionResult,
             client: selectedClient,
             items: cart,
-            subtotal: getSubtotal(),
+            subtotal: terminalBaseAmount,
             tax: getTax(),
-            tipAmount: tipAmount,
-            total: getGrandTotal(),
+            tipAmount: terminalTipAmount,
+            total: terminalTotalAmount,
             paymentMethod: "terminal",
             timestamp: new Date(),
             paymentId: result.transactionId,
@@ -536,7 +548,7 @@ export default function PointOfSale() {
           
           toast({
             title: "Payment Successful",
-            description: `Terminal payment of $${getGrandTotal().toFixed(2)} completed. Card ending in ${result.cardLast4 || '****'}`,
+            description: `Terminal payment of $${terminalTotalAmount.toFixed(2)} completed${terminalTipAmount > 0 ? ` (includes $${terminalTipAmount.toFixed(2)} tip)` : ''}. Card ending in ${result.cardLast4 || '****'}`,
           });
           
           clearCart();
@@ -551,14 +563,16 @@ export default function PointOfSale() {
           throw new Error(completeResult.error || 'Failed to sync payment with calendar');
         }
       } catch (error: any) {
-        console.error('Error completing terminal payment:', error);
+        console.error('Error completing terminal payment, trying alternate method:', error);
         
-        // Still process the transaction even if calendar sync fails
+        // Fallback: Still process the transaction using the transactions endpoint
         const response = await apiRequest("POST", "/api/transactions", {
           ...transaction,
           paymentId: result.transactionId,
           helcimTransactionId: result.transactionId,
           cardLast4: result.cardLast4,
+          tipAmount: terminalTipAmount, // Make sure tip is passed
+          total: terminalTotalAmount,    // Make sure total includes tip
           terminalPaymentMethod: result.paymentMethod
         });
         const transactionResult = await response.json();
@@ -568,10 +582,10 @@ export default function PointOfSale() {
           ...transactionResult,
           client: selectedClient,
           items: cart,
-          subtotal: getSubtotal(),
+          subtotal: terminalBaseAmount,
           tax: getTax(),
-          tipAmount: tipAmount,
-          total: getGrandTotal(),
+          tipAmount: terminalTipAmount,
+          total: terminalTotalAmount,
           paymentMethod: "terminal",
           timestamp: new Date(),
           paymentId: result.transactionId,
@@ -580,7 +594,7 @@ export default function PointOfSale() {
         
         toast({
           title: "Payment Successful",
-          description: `Terminal payment of $${getGrandTotal().toFixed(2)} completed. Card ending in ${result.cardLast4 || '****'}`,
+          description: `Terminal payment of $${terminalTotalAmount.toFixed(2)} completed${terminalTipAmount > 0 ? ` (includes $${terminalTipAmount.toFixed(2)} tip)` : ''}. Card ending in ${result.cardLast4 || '****'}`,
         });
         
         clearCart();

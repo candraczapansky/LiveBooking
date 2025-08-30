@@ -586,7 +586,7 @@ const AppointmentDetails = ({
   };
 
   const handleCardPayment = () => {
-    // Freeze the amount and open Helcim modal immediately
+    // Freeze the amount and show card payment options
     const amt = getAppointmentChargeAmount();
     console.log('[CardPayment] Freezing chargeAmount =', amt, {
       totalAmount: (appointment as any)?.totalAmount,
@@ -594,13 +594,7 @@ const AppointmentDetails = ({
     });
     setChargeAmount(amt);
     setShowCardPayment(true);
-    
-    // Add small delay before showing Helcim modal to ensure state updates have processed
-    console.log('[CardPayment] Setting showCardPayment=true, waiting to open modal');
-    setTimeout(() => {
-      console.log('[CardPayment] Opening Helcim modal...');
-      setShowHelcimModal(true);
-    }, 100);
+    // Modal will be opened when user clicks "Pay Now" button
   };
 
   // Card payment inline handlers handled inline in JSX
@@ -620,17 +614,19 @@ const AppointmentDetails = ({
         if ((result.success || result.status === 'completed') && result.status === 'completed') {
           clearInterval(pollInterval);
           
-          // Use the new complete-payment endpoint to sync with calendar
+          // Use the complete endpoint to sync with calendar and save tip info
           try {
-            const completeResponse = await fetch('/api/terminal/complete-payment', {
+            const completeResponse = await fetch(`/api/terminal/complete/${appointment.id}/${paymentId}`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
               },
               body: JSON.stringify({
                 transactionId,
-                appointmentId: appointment.id,
-                paymentId
+                cardLast4: result.cardLast4 || result.last4,
+                totalAmount: result.amount || appointment.totalAmount,
+                tipAmount: result.tipAmount || 0,
+                baseAmount: result.baseAmount || appointment.totalAmount
               }),
             });
 
