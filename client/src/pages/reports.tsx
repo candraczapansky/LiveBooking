@@ -639,13 +639,15 @@ const SpecificReportView = ({
   timePeriod, 
   customStartDate, 
   customEndDate,
-  selectedLocation
+  selectedLocation,
+  selectedStaff
 }: { 
   reportType: string; 
   timePeriod: string; 
   customStartDate: string; 
   customEndDate: string; 
   selectedLocation: string; 
+  selectedStaff?: string;
 }) => {
   // Generate reports based on type
   switch (reportType) {
@@ -660,7 +662,7 @@ const SpecificReportView = ({
     case "staff":
       return <StaffReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     case "payroll":
-      return <PayrollReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
+      return <PayrollReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} selectedStaffId={selectedStaff || "all"} />;
     case "timeclock":
       return <TimeClockReport timePeriod={timePeriod} customStartDate={customStartDate} customEndDate={customEndDate} />;
     default:
@@ -2688,6 +2690,7 @@ const ReportsPage = () => {
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedStaffForPayroll, setSelectedStaffForPayroll] = useState<string>("all");
   // Apply filters only when user clicks "Load Report"
   const [appliedLocation, setAppliedLocation] = useState<string>("all");
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
@@ -2710,6 +2713,25 @@ const ReportsPage = () => {
     refetchOnMount: true,
     staleTime: 0,
   });
+
+  // Fetch staff and users for header staff filter (payroll only)
+  const { data: headerStaff = [] } = useQuery({
+    queryKey: ["/api/staff"],
+  });
+  const { data: headerUsers = [] } = useQuery({
+    queryKey: ["/api/users"],
+  });
+
+  const getHeaderStaffName = (staff: any) => {
+    try {
+      const u = (headerUsers as any[]).find((usr: any) => usr.id === staff.userId);
+      if (u && (u.firstName || u.lastName)) return `${u.firstName || ''} ${u.lastName || ''}`.trim();
+      if (staff.user && (staff.user.firstName || staff.user.lastName)) return `${staff.user.firstName || ''} ${staff.user.lastName || ''}`.trim();
+      return `Staff ${staff.id}`;
+    } catch {
+      return `Staff ${staff?.id ?? ''}`;
+    }
+  };
 
   // Auto-update the last update time every 30 seconds to show live status
   React.useEffect(() => {
@@ -2870,6 +2892,26 @@ const ReportsPage = () => {
                         </Popover>
                       )}
                       
+                      {/* Staff filter only for Payroll report */}
+                      {selectedReport === 'payroll' && (
+                        <Select 
+                          value={selectedStaffForPayroll}
+                          onValueChange={setSelectedStaffForPayroll}
+                        >
+                          <SelectTrigger className="w-full sm:w-[200px] min-h-[44px] text-left">
+                            <SelectValue placeholder="All Staff" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Staff</SelectItem>
+                            {(headerStaff as any[]).map((s: any) => (
+                              <SelectItem key={s.id} value={String(s.id)}>
+                                {getHeaderStaffName(s)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+
                       {/* Location Filter */}
                       <Select 
                         value={selectedLocation} 
@@ -2957,6 +2999,7 @@ const ReportsPage = () => {
                   customStartDate={customStartDate}
                   customEndDate={customEndDate}
                   selectedLocation={appliedLocation}
+                  selectedStaff={selectedReport === 'payroll' ? selectedStaffForPayroll : undefined}
                 />
               </div>
             ) : (

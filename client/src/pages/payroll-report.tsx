@@ -17,6 +17,7 @@ interface PayrollReportProps {
   timePeriod: string;
   customStartDate?: string;
   customEndDate?: string;
+  selectedStaffId?: string; // comes from header filter
 }
 
 interface PayrollData {
@@ -80,9 +81,9 @@ interface Payment {
   paymentDate: string;
 }
 
-export default function PayrollReport({ timePeriod, customStartDate, customEndDate }: PayrollReportProps) {
+export default function PayrollReport({ timePeriod, customStartDate, customEndDate, selectedStaffId }: PayrollReportProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
-  const [selectedStaff, setSelectedStaff] = useState<string>("all");
+  const [selectedStaff, setSelectedStaff] = useState<string>(selectedStaffId || "all");
   const [syncing, setSyncing] = useState<number | null>(null);
   const [saving, setSaving] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
@@ -94,6 +95,16 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
   const queryClient = useQueryClient();
   const { businessSettings } = useBusinessSettings();
   const businessTz = businessSettings?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+
+  // Keep selected staff in sync with header filter
+  useEffect(() => {
+    if (selectedStaffId && selectedStaffId !== selectedStaff) {
+      setSelectedStaff(selectedStaffId);
+    }
+    if (!selectedStaffId && selectedStaff !== 'all') {
+      setSelectedStaff('all');
+    }
+  }, [selectedStaffId]);
 
   const formatYmdInTimeZone = (date: Date) => {
     try {
@@ -183,9 +194,70 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       rangeStart = s.start;
       rangeEnd = e.end;
     } else {
-      // Use month selection as fallback
-      rangeStart = startOfMonth(selectedMonth);
-      rangeEnd = endOfMonth(selectedMonth);
+      // Respect selected time period from Reports page; keep month selector for 'month'
+      const now = new Date();
+      switch (timePeriod) {
+        case 'day': {
+          const tzNow = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzNow.setHours(0,0,0,0);
+          const tzEnd = new Date(tzNow);
+          tzEnd.setHours(23,59,59,999);
+          rangeStart = tzNow;
+          rangeEnd = tzEnd;
+          break;
+        }
+        case 'yesterday': {
+          const y = new Date(now);
+          y.setDate(now.getDate() - 1);
+          const tzY = new Date(y.toLocaleString('en-US', { timeZone: businessTz }));
+          tzY.setHours(0,0,0,0);
+          const tzEnd = new Date(tzY);
+          tzEnd.setHours(23,59,59,999);
+          rangeStart = tzY;
+          rangeEnd = tzEnd;
+          break;
+        }
+        case 'week': {
+          const tzStart = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzStart.setHours(0,0,0,0);
+          tzStart.setDate(tzStart.getDate() - 6);
+          const tzEnd = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzEnd.setHours(23,59,59,999);
+          rangeStart = tzStart;
+          rangeEnd = tzEnd;
+          break;
+        }
+        case 'month': {
+          // Use the page's month selector for monthly view
+          rangeStart = startOfMonth(selectedMonth);
+          rangeEnd = endOfMonth(selectedMonth);
+          break;
+        }
+        case 'quarter': {
+          const tzStart = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzStart.setHours(0,0,0,0);
+          tzStart.setMonth(tzStart.getMonth() - 3);
+          const tzEnd = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzEnd.setHours(23,59,59,999);
+          rangeStart = tzStart;
+          rangeEnd = tzEnd;
+          break;
+        }
+        case 'year': {
+          const tzStart = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzStart.setHours(0,0,0,0);
+          tzStart.setFullYear(tzStart.getFullYear() - 1);
+          const tzEnd = new Date(now.toLocaleString('en-US', { timeZone: businessTz }));
+          tzEnd.setHours(23,59,59,999);
+          rangeStart = tzStart;
+          rangeEnd = tzEnd;
+          break;
+        }
+        default: {
+          rangeStart = startOfMonth(selectedMonth);
+          rangeEnd = endOfMonth(selectedMonth);
+        }
+      }
     }
 
     // Compare by ISO date strings (YYYY-MM-DD) to avoid any timezone off-by-one
@@ -713,44 +785,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </div>
       </div>
 
-      {/* Filter Controls */}
-      <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:space-x-4 sm:space-y-0">
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Select Month</label>
-          <Select
-            value={selectedMonth.toISOString()}
-            onValueChange={(value) => setSelectedMonth(new Date(value))}
-          >
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Filter Staff</label>
-          <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Staff</SelectItem>
-              {payrollData.map((data) => (
-                <SelectItem key={data.staffId} value={data.staffId.toString()}>
-                  {data.staffName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      {/* Filter Controls removed: unified filters live in the header. Keep month for 'month' period only if needed. */}
 
       {/* Summary Cards - show only in Full mode to simplify the page */}
       {displayMode === 'full' && (
