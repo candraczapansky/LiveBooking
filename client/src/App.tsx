@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { useLocation } from "wouter";
@@ -65,7 +65,16 @@ const PageLoading = () => (
 );
 
 function Router() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
+  const [location, navigate] = useLocation();
+  const isClient = isAuthenticated && user?.role === 'client';
+
+  // Force authenticated clients to stay on /booking
+  useEffect(() => {
+    if (isClient && location !== '/booking') {
+      try { navigate('/booking', { replace: true }); } catch {}
+    }
+  }, [isClient, location, navigate]);
 
   // Show loading indicator while checking authentication
   if (loading) {
@@ -86,6 +95,18 @@ function Router() {
           <Route path="/documents/:id" component={DocumentDisplay} />
           <Route path="/" component={Login} />
           <Route component={Login} />
+        </Switch>
+      </Suspense>
+    );
+  }
+
+  // Restrict authenticated clients to booking only
+  if (isClient) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <Switch>
+          <Route path="/booking" component={ClientBooking} />
+          <Route component={() => null} />
         </Switch>
       </Suspense>
     );

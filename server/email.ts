@@ -33,7 +33,8 @@ interface EmailParams {
 
 // Known verified senders (update this list with actually verified senders)
 const VERIFIED_SENDERS = [
-  'hello@headspaglo.com'  // Primary verified sender - this is the only verified email
+  'hello@headspaglo.com', // Primary verified sender
+  'hello@gloheadspa.app', // Correct domain used on booking site
 ];
 
 // Check if an email is in our verified list

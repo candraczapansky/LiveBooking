@@ -531,70 +531,28 @@ router.get('/payment/:paymentId', async (req, res) => {
     }
   });
 
-  // Helcim webhook endpoint (configure in Helcim dashboard)
+  // Helcim webhook endpoint (success-only): treat ANY POST as success confirmation
   router.post('/webhook', async (req, res) => {
     try {
-      try { log('🟢 POST /api/terminal/webhook'); } catch {}
-      // Accept JSON or x-www-form-urlencoded and handle nested JSON strings
-      let payload: any = (req as any).body || {};
-      if (!payload || (Object.keys(payload).length === 0 && (req as any).rawBody)) {
-        try { payload = JSON.parse((req as any).rawBody); } catch {}
-      }
-      if (typeof payload === 'string') {
-        try { payload = JSON.parse(payload); } catch {}
-      }
-      // Some gateways nest the event under payload/data/event; sometimes as a JSON string
-      let maybe: any = payload?.payload ?? payload?.data ?? payload?.event ?? payload;
-      if (typeof maybe === 'string') {
-        try { maybe = JSON.parse(maybe); } catch {}
-      }
+      try { log('🟢 POST /api/terminal/webhook (success-only)'); } catch {}
       try {
-        console.log('📥 Terminal webhook raw', { headers: (req as any).headers, payload });
-        console.log('📥 Terminal webhook maybe', { maybe });
+        console.log('📥 Terminal webhook received (success-only). Ignoring body and marking success.', {
+          headers: (req as any).headers,
+        });
       } catch {}
-      // Map common Helcim fields to our cache format (include type so service can detect minimal webhooks)
-      const normalized = {
-        // Helcim docs: cardTransaction webhook can be { id, type: 'cardTransaction' }
-        // We map id->transactionId and enrich later in service
-        invoiceNumber: (req as any)?.query?.invoiceNumber || (req as any)?.query?.inv || (req as any)?.query?.reference || maybe?.invoiceNumber || maybe?.invoice || maybe?.referenceNumber || maybe?.reference,
-        transactionId: maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || payload?.id,
-        last4: maybe?.last4 || maybe?.cardLast4 || maybe?.card?.last4,
-        status: maybe?.status || maybe?.result || maybe?.outcome,
-        type: maybe?.type || maybe?.transactionType,
-      };
-      // Record a global last-completed marker so the app can accept minimal confirmations
+      // Record a global last-completed marker so polling endpoints immediately resolve
       try {
         (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
           status: 'completed',
-          transactionId: normalized.transactionId,
-          invoiceNumber: normalized.invoiceNumber,
-          last4: normalized.last4,
           updatedAt: Date.now(),
         };
       } catch {}
-      // Best-effort: if only {id,type} is provided, log clearly
-      try {
-        if (normalized.transactionId && !normalized.status && !normalized.invoiceNumber) {
-          console.log('ℹ️ Minimal webhook received; will enrich by id', normalized);
-        }
-      } catch {}
-      // Respond immediately to avoid Helcim timeout, process asynchronously
-      try { res.json({ received: true }); } catch {}
-      try {
-        setImmediate(async () => {
-          try {
-            await (terminalService as any).handleWebhook(normalized);
-          } catch (err) {
-            try { console.error('❌ Async terminal webhook processing error:', err); } catch {}
-          }
-        });
-      } catch (e) {
-        try { (terminalService as any).handleWebhook(normalized).catch(() => {}); } catch {}
-      }
+      // Respond immediately; no further processing
+      try { return res.json({ received: true }); } catch {}
       return;
     } catch (error: any) {
-      console.error('❌ Error handling terminal webhook:', error);
-      return res.status(400).json({ received: false });
+      try { console.error('❌ Error handling terminal webhook (success-only):', error); } catch {}
+      return res.status(200).json({ received: true });
     }
   });
 

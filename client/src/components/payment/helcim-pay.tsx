@@ -2,13 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
@@ -38,11 +31,12 @@ export default function HelcimPay({
   const { toast } = useToast();
 
   const initializeHelcimPay = useCallback(async () => {
-    if (!window.helcimPay || isInitialized) return;
+    if (isInitialized) return;
 
     try {
       setIsLoading(true);
-      // Ensure Helcim scripts are present if global is not ready in time
+
+      // Ensure Helcim scripts are present
       const ensureScripts = () => {
         const hasStart = Array.from(document.scripts).some(s => s.src.includes('helcim-pay/services/start.js'));
         if (!hasStart) {
@@ -60,6 +54,31 @@ export default function HelcimPay({
         }
       };
       ensureScripts();
+
+      // Wait for helcimPay to be injected
+      const waitFor = async <T,>(fn: () => T | undefined, timeoutMs = 20000, intervalMs = 100): Promise<T> => {
+        const start = Date.now();
+        return await new Promise<T>((resolve, reject) => {
+          const id = setInterval(() => {
+            try {
+              const value = fn();
+              if (value) {
+                clearInterval(id);
+                resolve(value);
+              } else if (Date.now() - start >= timeoutMs) {
+                clearInterval(id);
+                reject(new Error('Helcim script not loaded'));
+              }
+            } catch (err) {
+              clearInterval(id);
+              reject(err as Error);
+            }
+          }, intervalMs);
+        });
+      };
+      // @ts-ignore
+      await waitFor(() => window.helcimPay, 20000, 100);
+
       // Fetch session token from backend first
       const initResponse = await apiRequest('POST', '/api/payments/helcim/initialize', {
         amount,
@@ -73,14 +92,18 @@ export default function HelcimPay({
       }
 
       // Initialize Helcim Pay.js with session token
+      // @ts-ignore
       await window.helcimPay.initialize({
+        // @ts-ignore
         accountId: import.meta.env.VITE_HELCIM_ACCOUNT_ID,
+        // @ts-ignore
         terminalId: import.meta.env.VITE_HELCIM_TERMINAL_ID,
         token: initData.token,
         test: process.env.NODE_ENV !== 'production',
       });
 
       // Mount the payment form
+      // @ts-ignore
       window.helcimPay.mount('helcim-payment-form');
       setIsInitialized(true);
     } catch (error) {
@@ -167,50 +190,54 @@ export default function HelcimPay({
     onError?.(error);
   };
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>Payment Details</DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 z-[9999]">
+      <div className="absolute inset-0 bg-black/80 z-[0]" onClick={() => onOpenChange(false)} />
+      <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
+        <div className="pointer-events-auto bg-background w-[95vw] sm:max-w-[425px] max-h-[95vh] p-6 rounded-lg shadow-lg z-[2] isolate">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold leading-none tracking-tight">Payment Details</h2>
+          </div>
 
-        <div className="grid gap-4 py-4">
-          <div id="helcim-payment-form" className="min-h-[150px]" />
-          
-          {isLoading && (
-            <div className="flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handlePayment}
-            disabled={isLoading || !isInitialized}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              `Pay ${new Intl.NumberFormat('en-US', {
-                style: 'currency',
-                currency: 'USD'
-              }).format(amount)}`
+          <div className="grid gap-4 py-4">
+            <div id="helcim-payment-form" className="min-h-[150px] pointer-events-auto" />
+            {isLoading && (
+              <div className="flex justify-center">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
             )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </div>
+
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handlePayment}
+              disabled={isLoading || !isInitialized}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                `Pay ${new Intl.NumberFormat('en-US', {
+                  style: 'currency',
+                  currency: 'USD'
+                }).format(amount)}`
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

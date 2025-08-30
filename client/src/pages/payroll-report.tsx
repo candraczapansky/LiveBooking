@@ -86,6 +86,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
   const [saving, setSaving] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
   const [detailStaffId, setDetailStaffId] = useState<number | null>(null);
+  // UI display preference: keep existing summary/full view intact, but default to a simpler table
+  const [displayMode, setDisplayMode] = useState<'simple' | 'full'>('simple');
   const { toast } = useToast();
   const detailContainerRef = useRef<HTMLDivElement | null>(null);
   const queryClient = useQueryClient();
@@ -581,6 +583,23 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </div>
         
         <div className="flex items-center space-x-2">
+          {/* Simple/Full toggle - minimal UI using existing Button */}
+          <div className="flex items-center space-x-1 mr-2">
+            <Button
+              variant={displayMode === 'simple' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDisplayMode('simple')}
+            >
+              Simple
+            </Button>
+            <Button
+              variant={displayMode === 'full' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDisplayMode('full')}
+            >
+              Full
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -641,165 +660,224 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
-            <UsersIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summaryStats.totalStaff}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalRevenue)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
-            <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalPayroll)}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Services</CardTitle>
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summaryStats.totalServices}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Tips</CardTitle>
-            <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalTips)}</div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Summary Cards - show only in Full mode to simplify the page */}
+      {displayMode === 'full' && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Staff</CardTitle>
+              <UsersIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{summaryStats.totalStaff}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+              <TrendingUpIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalRevenue)}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
+              <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalPayroll)}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Services</CardTitle>
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{summaryStats.totalServices}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Tips</CardTitle>
+              <DollarSignIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCurrency(summaryStats.totalTips)}</div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-      {/* Payroll Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Staff Payroll Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredPayrollData.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-muted-foreground">No payroll data found for the selected period.</p>
-            </div>
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Staff Member</TableHead>
-                    <TableHead>Commission Type</TableHead>
-                    <TableHead className="text-right">Services</TableHead>
-                    <TableHead className="text-right">Revenue</TableHead>
-                    <TableHead className="text-right">Tips</TableHead>
-                    <TableHead className="text-right">Hours</TableHead>
-                    <TableHead className="text-right">Total Earnings</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredPayrollData.map((data) => (
-                    <TableRow key={data.staffId}>
-                      <TableCell>
-                        <div>
+      {/* Payroll Tables */}
+      {displayMode === 'simple' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Payroll (Simple)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredPayrollData.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">No payroll data found for the selected period.</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Staff</TableHead>
+                      <TableHead className="text-right">Services</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Tips</TableHead>
+                      <TableHead className="text-right">Earnings</TableHead>
+                      <TableHead className="text-right">Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPayrollData.map((data) => (
+                      <TableRow key={data.staffId}>
+                        <TableCell>
                           <div className="font-medium">{data.staffName}</div>
-                          <div className="text-sm text-muted-foreground">{data.title}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {data.commissionType.replace('_', ' ')}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{data.totalServices}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
-                      <TableCell className="text-right">
-                        {data.totalHours > 0 ? `${data.totalHours.toFixed(1)}h` : '-'}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatCurrency(data.totalEarnings)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-2">
+                          <div className="text-xs text-muted-foreground">{data.title}</div>
+                        </TableCell>
+                        <TableCell className="text-right">{data.totalServices}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
+                        <TableCell className="text-right font-semibold">{formatCurrency(data.totalEarnings)}</TableCell>
+                        <TableCell className="text-right">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              console.log('Setting detail view for staff:', data.staffId);
                               setDetailStaffId(data.staffId);
                               setViewMode('detail');
-                              console.log('State should now be:', { viewMode: 'detail', detailStaffId: data.staffId });
                             }}
                           >
                             <Eye className="h-3 w-3 mr-1" />
-                            View Details
+                            View
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSavePayroll(data)}
-                            disabled={saving === data.staffId}
-                          >
-                            {saving === data.staffId ? (
-                              <>
-                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                Saving
-                              </>
-                            ) : (
-                              <>
-                                <Save className="h-3 w-3 mr-1" />
-                                Save
-                              </>
-                            )}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handlePayrollSync(data.staffId)}
-                            disabled={syncing === data.staffId}
-                          >
-                            {syncing === data.staffId ? (
-                              <>
-                                <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                                Syncing
-                              </>
-                            ) : (
-                              "Sync"
-                            )}
-                          </Button>
-                        </div>
-                      </TableCell>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Staff Payroll Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredPayrollData.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">No payroll data found for the selected period.</p>
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Staff Member</TableHead>
+                      <TableHead>Commission Type</TableHead>
+                      <TableHead className="text-right">Services</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Tips</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                      <TableHead className="text-right">Total Earnings</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPayrollData.map((data) => (
+                      <TableRow key={data.staffId}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{data.staffName}</div>
+                            <div className="text-sm text-muted-foreground">{data.title}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {data.commissionType.replace('_', ' ')}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">{data.totalServices}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
+                        <TableCell className="text-right">
+                          {data.totalHours > 0 ? `${data.totalHours.toFixed(1)}h` : '-'}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">
+                          {formatCurrency(data.totalEarnings)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                console.log('Setting detail view for staff:', data.staffId);
+                                setDetailStaffId(data.staffId);
+                                setViewMode('detail');
+                                console.log('State should now be:', { viewMode: 'detail', detailStaffId: data.staffId });
+                              }}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              View Details
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSavePayroll(data)}
+                              disabled={saving === data.staffId}
+                            >
+                              {saving === data.staffId ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  Saving
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="h-3 w-3 mr-1" />
+                                  Save
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handlePayrollSync(data.staffId)}
+                              disabled={syncing === data.staffId}
+                            >
+                              {syncing === data.staffId ? (
+                                <>
+                                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                  Syncing
+                                </>
+                              ) : (
+                                "Sync"
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
 
     </div>
