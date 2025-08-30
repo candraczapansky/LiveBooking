@@ -52,31 +52,42 @@ export default function HelcimPayJsModal({
 
   // Ensure Helcim scripts are present; inject if missing
   const ensureHelcimScripts = async () => {
-    // First, remove any conflicting scripts that might be causing issues
-    const removeScriptIfExists = (id: string) => {
-      const script = document.getElementById(id);
-      if (script) {
-        console.log(`[HelcimPayJs] Removing existing script: ${id}`);
-        script.remove();
-      }
+    // Check if the Helcim script is already loaded
+    const isScriptLoaded = () => {
+      return document.querySelectorAll('script').some(script => 
+        script.src && script.src.includes('helcim-pay/services/start.js')
+      );
     };
     
-    // Remove any potentially conflicting scripts
-    removeScriptIfExists('helcim-pay-sdk');
-    removeScriptIfExists('helcim-pay-sdk-alt');
-    removeScriptIfExists('helcim-pay-sdk-cdn');
-    removeScriptIfExists('helcim-js'); // This was likely causing conflicts
+    // Check if appendHelcimPayIframe function is already available
+    if (typeof window.appendHelcimPayIframe === 'function') {
+      console.log('[HelcimPayJs] Helcim Pay.js already loaded and ready');
+      return;
+    }
     
-    // Remove any scripts with helcim.js in the src which might be causing conflicts
-    document.querySelectorAll('script').forEach(script => {
-      if (script.src && (
-          script.src.includes('helcim.js') || 
-          script.src.includes('js/helcim')
-        )) {
-        console.log(`[HelcimPayJs] Removing conflicting script: ${script.src}`);
-        script.remove();
+    // If script tag exists but function not ready, wait a bit
+    if (isScriptLoaded()) {
+      console.log('[HelcimPayJs] Script tag exists, waiting for it to initialize...');
+      
+      // Wait for the script to fully load and initialize
+      let attempts = 0;
+      const maxAttempts = 20;
+      
+      while (attempts < maxAttempts && typeof window.appendHelcimPayIframe !== 'function') {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
       }
-    });
+      
+      if (typeof window.appendHelcimPayIframe === 'function') {
+        console.log('[HelcimPayJs] Helcim Pay.js initialized successfully');
+        return;
+      } else {
+        console.warn('[HelcimPayJs] Script loaded but appendHelcimPayIframe not available after waiting');
+      }
+    }
+    
+    // Only load the script if it's not already present
+    console.log('[HelcimPayJs] Script not found, loading Helcim Pay.js...');
     
     const loadScript = async (src: string, id: string): Promise<void> => {
       console.log(`[HelcimPayJs] Loading script: ${src}`);
@@ -112,7 +123,6 @@ export default function HelcimPayJsModal({
     };
     
     // Load only the official Helcim Pay.js script as per documentation
-    console.log('[HelcimPayJs] Loading official Helcim Pay.js script');
     await loadScript('https://secure.helcim.app/helcim-pay/services/start.js', 'helcim-pay-sdk');
   };
 

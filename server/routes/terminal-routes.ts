@@ -104,11 +104,14 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
-    // Minimal confirmation mode: if a fresh Helcim webhook was received recently,
-    // immediately report completed (confirmation-only behavior).
+    // CRITICAL FIX: Only return completed if the webhook is for THIS specific payment
+    // Must verify the webhook matches this exact paymentId to prevent false completions
     try {
       const g: any = (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__;
-      if (g && (Date.now() - (g.updatedAt || 0)) <= 90 * 1000) {
+      if (g && 
+          (g.transactionId === paymentId || g.invoiceNumber === paymentId) &&
+          (Date.now() - (g.updatedAt || 0)) <= 90 * 1000) {
+        console.log('✅ Found matching webhook for payment:', paymentId);
         return res.json({
           success: true,
           status: 'completed',
@@ -185,7 +188,9 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
             const statusOk = w?.status === 'completed';
             const recentOk = (w?.updatedAt || 0) >= recentMs;
             const hasId = !!(w?.transactionId || w?.key);
-            return keyOk && statusOk && recentOk && hasId;
+            // CRITICAL FIX: Only match if the key matches our specific paymentId
+            const matchesPayment = w?.key === paymentId || w?.invoiceNumber === paymentId;
+            return keyOk && statusOk && recentOk && hasId && matchesPayment;
           });
           if (candidates.length >= 1) {
             // Choose the most recent candidate
@@ -280,7 +285,9 @@ router.get('/payment/:paymentId', async (req, res) => {
             const statusOk = w?.status === 'completed';
             const recentOk = (w?.updatedAt || 0) >= recentMs;
             const hasId = !!(w?.transactionId || w?.key);
-            return keyOk && statusOk && recentOk && hasId;
+            // CRITICAL FIX: Only match if the key matches our specific paymentId
+            const matchesPayment = w?.key === paymentId || w?.invoiceNumber === paymentId;
+            return keyOk && statusOk && recentOk && hasId && matchesPayment;
           });
           if (candidates.length >= 1) {
             const winner = candidates.sort((a: any, b: any) => (b.updatedAt || 0) - (a.updatedAt || 0))[0];
@@ -679,6 +686,34 @@ router.get('/status/:locationId', async (req, res) => {
       success: false, 
       message: error.message || 'Failed to get terminal status' 
     });
+  }
+});
+
+/**
+ * Debug endpoint to clear webhook cache (temporary for testing)
+ */
+router.post('/clear-cache', (req, res) => {
+  try {
+    // Clear the global marker
+    delete (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__;
+    
+    // Clear webhook store
+    const webhookStore = (terminalService as any).webhookStore;
+    if (webhookStore) {
+      webhookStore.clear();
+    }
+    
+    // Clear session store
+    const sessionStore = (terminalService as any).sessionStore;
+    if (sessionStore) {
+      sessionStore.clear();
+    }
+    
+    console.log('🧹 Cleared all webhook and session caches');
+    return res.json({ success: true, message: 'All caches cleared' });
+  } catch (error: any) {
+    console.error('❌ Error clearing caches:', error);
+    return res.status(500).json({ error: error.message });
   }
 });
 
