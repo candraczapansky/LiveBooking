@@ -723,7 +723,14 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
   const isSingleDay = timePeriod === 'day' || timePeriod === 'yesterday';
   const targetUtcDay = new Date(Date.UTC(normalizedStart.getFullYear(), normalizedStart.getMonth(), normalizedStart.getDate())).toISOString().slice(0, 10);
   
-  // Filter sales by date range, completed status, and location
+  // Build a quick lookup of appointments that are both completed and paid
+  const paidAppointmentIdSet = new Set(
+    (appointments as any[])
+      .filter((a: any) => String((a.status || '').toLowerCase()) === 'completed' && String((a.paymentStatus || a.payment_status || '').toLowerCase()) === 'paid')
+      .map((a: any) => a.id)
+  );
+
+  // Filter sales by date range, completed payment status, appointment paid/completed (for services), and location
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
     const dateFilterPrimary = saleDate >= normalizedStart && saleDate <= normalizedEnd;
@@ -740,14 +747,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
     }
     const dateFilter = dateFilterPrimary || dateFilterFallback;
     const statusFilter = (sale.paymentStatus === "completed" || sale.payment_status === "completed");
+    const txType = sale.transactionType || sale.transaction_type;
+    const apptId = sale.appointmentId || sale.appointment_id;
+    const appointmentPaidOk = txType === 'appointment' ? (apptId ? paidAppointmentIdSet.has(apptId) : false) : true;
     
     // Location filtering - for appointment sales, check the appointment's location
     let locationFilter = true;
     if (selectedLocation && selectedLocation !== 'all') {
-      if (sale.transactionType === 'appointment' && sale.appointmentId) {
-        const apt = (appointments as any[]).find((a: any) => a.id === sale.appointmentId);
+      if (txType === 'appointment' && apptId) {
+        const apt = (appointments as any[]).find((a: any) => a.id === apptId);
         locationFilter = !!apt && String(apt.locationId) === String(selectedLocation);
-      } else if (sale.transactionType === 'pos_sale') {
+      } else if (txType === 'pos_sale') {
         // Exclude POS sales when a specific location is selected (no location mapping available)
         locationFilter = false;
       } else {
@@ -756,7 +766,7 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
       }
     }
     
-    return dateFilter && statusFilter && locationFilter;
+    return dateFilter && statusFilter && appointmentPaidOk && locationFilter;
   });
   
   // Build fallback sales-like records from payments to capture very recent activity
@@ -774,9 +784,19 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
           const d = new Date(p.paymentDate || p.createdAt || p.processedAt || Date.now());
           const inRange = d >= normalizedStart && d <= normalizedEnd;
           if (!statusOk || !inRange) return false;
-          if (selectedLocation && selectedLocation !== 'all') {
+          // For appointment payments, require the underlying appointment to be completed and paid
+          if (p.appointmentId) {
             const apt = (appointments as any[]).find((a: any) => a.id === p.appointmentId);
-            if (!apt || String(apt.locationId) !== String(selectedLocation)) return false;
+            if (!apt) return false;
+            const paidOk = String((apt.paymentStatus || apt.payment_status || '').toLowerCase()) === 'paid';
+            const completedOk = String((apt.status || '').toLowerCase()) === 'completed';
+            if (!(paidOk && completedOk)) return false;
+            if (selectedLocation && selectedLocation !== 'all') {
+              if (String(apt.locationId) !== String(selectedLocation)) return false;
+            }
+          } else if (selectedLocation && selectedLocation !== 'all') {
+            // Exclude non-appointment payments when filtering by location
+            return false;
           }
           // Avoid duplicates when a sales_history already exists for this payment
           const pid = p.id || p.paymentId;
