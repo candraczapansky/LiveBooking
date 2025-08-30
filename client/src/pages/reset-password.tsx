@@ -39,14 +39,26 @@ const ResetPassword = () => {
     },
   });
 
+  // Always clear any existing auth before going to Login to avoid auto-entering the app
+  const goToLoginClearingAuth = () => {
+    try {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('profilePicture');
+    } catch {}
+    try {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      window.location.replace(base + '/login');
+    } catch {
+      navigate('/login');
+    }
+  };
+
   // After successful reset, auto-redirect to login as a failsafe
   useEffect(() => {
     if (resetComplete) {
       const timer = setTimeout(() => {
-        try {
-          const base = typeof window !== 'undefined' ? window.location.origin : '';
-          window.location.replace(base + '/login');
-        } catch {}
+        goToLoginClearingAuth();
       }, 1200);
       return () => clearTimeout(timer);
     }
@@ -97,10 +109,7 @@ const ResetPassword = () => {
         title: "Success",
         description: "Your password has been reset successfully!",
       });
-      try {
-        window.location.replace(loginUrl);
-        return;
-      } catch {}
+      goToLoginClearingAuth();
 
     } catch (error: any) {
       console.error("Reset password error:", error);
@@ -145,7 +154,7 @@ const ResetPassword = () => {
                   </Button>
                   <Button
                     variant="default"
-                    onClick={() => navigate("/login")}
+                    onClick={() => goToLoginClearingAuth()}
                     className="w-full"
                   >
                     Back to Login
@@ -187,13 +196,8 @@ const ResetPassword = () => {
                 <a
                   href={loginUrl}
                   onClick={(e) => {
-                    try {
-                      // Force hard navigation for reliability on mobile browsers
-                      e.preventDefault();
-                      window.location.replace(loginUrl);
-                    } catch {
-                      // If anything blocks JS, the href still works
-                    }
+                    e.preventDefault();
+                    goToLoginClearingAuth();
                   }}
                   className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 h-10 px-4 py-2 w-full bg-[#ff8d8f] text-primary-foreground hover:bg-primary/90"
                 >
@@ -201,9 +205,7 @@ const ResetPassword = () => {
                 </a>
                 <button
                   type="button"
-                  onClick={() => {
-                    try { window.location.assign(loginUrl); } catch {}
-                  }}
+                  onClick={() => { goToLoginClearingAuth(); }}
                   className="mt-2 w-full text-xs text-gray-600 underline"
                 >
                   If the button doesn’t work, tap here
@@ -308,7 +310,7 @@ const ResetPassword = () => {
             <div className="mt-6 text-center">
               <Button
                 variant="ghost"
-                onClick={() => navigate("/login")}
+                onClick={() => goToLoginClearingAuth()}
                 className="text-sm"
               >
                 Back to Login

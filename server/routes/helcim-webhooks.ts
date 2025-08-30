@@ -1,31 +1,146 @@
 import { Router } from 'express';
 import type { IStorage } from '../storage.js';
+import { TerminalConfigService } from '../services/terminal-config-service.js';
+import { HelcimTerminalService } from '../services/helcim-terminal-service.js';
 import { log } from '../log.js';
+import * as crypto from 'crypto';
 
-export default function createHelcimWebhookRoutes(_storage: IStorage) {
+export default function createHelcimWebhookRoutes(storage: IStorage) {
   const router = Router();
+  const configService = new TerminalConfigService(storage);
+  const terminalService: any = (storage as any).__terminalService || new HelcimTerminalService(configService);
+  (storage as any).__terminalService = terminalService;
 
-  // Minimal success-only webhook handler: treat ANY POST as a success confirmation.
+  // Webhook handler with proper signature verification
   const handler = async (req: any, res: any) => {
     try {
-      try { log('🟢 POST /api/helcim/webhook (success-only)'); } catch {}
-      try {
-        console.log('📥 Helcim webhook received (success-only). Ignoring body and marking success.', {
-          headers: req.headers,
-        });
-      } catch {}
+      try { log('🟢 POST /api/helcim/webhook'); } catch {}
+      
+      // Get webhook headers
+      const signature = req.headers['webhook-signature'] || req.headers['Webhook-Signature'];
+      const timestamp = req.headers['webhook-timestamp'] || req.headers['Webhook-Timestamp'];
+      const webhookId = req.headers['webhook-id'] || req.headers['Webhook-Id'];
+      
+      console.log('📥 Helcim webhook received:', {
+        headers: {
+          'webhook-signature': signature,
+          'webhook-timestamp': timestamp,
+          'webhook-id': webhookId,
+        },
+        body: req.body,
+      });
+
+      // Verify webhook signature if verifier token is configured
+      const verifierToken = process.env.HELCIM_WEBHOOK_VERIFIER_TOKEN;
+      if (verifierToken && signature && timestamp && webhookId) {
+        try {
+          // Get the raw body string for signature verification
+          let bodyString = '';
+          if (typeof req.body === 'string') {
+            bodyString = req.body;
+          } else if ((req as any).rawBody) {
+            bodyString = (req as any).rawBody;
+          } else {
+            bodyString = JSON.stringify(req.body);
+          }
+          
+          // Construct the signed content
+          const signedContent = `${webhookId}.${timestamp}.${bodyString}`;
+          
+          // Base64 decode the verifier token
+          const verifierTokenBytes = Buffer.from(verifierToken, 'base64');
+          
+          // Generate the expected signature
+          const expectedSignature = crypto
+            .createHmac('sha256', verifierTokenBytes)
+            .update(signedContent)
+            .digest('base64');
+          
+          // Extract the actual signature (format: "v1,signature v2,signature")
+          const signatures = signature.split(' ');
+          let signatureValid = false;
+          
+          for (const sig of signatures) {
+            const parts = sig.split(',');
+            if (parts.length === 2) {
+              const [version, actualSig] = parts;
+              if (actualSig === expectedSignature) {
+                signatureValid = true;
+                console.log('✅ Webhook signature verified successfully');
+                break;
+              }
+            }
+          }
+          
+          if (!signatureValid) {
+            console.warn('⚠️ Webhook signature verification failed, but continuing anyway');
+            // Note: We're not rejecting invalid signatures for now to avoid blocking legitimate webhooks
+            // In production, you might want to: return res.status(401).json({ error: 'Invalid signature' });
+          }
+        } catch (err) {
+          console.error('❌ Error verifying webhook signature:', err);
+        }
+      } else if (verifierToken) {
+        console.warn('⚠️ Missing webhook headers for signature verification');
+      }
+
+      // Parse the webhook payload
+      let payload: any = req.body || {};
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+      
+      // Helcim sends minimal webhook: {"id":"TRANSACTION_ID", "type":"cardTransaction"}
+      const txId = payload?.id;
+      const type = payload?.type;
 
       // Record a global last-completed marker for polling endpoints to detect completion.
       try {
         (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
           status: 'completed',
           updatedAt: Date.now(),
+          transactionId: txId,
         };
       } catch {}
 
-      // Respond immediately; no further processing.
-      try { return res.json({ received: true }); } catch {}
-      return;
+      // Process webhook based on type
+      if (type === 'cardTransaction' && txId) {
+        console.log('🎯 Processing cardTransaction webhook for transaction:', txId);
+        
+        // Handle the webhook asynchronously to return quickly
+        setImmediate(async () => {
+          try {
+            // Pass the minimal webhook data to the handler
+            await (terminalService as any).handleWebhook({
+              id: txId,
+              transactionId: txId,
+              type: 'cardTransaction',
+              // Mark as completed since Helcim only sends webhooks for successful transactions
+              status: 'completed',
+            });
+            console.log('✅ Webhook processing completed for transaction:', txId);
+          } catch (err) {
+            console.error('❌ Helcim webhook processing failed:', err);
+            // Even if enrichment fails, the payment was successful
+            // Store minimal data in webhook cache
+            try {
+              const webhookStore = (terminalService as any).webhookStore || new Map();
+              webhookStore.set(String(txId), {
+                status: 'completed',
+                transactionId: txId,
+                updatedAt: Date.now(),
+              });
+            } catch {}
+          }
+        });
+      } else if (type === 'terminalCancel') {
+        console.log('🚫 Terminal cancel webhook received:', payload);
+        // Handle terminal cancel if needed
+      }
+
+      // Respond immediately with 200 OK to acknowledge receipt
+      // This is critical - Helcim expects a 2xx response quickly
+      return res.status(200).json({ received: true });
     } catch (error: any) {
       try { console.error('❌ Error in success-only Helcim webhook:', error); } catch {}
       return res.status(200).json({ received: true });

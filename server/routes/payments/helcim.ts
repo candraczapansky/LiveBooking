@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { helcimService } from '../../services/helcim-service.js';
 import type { Request, Response } from 'express';
 
 function createHelcimPaymentsRouter(storage?: any) {
@@ -73,7 +72,11 @@ router.post('/initialize', async (req, res) => {
       result = v1;
     }
 
-    res.json({ success: true, token: result.data.checkoutToken });
+    res.json({ 
+      success: true, 
+      token: result.data.checkoutToken,
+      secretToken: result.data.secretToken  // Include the secretToken as per Helcim docs
+    });
   } catch (error: any) {
     console.error('Helcim initialize exception:', error);
     res.status(500).json({
@@ -94,8 +97,10 @@ router.post('/process', async (req, res) => {
         message: 'Missing required payment information'
       });
     }
-
-    const payment = await helcimService.processPayment({
+    // Load helcim service lazily so missing env doesn't prevent router from loading
+    const mod = await import('../../services/helcim-service.js');
+    const service = (mod as any)?.helcimService || (mod as any)?.default || mod;
+    const payment = await service.processPayment({
       token,
       amount,
       description,
@@ -127,8 +132,9 @@ router.post('/verify', async (req, res) => {
         message: 'Transaction ID is required'
       });
     }
-
-    const payment = await helcimService.verifyPayment(transactionId);
+    const mod = await import('../../services/helcim-service.js');
+    const service = (mod as any)?.helcimService || (mod as any)?.default || mod;
+    const payment = await service.verifyPayment(transactionId);
 
     res.json({
       success: true,
@@ -147,7 +153,9 @@ router.post('/verify', async (req, res) => {
 router.post('/create-customer', async (req: Request, res: Response) => {
   try {
     const { firstName, lastName, email, phone } = req.body || {};
-    const created = await helcimService.createCustomer({
+    const mod = await import('../../services/helcim-service.js');
+    const service = (mod as any)?.helcimService || (mod as any)?.default || mod;
+    const created = await service.createCustomer({
       firstName,
       lastName,
       email,
@@ -177,7 +185,9 @@ router.post('/save-card', async (req: Request, res: Response) => {
       // Attempt to create a customer with provided info
       const firstName = (customerName || '').split(' ')[0] || undefined;
       const lastName = (customerName || '').split(' ').slice(1).join(' ') || undefined;
-      const created = await helcimService.createCustomer({
+      const mod = await import('../../services/helcim-service.js');
+      const service = (mod as any)?.helcimService || (mod as any)?.default || mod;
+      const created = await service.createCustomer({
         firstName,
         lastName,
         email: customerEmail,
@@ -188,7 +198,9 @@ router.post('/save-card', async (req: Request, res: Response) => {
       }
     }
 
-    const saved = await helcimService.saveCardToCustomer({ customerId: helcimCustomerId, token });
+    const mod2 = await import('../../services/helcim-service.js');
+    const service2 = (mod2 as any)?.helcimService || (mod2 as any)?.default || mod2;
+    const saved = await service2.saveCardToCustomer({ customerId: helcimCustomerId, token });
     const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id;
     const brand = saved?.brand || saved?.cardBrand;
     const last4 = saved?.last4 || saved?.cardLast4;

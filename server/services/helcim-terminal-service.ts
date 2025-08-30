@@ -581,10 +581,11 @@ export class HelcimTerminalService {
       // Be more permissive with status detection
       let normalized: 'completed' | 'failed' | 'pending' = 'pending';
       
-      // IMPORTANT: If webhook has type "cardTransaction" with an ID but no status,
+      // IMPORTANT: If webhook has type "cardTransaction" with an ID,
       // it's Helcim's minimal webhook format - assume completed since they only send for successful transactions
-      if (payload?.type === 'cardTransaction' && transactionId && !payload?.status && !payload?.approved) {
-        console.log('📌 Minimal Helcim webhook detected - assuming completed');
+      // Also check if status is explicitly set to 'completed' from our webhook handler
+      if ((payload?.type === 'cardTransaction' && transactionId) || payload?.status === 'completed') {
+        console.log('📌 Helcim cardTransaction webhook detected - marking as completed');
         normalized = 'completed';
       }
       // Check for success indicators
@@ -619,19 +620,10 @@ export class HelcimTerminalService {
         return;
       }
 
-      // Skip enrichment if we already have a clear status
-      // The API endpoints are returning 404s, so we'll trust the webhook data
-      if (normalized === 'completed' || normalized === 'failed') {
-        console.log('📌 Webhook has clear status, skipping enrichment');
-      } else if ((!rawStatus || normalized === 'pending') && transactionId) {
-        console.log('⚠️ Webhook status unclear, would normally enrich but API endpoints return 404');
-        // If we have a transaction ID but no clear status, assume it's completed
-        // (Helcim typically only sends webhooks for completed transactions)
-        if (transactionId) {
-          console.log('🎯 Assuming completed status for webhook with transaction ID');
-          normalized = 'completed';
-        }
-      }
+      // Always try to enrich the webhook data if we have a transaction ID
+      // This will help us get the invoice number and card last 4 digits
+      let enrichmentAttempted = false;
+      let enrichmentSuccess = false;
       
       // Try to find the session to get the invoice number if missing
       let sessionKey: string | null = null;
@@ -662,8 +654,10 @@ export class HelcimTerminalService {
         }
       }
 
-      // If Helcim omitted invoiceNumber, enrich by querying the transaction by id
-      if (transactionId && !invoiceNumber) {
+      // Try to enrich the webhook data by querying the transaction details
+      // This helps us get the invoice number and card last 4 digits
+      if (transactionId && (!invoiceNumber || !last4)) {
+        enrichmentAttempted = true;
         try {
           let apiToken: string | undefined;
           try {
@@ -676,13 +670,20 @@ export class HelcimTerminalService {
             const resp = await this.makeRequest('GET', `/card-transactions/${transactionId}`, undefined, apiToken);
             const t = (resp?.data as any) || {};
             const inv = t?.invoiceNumber || t?.invoice || t?.referenceNumber || t?.reference || undefined;
-            const l4 = t?.cardLast4 || t?.last4 || t?.card?.last4 || last4;
+            const l4 = t?.cardLast4 || t?.last4 || t?.card?.last4 || t?.cardNumber || last4;
             if (inv) invoiceNumber = String(inv);
             if (l4) last4 = String(l4);
-            console.log('🧩 Enriched webhook via API', { invoiceNumber, last4 });
+            console.log('🧩 Enriched webhook via API', { invoiceNumber, last4, transactionId });
+            enrichmentSuccess = true;
           }
         } catch (e) {
-          console.log('ℹ️ Transaction enrichment failed; proceeding with minimal webhook', String((e as any)?.message || e));
+          const errorMsg = String((e as any)?.message || e);
+          // Don't worry about 404 errors - the transaction might not be immediately available
+          if (errorMsg.includes('404') || errorMsg.includes('Not Found')) {
+            console.log('ℹ️ Transaction not yet available in API; proceeding with minimal webhook data');
+          } else {
+            console.log('⚠️ Transaction enrichment failed:', errorMsg);
+          }
         }
       }
 

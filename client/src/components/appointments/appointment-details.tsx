@@ -594,7 +594,13 @@ const AppointmentDetails = ({
     });
     setChargeAmount(amt);
     setShowCardPayment(true);
-    setShowHelcimModal(true);
+    
+    // Add small delay before showing Helcim modal to ensure state updates have processed
+    console.log('[CardPayment] Setting showCardPayment=true, waiting to open modal');
+    setTimeout(() => {
+      console.log('[CardPayment] Opening Helcim modal...');
+      setShowHelcimModal(true);
+    }, 100);
   };
 
   // Card payment inline handlers handled inline in JSX
@@ -1154,7 +1160,10 @@ const AppointmentDetails = ({
                             Back
                           </Button>
                           <Button
-                            onClick={() => setShowHelcimModal(true)}
+                            onClick={() => {
+                              console.log('[CardPayment] Pay Now button clicked, opening modal...');
+                              setShowHelcimModal(true);
+                            }}
                             className="flex-1"
                           >
                             Pay Now

@@ -1,36 +1,33 @@
-#!/usr/bin/env node
+import http from 'http';
 
-/**
- * Test payment status checking
- */
+const testPaymentStatus = (paymentId) => {
+  const options = {
+    hostname: 'localhost',
+    port: 5000,
+    path: `/api/terminal/payment/test/${paymentId}`,
+    method: 'GET'
+  };
 
-async function checkPaymentStatus() {
-  const paymentId = 'POS-1756341646413';
-  const locationId = '4';
-  
-  console.log('🔍 Checking payment status...');
-  console.log('Payment ID:', paymentId);
-  console.log('Location ID:', locationId);
-  
-  try {
-    const response = await fetch(`http://localhost:5000/api/terminal/payment/${locationId}/${paymentId}`);
-    const data = await response.json();
-    
-    console.log('\n📊 Payment Status Response:');
-    console.log(JSON.stringify(data, null, 2));
-    
-    if (data.success) {
-      console.log('\n✅ Payment COMPLETED!');
-      console.log('Transaction ID:', data.transactionId);
-      console.log('Last 4 digits:', data.last4);
-    } else if (data.status === 'pending') {
-      console.log('\n⏳ Payment is still pending');
-    } else {
-      console.log('\n❌ Payment failed or unknown');
-    }
-  } catch (error) {
-    console.error('\n❌ Error checking status:', error.message);
-  }
-}
+  return new Promise((resolve, reject) => {
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        console.log(`Status Code: ${res.statusCode}`);
+        console.log('Response:', data);
+        resolve(data);
+      });
+    });
 
-checkPaymentStatus();
+    req.on('error', (e) => {
+      console.error(`Problem with request: ${e.message}`);
+      reject(e);
+    });
+
+    req.end();
+  });
+};
+
+// Test with a fake payment ID
+console.log('Testing payment status endpoint...');
+testPaymentStatus('test-payment-123').catch(console.error);

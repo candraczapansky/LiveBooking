@@ -125,9 +125,18 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.use('/api/helcim', createHelcimWebhookRoutes(storage));
   // Legacy alias used by some Helcim configurations
   app.use('/api/helcim-smart-terminal', createHelcimWebhookRoutes(storage));
-  // Enable helcim payment routes; load dynamically to avoid missing compiled file in some builds
+  // Enable helcim payment routes; attempt multiple resolutions to support dev (.ts) and prod (.js)
   try {
-    const helcimModule = await import('./routes/payments/helcim.js');
+    let helcimModule: any;
+    try {
+      helcimModule = await import('./routes/payments/helcim.js');
+    } catch (e1) {
+      try {
+        helcimModule = await import('./routes/payments/helcim');
+      } catch (e2) {
+        throw e2;
+      }
+    }
     const modDefault = helcimModule?.default || helcimModule;
     if (typeof modDefault === 'function') {
       // Factory that accepts storage and returns a Router

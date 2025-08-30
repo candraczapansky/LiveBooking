@@ -31,6 +31,20 @@ const ForgotPassword = () => {
     },
   });
 
+  const goToLoginClearingAuth = () => {
+    try {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      localStorage.removeItem('profilePicture');
+    } catch {}
+    try {
+      const base = typeof window !== 'undefined' ? window.location.origin : '';
+      window.location.replace(base + '/login');
+    } catch {
+      navigate('/login');
+    }
+  };
+
   const handleSubmit = async (values: ForgotPasswordValues) => {
     setIsLoading(true);
     try {
@@ -103,7 +117,7 @@ const ForgotPassword = () => {
                   </Button>
                   <Button
                     variant="default"
-                    onClick={() => navigate("/login")}
+                    onClick={() => goToLoginClearingAuth()}
                     className="w-full flex items-center gap-2"
                   >
                     <ArrowLeft className="h-4 w-4" />
@@ -178,7 +192,7 @@ const ForgotPassword = () => {
               <div>
                 <Button
                   variant="ghost"
-                  onClick={() => navigate("/login")}
+                  onClick={() => goToLoginClearingAuth()}
                   className="text-sm flex items-center gap-2 mx-auto"
                 >
                   <ArrowLeft className="h-4 w-4" />

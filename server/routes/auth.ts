@@ -305,7 +305,15 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
 
         const sanitizedEmail = sanitizeInputString(email);
 
-        const user = await storage.getUserByEmail(sanitizedEmail);
+        // Try exact match first
+        let user = await storage.getUserByEmail(sanitizedEmail);
+        // Fallback: case-insensitive search if exact lookup fails
+        if (!user) {
+          try {
+            const allUsers = await storage.getAllUsers();
+            user = allUsers.find(u => (u.email || '').toLowerCase() === sanitizedEmail.toLowerCase());
+          } catch {}
+        }
         if (!user) {
           // Don't reveal if email exists or not
           LoggerService.warn("Password reset attempt for non-existent email", {
@@ -345,7 +353,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
           || defaultDomain).replace(/\/$/, '');
         const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
-        // Try to send email; if it fails for any reason, fall back to success response
+        // Try to send email; if it fails for any reason, fall back to success response and attempt SMS if phone exists
         try {
           await sendEmail({
             to: user!.email,
@@ -367,6 +375,13 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
             userId: user!.id,
             error: err?.message || String(err),
           });
+          // Best-effort SMS fallback if user has a phone and Twilio is configured
+          try {
+            if (user && user.phone && await isTwilioConfigured()) {
+              await sendSMS(user.phone, `Reset your password: ${resetLink}`);
+              LoggerService.logAuthentication("password_reset_sms_fallback", user.id, context);
+            }
+          } catch {}
         }
 
         // Always return success to the client to avoid blocking the flow
