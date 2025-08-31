@@ -271,32 +271,20 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       return raw ? new Date(raw) : null;
     };
 
-    // Only include real completed payments with positive amounts within the selected period
-    const completedPaymentsInRange = (payments || []).filter((p: any) => {
-      // Strictly require 'completed' status
+    // Include all real completed payments with positive amounts (do not filter by payment date)
+    // The time period filter is applied to the appointment's date, not the payment's timestamp
+    const completedAppointmentPayments = (payments || []).filter((p: any) => {
       const statusOk = (p.status === 'completed');
-      
-      // Only include payments for appointments
       const typeOk = !p.type || p.type === 'appointment' || p.type === 'appointment_payment';
-      
-      // Must have a positive amount (not zero or negative)
       const amount = (p.totalAmount ?? p.amount ?? 0) as number;
       const positiveAmount = Number(amount) > 0;
-      
-      // Must have a valid payment date within the date range
-      const d = getPaymentDate(p);
-      if (!d || Number.isNaN(d.getTime())) return false;
-      const dStr = formatYmdInTimeZone(d);
-      
-      // Payment must also have a valid appointmentId to be included
       const hasValidAppointmentId = Boolean(p.appointmentId);
-      
-      return statusOk && typeOk && positiveAmount && hasValidAppointmentId && dStr >= startStr && dStr <= endStr;
+      return statusOk && typeOk && positiveAmount && hasValidAppointmentId;
     });
 
     // Map appointmentId -> completed payments in range with positive amounts
     const appointmentIdToPayments = new Map<number, any[]>();
-    for (const p of completedPaymentsInRange) {
+    for (const p of completedAppointmentPayments) {
       const apptId = (p as any).appointmentId as number | undefined;
       if (!apptId) continue;
       
@@ -312,13 +300,12 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     }
 
     const isPaidAppointment = (apt: any) => {
-      // Appointment must be completed and marked as paid (rule-of-thumb)
+      // Appointment must not be cancelled and must be marked as paid
       const statusLower = String(apt.status || apt.appointment_status || '').toLowerCase();
       const paymentStatusLower = String(apt.paymentStatus || apt.payment_status || '').toLowerCase();
       const notCancelled = statusLower !== 'cancelled';
-      const isCompleted = statusLower === 'completed';
       const isPaid = paymentStatusLower === 'paid';
-      if (!(notCancelled && isCompleted && isPaid)) return false;
+      if (!(notCancelled && isPaid)) return false;
       
       // Must have associated completed payments mapped to this appointment
       const apptPayments = appointmentIdToPayments.get(apt.id) || [];
@@ -1114,13 +1101,12 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         const statusLower = String(a.status || a.appointment_status || '').toLowerCase();
         const paymentStatusLower = String(a.paymentStatus || a.payment_status || '').toLowerCase();
         const notCancelled = statusLower !== 'cancelled';
-        const isCompleted = statusLower === 'completed';
         const isPaid = paymentStatusLower === 'paid';
         const getPaymentDate = (p: any) => {
           const raw = p.paymentDate || p.payment_date || p.processedAt || p.processed_at;
           return raw ? new Date(raw) : null;
         };
-        // Get all valid payments for this appointment
+        // Get all valid payments for this appointment (no date filter; appointment date governs period)
         const validPaymentsForAppt = (payments || []).filter((p: any) => {
           // Only consider 'completed' status
           const statusOk = (p.status === 'completed');
@@ -1131,17 +1117,12 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
           // Must match this appointment
           const apptMatch = (p.appointmentId || p.appointment_id) === a.id;
           
-          // Must have a valid payment date in the date range
-          const d = getPaymentDate(p);
-          if (!d || Number.isNaN(d.getTime())) return false;
-          const dateInRange = d >= start && d <= end;
-          
           // Must have positive base amount (exclude tips)
           const base = p.amount ?? Math.max((p.totalAmount || 0) - (p.tipAmount || 0), 0);
           const positive = Number(base) > 0;
           
           // All criteria must be met for a payment to be considered valid
-          return statusOk && typeOk && apptMatch && dateInRange && positive;
+          return statusOk && typeOk && apptMatch && positive;
         });
         
         // Calculate the total payment amount (excluding tips)
@@ -1159,7 +1140,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         }
         
         // All conditions must be met to include this appointment in payroll calculations
-        return aStaffId === staffId && aStart >= start && aStart <= end && notCancelled && isCompleted && isPaid && hasRealPayment;
+        return aStaffId === staffId && aStart >= start && aStart <= end && notCancelled && isPaid && hasRealPayment;
       });
 
       let totalRevenue = 0;

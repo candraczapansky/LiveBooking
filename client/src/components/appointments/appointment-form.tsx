@@ -867,6 +867,44 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               
+              {/* Date Selection */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <div className="space-y-2">
+                        <Input
+                          type="date"
+                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              const [year, month, day] = e.target.value.split('-').map(Number);
+                              const date = new Date(year, month - 1, day);
+                              console.log('Date input changed:', e.target.value, 'to local date:', date);
+                              field.onChange(date);
+                              form.trigger('date');
+                            } else {
+                              field.onChange(null);
+                            }
+                          }}
+                          min={format(new Date(), "yyyy-MM-dd")}
+                          className="w-full"
+                        />
+                        {field.value && (
+                          <div className="text-sm text-muted-foreground">
+                            Selected: {format(field.value, "PPP")}
+                          </div>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               {/* Staff Selection - Must be first in staff-centric workflow */}
               <FormField
                 control={form.control}
@@ -1143,46 +1181,6 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                                 Clear
                               </Button>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Date Selection */}
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Date</FormLabel>
-                    <FormControl>
-                      <div className="space-y-2">
-                        <Input
-                          type="date"
-                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              // Parse the date string and create a date in local timezone
-                              const [year, month, day] = e.target.value.split('-').map(Number);
-                              const date = new Date(year, month - 1, day); // month is 0-indexed
-                              console.log('Date input changed:', e.target.value, 'to local date:', date);
-                              field.onChange(date);
-                              // Force form validation after date selection
-                              form.trigger('date');
-                            } else {
-                              field.onChange(null);
-                            }
-                          }}
-                          min={format(new Date(), "yyyy-MM-dd")}
-                          className="w-full"
-                        />
-                        {field.value && (
-                          <div className="text-sm text-muted-foreground">
-                            Selected: {format(field.value, "PPP")}
                           </div>
                         )}
                       </div>

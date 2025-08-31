@@ -38,6 +38,7 @@ import {
   businessKnowledge, BusinessKnowledge, InsertBusinessKnowledge,
   businessKnowledgeCategories, BusinessKnowledgeCategory, InsertBusinessKnowledgeCategory,
   llmConversations, LLMConversation, InsertLLMConversation,
+  smsMessages, SMSMessage, InsertSMSMessage,
   checkSoftwareProviders, CheckSoftwareProvider, InsertCheckSoftwareProvider,
   payrollChecks, PayrollCheck, InsertPayrollCheck,
   checkSoftwareLogs, CheckSoftwareLog, InsertCheckSoftwareLog,
@@ -436,6 +437,17 @@ export interface IStorage {
   // LLM Conversations
   createLLMConversation(conversation: any): Promise<any>;
   getLLMConversations(clientId?: number): Promise<any[]>;
+
+  // SMS Messaging
+  createSMSMessage(message: InsertSMSMessage): Promise<SMSMessage>;
+  getSMSMessages(clientId?: number, phone?: string, limit?: number): Promise<SMSMessage[]>;
+  getSMSConversations(limit?: number): Promise<Array<{
+    phone: string;
+    clientId?: number | null;
+    clientName?: string | null;
+    lastMessage: string;
+    lastAt: Date;
+  }>>;
 
   // Check Software Providers
   getCheckSoftwareProviders(): Promise<any[]>;
@@ -4255,6 +4267,99 @@ Glo Head Spa`,
       return conversations;
     } catch (error) {
       console.error('Error fetching LLM conversations:', error);
+      return [];
+    }
+  }
+
+  // SMS Messaging methods
+  async createSMSMessage(message: InsertSMSMessage): Promise<SMSMessage> {
+    try {
+      const [row] = await db.insert(smsMessages).values(message as any).returning();
+      return row as SMSMessage;
+    } catch (e) {
+      console.error('createSMSMessage failed:', e);
+      throw e;
+    }
+  }
+
+  async getSMSMessages(clientId?: number, phone?: string, limit: number = 200): Promise<SMSMessage[]> {
+    try {
+      let rows: any[] = [];
+      if (clientId) {
+        rows = await db
+          .select()
+          .from(smsMessages)
+          .where(eq(smsMessages.clientId, clientId))
+          .orderBy(desc(smsMessages.createdAt))
+          .limit(limit);
+      } else if (phone) {
+        rows = await db
+          .select()
+          .from(smsMessages)
+          .where(or(eq(smsMessages.from, phone), eq(smsMessages.to, phone)))
+          .orderBy(desc(smsMessages.createdAt))
+          .limit(limit);
+      } else {
+        rows = await db
+          .select()
+          .from(smsMessages)
+          .orderBy(desc(smsMessages.createdAt))
+          .limit(limit);
+      }
+      return rows as SMSMessage[];
+    } catch (e) {
+      console.error('getSMSMessages failed:', e);
+      return [] as SMSMessage[];
+    }
+  }
+
+  async getSMSConversations(limit: number = 200): Promise<Array<{ phone: string; clientId?: number | null; clientName?: string | null; lastMessage: string; lastAt: Date }>> {
+    try {
+      const msgs = await db
+        .select()
+        .from(smsMessages)
+        .orderBy(desc(smsMessages.createdAt))
+        .limit(1000);
+
+      // Map phone to latest message and client
+      const normalize = (p: string) => (p || '').replace(/\D/g, '').slice(-10);
+
+      // Load users for name lookup
+      let allUsers: any[] = [];
+      try {
+        allUsers = await db.select().from(users);
+      } catch {}
+      const userByPhone = new Map<string, any>(
+        (allUsers || [])
+          .filter((u: any) => u?.phone)
+          .map((u: any) => [normalize(u.phone), u])
+      );
+
+      const convMap = new Map<string, { phone: string; clientId?: number | null; clientName?: string | null; lastMessage: string; lastAt: Date }>();
+
+      for (const m of msgs as any[]) {
+        const other = m.direction === 'inbound' ? m.from : m.to;
+        const key = normalize(other);
+        if (!key) continue;
+        if (!convMap.has(key)) {
+          const u = userByPhone.get(key);
+          convMap.set(key, {
+            phone: other,
+            clientId: u?.id ?? m.clientId ?? null,
+            clientName: u ? `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.username : null,
+            lastMessage: m.body,
+            lastAt: m.createdAt,
+          });
+        }
+      }
+
+      const list = Array.from(convMap.values())
+        .sort((a, b) => (b.lastAt as any) - (a.lastAt as any))
+        .slice(0, limit);
+
+      return list;
+    } catch (e) {
+      console.error('getSMSConversations failed:', e);
       return [];
     }
   }

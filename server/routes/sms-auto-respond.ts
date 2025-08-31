@@ -278,6 +278,23 @@ export function registerSmsAutoRespondRoutes(app: Express, storage: IStorage) {
 
       console.log('📨 Incoming SMS webhook', { from, to, bodyPreview: body.slice(0, 80), messageId });
 
+      // Persist inbound SMS to database for inbox
+      try {
+        let client: any = null;
+        try { client = await storage.getUserByPhone(from); } catch {}
+        await storage.createSMSMessage({
+          clientId: client?.id ?? null,
+          from,
+          to,
+          body,
+          direction: 'inbound',
+          messageSid: messageId,
+          status: 'received',
+        } as any);
+      } catch (e) {
+        console.warn('Failed to persist inbound SMS:', (e as any)?.message || e);
+      }
+
       // Handle STOP/START keywords first (compliance and suppression)
       if (isStopKeyword(body)) {
         await setSmsOptOut(from);

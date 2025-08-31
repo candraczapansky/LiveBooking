@@ -49,6 +49,7 @@ const FormDisplay = lazy(() => import("@/pages/form-display"));
 const DocumentsPage = lazy(() => import("@/pages/documents"));
 const DocumentDisplay = lazy(() => import("@/pages/document-display"));
 const AIMessagingPage = lazy(() => import("@/pages/ai-messaging"));
+const SMSInboxPage = lazy(() => import("@/pages/sms-inbox"));
 const PayrollPage = lazy(() => import("@/pages/payroll"));
 const Locations = lazy(() => import("@/pages/locations"));
 const PermissionsPage = lazy(() => import("@/pages/permissions"));
@@ -141,6 +142,7 @@ function Router() {
           <Route path="/forms" component={FormsPage} />
           <Route path="/documents" component={DocumentsPage} />
           <Route path="/ai-messaging" component={AIMessagingPage} />
+          <Route path="/sms-inbox" component={SMSInboxPage} />
           <Route path="/payroll" component={PayrollPage} />
           <Route path="/locations" component={Locations} />
           <Route path="/permissions" component={PermissionsPage} />
@@ -185,12 +187,12 @@ export default function App() {
     );
   }
 
-  if (isForgotPasswordRoute) {
+  if (isForgotPasswordSmsRoute) {
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Suspense fallback={<PageLoading />}>
-            <ForgotPassword />
+            <ForgotPasswordSMS />
           </Suspense>
           <Toaster />
         </TooltipProvider>
@@ -198,12 +200,12 @@ export default function App() {
     );
   }
 
-  if (isForgotPasswordSmsRoute) {
+  if (isForgotPasswordRoute) {
     return (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Suspense fallback={<PageLoading />}>
-            <ForgotPasswordSMS />
+            <ForgotPassword />
           </Suspense>
           <Toaster />
         </TooltipProvider>
