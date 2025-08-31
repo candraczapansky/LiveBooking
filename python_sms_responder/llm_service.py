@@ -2,8 +2,9 @@ import os
 from openai import OpenAI
 import logging
 from typing import Optional, Dict, Any
-from .models import ClientInfo, LLMRequest, LLMResponse
-from .conversation_manager import ConversationManager
+from models import ClientInfo, LLMRequest, LLMResponse
+from conversation_manager import ConversationManager
+from business_knowledge import BusinessKnowledge
 
 class LLMService:
     """Service for handling LLM operations via OpenAI"""
@@ -24,32 +25,47 @@ class LLMService:
         # Initialize conversation manager
         self.conversation_manager = ConversationManager()
         
+        # Initialize business knowledge
+        self.business_knowledge = BusinessKnowledge()
+        
         # System prompt for salon context
         self.system_prompt = self._get_system_prompt()
     
     def _get_system_prompt(self) -> str:
-        """Get the system prompt for salon SMS responses"""
-        return """You are an AI assistant for a professional salon. Your role is to help clients with appointment-related inquiries via SMS. 
+        """Get the system prompt for salon SMS responses with business knowledge"""
+        # Get business knowledge
+        business_knowledge = self.business_knowledge.get_knowledge_for_llm()
+        
+        base_prompt = """You are an AI assistant for a professional beauty salon & spa. Your role is to help clients with inquiries via SMS, acting as a friendly, kind front desk person. 
 
 Key responsibilities:
 - Help clients book, reschedule, or cancel appointments
-- Provide information about services and pricing
-- Answer questions about salon policies and hours
-- Be friendly, professional, and concise
-- Keep responses under 160 characters when possible
+- Provide accurate information about services and pricing based on the knowledge provided
+- Answer questions about salon policies, hours, and services
+- Promote current specials and discounts when relevant
+- Be friendly, professional, and conversational
 - If you can't handle a request, offer to have someone call them
 
 Important guidelines:
-- Always be polite and professional
-- Keep responses brief and clear
-- If you need more information, ask specific questions
+- Always be warm and welcoming in your tone
+- Provide helpful, informative responses based on the business knowledge provided
+- Never make up information - only use what's in the business knowledge
+- Remember details about clients from their conversation history
 - For complex requests, offer to have a staff member call them
-- Don't make up information about services or pricing
-- If unsure about availability, suggest they call the salon
+- If unsure about availability, suggest they call or text to speak with staff
 
-Current salon hours: Monday-Saturday 9AM-7PM, Sunday 10AM-5PM
-Address: [Salon Address]
-Phone: [Salon Phone]"""
+Your personality:
+- You are a friendly, helpful front desk person at a beauty salon & spa
+- You are knowledgeable about beauty services and treatments
+- You are enthusiastic about helping clients look and feel their best
+- You respond in a personable, conversational manner
+- You provide excellent customer service
+
+Below is specific information about the business that you should use when responding to customers:
+"""
+        
+        # Combine base prompt with business knowledge
+        return base_prompt + "\n\n" + business_knowledge
     
     async def generate_response(
         self, 
@@ -88,15 +104,29 @@ Phone: [Salon Phone]"""
             self.logger.info(f"Using AI response for {phone_number}")
             prompt = self._build_prompt(user_message, client_info, phone_number, context)
             
-            # Generate response using OpenAI
+            # Get conversation history for context
+            messages = [
+                {"role": "system", "content": self.system_prompt}
+            ]
+            
+            # Add recent conversation messages if available
+            conversation_summary = self.conversation_manager.get_conversation_summary(phone_number)
+            if conversation_summary and 'temp_data' in conversation_summary and 'messages' in conversation_summary['temp_data']:
+                history = conversation_summary['temp_data']['messages']
+                # Include up to 5 most recent messages for context
+                for msg in history[-5:]:
+                    if 'role' in msg and 'content' in msg:
+                        messages.append({"role": msg['role'], "content": msg['content']})
+            
+            # Add current prompt as the most recent user message
+            messages.append({"role": "user", "content": prompt})
+            
+            # Generate response using OpenAI with conversation history
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
+                messages=messages,
+                max_tokens=400,  # Increased for more detailed responses
+                temperature=0.7  # Balanced creativity
             )
             
             ai_response = response.choices[0].message.content.strip()
@@ -138,15 +168,29 @@ Phone: [Salon Phone]"""
             self.logger.info(f"Using AI response for {phone_number}")
             prompt = self._build_prompt(user_message, client_info, phone_number, context)
             
-            # Generate response using OpenAI
+            # Get conversation history for context
+            messages = [
+                {"role": "system", "content": self.system_prompt}
+            ]
+            
+            # Add recent conversation messages if available
+            conversation_summary = self.conversation_manager.get_conversation_summary(phone_number)
+            if conversation_summary and 'temp_data' in conversation_summary and 'messages' in conversation_summary['temp_data']:
+                history = conversation_summary['temp_data']['messages']
+                # Include up to 5 most recent messages for context
+                for msg in history[-5:]:
+                    if 'role' in msg and 'content' in msg:
+                        messages.append({"role": msg['role'], "content": msg['content']})
+            
+            # Add current prompt as the most recent user message
+            messages.append({"role": "user", "content": prompt})
+            
+            # Generate response using OpenAI with conversation history
             response = self.client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
+                messages=messages,
+                max_tokens=400,  # Increased for more detailed responses
+                temperature=0.7  # Balanced creativity
             )
             
             ai_response = response.choices[0].message.content.strip()
@@ -183,41 +227,64 @@ Phone: [Salon Phone]"""
         
         # Add client context if available
         if client_info:
-            prompt_parts.append(f"Client Information:")
+            prompt_parts.append(f"## Client Information:")
             prompt_parts.append(f"- Name: {client_info.name or 'Unknown'}")
             prompt_parts.append(f"- Phone: {client_info.phone}")
+            if client_info.email:
+                prompt_parts.append(f"- Email: {client_info.email}")
             if client_info.total_appointments:
                 prompt_parts.append(f"- Total appointments: {client_info.total_appointments}")
             if client_info.last_appointment:
                 prompt_parts.append(f"- Last appointment: {client_info.last_appointment}")
             if client_info.upcoming_appointments:
                 prompt_parts.append(f"- Upcoming appointments: {len(client_info.upcoming_appointments)}")
+                for i, appt in enumerate(client_info.upcoming_appointments[:3]):
+                    prompt_parts.append(f"  * Appointment {i+1}: {appt.service} on {appt.date}")
+            if client_info.preferences:
+                prompt_parts.append(f"- Preferences: {client_info.preferences}")
             prompt_parts.append("")
         
         # Add conversation context
         conversation_summary = self.conversation_manager.get_conversation_summary(phone_number)
         if conversation_summary:
-            prompt_parts.append(f"Conversation Context:")
+            prompt_parts.append(f"## Conversation Context:")
             prompt_parts.append(f"- Current step: {conversation_summary['step']}")
-            if conversation_summary['selected_service']:
+            if conversation_summary.get('selected_service'):
                 prompt_parts.append(f"- Selected service: {conversation_summary['selected_service']}")
-            if conversation_summary['selected_date']:
+            if conversation_summary.get('selected_date'):
                 prompt_parts.append(f"- Selected date: {conversation_summary['selected_date']}")
-            if conversation_summary['selected_time']:
+            if conversation_summary.get('selected_time'):
                 prompt_parts.append(f"- Selected time: {conversation_summary['selected_time']}")
+            
+            # Include conversation history/temporary data if available
+            if 'temp_data' in conversation_summary and conversation_summary['temp_data']:
+                prompt_parts.append("\nConversation History:")
+                for key, value in conversation_summary['temp_data'].items():
+                    if key != 'messages':
+                        prompt_parts.append(f"- {key}: {value}")
+                
+                # If there are stored messages, include recent ones
+                if 'messages' in conversation_summary['temp_data']:
+                    messages = conversation_summary['temp_data'].get('messages', [])
+                    if messages:
+                        prompt_parts.append("\nRecent Messages:")
+                        # Only include the last 5 messages to avoid excessive context
+                        for msg in messages[-5:]:
+                            if 'role' in msg and 'content' in msg:
+                                prompt_parts.append(f"- {msg['role']}: {msg['content']}")
             prompt_parts.append("")
         
         # Add context information
         if context:
-            prompt_parts.append("Additional Context:")
+            prompt_parts.append("## Additional Context:")
             for key, value in context.items():
                 prompt_parts.append(f"- {key}: {value}")
             prompt_parts.append("")
         
         # Add user message
-        prompt_parts.append(f"User Message: {user_message}")
+        prompt_parts.append(f"## User Message: {user_message}")
         prompt_parts.append("")
-        prompt_parts.append("Please provide a helpful, professional response:")
+        prompt_parts.append("Please provide a helpful, friendly, and conversational response as a salon front desk person. Be specific about the salon's services and policies based on the business information provided in the system prompt.")
         
         return "\n".join(prompt_parts)
     

@@ -14,7 +14,9 @@ class ConversationState:
         self.selected_date = None
         self.selected_time = None
         self.client_info = None
-        self.temp_data = {}
+        self.temp_data = {
+            "messages": []  # Store conversation messages as a list of {"role": "...", "content": "..."} dicts
+        }
         self.created_at = datetime.now()
         self.last_activity = datetime.now()
     
@@ -87,6 +89,29 @@ class ConversationManager:
         state.last_activity = datetime.now()
         return state
     
+    def add_message_to_history(self, state: ConversationState, role: str, content: str):
+        """
+        Add a message to the conversation history
+        
+        Args:
+            state: The conversation state
+            role: Role of the message sender (user or assistant)
+            content: Message content
+        """
+        if "messages" not in state.temp_data:
+            state.temp_data["messages"] = []
+            
+        # Add message to history
+        state.temp_data["messages"].append({
+            "role": role,
+            "content": content,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+        # Trim history if it gets too long (keep last 20 messages)
+        if len(state.temp_data["messages"]) > 20:
+            state.temp_data["messages"] = state.temp_data["messages"][-20:]
+    
     def process_message(self, phone_number: str, message: str, client_info: Optional[ClientInfo] = None) -> Dict[str, Any]:
         """
         Process incoming message and return appropriate response
@@ -96,6 +121,9 @@ class ConversationManager:
         # Update client info if provided
         if client_info:
             state.client_info = client_info
+        
+        # Add user message to conversation history
+        self.add_message_to_history(state, "user", message)
         
         # Log current state for debugging
         self.logger.info(f"Processing message for {phone_number}: '{message}' at step '{state.step}'")
@@ -113,6 +141,10 @@ class ConversationManager:
             result = self._handle_confirmation(state, message)
         else:
             result = self._handle_greeting(state, message)
+        
+        # Add assistant response to conversation history
+        if "response" in result:
+            self.add_message_to_history(state, "assistant", result["response"])
         
         # Log result for debugging
         self.logger.info(f"Conversation result for {phone_number}: {result}")
