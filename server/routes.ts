@@ -49,7 +49,6 @@ import { registerDocumentsRoutes } from "./routes/documents.js";
 import { registerBusinessKnowledgeRoutes } from "./routes/business-knowledge.js";
 import { registerLLMRoutes } from "./routes/llm.js";
 import { registerSmsAutoRespondRoutes } from "./routes/sms-auto-respond.js";
-import { registerSmsMessagingRoutes } from "./routes/sms-messaging.js";
 import { registerAutomationRuleRoutes } from "./routes/automation-rules.js";
 import { registerMembershipRoutes } from "./routes/memberships.js";
 import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
@@ -105,7 +104,6 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessKnowledgeRoutes(app, storage);
   registerLLMRoutes(app, storage);
   registerSmsAutoRespondRoutes(app, storage);
-  registerSmsMessagingRoutes(app, storage);
   // Automations
   registerAutomationRuleRoutes(app, storage);
   // Memberships
@@ -697,7 +695,24 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
   app.post("/api/schedules", async (req: Request, res: Response) => {
     try {
-      const data = insertStaffScheduleSchema.parse(req.body);
+      // Clean empty endDate string to null; keep date strings as strings for schema compatibility
+      const raw = (req.body || {}) as any;
+      const normalized: any = { ...raw };
+      if (normalized?.endDate === '') normalized.endDate = null;
+      const data = insertStaffScheduleSchema.parse(normalized);
+
+      try {
+        console.log("[POST /api/schedules] payload", {
+          staffId: (data as any)?.staffId,
+          locationId: (data as any)?.locationId,
+          dayOfWeek: (data as any)?.dayOfWeek,
+          startTime: (data as any)?.startTime,
+          endTime: (data as any)?.endTime,
+          startDate: (data as any)?.startDate,
+          endDate: (data as any)?.endDate,
+          isBlocked: (data as any)?.isBlocked,
+        });
+      } catch {}
 
       // Validate basic time ordering
       const toMinutes = (t: string) => {
@@ -726,8 +741,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       };
 
       // Prevent overlapping schedules on the same day for the same staff/location
+      // Exception: if creating a blocked schedule, allow overlaps so staff can block off time
       const allSchedules = await storage.getAllStaffSchedules();
       const hasOverlap = (allSchedules || []).some((s: any) => {
+        // If the new schedule is a block, we permit overlaps
+        if (data.isBlocked) return false;
         if (s.staffId !== data.staffId) return false;
         if (s.locationId !== data.locationId) return false;
         if (String(s.dayOfWeek) !== String(data.dayOfWeek)) return false;
@@ -769,7 +787,25 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const id = parseInt(req.params.id);
       // Allow partial updates
       const partialSchema = insertStaffScheduleSchema.partial();
-      const updateData = partialSchema.parse(req.body);
+      // Clean empty endDate string to null; keep date strings as strings for schema compatibility
+      const raw = (req.body || {}) as any;
+      const normalized: any = { ...raw };
+      if (normalized?.endDate === '') normalized.endDate = null;
+      const updateData = partialSchema.parse(normalized);
+
+      try {
+        console.log("[PUT /api/schedules/:id] payload", {
+          id,
+          staffId: (updateData as any)?.staffId,
+          locationId: (updateData as any)?.locationId,
+          dayOfWeek: (updateData as any)?.dayOfWeek,
+          startTime: (updateData as any)?.startTime,
+          endTime: (updateData as any)?.endTime,
+          startDate: (updateData as any)?.startDate,
+          endDate: (updateData as any)?.endDate,
+          isBlocked: (updateData as any)?.isBlocked,
+        });
+      } catch {}
 
       const existing = await (storage as any).getStaffSchedule?.(id);
       if (!existing) {
@@ -815,6 +851,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
       const allSchedules = await storage.getAllStaffSchedules();
       const hasOverlap = (allSchedules || []).some((s: any) => {
+        // If the effective schedule is a block, we permit overlaps
+        if (effective.isBlocked) return false;
         if (s.id === id) return false; // exclude self
         if (s.staffId !== effective.staffId) return false;
         if (s.locationId !== effective.locationId) return false;

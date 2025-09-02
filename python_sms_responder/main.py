@@ -1,18 +1,14 @@
 from fastapi import FastAPI, HTTPException, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import uvicorn
 import os
-from pathlib import Path
 from dotenv import load_dotenv
 
-from sms_service import SMSService
-from llm_service import LLMService
-from database_service import DatabaseService
-from voice_service import VoiceService
-from business_knowledge import BusinessKnowledge
-from admin_routes import router as admin_router
-from models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
+from .sms_service import SMSService
+from .llm_service import LLMService
+from .database_service import DatabaseService
+from .voice_service import VoiceService
+from .models import SMSRequest, SMSResponse, VoiceRequest, VoiceResponse
 
 # Load environment variables
 load_dotenv()
@@ -31,13 +27,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Include admin routes
-app.include_router(admin_router)
-
-# Mount static files directory
-static_dir = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Initialize services lazily
 _sms_service = None
@@ -93,12 +82,6 @@ def get_voice_service():
 async def root():
     """Health check endpoint"""
     return {"message": "Salon SMS Responder is running", "status": "healthy"}
-
-@app.get("/admin")
-async def admin_panel():
-    """Redirect to admin panel"""
-    from fastapi.responses import RedirectResponse
-    return RedirectResponse(url="/static/admin.html")
 
 @app.post("/webhook/sms", response_model=SMSResponse)
 async def handle_sms_webhook(

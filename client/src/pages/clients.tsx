@@ -77,6 +77,7 @@ import ClientNoteHistory from "@/components/client/client-note-history";
 // Square payment configuration
 
 
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 type Client = {
   id: number;
   username: string;
@@ -1400,11 +1401,15 @@ const ClientsPage = () => {
                                   {getFullName(client.firstName, client.lastName, (client as any).username)}
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                  {client.email}
+                                  <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                    {client.email}
+                                  </PermissionGuard>
                                 </div>
                                 {client.phone && (
                                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                                    {client.phone}
+                                    <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                      {client.phone}
+                                    </PermissionGuard>
                                   </div>
                                 )}
                               </div>
@@ -1465,9 +1470,15 @@ const ClientsPage = () => {
                                   {getFullName(client.firstName, client.lastName, (client as any).username)}
                                 </div>
                               </TableCell>
-                              <TableCell>{client.email}</TableCell>
                               <TableCell>
-                                {client.phone || "-"}
+                                <PermissionGuard permission="view_client_contact_info" fallback="-">
+                                  {client.email}
+                                </PermissionGuard>
+                              </TableCell>
+                              <TableCell>
+                                <PermissionGuard permission="view_client_contact_info" fallback="-">
+                                  {client.phone || "-"}
+                                </PermissionGuard>
                                 {/* Debug: {JSON.stringify({phone: client.phone, type: typeof client.phone})} */}
                               </TableCell>
                               <TableCell className="text-right">
@@ -1545,11 +1556,19 @@ const ClientsPage = () => {
                         <div className="space-y-2 text-sm">
                           <div>
                             <span className="text-gray-500 dark:text-gray-400">Email:</span>
-                            <span className="ml-2">{clientDetail?.email}</span>
+                            <span className="ml-2">
+                              <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                {clientDetail?.email}
+                              </PermissionGuard>
+                            </span>
                           </div>
                           <div>
                             <span className="text-gray-500 dark:text-gray-400">Phone:</span>
-                            <span className="ml-2">{clientDetail?.phone || "Not provided"}</span>
+                            <span className="ml-2">
+                              <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                {clientDetail?.phone || "Not provided"}
+                              </PermissionGuard>
+                            </span>
                           </div>
                         </div>
                       </div>

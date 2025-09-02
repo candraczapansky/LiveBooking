@@ -125,7 +125,7 @@ const ClientBookingPage = () => {
   };
 
   const isClientUser = user?.role === 'client' || user?.role === 'customer';
-  const shouldShowRegister = !isAuthenticated || !isClientUser;
+  const shouldShowRegister = false;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">

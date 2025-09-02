@@ -1128,21 +1128,6 @@ export const llmConversations = pgTable("llm_conversations", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// SMS Messages schema (inbound/outbound)
-export const smsMessages = pgTable("sms_messages", {
-  id: serial("id").primaryKey(),
-  clientId: integer("client_id").references(() => users.id),
-  from: text("from").notNull(),
-  to: text("to").notNull(),
-  body: text("body").notNull(),
-  direction: text("direction").notNull(), // 'inbound' | 'outbound'
-  messageSid: text("message_sid"),
-  status: text("status"), // 'received' | 'sent' | 'failed'
-  errorMessage: text("error_message"),
-  metadata: text("metadata"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
 export const insertAutomationRuleSchema = createInsertSchema(automationRules).omit({
   id: true,
   sentCount: true,
@@ -1167,15 +1152,6 @@ export const insertLLMConversationSchema = createInsertSchema(llmConversations).
   id: true,
   createdAt: true,
 });
-
-// SMS Messages insert schema and types
-export const insertSMSMessageSchema = createInsertSchema(smsMessages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type SMSMessage = typeof smsMessages.$inferSelect;
-export type InsertSMSMessage = z.infer<typeof insertSMSMessageSchema>;
 
 export type AutomationRule = typeof automationRules.$inferSelect;
 export type InsertAutomationRule = z.infer<typeof insertAutomationRuleSchema>;

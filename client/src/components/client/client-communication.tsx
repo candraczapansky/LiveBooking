@@ -33,6 +33,7 @@ import {
   Bell,
   CheckCircle
 } from "lucide-react";
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -206,13 +207,21 @@ export default function ClientCommunication({
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-blue-600" />
                 <span className="text-gray-600">Email:</span>
-                <span className="font-medium">{clientEmail}</span>
+                <span className="font-medium">
+                  <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                    {clientEmail}
+                  </PermissionGuard>
+                </span>
               </div>
               {clientPhone && (
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-green-600" />
                   <span className="text-gray-600">Phone:</span>
-                  <span className="font-medium">{clientPhone}</span>
+                  <span className="font-medium">
+                    <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                      {clientPhone}
+                    </PermissionGuard>
+                  </span>
                 </div>
               )}
             </div>

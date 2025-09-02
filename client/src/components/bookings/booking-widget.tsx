@@ -127,8 +127,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const selectedLocationId = form.watch('locationId');
 
-  // We no longer use the generic services list for rendering to avoid leaks
-  useQuery({
+  // Fetch services available at the selected location (for precise location scoping)
+  const { data: servicesAtLocation = [], isLoading: isLoadingLocationServices } = useQuery({
     queryKey: ['/api/services', selectedCategoryId, selectedLocationId],
     queryFn: async () => {
       const params: string[] = [];
@@ -136,49 +136,73 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (selectedLocationId) params.push(`locationId=${selectedLocationId}`);
       const endpoint = params.length > 0 ? `/api/services?${params.join('&')}` : '/api/services';
       const res = await apiRequest('GET', endpoint);
-      // Fetch kept for potential price/description refresh, but UI renders from allowedServices
       return res.json();
     },
     enabled: open && !!selectedLocationId
   });
 
-  const { data: staff, isLoading: isLoadingStaff } = useQuery({
+  const { data: staff, isLoading: isLoadingStaff, refetch: refetchStaff } = useQuery({
     queryKey: ['/api/staff', selectedLocationId],
     queryFn: async () => {
-      // Fetch all staff; we'll filter by schedules and service assignments client-side
+      // Fetch all staff; filter by location on the client to avoid server-side zero results
       const res = await apiRequest('GET', '/api/staff');
       return res.json();
     },
-    enabled: open && !!selectedLocationId
+    enabled: open,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
   // Fetch schedules for the selected location to detect which staff actually work there
-  const { data: schedules, isLoading: isLoadingSchedules } = useQuery({
-    queryKey: ['/api/schedules', selectedLocationId],
+  const { data: schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = useQuery({
+    queryKey: ['/api/schedules', selectedLocationId, currentStep],
     queryFn: async () => {
-      const endpoint = selectedLocationId ? `/api/schedules?locationId=${selectedLocationId}` : '/api/schedules';
-      const res = await apiRequest('GET', endpoint);
+      // Always fetch all schedules so we can treat null locationId as global
+      const res = await apiRequest('GET', '/api/schedules');
       return res.json();
     },
-    enabled: open && !!selectedLocationId
+    enabled: open,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
   // Fetch appointments for the selected location to prevent double-booking
-  const { data: appointments = [] } = useQuery({
+  const { data: appointments = [], refetch: refetchAppointments } = useQuery({
     queryKey: ['/api/appointments', selectedLocationId],
     queryFn: async () => {
       const endpoint = selectedLocationId ? `/api/appointments?locationId=${selectedLocationId}` : '/api/appointments';
       const res = await apiRequest('GET', endpoint);
       return res.json();
     },
-    enabled: open && !!selectedLocationId
+    enabled: open,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
+
+  // Force-refresh staff/schedules/appointments when entering Staff (2) or Time (3) steps
+  useEffect(() => {
+    try {
+      if (!open || !selectedLocationId) return;
+      if (currentStep === 2 || currentStep === 3) {
+        refetchStaff();
+        refetchSchedules();
+        refetchAppointments();
+      }
+    } catch {}
+  }, [currentStep, open, selectedLocationId]);
 
   // Compute allowed services based on staff assignments at the selected location
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [allowedServices, setAllowedServices] = useState<any[]>([]);
   // Map of staffId -> set of serviceIds they are assigned (public)
   const [staffServiceIdsMap, setStaffServiceIdsMap] = useState<Map<number, Set<number>>>(new Map());
+  // Map of serviceId -> set of staffIds that can perform it (built from the same staffIdsToUse)
+  const [serviceToStaffIdsMap, setServiceToStaffIdsMap] = useState<Map<number, Set<number>>>(new Map());
+  // Persist the exact staff IDs used to compute allowed services so Step 3 matches Step 2
+  const [eligibleStaffIds, setEligibleStaffIds] = useState<number[]>([]);
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -191,20 +215,24 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         }
         // Build list of staff IDs that actually have a schedule at this location (fallback to staff list if schedules are empty)
         const staffIdsFromSchedules = Array.isArray(schedules)
-          ? Array.from(new Set((schedules as any[]).map((sch: any) => sch.staffId)))
+          ? Array.from(new Set((schedules as any[])
+              .filter((sch: any) => !sch.isBlocked && (sch.locationId == null || String(sch.locationId) === String(selectedLocationId)))
+              .map((sch: any) => Number(sch.staffId))))
           : [];
 
         const staffIdsAtLocation = (Array.isArray(staff) && selectedLocationId)
           ? (staff as any[])
               .filter((s: any) => String(s.locationId) === String(selectedLocationId))
-              .map((s: any) => s.id)
+              .map((s: any) => Number(s.id))
           : [];
-        const staffIdsToUse: number[] = staffIdsFromSchedules.length > 0
-          ? staffIdsFromSchedules
-          : staffIdsAtLocation;
+
+        // Use union to include anyone with a schedule matching location or assigned to this location
+        const staffIdsToUseSet = new Set<number>([...staffIdsFromSchedules, ...staffIdsAtLocation]);
+        const staffIdsToUse: number[] = Array.from(staffIdsToUseSet);
 
         if (staffIdsToUse.length === 0) {
           setAllowedServices([]);
+          setEligibleStaffIds([]);
           if (!cancelled) setIsLoadingServices(false);
           return;
         }
@@ -230,23 +258,32 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         });
         // Build staff -> serviceIds map from lists aligned with staffIdsToUse
         const map = new Map<number, Set<number>>();
+        const reverseMap = new Map<number, Set<number>>();
         staffIdsToUse.forEach((sid, idx) => {
           const svcList = lists[idx] || [];
           const serviceIds = new Set<number>();
           svcList.forEach((svc: any) => {
             if (svc && typeof svc.id === 'number') serviceIds.add(svc.id);
+            if (svc && typeof svc.id === 'number') {
+              if (!reverseMap.has(svc.id)) reverseMap.set(svc.id, new Set<number>());
+              reverseMap.get(svc.id)!.add(Number(sid));
+            }
           });
           map.set(sid, serviceIds);
         });
         if (!cancelled) {
           setAllowedServices(Array.from(uniqById.values()));
           setStaffServiceIdsMap(map);
+          setServiceToStaffIdsMap(reverseMap);
+          setEligibleStaffIds(staffIdsToUse);
           setIsLoadingServices(false);
         }
       } catch {
         if (!cancelled) {
           setAllowedServices([]);
           setStaffServiceIdsMap(new Map());
+          setServiceToStaffIdsMap(new Map());
+          setEligibleStaffIds([]);
           setIsLoadingServices(false);
         }
       }
@@ -257,7 +294,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     };
   }, [open, selectedLocationId, staff, schedules]);
 
-  const isPreparingServices = isLoadingCategories || isLoadingStaff || isLoadingSchedules || isLoadingServices;
+  const isPreparingServices = isLoadingCategories || isLoadingStaff || isLoadingSchedules || isLoadingServices || isLoadingLocationServices;
 
   const { data: locations } = useQuery({
     queryKey: ['/api/locations'],
@@ -290,8 +327,18 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     }
   }, [userData, currentStep, form]);
 
-  // Filter services by search query and allowed set (from staff assignments)
-  const filteredServices = allowedServices?.filter((service: any) => {
+  // Intersect staff-assigned services with services explicitly available at the selected location
+  const allowedServicesAtLocation = useMemo(() => {
+    if (!selectedLocationId) return allowedServices;
+    const list = Array.isArray(servicesAtLocation) ? servicesAtLocation : [];
+    // If the location-scoped services are empty, fall back to allowedServices derived from staff assignments
+    if (list.length === 0) return allowedServices;
+    const locIds = new Set(list.map((s: any) => s?.id).filter((id: any) => typeof id === 'number'));
+    return (allowedServices || []).filter((svc: any) => locIds.has(svc?.id));
+  }, [allowedServices, servicesAtLocation, selectedLocationId]);
+
+  // Filter services by search query and allowed set (scoped to location)
+  const filteredServices = allowedServicesAtLocation?.filter((service: any) => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       service.description?.toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
@@ -316,19 +363,27 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   // Compute staff available for the selected service at this location
   const staffIdsFromSchedulesSet = new Set<number>(
-    Array.isArray(schedules) ? (schedules as any[]).map((sch: any) => sch.staffId) : []
+    Array.isArray(schedules)
+      ? (schedules as any[])
+          .filter((sch: any) => !sch.isBlocked && (sch.locationId == null || String(sch.locationId) === String(selectedLocationId)))
+          .map((sch: any) => Number(sch.staffId))
+      : []
   );
   const useScheduleFilter = staffIdsFromSchedulesSet.size > 0;
-  const availableStaff = Array.isArray(staff) && selectedServiceId
-    ? (staff as any[]).filter((s: any) => {
-        const matchesLocation = selectedLocationId ? String((s as any).locationId) === String(selectedLocationId) : true;
-        const matchesSchedule = useScheduleFilter ? staffIdsFromSchedulesSet.has(s.id) : true;
-        const svcSet = staffServiceIdsMap.get(s.id);
-        const svcIdNum = parseInt(selectedServiceId);
-        const matchesService = svcSet ? svcSet.has(svcIdNum) : false;
-        return matchesLocation && matchesSchedule && matchesService;
-      })
-    : [];
+  const availableStaff = useMemo(() => {
+    if (!Array.isArray(staff) || !selectedServiceId) return [] as any[];
+    const svcIdNum = parseInt(selectedServiceId);
+    // Start from eligibleStaffIds (union) so Step 3 matches Step 2 service map
+    const baseIds = eligibleStaffIds.length > 0 ? eligibleStaffIds : Array.from(new Set<number>([...staffIdsFromSchedulesSet]));
+    const finalIds = baseIds.filter((id) => {
+      const svcSet = staffServiceIdsMap.get(Number(id));
+      const canDoService = !!svcSet && svcSet.has(svcIdNum);
+      const hasSched = useScheduleFilter ? staffIdsFromSchedulesSet.has(Number(id)) : true;
+      return canDoService && hasSched;
+    });
+    const staffById = new Map<number, any>((Array.isArray(staff) ? staff : []).map((s: any) => [Number(s.id), s]));
+    return finalIds.map((id) => staffById.get(Number(id))).filter(Boolean) as any[];
+  }, [staff, selectedServiceId, eligibleStaffIds, staffServiceIdsMap, useScheduleFilter, selectedLocationId, schedules]);
 
   // Generate time slots (8am to 10pm with 30 minute intervals)
   const generateTimeSlots = () => {
@@ -355,16 +410,29 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const timeSlots = generateTimeSlots();
 
+  // Restrict appointments to the selected location to avoid cross-location blocking
+  const appointmentsForAvailability = useMemo(() => {
+    try {
+      const list: any[] = Array.isArray(appointments) ? (appointments as any[]) : [];
+      if (!selectedLocationId) return list;
+      return list.filter((apt: any) => String(apt.locationId) === String(selectedLocationId));
+    } catch {
+      return [] as any[];
+    }
+  }, [appointments, selectedLocationId]);
+
   // Helpers for schedule filtering
   const getDayName = (date: Date) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[date.getDay()];
   };
-  const formatDateForComparison = (date: Date) => date.toISOString().split('T')[0];
+  const formatDateForComparison = (date: Date) => format(date, 'yyyy-MM-dd');
   const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => {
     const toMinutes = (t: string) => {
-      const [h, m] = t.split(':').map(Number);
-      return h * 60 + m;
+      const parts = String(t).trim().split(':');
+      const hours = Number(parts[0] || 0);
+      const minutes = Number(parts[1] || 0);
+      return hours * 60 + minutes;
     };
     const slot = toMinutes(timeSlot);
     const start = toMinutes(startTime);
@@ -380,13 +448,25 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     const svc: any = selectedService;
 
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
+      const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
       const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
         const currentDateString = formatDateForComparison(selectedFormDate);
-        const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
-        const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
+        const startDateString = typeof schedule.startDate === 'string'
+          ? String(schedule.startDate).slice(0, 10)
+          : format(new Date(schedule.startDate), 'yyyy-MM-dd');
+        const endDateString = schedule.endDate
+          ? (typeof schedule.endDate === 'string'
+              ? String(schedule.endDate).slice(0, 10)
+              : format(new Date(schedule.endDate), 'yyyy-MM-dd'))
+          : null;
 
-        return schedule.staffId === staffIdNum &&
-          schedule.dayOfWeek === dayName &&
+        const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
+        const targetDay = String(dayName).trim().toLowerCase();
+
+        // Treat null locationId as global, matching any selected location
+        if (selectedLocationId && schedule.locationId != null && String(schedule.locationId) !== String(selectedLocationId)) return false;
+        return Number(schedule.staffId) === Number(staffIdNum) &&
+          scheduleDay === targetDay &&
           startDateString <= currentDateString &&
           (!endDateString || endDateString >= currentDateString) &&
           !schedule.isBlocked;
@@ -404,7 +484,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
       const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
 
-      const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+      const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
         .filter((apt: any) => apt.staffId === staffIdNum)
         .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
         .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -433,7 +513,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     return timeSlots;
   };
 
-  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointments, timeSlots]);
+  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointmentsForAvailability, timeSlots]);
 
   // Compute available days (next 30 days) based on staff schedules, service duration and existing appointments
   const availableDatesSet = useMemo(() => {
@@ -449,16 +529,31 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       const staffHasAvailabilityOnDay = (staffIdNum: number, day: Date) => {
         const dayName = getDayName(day);
         const currentDateString = formatDateForComparison(day);
+        const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
         const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
-          .filter((schedule: any) => schedule.staffId === staffIdNum && !schedule.isBlocked)
           .filter((schedule: any) => {
-            const startDateString = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
-            const endDateString = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : null;
-            return schedule.dayOfWeek === dayName && startDateString <= currentDateString && (!endDateString || endDateString >= currentDateString);
+            if (Number(schedule.staffId) !== Number(staffIdNum)) return false;
+            if (schedule.isBlocked) return false;
+            // Treat null locationId as global
+            if (selectedLocationId && schedule.locationId != null && String(schedule.locationId) !== String(selectedLocationId)) return false;
+            return true;
+          })
+          .filter((schedule: any) => {
+            const startDateString = typeof schedule.startDate === 'string'
+              ? String(schedule.startDate).slice(0, 10)
+              : format(new Date(schedule.startDate), 'yyyy-MM-dd');
+            const endDateString = schedule.endDate
+              ? (typeof schedule.endDate === 'string'
+                  ? String(schedule.endDate).slice(0, 10)
+                  : format(new Date(schedule.endDate), 'yyyy-MM-dd'))
+              : null;
+            const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
+            const targetDay = String(dayName).trim().toLowerCase();
+            return scheduleDay === targetDay && startDateString <= currentDateString && (!endDateString || endDateString >= currentDateString);
           });
         if (staffSchedules.length === 0) return false;
 
-        const appointmentsForDay = (Array.isArray(appointments) ? (appointments as any[]) : [])
+        const appointmentsForDay = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
           .filter((apt: any) => apt.staffId === staffIdNum)
           .filter((apt: any) => new Date(apt.startTime).toDateString() === day.toDateString())
           .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -506,7 +601,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       // swallow errors; show no markers on failure
     }
     return result;
-  }, [selectedStaffId, selectedServiceId, schedules, appointments, timeSlots, selectedService]);
+  }, [selectedStaffId, selectedServiceId, schedules, appointmentsForAvailability, timeSlots, selectedService]);
 
   // Clear time if it becomes invalid when dependencies change
   useEffect(() => {
@@ -589,7 +684,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
           if (!withinSchedule) continue;
           const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
           const appointmentEnd = new Date(date.getTime() + totalDuration * 60000);
-          const staffAppointments = (Array.isArray(appointments) ? (appointments as any[]) : [])
+          const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
             .filter((apt: any) => apt.staffId === staffIdNum)
             .filter((apt: any) => new Date(apt.startTime).toDateString() === date.toDateString())
             .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
@@ -760,9 +855,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   ) : (
                     categories?.filter((category: Category) => {
                       if (!selectedLocationId) return true;
-                      // Show category only if at least one allowed service belongs to it
-                      if (!allowedServices || allowedServices.length === 0) return false;
-                      return allowedServices.some((svc: any) => svc.categoryId === category.id);
+                      // Show category only if at least one allowed service at this location belongs to it
+                      if (!allowedServicesAtLocation || allowedServicesAtLocation.length === 0) return false;
+                      return allowedServicesAtLocation.some((svc: any) => svc.categoryId === category.id);
                     }).map((category: Category) => (
                       <Button
                         key={category.id}

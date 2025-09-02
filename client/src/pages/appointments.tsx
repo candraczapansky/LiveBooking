@@ -49,6 +49,13 @@ const AppointmentsPage = () => {
   const [quickSchedule, setQuickSchedule] = useState<any | null>(null);
   const [quickStartTime, setQuickStartTime] = useState<string>("");
   const [quickEndTime, setQuickEndTime] = useState<string>("");
+  const [quickDate, setQuickDate] = useState<string | null>(null);
+  const [repeatWeekly, setRepeatWeekly] = useState<boolean>(false);
+  const [repeatEndDate, setRepeatEndDate] = useState<string>("");
+  // Calendar color controls
+  const [availableColor, setAvailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('availableColor')) || '#dbeafe');
+  const [unavailableColor, setUnavailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('unavailableColor')) || '#e5e7eb');
+  const [blockedColor, setBlockedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('blockedColor')) || '#e5e7eb');
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -163,7 +170,7 @@ const AppointmentsPage = () => {
   // Force refetch appointments when component mounts (after login)
   useEffect(() => {
     refetch();
-  }, [refetch]);
+  }, [refetch, selectedLocation?.id]);
 
   // Listen for schedule updates from other components
   useEffect(() => {
@@ -193,7 +200,7 @@ const AppointmentsPage = () => {
       const matchesDay = schedule.dayOfWeek === dayName;
       
       // Check if the schedule is at the selected location (if location filtering is enabled)
-      const matchesLocation = !locationId || schedule.locationId === locationId;
+      const matchesLocation = !locationId || schedule.locationId == null || schedule.locationId === locationId;
       
       // Check if the schedule is active for this date
       const startDateString = typeof schedule.startDate === 'string' 
@@ -216,8 +223,15 @@ const AppointmentsPage = () => {
 
   const filteredAppointments = appointments.filter((apt: any) => {
     // Filter by selected location if set
-    if (selectedLocation?.id && apt.locationId !== selectedLocation.id) {
-      return false;
+    if (selectedLocation?.id) {
+      // If appointment has explicit locationId, require match; otherwise infer by staff's location if available
+      if (apt.locationId != null && apt.locationId !== selectedLocation.id) return false;
+      if (apt.locationId == null) {
+        try {
+          const staffRow = staff.find((s: any) => s.id === apt.staffId);
+          if (staffRow && staffRow.locationId != null && staffRow.locationId !== selectedLocation.id) return false;
+        } catch {}
+      }
     }
     // Then apply staff filter
     if (selectedStaffFilter !== "all" && apt.staffId !== parseInt(selectedStaffFilter)) {
@@ -493,9 +507,15 @@ const AppointmentsPage = () => {
         const start: Date | null = slotInfo?.start ? new Date(slotInfo.start) : null;
         if (start && !isNaN(start.getTime())) {
           const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
+          const dateStr = start.toISOString().slice(0, 10);
           setQuickSchedule({ ...schedule, dayOfWeek });
+          setQuickDate(dateStr);
           setQuickStartTime(String(schedule.startTime || ''));
           setQuickEndTime(String(schedule.endTime || ''));
+          const startDateStr = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+          const endDateStr = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : '';
+          setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+          setRepeatEndDate(endDateStr || '');
           setIsQuickBlockedOpen(true);
           return;
         }
@@ -660,7 +680,7 @@ const AppointmentsPage = () => {
               
               const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
               console.log(`Checking ${dayName} for staff ${s.id}`);
-              
+
               // Find all schedules for this staff on this day (including blocked ones)
               const allStaffSchedules = (schedules as any[]).filter((sch: any) => {
                 try {
@@ -671,7 +691,7 @@ const AppointmentsPage = () => {
                   
                   const matchesStaff = sch.staffId === s.id;
                   const matchesDay = sch.dayOfWeek === dayName;
-                  const matchesLocation = !selectedLocation?.id || sch.locationId === selectedLocation.id;
+                  const matchesLocation = !selectedLocation?.id || sch.locationId == null || sch.locationId === selectedLocation.id;
                   
                   // Fix date comparison logic
                   const todayString = date.toISOString().slice(0, 10);
@@ -711,23 +731,36 @@ const AppointmentsPage = () => {
               // Separate blocked and non-blocked schedules
               const blockedSchedules = allStaffSchedules.filter((sch: any) => sch.isBlocked);
               const availableSchedules = allStaffSchedules.filter((sch: any) => !sch.isBlocked);
+
+              // Highlight available schedule region (customizable): draw a background strip for the working window
+              try {
+                const availableColorLocal = availableColor as string;
+                availableSchedules.forEach((avail: any) => {
+                  if (!avail.startTime || !avail.endTime) return;
+                  const [ah, am] = String(avail.startTime).split(':').map(Number);
+                  const [zh, zm] = String(avail.endTime).split(':').map(Number);
+                  if ([ah, am, zh, zm].some((n) => isNaN(n))) return;
+                  const availStart = setMinutes(setHours(startOfDay(date), ah), am);
+                  const availEnd = setMinutes(setHours(startOfDay(date), zh), zm);
+                  // Use rbc-day-slot background segment by adding a background event
+                  events.push({
+                    start: availStart,
+                    end: availEnd,
+                    resourceId: s.id,
+                    allDay: false,
+                    title: '',
+                    type: 'available',
+                    style: { backgroundColor: availableColorLocal, opacity: 1 },
+                    isBackground: true,
+                  });
+                });
+              } catch {}
               
               // Note: appointments are rendered separately as interactive events; we also render a visible blocked event for interaction
               
-              // If no schedule at all, gray out the whole day
-              if (allStaffSchedules.length === 0) {
-                events.push({
-                  start: startOfDay(date),
-                  end: endOfDay(date),
-                  resourceId: s.id,
-                  allDay: false,
-                  title: '',
-                  type: 'unavailable',
-                  style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
-                  isBackground: true,
-                });
-              } else {
-                // Handle blocked schedules
+              // Only render masks that strictly match staff schedules; do not gray out whole day when no schedule
+              if (allStaffSchedules.length > 0) {
+                // Handle blocked schedules (render only background mask, no extra clickable block event)
                 blockedSchedules.forEach((sch: any) => {
                   try {
                     if (!sch.startTime || !sch.endTime) return;
@@ -748,7 +781,7 @@ const AppointmentsPage = () => {
                       return;
                     }
                     
-                    // Non-interactive gray background mask
+                    // Non-interactive gray background mask (customizable)
                     events.push({
                       start: blockStart,
                       end: blockEnd,
@@ -756,19 +789,8 @@ const AppointmentsPage = () => {
                       allDay: false,
                       title: '',
                       type: 'unavailable',
-                      style: { backgroundColor: '#e5e7eb', opacity: 0.35 },
+                      style: { backgroundColor: unavailableColor as string, opacity: 0.35 },
                       isBackground: true,
-                    });
-
-                    // Clickable, visible blocked event in blue to match your UI
-                    events.push({
-                      start: blockStart,
-                      end: blockEnd,
-                      resourceId: s.id,
-                      allDay: false,
-                      title: 'Blocked',
-                      type: 'blocked',
-                      resource: sch,
                     });
                   } catch (error) {
                     console.warn('Error processing blocked schedule:', error);
@@ -805,7 +827,7 @@ const AppointmentsPage = () => {
                         allDay: false,
                         title: '',
                         type: 'unavailable',
-                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        style: { backgroundColor: unavailableColor as string, opacity: 0.5 },
                         isBackground: true,
                       });
                     }
@@ -819,7 +841,7 @@ const AppointmentsPage = () => {
                         allDay: false,
                         title: '',
                         type: 'unavailable',
-                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        style: { backgroundColor: unavailableColor as string, opacity: 0.5 },
                         isBackground: true,
                       });
                     }
@@ -870,7 +892,7 @@ const AppointmentsPage = () => {
       staffToInclude.forEach((s: any) => {
         days.forEach((date) => {
           const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-          const todaysSchedules = (schedules as any[]).filter((sch: any) => {
+          (schedules as any[]).filter((sch: any) => {
             if (!sch || sch.staffId !== s.id || sch.dayOfWeek !== dayName) return false;
             if (selectedLocation?.id && sch.locationId !== selectedLocation.id) return false;
             const todayString = date.toISOString().slice(0, 10);
@@ -879,24 +901,8 @@ const AppointmentsPage = () => {
             return startDateString <= todayString && (!endDateString || endDateString >= todayString);
           });
 
-          const blocked = todaysSchedules.filter((sch: any) => sch.isBlocked);
-          blocked.forEach((sch: any) => {
-            if (!sch.startTime || !sch.endTime) return;
-            const [sh, sm] = String(sch.startTime).split(':').map(Number);
-            const [eh, em] = String(sch.endTime).split(':').map(Number);
-            if ([sh, sm, eh, em].some((n) => isNaN(n))) return;
-            const start = setMinutes(setHours(startOfDay(date), sh), sm);
-            const end = setMinutes(setHours(startOfDay(date), eh), em);
-            events.push({
-              id: `blocked-${sch.id}-${date.toISOString().slice(0,10)}`,
-              title: 'Blocked',
-              start,
-              end,
-              resourceId: s.id,
-              type: 'blocked',
-              resource: sch,
-            });
-          });
+          // Disable redundant clickable blocked overlays to avoid duplicate blocks on the calendar
+          // Background masks for blocked times are still rendered elsewhere for visual indication.
         });
       });
 
@@ -1063,13 +1069,15 @@ const AppointmentsPage = () => {
         /* Let page control height; remove forced calendar heights */
         .appointments-calendar-container { height: auto !important; }
 
-        /* Fix month view date alignment - override the default right-align */
+        /* Fix month view date alignment - ensure date numbers are perfectly centered */
         .rbc-month-view .rbc-date-cell {
           flex: 1 1 0 !important;
           min-width: 0 !important;
-          padding: 5px !important;
+          padding: 6px 0 !important; /* remove asymmetric right padding */
           text-align: center !important;
-          padding-right: 5px !important; /* Override the default right padding */
+          display: flex !important;
+          align-items: flex-start !important;
+          justify-content: center !important;
         }
         
         /* Ensure all cells in a row are equal width */
@@ -1095,9 +1103,18 @@ const AppointmentsPage = () => {
         
         /* Ensure the date numbers themselves are centered */
         .rbc-month-view .rbc-date-cell > a,
-        .rbc-month-view .rbc-date-cell > span {
-          display: block !important;
+        .rbc-month-view .rbc-date-cell > span,
+        .rbc-month-view .rbc-date-cell > button,
+        .rbc-month-view .rbc-date-cell .rbc-button-link {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
           text-align: center !important;
+          margin: 0 auto !important; /* center inside the cell */
+          float: none !important; /* override library float */
+          position: relative !important;
+          left: 12px !important; /* nudge numbers more to the right */
+          font-variant-numeric: tabular-nums !important; /* consistent centering for 1-digit days */
         }
         
         /* Fix selected cell and today highlights to align with centered dates */
@@ -1130,34 +1147,43 @@ const AppointmentsPage = () => {
           display: grid !important;
           grid-template-columns: repeat(7, minmax(0, 1fr));
           gap: 0 !important;
+          justify-items: center !important;
+          align-items: center !important;
         }
         .appointments-mini-calendar .rdp-head_cell,
         .appointments-mini-calendar .rdp-cell {
           padding: 0 !important;
           text-align: center !important;
           vertical-align: middle !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
+          display: grid !important;
+          place-items: center !important;
+        }
+
+        /* Nudge weekday labels and the selected-day border slightly left to align visually */
+        .appointments-mini-calendar .rdp-head_cell {
+          transform: translateX(-2px) !important;
         }
         .appointments-mini-calendar .rdp-day {
           width: 36px !important;
           height: 36px !important;
           padding: 0 !important;
-          margin: 0 auto !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
+          margin: 0 !important;
+          margin-left: 16px !important; /* push the entire day button right */
+          display: block !important; /* block to enable padding control */
+          line-height: 36px !important; /* keep number vertically centered */
+          text-align: left !important; /* allow horizontal nudge via padding */
+          padding-left: 26px !important; /* push numeral further to the right */
           border-radius: 0.375rem !important;
           box-sizing: border-box !important;
+          font-variant-numeric: tabular-nums !important;
+          text-indent: 0 !important; /* use padding-left for reliable shift */
         }
 
-        /* Force exact centering of mini-calendar day buttons (and their borders) */
+        /* Ensure day buttons are centered within grid cells without offsets */
         .appointments-mini-calendar .rdp-cell { position: relative !important; }
         .appointments-mini-calendar .rdp-day {
-          position: absolute !important;
-          inset: 0 !important;
-          margin: auto !important;
+          position: relative !important;
+          left: 12px !important; /* shift entire day button right */
         }
 
         /* Mini calendar: highlight the selected date when in day view */
@@ -1203,6 +1229,7 @@ const AppointmentsPage = () => {
           box-sizing: border-box !important;
           width: 36px !important;
           height: 36px !important;
+          transform: none !important; /* keep highlight centered; only the number shifts */
         }
       `}</style>
       <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />
@@ -1280,8 +1307,8 @@ const AppointmentsPage = () => {
                         }
                       </CardDescription>
                     </div>
-                    {/* Staff Filter Dropdown - Show for all views, but with different behavior for day view */}
-                    <div className="flex items-center gap-2">
+                    {/* Staff Filter Dropdown - Show for all views, plus color controls */}
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Filter className="h-4 w-4 text-gray-500" />
                       <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
                         <SelectTrigger className="w-full sm:w-48 min-h-[44px]">
@@ -1298,6 +1325,55 @@ const AppointmentsPage = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                      {/* Color pickers */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Available</label>
+                        <input
+                          type="color"
+                          value={availableColor}
+                          onChange={(e) => {
+                            try {
+                              const v = e.target.value;
+                              localStorage.setItem('availableColor', v);
+                              setAvailableColor(v);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Unavailable</label>
+                        <input
+                          type="color"
+                          value={unavailableColor}
+                          onChange={(e) => {
+                            try {
+                              const v = e.target.value;
+                              localStorage.setItem('unavailableColor', v);
+                              setUnavailableColor(v);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Blocked</label>
+                        <input
+                          type="color"
+                          value={blockedColor}
+                          onChange={(e) => {
+                            try {
+                              const v = e.target.value;
+                              localStorage.setItem('blockedColor', v);
+                              setBlockedColor(v);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -1355,6 +1431,9 @@ const AppointmentsPage = () => {
                     >
                       <BigCalendar
                         key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}`}
+                        blockedColor={(localStorage.getItem('blockedColor') || '#e5e7eb') as string}
+                        unavailableColor={unavailableColor}
+                        availableColor={availableColor}
                         events={(() => {
                           try {
                             const appointmentEvents = filteredAppointments?.map((apt: any) => {
@@ -1372,9 +1451,8 @@ const AppointmentsPage = () => {
                                 let endDate: Date;
                                 
                                 try {
-                                  // Interpret appointment timestamps in Central Time for display
-                                  startDate = toCentralWallTime(apt.startTime);
-                                  // Ensure it's a valid date
+                                  // Use raw timestamps; calendar will render in local wall-clock
+                                  startDate = new Date(apt.startTime);
                                   if (isNaN(startDate.getTime())) {
                                     console.warn('Invalid start date:', apt.startTime);
                                     return null;
@@ -1385,8 +1463,7 @@ const AppointmentsPage = () => {
                                 }
                                 
                                 try {
-                                  endDate = apt.endTime ? toCentralWallTime(apt.endTime) : new Date(startDate.getTime() + 3600000); // Default to 1 hour if no end time
-                                  // Ensure it's a valid date
+                                  endDate = apt.endTime ? new Date(apt.endTime) : new Date(startDate.getTime() + 3600000); // Default to 1 hour if no end time
                                   if (isNaN(endDate.getTime())) {
                                     console.warn('Invalid end date:', apt.endTime);
                                     endDate = new Date(startDate.getTime() + 3600000); // Fallback to 1 hour duration
@@ -1423,6 +1500,7 @@ const AppointmentsPage = () => {
                             console.log('📅 Valid appointment events created:', appointmentEvents.length);
                             console.log('⛔ Clickable blocked events created:', blockedEvents.length);
                             
+                            // Ensure appointment events are returned after background strips (drawn earlier)
                             return [...appointmentEvents, ...blockedEvents];
                           } catch (error) {
                             console.error('Error creating appointment events:', error);
@@ -1462,8 +1540,13 @@ const AppointmentsPage = () => {
                               const sch = match.resource;
                               const dayOfWeek = clicked.toLocaleDateString('en-US', { weekday: 'long' });
                               setQuickSchedule({ ...sch, dayOfWeek });
+                              setQuickDate(clicked.toISOString().slice(0, 10));
                               setQuickStartTime(String(sch.startTime || ''));
                               setQuickEndTime(String(sch.endTime || ''));
+                              const startDateStr = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+                              const endDateStr = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : '';
+                              setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+                              setRepeatEndDate(endDateStr || '');
                               setIsQuickBlockedOpen(true);
                               return true; // prevent create card
                             }
@@ -1479,10 +1562,15 @@ const AppointmentsPage = () => {
                               const end: Date = (event as any).end;
                               const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
                               setQuickSchedule({ ...sch, dayOfWeek });
+                              setQuickDate(start.toISOString().slice(0, 10));
                               // Pre-fill with existing block window
                               const pad = (n: number) => String(n).padStart(2, '0');
                               setQuickStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
                               setQuickEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
+                              const startDateStr = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+                              const endDateStr = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : '';
+                              setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+                              setRepeatEndDate(endDateStr || '');
                               setIsQuickBlockedOpen(true);
                             }
                             return;
@@ -1521,6 +1609,7 @@ const AppointmentsPage = () => {
             refetch();
           }}
           appointments={appointments}
+          selectedDate={selectedDate}
         />
       </Suspense>
 
@@ -1556,7 +1645,14 @@ const AppointmentsPage = () => {
       </Suspense>
 
       {/* Quick Edit/Delete for Blocked Time */}
-      <Dialog open={isQuickBlockedOpen} onOpenChange={setIsQuickBlockedOpen}>
+      <Dialog open={isQuickBlockedOpen} onOpenChange={(open) => {
+        setIsQuickBlockedOpen(open);
+        if (!open) {
+          setQuickDate(null);
+          setRepeatWeekly(false);
+          setRepeatEndDate('');
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Blocked Time</DialogTitle>
@@ -1571,6 +1667,33 @@ const AppointmentsPage = () => {
                 <label className="text-sm font-medium">End Time</label>
                 <Input type="time" value={quickEndTime} onChange={(e) => setQuickEndTime(e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="repeatWeekly"
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={repeatWeekly}
+                  onChange={(e) => setRepeatWeekly(e.target.checked)}
+                />
+                <label htmlFor="repeatWeekly" className="text-sm font-medium">Repeat weekly</label>
+              </div>
+              {repeatWeekly && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Repeat until</label>
+                    <Input
+                      type="date"
+                      value={repeatEndDate}
+                      onChange={(e) => setRepeatEndDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground self-end">
+                    {quickDate ? `Starts ${quickDate}` : ''}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -1589,16 +1712,21 @@ const AppointmentsPage = () => {
             <Button
               onClick={() => {
                 if (!quickSchedule?.id) return;
+                const existingStartStr = typeof quickSchedule.startDate === 'string' ? quickSchedule.startDate : new Date(quickSchedule.startDate).toISOString().slice(0, 10);
+                const baseStartDate = quickDate || existingStartStr;
+                const computedEndDate = repeatWeekly
+                  ? (repeatEndDate || null)
+                  : (baseStartDate || null);
                 const payload = {
                   id: quickSchedule.id,
                   data: {
                     staffId: Number(quickSchedule.staffId),
-                    locationId: Number(quickSchedule.locationId),
+                    locationId: quickSchedule.locationId == null ? null : Number(quickSchedule.locationId),
                     dayOfWeek: quickSchedule.dayOfWeek,
                     startTime: quickStartTime,
                     endTime: quickEndTime,
-                    startDate: quickSchedule.startDate,
-                    endDate: quickSchedule.endDate || null,
+                    startDate: baseStartDate,
+                    endDate: computedEndDate,
                     isBlocked: true,
                     serviceCategories: quickSchedule.serviceCategories || [],
                   },
