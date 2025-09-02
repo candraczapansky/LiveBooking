@@ -77,9 +77,17 @@ export default function StaffScheduleDetailPage() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      // Invalidate all schedules queries (including location-scoped keys)
+      try {
+        queryClient.invalidateQueries({ 
+          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
+        });
+        queryClient.refetchQueries({ 
+          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
+        });
+      } catch {}
       // Dispatch custom event to notify calendar
-      window.dispatchEvent(new CustomEvent('schedule-updated'));
+      try { window.dispatchEvent(new CustomEvent('schedule-updated')); } catch {}
       toast({
         title: "Success",
         description: "Schedule deleted successfully.",

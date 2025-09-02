@@ -4,16 +4,3 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
-# Ignore user uploaded assets
-/attached_assets/
-
-# Ignore database backups
-/backups/
-
-# Ignore zip files
-*.zip
-
-# Standard Node.js ignores
-/node_modules
-.env
-.DS_Store

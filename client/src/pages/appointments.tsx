@@ -49,6 +49,9 @@ const AppointmentsPage = () => {
   const [quickSchedule, setQuickSchedule] = useState<any | null>(null);
   const [quickStartTime, setQuickStartTime] = useState<string>("");
   const [quickEndTime, setQuickEndTime] = useState<string>("");
+  const [quickDate, setQuickDate] = useState<string | null>(null);
+  const [repeatWeekly, setRepeatWeekly] = useState<boolean>(false);
+  const [repeatEndDate, setRepeatEndDate] = useState<string>("");
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -493,9 +496,15 @@ const AppointmentsPage = () => {
         const start: Date | null = slotInfo?.start ? new Date(slotInfo.start) : null;
         if (start && !isNaN(start.getTime())) {
           const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
+          const dateStr = start.toISOString().slice(0, 10);
           setQuickSchedule({ ...schedule, dayOfWeek });
+          setQuickDate(dateStr);
           setQuickStartTime(String(schedule.startTime || ''));
           setQuickEndTime(String(schedule.endTime || ''));
+          const startDateStr = typeof schedule.startDate === 'string' ? schedule.startDate : new Date(schedule.startDate).toISOString().slice(0, 10);
+          const endDateStr = schedule.endDate ? (typeof schedule.endDate === 'string' ? schedule.endDate : new Date(schedule.endDate).toISOString().slice(0, 10)) : '';
+          setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+          setRepeatEndDate(endDateStr || '');
           setIsQuickBlockedOpen(true);
           return;
         }
@@ -723,7 +732,7 @@ const AppointmentsPage = () => {
                   allDay: false,
                   title: '',
                   type: 'unavailable',
-                  style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                  style: { backgroundColor: (localStorage.getItem('unavailableColor') || '#e5e7eb') as string, opacity: 0.5 },
                   isBackground: true,
                 });
               } else {
@@ -748,7 +757,7 @@ const AppointmentsPage = () => {
                       return;
                     }
                     
-                    // Non-interactive gray background mask
+                    // Non-interactive gray background mask (customizable)
                     events.push({
                       start: blockStart,
                       end: blockEnd,
@@ -756,7 +765,7 @@ const AppointmentsPage = () => {
                       allDay: false,
                       title: '',
                       type: 'unavailable',
-                      style: { backgroundColor: '#e5e7eb', opacity: 0.35 },
+                      style: { backgroundColor: (localStorage.getItem('unavailableColor') || '#e5e7eb') as string, opacity: 0.35 },
                       isBackground: true,
                     });
 
@@ -805,7 +814,7 @@ const AppointmentsPage = () => {
                         allDay: false,
                         title: '',
                         type: 'unavailable',
-                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        style: { backgroundColor: (localStorage.getItem('unavailableColor') || '#e5e7eb') as string, opacity: 0.5 },
                         isBackground: true,
                       });
                     }
@@ -819,7 +828,7 @@ const AppointmentsPage = () => {
                         allDay: false,
                         title: '',
                         type: 'unavailable',
-                        style: { backgroundColor: '#e5e7eb', opacity: 0.5 },
+                        style: { backgroundColor: (localStorage.getItem('unavailableColor') || '#e5e7eb') as string, opacity: 0.5 },
                         isBackground: true,
                       });
                     }
@@ -1063,13 +1072,12 @@ const AppointmentsPage = () => {
         /* Let page control height; remove forced calendar heights */
         .appointments-calendar-container { height: auto !important; }
 
-        /* Fix month view date alignment - override the default right-align */
+        /* Fix month view date alignment - ensure date numbers are perfectly centered */
         .rbc-month-view .rbc-date-cell {
           flex: 1 1 0 !important;
           min-width: 0 !important;
-          padding: 5px !important;
+          padding: 5px 0 !important; /* remove asymmetric right padding */
           text-align: center !important;
-          padding-right: 5px !important; /* Override the default right padding */
         }
         
         /* Ensure all cells in a row are equal width */
@@ -1098,6 +1106,7 @@ const AppointmentsPage = () => {
         .rbc-month-view .rbc-date-cell > span {
           display: block !important;
           text-align: center !important;
+          margin: 0 auto !important; /* center the inline element inside the cell */
         }
         
         /* Fix selected cell and today highlights to align with centered dates */
@@ -1148,6 +1157,7 @@ const AppointmentsPage = () => {
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
+          text-align: center !important;
           border-radius: 0.375rem !important;
           box-sizing: border-box !important;
         }
@@ -1281,7 +1291,7 @@ const AppointmentsPage = () => {
                       </CardDescription>
                     </div>
                     {/* Staff Filter Dropdown - Show for all views, but with different behavior for day view */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <Filter className="h-4 w-4 text-gray-500" />
                       <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
                         <SelectTrigger className="w-full sm:w-48 min-h-[44px]">
@@ -1298,6 +1308,50 @@ const AppointmentsPage = () => {
                           ))}
                         </SelectContent>
                       </Select>
+
+                      {/* Color pickers */}
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Calendar BG</label>
+                        <input
+                          type="color"
+                          value={localStorage.getItem('calendarBgColor') || '#ffffff'}
+                          onChange={(e) => {
+                            try {
+                              localStorage.setItem('calendarBgColor', e.target.value);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Unavailable</label>
+                        <input
+                          type="color"
+                          value={localStorage.getItem('unavailableColor') || '#e5e7eb'}
+                          onChange={(e) => {
+                            try {
+                              localStorage.setItem('unavailableColor', e.target.value);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs text-muted-foreground">Blocked</label>
+                        <input
+                          type="color"
+                          value={localStorage.getItem('blockedColor') || '#e5e7eb'}
+                          onChange={(e) => {
+                            try {
+                              localStorage.setItem('blockedColor', e.target.value);
+                              setSelectedDate((d) => d ? new Date(d) : new Date());
+                            } catch {}
+                          }}
+                          className="h-8 w-10 p-0 border rounded"
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -1350,11 +1404,13 @@ const AppointmentsPage = () => {
                     <div
                       className="appointments-calendar-container overflow-x-auto w-full touch-manipulation rounded-lg border-2 border-primary"
                       style={{ 
-                        minWidth: `${Math.max((filteredResources?.length || 0) * 220, 360)}px`
+                        minWidth: `${Math.max((filteredResources?.length || 0) * 220, 360)}px`,
+                        backgroundColor: (localStorage.getItem('calendarBgColor') || '#ffffff') as string,
                       }}
                     >
                       <BigCalendar
                         key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}`}
+                        blockedColor={(localStorage.getItem('blockedColor') || '#e5e7eb') as string}
                         events={(() => {
                           try {
                             const appointmentEvents = filteredAppointments?.map((apt: any) => {
@@ -1462,8 +1518,13 @@ const AppointmentsPage = () => {
                               const sch = match.resource;
                               const dayOfWeek = clicked.toLocaleDateString('en-US', { weekday: 'long' });
                               setQuickSchedule({ ...sch, dayOfWeek });
+                              setQuickDate(clicked.toISOString().slice(0, 10));
                               setQuickStartTime(String(sch.startTime || ''));
                               setQuickEndTime(String(sch.endTime || ''));
+                              const startDateStr = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+                              const endDateStr = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : '';
+                              setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+                              setRepeatEndDate(endDateStr || '');
                               setIsQuickBlockedOpen(true);
                               return true; // prevent create card
                             }
@@ -1479,10 +1540,15 @@ const AppointmentsPage = () => {
                               const end: Date = (event as any).end;
                               const dayOfWeek = start.toLocaleDateString('en-US', { weekday: 'long' });
                               setQuickSchedule({ ...sch, dayOfWeek });
+                              setQuickDate(start.toISOString().slice(0, 10));
                               // Pre-fill with existing block window
                               const pad = (n: number) => String(n).padStart(2, '0');
                               setQuickStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
                               setQuickEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
+                              const startDateStr = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+                              const endDateStr = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : '';
+                              setRepeatWeekly(!!endDateStr && endDateStr !== startDateStr);
+                              setRepeatEndDate(endDateStr || '');
                               setIsQuickBlockedOpen(true);
                             }
                             return;
@@ -1521,6 +1587,7 @@ const AppointmentsPage = () => {
             refetch();
           }}
           appointments={appointments}
+          selectedDate={selectedDate}
         />
       </Suspense>
 
@@ -1556,7 +1623,14 @@ const AppointmentsPage = () => {
       </Suspense>
 
       {/* Quick Edit/Delete for Blocked Time */}
-      <Dialog open={isQuickBlockedOpen} onOpenChange={setIsQuickBlockedOpen}>
+      <Dialog open={isQuickBlockedOpen} onOpenChange={(open) => {
+        setIsQuickBlockedOpen(open);
+        if (!open) {
+          setQuickDate(null);
+          setRepeatWeekly(false);
+          setRepeatEndDate('');
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Blocked Time</DialogTitle>
@@ -1571,6 +1645,33 @@ const AppointmentsPage = () => {
                 <label className="text-sm font-medium">End Time</label>
                 <Input type="time" value={quickEndTime} onChange={(e) => setQuickEndTime(e.target.value)} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  id="repeatWeekly"
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={repeatWeekly}
+                  onChange={(e) => setRepeatWeekly(e.target.checked)}
+                />
+                <label htmlFor="repeatWeekly" className="text-sm font-medium">Repeat weekly</label>
+              </div>
+              {repeatWeekly && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Repeat until</label>
+                    <Input
+                      type="date"
+                      value={repeatEndDate}
+                      onChange={(e) => setRepeatEndDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground self-end">
+                    {quickDate ? `Starts ${quickDate}` : ''}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>
@@ -1589,16 +1690,21 @@ const AppointmentsPage = () => {
             <Button
               onClick={() => {
                 if (!quickSchedule?.id) return;
+                const existingStartStr = typeof quickSchedule.startDate === 'string' ? quickSchedule.startDate : new Date(quickSchedule.startDate).toISOString().slice(0, 10);
+                const baseStartDate = quickDate || existingStartStr;
+                const computedEndDate = repeatWeekly
+                  ? (repeatEndDate || null)
+                  : (baseStartDate || null);
                 const payload = {
                   id: quickSchedule.id,
                   data: {
                     staffId: Number(quickSchedule.staffId),
-                    locationId: Number(quickSchedule.locationId),
+                    locationId: quickSchedule.locationId == null ? null : Number(quickSchedule.locationId),
                     dayOfWeek: quickSchedule.dayOfWeek,
                     startTime: quickStartTime,
                     endTime: quickEndTime,
-                    startDate: quickSchedule.startDate,
-                    endDate: quickSchedule.endDate || null,
+                    startDate: baseStartDate,
+                    endDate: computedEndDate,
                     isBlocked: true,
                     serviceCategories: quickSchedule.serviceCategories || [],
                   },

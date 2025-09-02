@@ -438,16 +438,6 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                             onClick={handleItemClick}
                           />
                         </div>
-                        <div className="mt-1">
-                          <SidebarItem
-                            icon={<Mail className="w-5 h-5" strokeWidth={1.75} />}
-                            label="SMS Inbox"
-                            href="/sms-inbox"
-                            isActive={location === "/sms-inbox"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
-                        </div>
                       </div>
                     )}
                   </div>

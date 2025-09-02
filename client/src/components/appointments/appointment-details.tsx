@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
@@ -908,11 +909,17 @@ const AppointmentDetails = ({
                     <span className="font-medium">Name:</span> {client.firstName} {client.lastName}
                   </p>
                   <p className="text-sm">
-                    <span className="font-medium">Email:</span> {client.email}
+                    <span className="font-medium">Email:</span>{' '}
+                    <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                      {client.email}
+                    </PermissionGuard>
                   </p>
                   {client.phone && (
                     <p className="text-sm">
-                      <span className="font-medium">Phone:</span> {client.phone}
+                      <span className="font-medium">Phone:</span>{' '}
+                      <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                        {client.phone}
+                      </PermissionGuard>
                     </p>
                   )}
                 </div>

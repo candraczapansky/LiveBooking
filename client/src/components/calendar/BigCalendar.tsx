@@ -47,9 +47,11 @@ interface BigCalendarProps {
   onNavigate?: (date: Date) => void;
   onPreSelectResource?: (resourceId: number | string | null) => void;
   onInterceptSlotClick?: (info: { date: Date | null; resourceId: number | string | null }) => boolean | void;
+  // Optional color customization
+  blockedColor?: string;
 }
 
-const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick }) => {
+const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick, blockedColor }) => {
   // Limit visible time range to reduce internal scrolling and show more calendar content
   const today = new Date();
   // Keep a consistent visible window that matches Central hours. These are wall-clock hours.
@@ -177,10 +179,15 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
           if ((event as any).type === 'blocked') {
             return {
               style: {
-                backgroundColor: '#3b82f6',
-                color: '#ffffff',
-                border: '1px solid #3b82f6',
-                opacity: 0.85,
+                // Use provided blocked color or fallback to unavailability gray
+                backgroundColor: blockedColor || '#e5e7eb',
+                color: '#111827',
+                border: `1px solid ${blockedColor || '#d1d5db'}`,
+                opacity: 0.9,
+                // Keep blocked events clickable and above masks
+                zIndex: 5,
+                pointerEvents: 'auto',
+                cursor: 'pointer',
               },
             };
           }

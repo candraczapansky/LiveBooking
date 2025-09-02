@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatTime, getInitials, toCentralWallTime } from "@/lib/utils";
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 
 const getStatusBadgeStyle = (status: string) => {
   switch(status) {
@@ -178,7 +179,9 @@ const AppointmentsTable = () => {
                           {client?.firstName} {client?.lastName}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {client?.email}
+                          <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                            {client?.email}
+                          </PermissionGuard>
                         </div>
                       </div>
                     </div>
