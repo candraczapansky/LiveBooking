@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import { FileText, Eye, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 
 interface ClientFormSubmission {
   id: string;
@@ -188,6 +189,15 @@ export default function ClientFormSubmissions({ clientId, clientName }: ClientFo
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
     }
+  };
+
+  // Detect likely email/phone fields for masking
+  const isSensitiveContactField = (fieldKey: string, value: any): boolean => {
+    const keyLc = (fieldKey || '').toLowerCase();
+    const valueStr = typeof value === 'string' ? value : '';
+    const looksLikeEmail = /.+@.+\..+/.test(valueStr);
+    const looksLikePhone = /(?:\+?\d[\d\s().-]{5,}\d)/.test(valueStr);
+    return keyLc.includes('email') || keyLc.includes('phone') || looksLikeEmail || looksLikePhone;
   };
 
   const toggleSubmissionExpansion = (submissionId: string) => {
@@ -379,6 +389,7 @@ export default function ClientFormSubmissions({ clientId, clientName }: ClientFo
                           const isImage = typeof val === 'string' ? val.startsWith('data:image/') || /^https?:\/\//.test(val) : false;
                           const isObjWithData = val && typeof val === 'object' && typeof val.data === 'string' && val.data.startsWith('data:image/');
                           const isFileArray = Array.isArray(val);
+                          const isSensitive = isSensitiveContactField(key, val);
                           return (
                             <div key={key} className="space-y-1">
                               <label className="text-sm font-medium text-gray-700 dark:text-gray-300 capitalize">
@@ -411,7 +422,13 @@ export default function ClientFormSubmissions({ clientId, clientName }: ClientFo
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-900 dark:text-gray-100">
-                                  {typeof val === 'string' ? val : JSON.stringify(val)}
+                                  {isSensitive && (typeof val === 'string' || typeof val === 'number') ? (
+                                    <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                      {String(val)}
+                                    </PermissionGuard>
+                                  ) : (
+                                    typeof val === 'string' ? val : JSON.stringify(val)
+                                  )}
                                 </p>
                               )}
                             </div>

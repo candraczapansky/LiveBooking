@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FileText, Calendar, User, Download, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 
 interface FormSubmission {
   id: string;
@@ -626,6 +627,16 @@ export function FormSubmissionsDialog({
     return map;
   }, [form?.fields, formLoading, formError]);
 
+  // Detect if a field likely contains contact info (email/phone)
+  const isSensitiveContactField = (fieldKey: string, fieldLabel: string | undefined, value: any): boolean => {
+    const keyLc = (fieldKey || '').toLowerCase();
+    const labelLc = (fieldLabel || '').toLowerCase();
+    const valueStr = typeof value === 'string' ? value : '';
+    const looksLikeEmail = /.+@.+\..+/.test(valueStr);
+    const looksLikePhone = /(?:\+?\d[\d\s().-]{5,}\d)/.test(valueStr);
+    return keyLc.includes('email') || keyLc.includes('phone') || labelLc.includes('email') || labelLc.includes('phone') || looksLikeEmail || looksLikePhone;
+  };
+
   // Function to get field label from field ID
   const getFieldLabel = (fieldId: string) => {
     // First try to get the label from the fieldLabelMap
@@ -1127,16 +1138,27 @@ export function FormSubmissionsDialog({
                 <ScrollArea className="h-[400px]">
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 gap-4">
-                      {Object.entries(selectedSubmission.formData).map(([key, value]) => (
-                        <div key={key} className="p-3 border rounded-lg">
-                          <div className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-1">
-                            {getFieldLabel(key)}
+                      {Object.entries(selectedSubmission.formData).map(([key, value]) => {
+                        const label = getFieldLabel(key);
+                        const isSensitive = isSensitiveContactField(key, label, value);
+                        const isRenderableString = typeof value === 'string' || typeof value === 'number';
+                        return (
+                          <div key={key} className="p-3 border rounded-lg">
+                            <div className="font-medium text-sm text-gray-600 dark:text-gray-400 mb-1">
+                              {label}
+                            </div>
+                            <div className="text-gray-900 dark:text-gray-100">
+                              {isSensitive && isRenderableString ? (
+                                <PermissionGuard permission="view_client_contact_info" fallback={<span className="italic text-gray-400">Hidden</span>}>
+                                  {String(value)}
+                                </PermissionGuard>
+                              ) : (
+                                renderFileValue(value)
+                              )}
+                            </div>
                           </div>
-                          <div className="text-gray-900 dark:text-gray-100">
-                            {renderFileValue(value)}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
 
                     <Separator />

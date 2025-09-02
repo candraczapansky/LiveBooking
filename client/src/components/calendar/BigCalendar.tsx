@@ -49,9 +49,11 @@ interface BigCalendarProps {
   onInterceptSlotClick?: (info: { date: Date | null; resourceId: number | string | null }) => boolean | void;
   // Optional color customization
   blockedColor?: string;
+  unavailableColor?: string;
+  availableColor?: string;
 }
 
-const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick, blockedColor }) => {
+const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick, blockedColor, unavailableColor, availableColor }) => {
   // Limit visible time range to reduce internal scrolling and show more calendar content
   const today = new Date();
   // Keep a consistent visible window that matches Central hours. These are wall-clock hours.
@@ -191,26 +193,53 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
               },
             };
           }
-          // For regular appointments, check payment status first
+          // Render available/unavailable background strips even if passed via regular events
+          if ((event as any).type === 'available') {
+            return {
+              style: {
+                backgroundColor: availableColor || '#dbeafe',
+                border: 'none',
+                opacity: 1,
+                zIndex: 1,
+                pointerEvents: 'none',
+              },
+            };
+          }
+          if ((event as any).type === 'unavailable') {
+            return {
+              style: {
+                backgroundColor: unavailableColor || '#e5e7eb',
+                border: 'none',
+                opacity: ((event as any).style?.opacity ?? 0.5),
+                zIndex: 1,
+                pointerEvents: 'none',
+              },
+            };
+          }
+          // For regular appointments, ensure they render above background strips and remain clickable
           const appointmentEvent = event as AppointmentEvent;
           const durationMinutes = (appointmentEvent.end.getTime() - appointmentEvent.start.getTime()) / 60000;
           const isFifteenMinute = durationMinutes > 0 && durationMinutes <= 16; // treat <=16m as 15m block visually
 
           // Base style accumulator
-          const style: React.CSSProperties = {};
-          
-          // If appointment is paid, make it green
-          if (appointmentEvent.resource && (appointmentEvent.resource as any).paymentStatus === 'paid') {
-            style.backgroundColor = '#22c55e';
+          const style: React.CSSProperties = { zIndex: 10, pointerEvents: 'auto' };
+
+          // Determine appointment state for coloring
+          const eventResource: any = appointmentEvent.resource;
+          const isPaid: boolean = !!(eventResource && eventResource.paymentStatus === 'paid');
+          const isCompleted: boolean = !!(eventResource && eventResource.status === 'completed');
+          const serviceColor: string | undefined = eventResource && eventResource.serviceColor ? String(eventResource.serviceColor) : undefined;
+
+          // Paid or completed appointments should be green (#278741)
+          if (isPaid || isCompleted) {
+            style.backgroundColor = '#278741';
             style.color = '#ffffff';
-            style.border = '1px solid #22c55e';
-          }
-          
-          // For unpaid appointments, use the service color if available
-          if (appointmentEvent.resource && (appointmentEvent.resource as any).serviceColor) {
-            style.backgroundColor = (appointmentEvent.resource as any).serviceColor;
+            style.border = '1px solid #278741';
+          } else if (serviceColor) {
+            // Otherwise, use the service color if available
+            style.backgroundColor = serviceColor;
             style.color = '#ffffff';
-            style.border = `1px solid ${(appointmentEvent.resource as any).serviceColor}`;
+            style.border = `1px solid ${serviceColor}`;
           }
 
           // Visual hack: shrink 15-minute events beginning at :15 or :45
@@ -226,13 +255,14 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         }}
         backgroundEventPropGetter={(event) => {
           // Handle background events (unavailable times)
-          if ((event as any).type === 'unavailable' || (event as any).isBackground) {
+          if ((event as any).type === 'unavailable' || (event as any).type === 'available') {
             return {
               style: {
                 pointerEvents: 'none',
-                ...( (event as any).style || { backgroundColor: '#e5e7eb', opacity: 0.5 } )
+                zIndex: 1,
+                ...( (event as any).style || { backgroundColor: ((event as any).type === 'unavailable' ? (unavailableColor || '#e5e7eb') : '#dbeafe'), opacity: 0.5 } )
               },
-              className: 'bg-gray-200',
+              // Do not force a Tailwind class so custom colors can apply
             };
           }
           return {};
