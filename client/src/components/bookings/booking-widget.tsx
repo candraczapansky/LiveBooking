@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { formatDuration, formatPrice } from "@/lib/utils";
@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import SaveCardModal from "@/components/payment/save-card-modal";
+import { SaveCardModal } from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -97,6 +97,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [showSaveCardModal, setShowSaveCardModal] = useState(false);
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   const [bookingData, setBookingData] = useState<BookingFormValues | null>(null);
@@ -617,12 +618,16 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   }, [selectedStaffId, selectedServiceId, schedules, appointmentsForAvailability, timeSlots, selectedService]);
 
   // Clear time if it becomes invalid when dependencies change
+  // BUT only if we're on the time selection step (step 3)
   useEffect(() => {
-    const current = form.getValues('time');
-    if (current && !availableTimeSlots.some(slot => slot.value === current)) {
-      form.setValue('time', '');
+    if (currentStep === 3) {
+      const current = form.getValues('time');
+      if (current && availableTimeSlots.length > 0 && !availableTimeSlots.some(slot => slot.value === current)) {
+        console.log("[BookingWidget] Clearing invalid time selection:", current);
+        form.setValue('time', '');
+      }
     }
-  }, [availableTimeSlots]);
+  }, [availableTimeSlots, currentStep]);
 
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId));
@@ -642,15 +647,52 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
     const currentFields = fields[currentStep];
     
+    // Log current form values before validation
+    console.log(`[BookingWidget] Moving from step ${currentStep} to next. Current form values:`, form.getValues());
+    
     // Validate just the fields for the current step
     form.trigger(currentFields as any[]).then((isValid) => {
       if (isValid) {
         const next = Math.min(currentStep + 1, steps.length - 1);
+        console.log(`[BookingWidget] Validation passed, moving to step ${next}`);
         setCurrentStep(next);
         if (next === steps.length - 1) {
           // On entering save card step, prepare booking data
           const values = form.getValues();
-          setBookingData(values);
+          console.log("[BookingWidget] Preparing booking data for save card step:", values);
+          
+          // Store the current time value to prevent it from being cleared
+          const currentTime = values.time;
+          
+          // Ensure all required fields are present
+          if (!values.date) {
+            console.error("[BookingWidget] Missing date field!");
+            toast({
+              title: "Date Required",
+              description: "Please select a date for your appointment",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          if (!currentTime || currentTime === '') {
+            console.error("[BookingWidget] Missing time field! Time value:", currentTime);
+            console.log("[BookingWidget] Form state:", form.getValues());
+            console.log("[BookingWidget] Available time slots:", availableTimeSlots);
+            toast({
+              title: "Time Required",
+              description: availableTimeSlots.length === 0 
+                ? "No available time slots for the selected date. Please choose a different date."
+                : "Please select a time for your appointment",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Ensure time is preserved in booking data
+          const bookingValues = { ...values, time: currentTime };
+          console.log("[BookingWidget] Final booking values with preserved time:", bookingValues);
+          setBookingData(bookingValues);
         }
       }
     });
@@ -662,7 +704,24 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const createAppointmentAfterPayment = async (values: BookingFormValues) => {
     try {
+      console.log("[BookingWidget] createAppointmentAfterPayment called with values:", values);
+      
+      // Validate date and time
+      if (!values.date) {
+        console.error("[BookingWidget] No date provided!");
+        throw new Error("Appointment date is required");
+      }
+      if (!values.time) {
+        console.error("[BookingWidget] No time provided!");
+        throw new Error("Appointment time is required");
+      }
+      
       const date = new Date(values.date);
+      if (isNaN(date.getTime())) {
+        console.error("[BookingWidget] Invalid date:", values.date);
+        throw new Error("Invalid appointment date");
+      }
+      
       const [hours, minutes] = values.time.split(':').map(Number);
       date.setHours(hours, minutes);
       
@@ -670,6 +729,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       if (selectedService) {
         endTime.setMinutes(endTime.getMinutes() + selectedService.duration);
       }
+      
+      console.log("[BookingWidget] Appointment date:", date.toISOString());
+      console.log("[BookingWidget] Appointment end time:", endTime.toISOString());
       
       // Resolve actual staff if "Any" selection was made
       let staffIdToUse: number | null = null;
@@ -757,8 +819,10 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         totalAmount: selectedService?.price || 0
       };
       
+      console.log("[BookingWidget] Creating appointment with data:", appointmentData);
       const appointmentRes = await apiRequest("POST", "/api/appointments", appointmentData);
       const appointment = await appointmentRes.json();
+      console.log("[BookingWidget] Appointment created:", appointment);
       
       return appointment;
     } catch (error: any) {
@@ -766,9 +830,39 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     }
   };
 
+  // Listen for Helcim payment success events from the persistent listener
+  useEffect(() => {
+    const handleHelcimSuccess = (event: CustomEvent) => {
+      console.log("[BookingWidget] 🎉 Received Helcim payment success event:", event.detail);
+      
+      // Check if we have booking data to create an appointment
+      if (bookingData) {
+        console.log("[BookingWidget] 🚀 Creating appointment after payment success...");
+        createAppointmentAfterPayment(bookingData);
+      } else {
+        console.log("[BookingWidget] ⚠️ No booking data available for appointment creation");
+      }
+    };
+
+    window.addEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+    
+    return () => {
+      window.removeEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+    };
+  }, [bookingData, createAppointmentAfterPayment]);
+
   const handleSubmit = async () => {
+    // Get the latest form values
+    const latestValues = form.getValues();
+    console.log("[BookingWidget] handleSubmit - Latest form values:", latestValues);
+    
+    // Update bookingData with latest values
+    if (latestValues) {
+      setBookingData(latestValues);
+    }
+    
     // Show save card modal or complete booking
-    if (currentStep === steps.length - 1 && bookingData) {
+    if (currentStep === steps.length - 1 && latestValues) {
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -776,7 +870,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             setIsProcessingBooking(true);
             
             // Try to find existing client by email
-            const clientsRes = await apiRequest("GET", `/api/clients?email=${encodeURIComponent(bookingData.email)}`);
+            const clientsRes = await apiRequest("GET", `/api/clients?email=${encodeURIComponent(latestValues.email)}`);
             const clients = await clientsRes.json();
             
             let clientId: number;
@@ -785,10 +879,10 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             } else {
               // Create new client
               const newClientRes = await apiRequest("POST", "/api/clients", {
-                firstName: bookingData.firstName,
-                lastName: bookingData.lastName,
-                email: bookingData.email,
-                phone: bookingData.phone,
+                firstName: latestValues.firstName,
+                lastName: latestValues.lastName,
+                email: latestValues.email,
+                phone: latestValues.phone,
                 role: 'client'
               });
               const newClient = await newClientRes.json();
@@ -814,9 +908,63 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         }
       } else {
         // Card already saved, create appointment
+        if (!bookingData) {
+          toast({
+            title: "Error",
+            description: "Booking information is missing. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
         try {
           setIsProcessingBooking(true);
           const appointment = await createAppointmentAfterPayment(bookingData);
+          
+          // Force refresh of appointments data with comprehensive cache invalidation
+          console.log("[BookingWidget] 🔄 Starting cache invalidation (card already saved)...");
+          // Invalidate all appointment-related queries using predicate
+          queryClient.invalidateQueries({ 
+            predicate: (query) => {
+              const queryKey = query.queryKey;
+              const shouldInvalidate = Array.isArray(queryKey) && 
+                     queryKey.length > 0 && 
+                     typeof queryKey[0] === 'string' && 
+                     queryKey[0].includes('/api/appointments');
+              if (shouldInvalidate) {
+                console.log("[BookingWidget] Invalidating query:", queryKey);
+              }
+              return shouldInvalidate;
+            }
+          });
+          console.log("[BookingWidget] ✅ Cache invalidation completed (card already saved)");
+          
+          // Also invalidate specific known query keys as backup
+          queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/appointments/active'] });
+          queryClient.invalidateQueries({ queryKey: ['/api/appointments/client'] });
+          
+          // Force refetch all appointment queries
+          queryClient.refetchQueries({ 
+            predicate: (query) => {
+              const queryKey = query.queryKey;
+              return Array.isArray(queryKey) && 
+                     queryKey.length > 0 && 
+                     typeof queryKey[0] === 'string' && 
+                     queryKey[0].includes('/api/appointments');
+            }
+          });
+          
+          // Debug: Log the created appointment and force a manual refetch
+          console.log("[BookingWidget] Appointment created successfully:", appointment);
+          console.log("[BookingWidget] Forcing manual refetch of appointments...");
+          
+          // Force a manual refetch of the appointments page query specifically
+          setTimeout(() => {
+            queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+            queryClient.refetchQueries({ queryKey: ['/api/appointments', bookingData.locationId] });
+            console.log("[BookingWidget] Manual refetch completed");
+          }, 100);
           
           toast({
             title: "Booking Successful",
@@ -1441,16 +1589,82 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             open={showSaveCardModal}
             onOpenChange={setShowSaveCardModal}
             clientId={userId || createdClientId || 0}  // Use existing user or previously created client
-            customerEmail={bookingData.email || undefined}
-            customerName={`${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim() || undefined}
+            customerEmail={bookingData.email || form.getValues('email') || undefined}
+            customerName={`${bookingData.firstName || form.getValues('firstName') || ''} ${bookingData.lastName || form.getValues('lastName') || ''}`.trim() || undefined}
             onSaved={async (cardInfo) => {
+              console.log("[BookingWidget] 🎉🎉🎉 onSaved callback triggered with:", cardInfo);
+              console.log("[BookingWidget] Card save successful! Starting appointment creation...");
+              
+              // Get the latest form values
+              const finalBookingData = form.getValues();
+              console.log("[BookingWidget] Final booking data from form:", finalBookingData);
+              
               setSavedCardInfo(cardInfo);
               setShowSaveCardModal(false);
+              
+              // Ensure we have booking data
+              if (!finalBookingData || !finalBookingData.date || !finalBookingData.time) {
+                console.error("[BookingWidget] Missing required booking data!");
+                console.error("  - date:", finalBookingData?.date);
+                console.error("  - time:", finalBookingData?.time);
+                toast({
+                  title: "Error",
+                  description: "Booking information is incomplete. Please ensure you've selected a date and time.",
+                  variant: "destructive",
+                });
+                return;
+              }
               
               // Now create the appointment with card on file
               try {
                 setIsProcessingBooking(true);
-                const appointment = await createAppointmentAfterPayment(bookingData);
+                console.log("[BookingWidget] Creating appointment after card save with data:", finalBookingData);
+                const appointment = await createAppointmentAfterPayment(finalBookingData);
+                
+                // Force refresh of appointments data with comprehensive cache invalidation
+                console.log("[BookingWidget] 🔄 Starting cache invalidation...");
+                // Invalidate all appointment-related queries using predicate
+                queryClient.invalidateQueries({ 
+                  predicate: (query) => {
+                    const queryKey = query.queryKey;
+                    const shouldInvalidate = Array.isArray(queryKey) && 
+                           queryKey.length > 0 && 
+                           typeof queryKey[0] === 'string' && 
+                           queryKey[0].includes('/api/appointments');
+                    if (shouldInvalidate) {
+                      console.log("[BookingWidget] Invalidating query:", queryKey);
+                    }
+                    return shouldInvalidate;
+                  }
+                });
+                console.log("[BookingWidget] ✅ Cache invalidation completed");
+                
+                // Also invalidate specific known query keys as backup
+                queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/appointments/active'] });
+                queryClient.invalidateQueries({ queryKey: ['/api/appointments/client'] });
+                
+                // Force refetch all appointment queries
+                queryClient.refetchQueries({ 
+                  predicate: (query) => {
+                    const queryKey = query.queryKey;
+                    return Array.isArray(queryKey) && 
+                           queryKey.length > 0 && 
+                           typeof queryKey[0] === 'string' && 
+                           queryKey[0].includes('/api/appointments');
+                  }
+                });
+                
+                // Debug: Log the created appointment and force a manual refetch
+                console.log("[BookingWidget] Appointment created successfully:", appointment);
+                console.log("[BookingWidget] Forcing manual refetch of appointments...");
+                
+                // Force a manual refetch of the appointments page query specifically
+                setTimeout(() => {
+                  queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+                  queryClient.refetchQueries({ queryKey: ['/api/appointments', finalBookingData.locationId] });
+                  console.log("[BookingWidget] Manual refetch completed");
+                }, 100);
                 
                 toast({
                   title: "Booking Successful",
@@ -1465,6 +1679,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 setCreatedClientId(null);
                 onOpenChange(false);
               } catch (error: any) {
+                console.error("[BookingWidget] Error creating appointment:", error);
                 toast({
                   title: "Booking Failed",
                   description: error.message || "Failed to create appointment. Please try again.",

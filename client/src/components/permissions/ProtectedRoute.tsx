@@ -56,6 +56,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     hasAnyPermission, 
     hasAllPermissions, 
     hasResourcePermission,
+    permissionGroups,
     loading 
   } = useUserPermissions();
   
@@ -81,6 +82,18 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   } else {
     // If no permission checks are specified, allow access
     hasAccess = true;
+  }
+  
+  // Debug logging for appointments route
+  if (anyPermissions?.includes('view_appointments') || anyPermissions?.includes('view_calendar')) {
+    console.log('ProtectedRoute (Appointments) check:', {
+      user: user?.username,
+      role: user?.role,
+      anyPermissions,
+      hasAccess,
+      loading,
+      permissionGroups: permissionGroups?.map(g => g.name)
+    });
   }
   
   if (hasAccess) {

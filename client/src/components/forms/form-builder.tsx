@@ -186,6 +186,17 @@ const FIELD_TYPES = [
     }
   },
   {
+    id: "emergency_phone",
+    label: "Emergency Contact Number",
+    icon: Phone,
+    description: "Emergency contact phone number input",
+    defaultConfig: {
+      label: "Emergency Contact Number",
+      placeholder: "Enter emergency contact number...",
+      required: false
+    }
+  },
+  {
     id: "date",
     label: "Date",
     icon: Calendar,
@@ -297,6 +308,17 @@ const FIELD_TYPES = [
     }
   },
   {
+    id: "info",
+    label: "Info (read-only)",
+    icon: FileText,
+    description: "Non-editable information block",
+    defaultConfig: {
+      label: "Information",
+      text: "Enter important instructions or information for the client to read.",
+      required: false
+    }
+  },
+  {
     id: "signature",
     label: "Signature",
     icon: FileText,
@@ -350,6 +372,11 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   const [selectedField, setSelectedField] = useState<FormField | null>(null);
   const [showFieldConfig, setShowFieldConfig] = useState(false);
   const [renderError, setRenderError] = useState<Error | null>(null);
+  const pendingDraftRef = useRef<{
+    fieldId: string;
+    inputValues: any;
+    config: any;
+  } | null>(null);
 
   console.log("FormBuilder rendered, open:", open, "formId:", formId);
 
@@ -360,6 +387,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
           <DialogHeader className="flex-shrink-0">
             <DialogTitle>Error in Form Builder</DialogTitle>
+            <DialogDescription>An unexpected error occurred while editing a form.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center justify-center py-8 space-y-4">
             <div className="text-red-500 text-center">
@@ -557,6 +585,32 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     }
   };
 
+  // Commit any pending config changes captured from FieldConfig
+  const commitPendingConfig = () => {
+    const draft = pendingDraftRef.current;
+    if (!draft) return;
+    if (!selectedField || draft.fieldId !== selectedField.id) return;
+    const cleanedOptions = Array.isArray(draft.inputValues?.options)
+      ? draft.inputValues.options
+          .map((opt: string) => (typeof opt === 'string' ? opt.replace(/\r/g, '') : ''))
+          .map((opt: string) => opt.trim())
+          .filter((opt: string) => opt.length > 0)
+      : undefined;
+    const finalConfig = {
+      ...draft.config,
+      label: draft.inputValues?.label,
+      placeholder: draft.inputValues?.placeholder,
+      rows: draft.inputValues?.rows,
+      maxStars: draft.inputValues?.maxStars,
+      maxSize: draft.inputValues?.maxSize,
+      min: draft.inputValues?.min,
+      max: draft.inputValues?.max,
+      ...(cleanedOptions ? { options: cleanedOptions } : {}),
+    };
+    updateFieldConfig(draft.fieldId, finalConfig);
+    pendingDraftRef.current = null;
+  };
+
   // Update field configuration
   const updateFieldConfig = (fieldId: string, config: any) => {
     setFields(fields.map(f => 
@@ -627,6 +681,14 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         );
       
       case "phone":
+        return (
+          <div className="space-y-2">
+            <Label>{config.label}</Label>
+            <Input type="tel" placeholder={config.placeholder} disabled />
+          </div>
+        );
+      
+      case "emergency_phone":
         return (
           <div className="space-y-2">
             <Label>{config.label}</Label>
@@ -720,6 +782,16 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           </div>
         );
       
+      case "info":
+        return (
+          <div className="space-y-1">
+            <Label>{config.label}</Label>
+            <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+              {config.text}
+            </div>
+          </div>
+        );
+      
       case "image":
         return (
           <ImageUploadField
@@ -777,7 +849,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
   };
 
   // Field configuration component
-  const FieldConfig = ({ field }: { field: FormField }) => {
+  const FieldConfig = ({ field, onDraftChange }: { field: FormField; onDraftChange: (data: { fieldId: string; inputValues: any; config: any }) => void }) => {
     const [config, setConfig] = useState(field.config);
     const [inputValues, setInputValues] = useState({
       label: field.config.label || "",
@@ -790,27 +862,17 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
       options: field.config.options || ["Option 1", "Option 2", "Option 3"]
     });
 
-    // Debounced update function
-    const debouncedUpdate = useDebounce((updates: any) => {
-      const newConfig = { ...config, ...updates };
-      updateFieldConfig(field.id, newConfig);
-    }, 1000); // 1000ms delay
-
+    // Defer persisting updates; parent will commit on close/switch
     const updateConfig = (updates: any) => {
       const newConfig = { ...config, ...updates };
       setConfig(newConfig);
-      debouncedUpdate(updates);
+      onDraftChange({ fieldId: field.id, inputValues, config: newConfig });
     };
 
-    const handleInputChange = (field: string, value: any) => {
-      setInputValues(prev => ({ ...prev, [field]: value }));
-      
-      // Update config with debounce
-      if (field === 'options' && Array.isArray(value)) {
-        debouncedUpdate({ [field]: value });
-      } else {
-        debouncedUpdate({ [field]: value });
-      }
+    const handleInputChange = (fieldKey: string, value: any) => {
+      const next = { ...inputValues, [fieldKey]: value };
+      setInputValues(next);
+      onDraftChange({ fieldId: field.id, inputValues: next, config });
     };
 
     // Sync input values when field config changes
@@ -825,7 +887,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         max: field.config.max || "",
         options: field.config.options || ["Option 1", "Option 2", "Option 3"]
       });
-    }, [field.id]); // Only update when field ID changes (switching fields)
+    }, [field.id]);
 
     return (
       <div className="space-y-4">
@@ -894,7 +956,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           </>
         )}
 
-        {(field.type === "email" || field.type === "phone") && (
+        {(field.type === "email" || field.type === "phone" || field.type === "emergency_phone") && (
           <div>
             <Label>Placeholder</Label>
             <Input
@@ -1001,9 +1063,21 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
             <Textarea
               value={inputValues.options.join('\n')}
               onChange={(e) => handleInputChange('options', 
-                e.target.value.split('\n').filter(opt => opt.trim())
+                e.target.value.split('\n')
               )}
               placeholder="Option 1&#10;Option 2&#10;Option 3"
+              rows={4}
+            />
+          </div>
+        )}
+
+        {field.type === "info" && (
+          <div>
+            <Label>Message</Label>
+            <Textarea
+              value={config.text || ""}
+              onChange={(e) => updateConfig({ text: e.target.value })}
+              placeholder="Enter information/instructions for the client to read"
               rows={4}
             />
           </div>
@@ -1291,6 +1365,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                     type="submit"
                     form="form-builder-form"
                     disabled={saveFormMutation.isPending || form.formState.isSubmitting}
+                    onClick={() => commitPendingConfig()}
                   >
                     {saveFormMutation.isPending ? (
                       <>
@@ -1502,6 +1577,10 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                                                   ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                                                   : "border-gray-200 dark:border-gray-700"
                                               }`}
+                                              onClick={() => {
+                                                setSelectedField(field);
+                                                setShowFieldConfig(true);
+                                              }}
                                             >
                                               <div className="flex items-center justify-between">
                                                 <div
@@ -1521,9 +1600,11 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                                                 </div>
                                                 <div className="flex items-center space-x-2">
                                                   <Button
+                                                    type="button"
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => {
+                                                      commitPendingConfig();
                                                       setSelectedField(field);
                                                       setShowFieldConfig(true);
                                                     }}
@@ -1531,6 +1612,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                                                     <Settings className="h-4 w-4" />
                                                   </Button>
                                                   <Button
+                                                    type="button"
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => removeField(field.id)}
@@ -1605,6 +1687,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                           type="submit"
                           disabled={saveFormMutation.isPending || form.formState.isSubmitting}
                           onClick={() => {
+                            commitPendingConfig();
                             console.log("Submit button clicked");
                             console.log("Current form values:", form.getValues());
                             console.log("Form errors:", form.formState.errors);
@@ -1635,14 +1718,14 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowFieldConfig(false)}
+                      onClick={() => { commitPendingConfig(); setShowFieldConfig(false); }}
                     >
                       ×
                     </Button>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4">
-                  <FieldConfig field={selectedField} />
+                  <FieldConfig field={selectedField} onDraftChange={(data: any) => { pendingDraftRef.current = data; }} />
                 </div>
               </div>
             )}

@@ -226,11 +226,19 @@ export function registerPermissionRoutes(app: Express) {
   // Get user permissions
   app.get("/api/users/:id/permissions",
     authenticateToken,
-    requireAdmin,
     asyncHandler(async (req: Request, res: Response) => {
       try {
         res.set("Cache-Control", "no-store");
         const userId = parseInt(req.params.id);
+
+        // Allow admins to fetch anyone's permissions, and allow a user to fetch their own
+        const currentUser = (req as any).user;
+        if (!currentUser || (currentUser.role !== 'admin' && currentUser.id !== userId)) {
+          return res.status(403).json({
+            success: false,
+            message: "Forbidden",
+          });
+        }
         // Fetch groups assigned to the user with basic fields
         const userGroups = await db
           .select({

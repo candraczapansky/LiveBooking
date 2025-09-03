@@ -11,6 +11,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthProvider";
+import { useUserPermissions } from "@/hooks/use-user-permissions";
 
 export default function StaffScheduleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,9 +21,42 @@ export default function StaffScheduleDetailPage() {
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const { hasPermission } = useUserPermissions();
 
   // Set document title
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
+
+  // Check permissions
+  const canEditAllSchedules = hasPermission('edit_schedules');
+  const canEditOwnSchedule = hasPermission('edit_own_schedule');
+  const canViewAllSchedules = hasPermission('view_schedules');
+  const canViewOwnSchedule = hasPermission('view_own_schedule');
+
+  // Check if user can access this schedule
+  const canAccessSchedule = canViewAllSchedules || (canViewOwnSchedule && user?.staffId === staffId);
+  const canEditSchedule = canEditAllSchedules || (canEditOwnSchedule && user?.staffId === staffId);
+
+  // Redirect if user doesn't have permission to view this schedule
+  if (!canAccessSchedule) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Access Denied</CardTitle>
+            <CardDescription className="text-center">
+              You don't have permission to view this schedule.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Link href="/schedule">
+              <Button variant="outline">Back to Schedules</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Fetch staff member details
   const { data: staff = [] } = useQuery<any[]>({
@@ -179,16 +214,18 @@ export default function StaffScheduleDetailPage() {
             </div>
           </div>
         </div>
-        <Button 
-          onClick={() => {
-            setEditingSchedule(null);
-            setIsDialogOpen(true);
-          }}
-          className="flex items-center gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          Add Schedule
-        </Button>
+        {canEditSchedule && (
+          <Button 
+            onClick={() => {
+              setEditingSchedule(null);
+              setIsDialogOpen(true);
+            }}
+            className="flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Add Schedule
+          </Button>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -281,22 +318,26 @@ export default function StaffScheduleDetailPage() {
                               <Badge variant="destructive">Blocked</Badge>
                             )}
                           </div>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEdit(schedule)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDelete(schedule.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
+                          {canEditSchedule && (
+                            {canEditSchedule && (
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEdit(schedule)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDelete(schedule.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          )}
                         </div>
                       ))}
                     </div>
@@ -347,22 +388,24 @@ export default function StaffScheduleDetailPage() {
                                 <Badge variant="destructive">Blocked</Badge>
                               )}
                             </div>
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleEdit(schedule)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(schedule.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {canEditSchedule && (
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEdit(schedule)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDelete(schedule.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

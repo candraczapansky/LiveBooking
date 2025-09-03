@@ -8,7 +8,8 @@ function createHelcimPaymentsRouter(storage?: any) {
 router.post('/initialize', async (req, res) => {
   try {
     const { amount, description } = req.body || {};
-    if (!amount) {
+    // Allow amount to be 0 for card verification
+    if (amount === undefined || amount === null) {
       return res.status(400).json({ success: false, message: 'Amount is required' });
     }
 
@@ -18,14 +19,25 @@ router.post('/initialize', async (req, res) => {
       return res.status(500).json({ success: false, message: 'Helcim API token not configured' });
     }
 
+    // Determine if this is for card saving (verify) or actual payment (purchase)
+    const isCardSaveOnly = 
+      Number(amount) === 0 || 
+      (description && description.toLowerCase().includes('save card'));
+
     const payload = {
-      amount: Number(amount),
+      amount: isCardSaveOnly ? 0 : Number(amount),
       currency: 'USD',
-      paymentType: 'purchase',
+      paymentType: isCardSaveOnly ? 'verify' : 'purchase',  // Use 'verify' for $0 auth
       test: process.env.NODE_ENV !== 'production',
       description: description || 'Payment',
       idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     } as any;
+
+    console.log('[Helcim] Initializing:', { 
+      paymentType: payload.paymentType, 
+      amount: payload.amount,
+      description: payload.description 
+    });
 
     // Try V2 first (api-token header)
     const tryV2 = async () => {
