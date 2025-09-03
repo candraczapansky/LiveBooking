@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { Settings, User, LogOut, ChevronDown, Menu } from "lucide-react";
+import { Settings, User, LogOut, ChevronDown, Menu, HelpCircle } from "lucide-react";
 import { Link } from "wouter";
 import { AuthContext } from "@/contexts/AuthProvider";
 import { BusinessBrand } from "@/components/BusinessBrand";
@@ -27,7 +27,7 @@ export const Header = () => {
 
   return (
     <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-[60] sticky top-0">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center min-w-0">
             <Button
@@ -49,6 +49,16 @@ export const Header = () => {
           <div className="flex items-center space-x-4">
             <nav className="flex items-center space-x-2">
               <LocationSelector variant="compact" showLabel={false} />
+              <Link href="/help" className="inline-flex">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg"
+                  aria-label="Help"
+                >
+                  <HelpCircle className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                </Button>
+              </Link>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-3 p-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg min-w-0">

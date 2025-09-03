@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useMemo } from "react";
+import { useState, useEffect, Suspense, lazy, useMemo, useContext } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import { startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { toCentralWallTime } from "@/lib/utils";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AuthContext } from "@/contexts/AuthProvider";
 
 const AppointmentsPage = () => {
   useDocumentTitle("Client Appointments | Glo Head Spa");
@@ -80,6 +81,7 @@ const AppointmentsPage = () => {
   const [availableColor, setAvailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('availableColor')) || '#dbeafe');
   const [unavailableColor, setUnavailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('unavailableColor')) || '#e5e7eb');
   const [blockedColor, setBlockedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('blockedColor')) || '#fca5a5');
+  const { user } = useContext(AuthContext);
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -213,6 +215,28 @@ const AppointmentsPage = () => {
   // Force refetch appointments when component mounts (after login)
   useEffect(() => {
     refetch();
+    // Load saved calendar colors for the current user (best-effort)
+    try {
+      const uid = (user as any)?.id || JSON.parse(localStorage.getItem('user') || '{}')?.id;
+      if (uid) {
+        fetch(`/api/users/${uid}/color-preferences`).then(async (res) => {
+          if (!res.ok) return;
+          const prefs = await res.json();
+          if (prefs?.availableColor) {
+            localStorage.setItem('availableColor', prefs.availableColor);
+            setAvailableColor(prefs.availableColor);
+          }
+          if (prefs?.unavailableColor) {
+            localStorage.setItem('unavailableColor', prefs.unavailableColor);
+            setUnavailableColor(prefs.unavailableColor);
+          }
+          if (prefs?.blockedColor) {
+            localStorage.setItem('blockedColor', prefs.blockedColor);
+            setBlockedColor(prefs.blockedColor);
+          }
+        }).catch(()=>{});
+      }
+    } catch {}
   }, [refetch, selectedLocation?.id]);
 
   // Listen for schedule updates from other components
@@ -1357,10 +1381,10 @@ const AppointmentsPage = () => {
       `}</style>
       <SidebarController isOpen={isSidebarOpen} isMobile={isSidebarMobile} />
       <div className="min-h-screen flex flex-col transition-all duration-300">
-        <main className="flex-1 p-3 sm:p-4 md:p-6">
-          <div className="max-w-7xl mx-auto flex flex-row gap-3 sm:gap-4 lg:gap-6">
+        <main className={`flex-1 p-3 sm:p-4 md:p-6 ${!isSidebarOpen && !isSidebarMobile ? '-ml-16 pl-0 sm:pl-0 md:pl-0' : ''}`}>
+          <div className="w-full flex flex-row gap-3 sm:gap-4 lg:gap-6">
             {/* Left Sidebar: Mini Calendar */}
-            <div className="appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px]" data-mini-mode={calendarView}>
+            <div className={`appointments-mini-calendar flex flex-col gap-6 flex-shrink-0 self-start w-auto min-w-[260px] ${!isSidebarOpen ? 'ml-0' : ''}`} data-mini-mode={calendarView}>
               <Card className={`p-2 sm:p-3 w-[260px] sm:w-[280px] ${calendarView === 'month' ? 'border-2 border-primary ring-2 ring-primary ring-offset-2 ring-offset-gray-50 dark:ring-offset-gray-900' : ''}`}>
                 <MiniCalendar
                   key={`mini-${calendarView}-${selectedDate ? selectedDate.toISOString().slice(0,10) : 'no-date'}`}
@@ -1440,72 +1464,40 @@ const AppointmentsPage = () => {
                         }
                       </CardDescription>
                     </div>
-                    {/* Staff Filter Dropdown - Show for all views, plus color controls */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Filter className="h-4 w-4 text-gray-500" />
-                      <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
-                        <SelectTrigger className="w-full sm:w-48 min-h-[44px]">
-                          <SelectValue placeholder="Filter by staff" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">
-                            {calendarView === 'day' ? 'All Staff (Daily View)' : 'All Staff'}
-                          </SelectItem>
-                          {staff?.map((s: any) => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                    {/* Staff Filter + Colors */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-gray-500" />
+                        <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
+                          <SelectTrigger className="w-48 min-h-[44px]">
+                            <SelectValue placeholder="Filter by staff" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">
+                              {calendarView === 'day' ? 'All Staff (Daily View)' : 'All Staff'}
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {/* Color pickers */}
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-muted-foreground">Available</label>
-                        <input
-                          type="color"
-                          value={availableColor}
-                          onChange={(e) => {
-                            try {
-                              const v = e.target.value;
-                              localStorage.setItem('availableColor', v);
-                              setAvailableColor(v);
-                              setSelectedDate((d) => d ? new Date(d) : new Date());
-                            } catch {}
-                          }}
-                          className="h-8 w-10 p-0 border rounded"
-                        />
+                            {locationStaffOptions?.map((s: any) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>
+                                {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-xs text-muted-foreground">Unavailable</label>
-                        <input
-                          type="color"
-                          value={unavailableColor}
-                          onChange={(e) => {
-                            try {
-                              const v = e.target.value;
-                              localStorage.setItem('unavailableColor', v);
-                              setUnavailableColor(v);
-                              setSelectedDate((d) => d ? new Date(d) : new Date());
-                            } catch {}
-                          }}
-                          className="h-8 w-10 p-0 border rounded"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-muted-foreground">Blocked</label>
-                        <input
-                          type="color"
-                          value={blockedColor}
-                          onChange={(e) => {
-                            try {
-                              const v = e.target.value;
-                              localStorage.setItem('blockedColor', v);
-                              setBlockedColor(v);
-                              setSelectedDate((d) => d ? new Date(d) : new Date());
-                            } catch {}
-                          }}
-                          className="h-8 w-10 p-0 border rounded"
-                        />
+                        <span className="text-xs text-muted-foreground">Colors:</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Avail</span>
+                          <input type="color" value={availableColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('availableColor',v);setAvailableColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({availableColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Unavail</span>
+                          <input type="color" value={unavailableColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('unavailableColor',v);setUnavailableColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({unavailableColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Blocked</span>
+                          <input type="color" value={blockedColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('blockedColor',v);setBlockedColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({blockedColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
+                        </div>
                       </div>
                     </div>
                   </div>

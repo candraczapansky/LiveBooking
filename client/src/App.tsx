@@ -53,6 +53,7 @@ const PayrollPage = lazy(() => import("@/pages/payroll"));
 const Locations = lazy(() => import("@/pages/locations"));
 const PermissionsPage = lazy(() => import("@/pages/permissions"));
 const TimeClockPage = lazy(() => import("@/pages/time-clock"));
+const HelpPage = lazy(() => import("@/pages/help"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -148,6 +149,7 @@ function Router() {
           <Route path="/email-test" component={EmailTest} />
           <Route path="/settings" component={Settings} />
           <Route path="/schedule" component={Schedule} />
+          <Route path="/help" component={HelpPage} />
           <Route path="/staff-schedule/:id" component={StaffScheduleDetail} />
           <Route path="/staff-schedule" component={StaffSchedule} />
           <Route component={NotFound} />

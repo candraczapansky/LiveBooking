@@ -27,6 +27,7 @@ interface PayrollData {
   commissionType: string;
   baseCommissionRate: number;
   totalServices: number;
+  totalClients: number;
   totalRevenue: number;
   totalCommission: number;
   totalHours: number;
@@ -357,6 +358,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       let totalHourlyPay = 0;
       let totalTips = 0;
       const totalServices = staffAppointments.length;
+      const uniqueClientIds = new Set<number>();
 
       // Calculate earnings for each paid appointment
       staffAppointments.forEach((apt: any) => {
@@ -393,6 +395,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         }
         
         totalRevenue += serviceRevenue;
+
+        // Track unique client only for revenue-counting appointments
+        const clientId = (apt.clientId ?? apt.client_id) as number | undefined;
+        if (typeof clientId === 'number') uniqueClientIds.add(clientId);
 
         // Find staff service assignment for custom rates
         const staffService = staffServices?.find((ss: any) => 
@@ -465,6 +471,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         commissionType: staffMember.commissionType,
         baseCommissionRate: staffMember.commissionRate || 0,
         totalServices,
+        totalClients: uniqueClientIds.size,
         totalRevenue,
         totalCommission,
         totalHours,
@@ -518,6 +525,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         'Commission Type',
         'Base Rate',
         'Total Services',
+        'Total Clients',
         'Total Revenue',
         'Total Commission',
         'Total Tips',
@@ -534,6 +542,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         data.commissionType,
         data.baseCommissionRate,
         data.totalServices,
+        data.totalClients,
         data.totalRevenue.toFixed(2),
         data.totalCommission.toFixed(2),
         data.totalTips.toFixed(2),
@@ -875,8 +884,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                   <TableHeader>
                     <TableRow>
                       <TableHead>Staff</TableHead>
+                      <TableHead className="text-right">Clients</TableHead>
                       <TableHead className="text-right">Services</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Commission</TableHead>
                       <TableHead className="text-right">Tips</TableHead>
                       <TableHead className="text-right">Earnings</TableHead>
                       <TableHead className="text-right">Details</TableHead>
@@ -889,8 +900,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                           <div className="font-medium">{data.staffName}</div>
                           <div className="text-xs text-muted-foreground">{data.title}</div>
                         </TableCell>
+                        <TableCell className="text-right">{data.totalClients}</TableCell>
                         <TableCell className="text-right">{data.totalServices}</TableCell>
                         <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalCommission)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
                         <TableCell className="text-right font-semibold">{formatCurrency(data.totalEarnings)}</TableCell>
                         <TableCell className="text-right">
@@ -931,8 +944,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                     <TableRow>
                       <TableHead>Staff Member</TableHead>
                       <TableHead>Commission Type</TableHead>
+                      <TableHead className="text-right">Clients</TableHead>
                       <TableHead className="text-right">Services</TableHead>
-                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Sales</TableHead>
+                      <TableHead className="text-right">Commission</TableHead>
                       <TableHead className="text-right">Tips</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
                       <TableHead className="text-right">Total Earnings</TableHead>
@@ -953,8 +968,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                             {data.commissionType.replace('_', ' ')}
                           </Badge>
                         </TableCell>
+                        <TableCell className="text-right">{data.totalClients}</TableCell>
                         <TableCell className="text-right">{data.totalServices}</TableCell>
                         <TableCell className="text-right">{formatCurrency(data.totalRevenue)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(data.totalCommission)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(data.totalTips)}</TableCell>
                         <TableCell className="text-right">
                           {data.totalHours > 0 ? `${data.totalHours.toFixed(1)}h` : '-'}
@@ -1164,6 +1181,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
 
       let totalRevenue = 0;
       let totalCommission = 0;
+      let totalTips = 0;
       const rows = appts.map((apt: any) => {
         const serviceId = apt.serviceId ?? apt.service_id;
         const service = (services || []).find((s: any) => s.id === serviceId);
@@ -1224,6 +1242,9 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
         }
 
         totalRevenue += servicePrice;
+        // Tips from the latest completed payment
+        const tipAmount = Number(latestCompletedPayment?.tipAmount || 0);
+        totalTips += tipAmount;
         totalCommission += commissionAmount;
 
         return {
@@ -1233,6 +1254,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
           serviceName: service?.name || 'Service',
           duration: service?.duration || 60,
           servicePrice,
+          tipAmount,
           commissionRate: effectiveRate,
           commissionAmount,
           paymentStatus: 'paid',
@@ -1252,6 +1274,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
           totalAppointments: validRows.length,
           totalRevenue,
           totalCommission,
+          totalTips,
           averageCommissionPerService: validRows.length > 0 ? (totalCommission / validRows.length) : 0,
         },
         appointments: validRows,
@@ -1326,7 +1349,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
       </CardHeader>
       <CardContent>
         {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {detailData.summary.totalAppointments}
@@ -1351,6 +1374,12 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
             </div>
             <div className="text-sm text-orange-600">Avg Commission/Service</div>
           </div>
+          <div className="bg-amber-50 p-4 rounded-lg">
+            <div className="text-2xl font-bold text-amber-600">
+              {formatCurrency(detailData.summary.totalTips || 0)}
+            </div>
+            <div className="text-sm text-amber-600">Total Tips</div>
+          </div>
         </div>
 
         {/* Appointments Table */}
@@ -1365,6 +1394,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
                   <TableHead>Service</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Service Price</TableHead>
+                  <TableHead>Tip</TableHead>
                   <TableHead>Commission Rate</TableHead>
                   <TableHead>Commission Earned</TableHead>
                   <TableHead>Status</TableHead>
@@ -1380,6 +1410,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
                     <TableCell>{appointment.serviceName}</TableCell>
                     <TableCell>{appointment.duration} min</TableCell>
                     <TableCell>{formatCurrency(appointment.servicePrice)}</TableCell>
+                    <TableCell>{formatCurrency(Number(appointment.tipAmount || 0))}</TableCell>
                     <TableCell>{(appointment.commissionRate * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-semibold text-green-600">
                       {formatCurrency(appointment.commissionAmount)}
