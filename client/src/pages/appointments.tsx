@@ -67,6 +67,26 @@ const AppointmentsPage = () => {
   const [quickDate, setQuickDate] = useState<string | null>(null);
   const [repeatWeekly, setRepeatWeekly] = useState<boolean>(false);
   const [repeatEndDate, setRepeatEndDate] = useState<string>("");
+  // Right-click context menu state for appointments
+  const [ctxMenuOpen, setCtxMenuOpen] = useState(false);
+  const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [ctxAppointment, setCtxAppointment] = useState<any | null>(null);
+
+  // Close context menu on outside click, escape, or scroll
+  useEffect(() => {
+    if (!ctxMenuOpen) return;
+    const handleClick = () => setCtxMenuOpen(false);
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenuOpen(false); };
+    const handleScroll = () => setCtxMenuOpen(false);
+    window.addEventListener('click', handleClick, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('click', handleClick, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [ctxMenuOpen]);
   // Add Block flow prefill values
   const [blockInitialValues, setBlockInitialValues] = useState<any | null>(null);
   const [defaultBlockStaffId, setDefaultBlockStaffId] = useState<number | undefined>(undefined);
@@ -90,8 +110,13 @@ const AppointmentsPage = () => {
       const url = selectedLocation?.id 
         ? `/api/appointments?locationId=${selectedLocation.id}`
         : '/api/appointments';
+      console.log("[AppointmentsPage] 🔄 Fetching appointments from:", url);
       const response = await apiRequest("GET", url);
-      return response.json();
+      const data = await response.json();
+      console.log("[AppointmentsPage] ✅ Received appointments:", data.length, "appointments");
+      console.log("[AppointmentsPage] Latest appointment:", data[0] ? {id: data[0].id, startTime: data[0].startTime, notes: data[0].notes} : "No appointments");
+      console.log("[AppointmentsPage] Sample appointments:", data.slice(0, 3));
+      return data;
     },
     refetchOnMount: true, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
@@ -306,6 +331,8 @@ const AppointmentsPage = () => {
     }
     return true;
   });
+  
+  console.log("[AppointmentsPage] Filtered appointments:", filteredAppointments.length, "out of", appointments.length, "total appointments");
 
   // Helper: Determine if a staff member has an appointment in the current calendar view
   const hasAppointmentInCurrentView = (staffId: number) => {
@@ -386,6 +413,25 @@ const AppointmentsPage = () => {
     // If no location selected, show all staff (existing behavior)
     return true;
   });
+
+  // Fallback: ensure calendar shows at least the current staff column if no scheduled resources match
+  const calendarResources = useMemo(() => {
+    try {
+      if (Array.isArray(filteredResources) && filteredResources.length > 0) return filteredResources;
+      const currentStaffId = (user as any)?.staffId;
+      if (currentStaffId != null) {
+        const self = (staff as any[]).find((s: any) => Number(s.id) === Number(currentStaffId));
+        if (self) return [self];
+        // Synthesize a minimal resource from the logged-in user so their column renders
+        const firstName = (user as any)?.firstName || (user as any)?.username || 'Staff';
+        const lastName = (user as any)?.lastName || '';
+        return [{ id: currentStaffId, user: { firstName, lastName } } as any];
+      }
+      return filteredResources;
+    } catch {
+      return filteredResources;
+    }
+  }, [filteredResources, staff, user]);
 
   // Log filtering results for debugging
   useEffect(() => {
@@ -1569,7 +1615,7 @@ const AppointmentsPage = () => {
 
                               try {
                                 const client = users?.find((u: any) => u.id === apt.clientId);
-                                const service = services?.find((s: any) => s.id === apt.serviceId);
+                                const service = services?.find((s: any) => Number(s.id) === Number(apt.serviceId));
                                 
                                 // Validate and parse dates
                                 let startDate: Date;
@@ -1641,7 +1687,7 @@ const AppointmentsPage = () => {
                           
                           return backgroundEvents;
                         })()}
-                        resources={filteredResources?.map((s: any) => ({
+                        resources={(calendarResources || filteredResources || [])?.map((s: any) => ({
                           resourceId: s.id,
                           resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
                         })) || []}
@@ -1651,6 +1697,20 @@ const AppointmentsPage = () => {
                           } catch {
                             setPreSelectedResourceId(null);
                           }
+                        }}
+                        onEventContextMenu={(event, position) => {
+                          try {
+                            // Only for appointments; BigCalendar already filters by type
+                            const apt = (event as any)?.resource;
+                            if (!apt) return;
+                            // Only allow context menu for appointments that are not paid
+                            if (apt.paymentStatus && String(apt.paymentStatus).toLowerCase() === 'paid') {
+                              return;
+                            }
+                            setCtxAppointment(apt);
+                            setCtxMenuPos(position);
+                            setCtxMenuOpen(true);
+                          } catch {}
                         }}
                         onInterceptSlotClick={({ date, resourceId }) => {
                           try {
@@ -1714,6 +1774,55 @@ const AppointmentsPage = () => {
                         }}
                         onNavigate={(date) => setSelectedDate(date)}
                       />
+                      {/* Absolute-positioned context menu near cursor for unpaid/Not-paid appointments */}
+                      {ctxMenuOpen && (
+                        <div
+                          style={{ position: 'fixed', left: ctxMenuPos.x, top: ctxMenuPos.y, zIndex: 9999 }}
+                          className="rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                          onClick={(e) => { e.stopPropagation(); }}
+                          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        >
+                          <button
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={async () => {
+                              try {
+                                if (!ctxAppointment?.id) return;
+                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
+                                setCtxMenuOpen(false);
+                                refetch();
+                              } catch {}
+                            }}
+                          >
+                            Mark confirmed
+                          </button>
+                          <button
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={async () => {
+                              try {
+                                if (!ctxAppointment?.id) return;
+                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
+                                setCtxMenuOpen(false);
+                                refetch();
+                              } catch {}
+                            }}
+                          >
+                            Mark arrived
+                          </button>
+                          <button
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={async () => {
+                              try {
+                                if (!ctxAppointment?.id) return;
+                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'cancelled' });
+                                setCtxMenuOpen(false);
+                                refetch();
+                              } catch {}
+                            }}
+                          >
+                            Cancel appointment
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>

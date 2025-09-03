@@ -12,6 +12,7 @@ import { SidebarProvider } from "@/contexts/SidebarContext";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { GlobalErrorBoundary } from "@/components/error-boundary";
+import ProtectedRoute from "@/components/permissions/ProtectedRoute";
 
 // Lazy load components
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -54,6 +55,31 @@ const Locations = lazy(() => import("@/pages/locations"));
 const PermissionsPage = lazy(() => import("@/pages/permissions"));
 const TimeClockPage = lazy(() => import("@/pages/time-clock"));
 const HelpPage = lazy(() => import("@/pages/help"));
+const HelpAppointmentsDetailed = lazy(() => import("@/pages/help/appointments-detailed"));
+const HelpClientsDetailed = lazy(() => import("@/pages/help/clients-detailed"));
+const HelpPOSDetailed = lazy(() => import("@/pages/help/pos-detailed"));
+const HelpProductsDetailed = lazy(() => import("@/pages/help/products-detailed"));
+const HelpStaffDetailed = lazy(() => import("@/pages/help/staff-detailed"));
+const HelpLocationsDetailed = lazy(() => import("@/pages/help/locations-detailed"));
+const HelpReportsDetailed = lazy(() => import("@/pages/help/reports-detailed"));
+const HelpMarketingDetailed = lazy(() => import("@/pages/help/marketing-detailed"));
+const HelpAutomationsDetailed = lazy(() => import("@/pages/help/automations-detailed"));
+const HelpFormsDetailed = lazy(() => import("@/pages/help/forms-detailed"));
+const HelpDocumentsDetailed = lazy(() => import("@/pages/help/documents-detailed"));
+const HelpPayrollDetailed = lazy(() => import("@/pages/help/payroll-detailed"));
+const HelpPermissionsDetailed = lazy(() => import("@/pages/help/permissions-detailed"));
+const HelpTimeClockDetailed = lazy(() => import("@/pages/help/time-clock-detailed"));
+const HelpSettingsDetailed = lazy(() => import("@/pages/help/settings-detailed"));
+const HelpAIMessagingDetailed = lazy(() => import("@/pages/help/ai-messaging-detailed"));
+const HelpGiftCertificatesDetailed = lazy(() => import("@/pages/help/gift-certificates-detailed"));
+const HelpDevicesDetailed = lazy(() => import("@/pages/help/devices-detailed"));
+const HelpClassesDetailed = lazy(() => import("@/pages/help/classes-detailed"));
+const HelpRoomsDetailed = lazy(() => import("@/pages/help/rooms-detailed"));
+const HelpPhoneDetailed = lazy(() => import("@/pages/help/phone-detailed"));
+const HelpNoteTemplatesDetailed = lazy(() => import("@/pages/help/note-templates-detailed"));
+const HelpScheduleDetailed = lazy(() => import("@/pages/help/schedule-detailed"));
+const HelpStaffScheduleDetailed = lazy(() => import("@/pages/help/staff-schedule-detailed"));
+const HelpMembershipsDetailed = lazy(() => import("@/pages/help/memberships-detailed"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -69,6 +95,18 @@ function Router() {
   const { isAuthenticated, loading, user } = useAuth();
   const [location, navigate] = useLocation();
   const isClient = isAuthenticated && user?.role === 'client';
+  
+  // Debug logging for user role
+  if (user?.username === 'lupe' || user?.firstName === 'Lupe') {
+    console.log('Router: Lupe user data:', {
+      username: user.username,
+      role: user.role,
+      isAuthenticated,
+      loading,
+      location,
+      isClient
+    });
+  }
 
   // Force authenticated clients to stay on /booking
   useEffect(() => {
@@ -131,7 +169,21 @@ function Router() {
           <Route path="/gift-certificates" component={GiftCertificatesPage} />
           <Route path="/rooms" component={Rooms} />
           <Route path="/devices" component={Devices} />
-          <Route path="/appointments" component={Appointments} />
+          <Route path="/appointments" component={() => {
+            console.log('Appointments route hit!');
+            return (
+              <ProtectedRoute anyPermissions={[
+                'view_calendar',
+                'edit_calendar',
+                'view_appointments',
+                'create_appointments',
+                'edit_appointments',
+                'update_appointments',
+              ]}>
+                <Appointments />
+              </ProtectedRoute>
+            );
+          }} />
           <Route path="/classes" component={Classes} />
           <Route path="/memberships" component={Memberships} />
           <Route path="/reports" component={Reports} />
@@ -149,6 +201,31 @@ function Router() {
           <Route path="/email-test" component={EmailTest} />
           <Route path="/settings" component={Settings} />
           <Route path="/schedule" component={Schedule} />
+          <Route path="/help/appointments" component={HelpAppointmentsDetailed} />
+          <Route path="/help/clients" component={HelpClientsDetailed} />
+          <Route path="/help/pos" component={HelpPOSDetailed} />
+          <Route path="/help/products" component={HelpProductsDetailed} />
+          <Route path="/help/staff" component={HelpStaffDetailed} />
+          <Route path="/help/locations" component={HelpLocationsDetailed} />
+          <Route path="/help/reports" component={HelpReportsDetailed} />
+          <Route path="/help/marketing" component={HelpMarketingDetailed} />
+          <Route path="/help/automations" component={HelpAutomationsDetailed} />
+          <Route path="/help/forms" component={HelpFormsDetailed} />
+          <Route path="/help/documents" component={HelpDocumentsDetailed} />
+          <Route path="/help/payroll" component={HelpPayrollDetailed} />
+          <Route path="/help/permissions" component={HelpPermissionsDetailed} />
+          <Route path="/help/time-clock" component={HelpTimeClockDetailed} />
+          <Route path="/help/settings" component={HelpSettingsDetailed} />
+          <Route path="/help/ai-messaging" component={HelpAIMessagingDetailed} />
+          <Route path="/help/gift-certificates" component={HelpGiftCertificatesDetailed} />
+          <Route path="/help/devices" component={HelpDevicesDetailed} />
+          <Route path="/help/classes" component={HelpClassesDetailed} />
+          <Route path="/help/rooms" component={HelpRoomsDetailed} />
+          <Route path="/help/phone" component={HelpPhoneDetailed} />
+          <Route path="/help/note-templates" component={HelpNoteTemplatesDetailed} />
+          <Route path="/help/schedule" component={HelpScheduleDetailed} />
+          <Route path="/help/staff-schedule" component={HelpStaffScheduleDetailed} />
+          <Route path="/help/memberships" component={HelpMembershipsDetailed} />
           <Route path="/help" component={HelpPage} />
           <Route path="/staff-schedule/:id" component={StaffScheduleDetail} />
           <Route path="/staff-schedule" component={StaffSchedule} />

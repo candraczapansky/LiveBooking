@@ -51,9 +51,14 @@ interface BigCalendarProps {
   blockedColor?: string;
   unavailableColor?: string;
   availableColor?: string;
+  // New: optional right-click handler for events
+  onEventContextMenu?: (event: AppointmentEvent, position: { x: number; y: number }) => void;
+  // New: appointment status colors
+  confirmedColor?: string;
+  arrivedColor?: string;
 }
 
-const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick, blockedColor, unavailableColor, availableColor }) => {
+const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, backgroundEvents, onSelectEvent, onSelectSlot, view, date, onView, onNavigate, onPreSelectResource, onInterceptSlotClick, blockedColor, unavailableColor, availableColor, onEventContextMenu, confirmedColor, arrivedColor }) => {
   // Limit visible time range to reduce internal scrolling and show more calendar content
   const today = new Date();
   // Keep a consistent visible window that matches Central hours. These are wall-clock hours.
@@ -126,8 +131,20 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         }
       } catch {}
     };
+    const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+      try {
+        if (!ev) return;
+        // Only surface context menu for appointment events; leave others alone
+        if ((ev as any).type === 'appointment' && onEventContextMenu) {
+          e.preventDefault();
+          e.stopPropagation();
+          onEventContextMenu(ev as AppointmentEvent, { x: e.clientX, y: e.clientY });
+          return;
+        }
+      } catch {}
+    };
     return (
-      <div onMouseDown={handleMouseDown} onClick={handleClick}>
+      <div onMouseDown={handleMouseDown} onClick={handleClick} onContextMenu={handleContextMenu}>
         {props.children}
       </div>
     );
@@ -229,12 +246,22 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
           const isPaid: boolean = !!(eventResource && eventResource.paymentStatus === 'paid');
           const isCompleted: boolean = !!(eventResource && eventResource.status === 'completed');
           const serviceColor: string | undefined = eventResource && eventResource.serviceColor ? String(eventResource.serviceColor) : undefined;
+          const isArrivedOverride: boolean = !!(eventResource && eventResource.arrivedOverride === true);
+          const isConfirmed: boolean = !!(eventResource && eventResource.status === 'confirmed');
 
           // Paid or completed appointments should be green (#278741)
           if (isPaid || isCompleted) {
             style.backgroundColor = '#278741';
             style.color = '#ffffff';
             style.border = '1px solid #278741';
+          } else if (isArrivedOverride && arrivedColor) {
+            style.backgroundColor = arrivedColor;
+            style.color = '#ffffff';
+            style.border = `1px solid ${arrivedColor}`;
+          } else if (isConfirmed && confirmedColor) {
+            style.backgroundColor = confirmedColor;
+            style.color = '#ffffff';
+            style.border = `1px solid ${confirmedColor}`;
           } else if (serviceColor) {
             // Otherwise, use the service color if available
             style.backgroundColor = serviceColor;

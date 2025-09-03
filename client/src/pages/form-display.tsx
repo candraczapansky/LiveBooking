@@ -16,7 +16,7 @@ import { FileText, Send, CheckCircle, AlertCircle } from "lucide-react";
 
 interface FormField {
   id: string;
-  type: 'text' | 'email' | 'phone' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'number' | 'name' | 'address' | 'rating' | 'image' | 'file' | 'signature';
+  type: 'text' | 'email' | 'phone' | 'emergency_phone' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'date' | 'number' | 'name' | 'address' | 'rating' | 'image' | 'file' | 'signature' | 'info' | 'divider';
   label?: string;
   required?: boolean;
   placeholder?: string;
@@ -42,6 +42,7 @@ interface FormField {
     multiple?: boolean;
     showPreview?: boolean;
     aspectRatio?: string;
+    text?: string;
   };
 }
 
@@ -121,6 +122,8 @@ const FormDisplay = () => {
         console.error('Raw fields data that caused error:', formData.fields);
         parsedFields = [];
       }
+      
+
       
       // Upgrade legacy signature fields on the client as a final safeguard
       const upgradedFields = (parsedFields || []).map((f: any) => {
@@ -275,14 +278,52 @@ const FormDisplay = () => {
   };
 
   const renderField = (field: FormField) => {
+    // First, check if this is an info field - do this BEFORE any other processing
+    const rawType = field.type;
+    if (rawType === 'info' || String(rawType).toLowerCase() === 'info') {
+      const infoLabel = field.label || field.config?.label || field.id;
+      const infoText = field.config?.text || '';
+      
+
+      
+      return (
+        <div className="w-full">
+          {infoLabel && infoLabel !== 'Information' && (
+            <Label className="text-sm font-medium mb-2 block">{infoLabel}</Label>
+          )}
+          <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line p-4 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+            {infoText || 'No information text provided'}
+          </div>
+        </div>
+      );
+    }
+    
     const value = formData[field.id] || '';
     const fieldLabel = field.label || field.config?.label || field.id;
     const fieldPlaceholder = field.placeholder || field.config?.placeholder;
     const fieldRequired = field.required || field.config?.required;
-    const typeLower = String(field.type || '').toLowerCase();
+    const typeLower = String(field.type || '').toLowerCase().trim();
     const labelLower = String(fieldLabel || '').toLowerCase();
     const placeholderLower = String(fieldPlaceholder || '').toLowerCase();
     const idLower = String(field.id || '').toLowerCase();
+    
+    // Handle divider field
+    if (typeLower === 'divider') {
+      return (
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+          </div>
+          {field.config?.text && (
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-gray-900 text-gray-500">
+                {field.config.text}
+              </span>
+            </div>
+          )}
+        </div>
+      );
+    }
 
     // Explicit handling: if field type is signature, always render the draw pad
     if (typeLower === 'signature') {
@@ -328,7 +369,8 @@ const FormDisplay = () => {
         </div>
       );
     }
-    
+
+
     switch (typeLower) {
       case 'name':
         if (field.config?.includeFirstLast) {
@@ -374,7 +416,6 @@ const FormDisplay = () => {
         );
       }
       case 'email':
-      case 'phone':
       case 'number':
         return (
           <Input
@@ -382,6 +423,30 @@ const FormDisplay = () => {
             value={value}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
             placeholder={fieldPlaceholder}
+            required={fieldRequired}
+            min={field.validation?.min}
+            max={field.validation?.max}
+          />
+        );
+      case 'phone':
+        return (
+          <Input
+            type="tel"
+            value={value}
+            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+            placeholder={fieldPlaceholder}
+            required={fieldRequired}
+            min={field.validation?.min}
+            max={field.validation?.max}
+          />
+        );
+      case 'emergency_phone':
+        return (
+          <Input
+            type="tel"
+            value={value}
+            onChange={(e) => handleFieldChange(field.id, e.target.value)}
+            placeholder={fieldPlaceholder || 'Enter emergency contact number'}
             required={fieldRequired}
             min={field.validation?.min}
             max={field.validation?.max}
@@ -406,8 +471,8 @@ const FormDisplay = () => {
               <SelectValue placeholder={fieldPlaceholder || "Select an option"} />
             </SelectTrigger>
             <SelectContent>
-              {Array.isArray(field.options || field.config?.options) && (field.options || field.config?.options)?.map((option) => (
-                <SelectItem key={option} value={option}>
+              {Array.isArray(field.options || field.config?.options) && (field.options || field.config?.options)?.map((option, index) => (
+                <SelectItem key={`${field.id}-${index}`} value={option}>
                   {option}
                 </SelectItem>
               ))}
@@ -430,13 +495,22 @@ const FormDisplay = () => {
       case 'radio':
         return (
           <RadioGroup value={value} onValueChange={(val) => handleFieldChange(field.id, val)}>
-            {Array.isArray(field.options || field.config?.options) && (field.options || field.config?.options)?.map((option) => (
-              <div key={option} className="flex items-center space-x-2">
-                <RadioGroupItem value={option} id={`${field.id}-${option}`} />
-                <Label htmlFor={`${field.id}-${option}`}>{option}</Label>
+            {Array.isArray(field.options || field.config?.options) && (field.options || field.config?.options)?.map((option, index) => (
+              <div key={`${field.id}-${index}`} className="flex items-center space-x-2">
+                <RadioGroupItem value={option} id={`${field.id}-${index}`} />
+                <Label htmlFor={`${field.id}-${index}`}>{option}</Label>
               </div>
             ))}
           </RadioGroup>
+        );
+
+      case 'info':
+        return (
+          <div className="space-y-1">
+            <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+              {field.config?.text || ''}
+            </div>
+          </div>
         );
       
       case 'date':
@@ -706,13 +780,18 @@ const FormDisplay = () => {
                 form.fields.map((field) => {
                   const fieldLabel = field.label || field.config?.label || field.id;
                   const fieldRequired = field.required || field.config?.required;
+                  const typeLower = String(field.type || '').toLowerCase();
+                  
+
                   
                   return (
                     <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.id} className="text-sm font-medium">
-                        {fieldLabel}
-                        {fieldRequired && <span className="text-red-500 ml-1">*</span>}
-                      </Label>
+                      {typeLower !== 'info' && typeLower !== 'divider' && (
+                        <Label htmlFor={field.id} className="text-sm font-medium">
+                          {fieldLabel}
+                          {fieldRequired && <span className="text-red-500 ml-1">*</span>}
+                        </Label>
+                      )}
                       {renderField(field)}
                     </div>
                   );

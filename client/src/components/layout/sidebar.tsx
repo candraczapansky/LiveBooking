@@ -1,6 +1,7 @@
 import { useLocation } from 'wouter';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthProvider';
+import { useUserPermissions } from '@/hooks/use-user-permissions';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { 
   LayoutDashboard, 
@@ -127,7 +128,16 @@ const SidebarItem = ({ icon, label, href, isActive, isOpen: _isOpen, onClick }: 
 export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
   const [location] = useLocation();
   const { user } = useAuth();
+  const { hasPermission, hasAnyPermission, permissionGroups } = useUserPermissions();
   const { toggleSidebar, closeSidebar } = useSidebar();
+  
+  // Debug logging for Basic Staff detection
+  if (permissionGroups?.some(g => g.name.toLowerCase().includes('basic'))) {
+    console.log('Sidebar: Basic Staff user detected', {
+      permissionGroups: permissionGroups.map(g => g.name),
+      isBasicStaffUser: permissionGroups.some(g => g.name.toLowerCase().includes('basic'))
+    });
+  }
   const isInStaffSection = location === '/staff' || location === '/schedule' || location.startsWith('/staff-schedule');
   const [isStaffExpanded, setIsStaffExpanded] = useState<boolean>(isInStaffSection);
   const isInCommunicationsSection = location === '/automations' || location === '/marketing' || location === '/ai-messaging';
@@ -192,6 +202,9 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
     { icon: <Phone className="w-5 h-5" strokeWidth={1.75} />, label: "Phone", href: "/phone" },
   ];
 
+  // Detect if user is part of the Basic Staff permission group (case-insensitive)
+  const isBasicStaffUser = (permissionGroups || []).some(g => (g?.name || '').toLowerCase() === 'basic staff');
+
   // Always render; on mobile it slides in with an overlay
 
   const handleItemClick = () => {
@@ -215,6 +228,40 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
           <nav className="flex-1 px-3 py-4 overflow-y-auto">
             {menuItems.map((originalItem) => {
               const item = { ...originalItem, label: normalizeLabel(originalItem.label) };
+
+              // Minimal gating for Basic Staff: restrict top-level items to only those with matching permissions
+              if (isBasicStaffUser) {
+                const allowedTopLevelLabels = new Set(['Dashboard','Appointments','clients','Staff','services','Phone']);
+                if (!allowedTopLevelLabels.has(item.label)) {
+                  console.log(`Sidebar: Filtering out ${item.label} - not in allowed list`);
+                  return null;
+                }
+                if (item.label === 'Dashboard' && !hasPermission('view_dashboard')) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no view_dashboard permission`);
+                  return null;
+                }
+                if (item.label === 'Appointments' && !hasAnyPermission(['view_calendar','edit_calendar','view_appointments','create_appointments','edit_appointments','update_appointments'])) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no appointment permissions`);
+                  return null;
+                }
+                if (item.label === 'clients' && !hasPermission('view_clients')) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no view_clients permission`);
+                  return null;
+                }
+                if (item.label === 'Staff' && !(hasPermission('view_staff') || hasPermission('view_time_clock'))) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no staff/time_clock permissions`);
+                  return null;
+                }
+                if (item.label === 'services' && !hasPermission('view_services')) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no view_services permission`);
+                  return null;
+                }
+                if (item.label === 'Phone' && !hasPermission('view_phone')) {
+                  console.log(`Sidebar: Filtering out ${item.label} - no view_phone permission`);
+                  return null;
+                }
+                console.log(`Sidebar: Allowing ${item.label} for Basic Staff user`);
+              }
               if (item.label === 'Staff') {
                 const isActive = isInStaffSection;
                 return (
@@ -248,33 +295,39 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
 
                     {isStaffExpanded && (
                       <div className="ml-6 mt-1">
-                        <SidebarItem
-                          icon={<UserCircle className="w-5 h-5" strokeWidth={1.75} />}
-                          label="Staff"
-                          href="/staff"
-                          isActive={location === "/staff"}
-                          isOpen={isOpen}
-                          onClick={handleItemClick}
-                        />
-                        <div className="mt-1">
+                        {(!isBasicStaffUser || hasPermission('view_staff')) && (
                           <SidebarItem
-                            icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Schedule"
-                            href="/schedule"
-                            isActive={location === "/schedule"}
+                            icon={<UserCircle className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Staff"
+                            href="/staff"
+                            isActive={location === "/staff"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />
+                        )}
+                        <div className="mt-1">
+                          {(!isBasicStaffUser || hasPermission('view_schedules') || hasPermission('view_own_schedule')) && (
+                            <SidebarItem
+                              icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Schedule"
+                              href="/schedule"
+                              isActive={location === "/schedule"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Time Clock"
-                            href="/time-clock"
-                            isActive={location === "/time-clock"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser || hasPermission('view_time_clock')) && (
+                            <SidebarItem
+                              icon={<DollarSign className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Time Clock"
+                              href="/time-clock"
+                              isActive={location === "/time-clock"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -314,63 +367,75 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
 
                     {isClientsExpanded && (
                       <div className="ml-6 mt-1">
-                        <SidebarItem
-                          icon={<Users className="w-5 h-5" strokeWidth={1.75} />}
-                          label="Client Profiles"
-                          href="/clients"
-                          isActive={location === "/clients"}
-                          isOpen={isOpen}
-                          onClick={handleItemClick}
-                        />
-                        <div className="mt-1">
+                        {(!isBasicStaffUser || hasPermission('view_clients')) && (
                           <SidebarItem
-                            icon={<FileText className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Forms"
-                            href="/forms"
-                            isActive={location === "/forms"}
+                            icon={<Users className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Client Profiles"
+                            href="/clients"
+                            isActive={location === "/clients"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />
+                        )}
+                        <div className="mt-1">
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<FileText className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Forms"
+                              href="/forms"
+                              isActive={location === "/forms"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Documents"
-                            href="/documents"
-                            isActive={location === "/documents"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Documents"
+                              href="/documents"
+                              isActive={location === "/documents"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Note Templates"
-                            href="/note-templates"
-                            isActive={location === "/note-templates"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<StickyNote className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Note Templates"
+                              href="/note-templates"
+                              isActive={location === "/note-templates"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<Calendar className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Client Booking"
-                            href="/booking-test"
-                            isActive={location === "/booking-test"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<Calendar className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Client Booking"
+                              href="/booking-test"
+                              isActive={location === "/booking-test"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<Building2 className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Memberships"
-                            href="/memberships"
-                            isActive={location === "/memberships"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<Building2 className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Memberships"
+                              href="/memberships"
+                              isActive={location === "/memberships"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -378,6 +443,9 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                 );
               }
               if (item.label === 'SMS & Email') {
+                if (isBasicStaffUser) {
+                  return null;
+                }
                 const isActive = isInCommunicationsSection;
                 return (
                   <div key={item.label} className="mb-1">
@@ -444,6 +512,9 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                 );
               }
               if (item.label === 'Retail') {
+                if (isBasicStaffUser) {
+                  return null;
+                }
                 const isActive = isInRetailSection;
                 return (
                   <div key={item.label} className="mb-1">
@@ -542,43 +613,51 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
 
                     {isServicesExpanded && (
                       <div className="ml-6 mt-1">
-                        <SidebarItem
-                          icon={<Scissors className="w-5 h-5" strokeWidth={1.75} />}
-                          label="Services"
-                          href="/services"
-                          isActive={location === "/services"}
-                          isOpen={isOpen}
-                          onClick={handleItemClick}
-                        />
-                        <div className="mt-1">
+                        {(!isBasicStaffUser || hasPermission('view_services')) && (
                           <SidebarItem
-                            icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Classes"
-                            href="/classes"
-                            isActive={location === "/classes"}
+                            icon={<Scissors className="w-5 h-5" strokeWidth={1.75} />}
+                            label="Services"
+                            href="/services"
+                            isActive={location === "/services"}
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />
+                        )}
+                        <div className="mt-1">
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<CalendarDays className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Classes"
+                              href="/classes"
+                              isActive={location === "/classes"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<Monitor className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Devices"
-                            href="/devices"
-                            isActive={location === "/devices"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<Monitor className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Devices"
+                              href="/devices"
+                              isActive={location === "/devices"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         <div className="mt-1">
-                          <SidebarItem
-                            icon={<MapPin className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Rooms"
-                            href="/rooms"
-                            isActive={location === "/rooms"}
-                            isOpen={isOpen}
-                            onClick={handleItemClick}
-                          />
+                          {(!isBasicStaffUser) && (
+                            <SidebarItem
+                              icon={<MapPin className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Rooms"
+                              href="/rooms"
+                              isActive={location === "/rooms"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                       </div>
                     )}
@@ -586,6 +665,9 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                 );
               }
               if (item.label === 'insights') {
+                if (isBasicStaffUser) {
+                  return null;
+                }
                 const isActive = isInInsightsSection;
                 return (
                   <div key={item.label} className="mb-1">
@@ -642,6 +724,9 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                 );
               }
               if (item.label === 'business') {
+                if (isBasicStaffUser) {
+                  return null;
+                }
                 const isActive = isInBusinessSection;
                 return (
                   <div key={item.label} className="mb-1">
@@ -710,6 +795,7 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                 );
               }
 
+              console.log(`Sidebar: Rendering default menu item: ${item.label}`);
               return (
                 <div key={item.href} className="mb-1">
                   <SidebarItem

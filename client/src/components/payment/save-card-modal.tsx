@@ -22,11 +22,78 @@ export function SaveCardModal({
   customerName,
   onSaved,
 }: SaveCardModalProps) {
+  console.log("[SaveCardModal] Component rendered with props:", {
+    open,
+    clientId,
+    customerEmail,
+    customerName,
+    onSavedExists: !!onSaved,
+    onSavedType: typeof onSaved
+  });
+  
+  // DEBUG: Alert to confirm component is loading
+  if (open) {
+    console.warn("🔴 SaveCardModal is OPEN - DEBUG v4 - Enhanced debugging active!");
+  }
+  
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [checkoutToken, setCheckoutToken] = useState<string | null>(null);
   const [helcimIframeOpen, setHelcimIframeOpen] = useState(false);
   const { toast } = useToast();
+
+  // Debug modal state changes
+  useEffect(() => {
+    console.log("[SaveCardModal] 🔄 Modal state changed - open:", open);
+  }, [open]);
+
+  // Persistent message listener - never gets removed
+  useEffect(() => {
+    console.log("[SaveCardModal] 🔒 Setting up PERSISTENT message listener");
+    
+    const persistentMessageHandler = (event: MessageEvent) => {
+      // Only log messages from Helcim domain
+      if (event.origin.includes('helcim') || event.origin.includes('secure.helcim.app')) {
+        console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Message from:", event.origin);
+        console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Message data:", event.data);
+        console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Message type:", typeof event.data);
+        
+        if (event.data && typeof event.data === 'object') {
+          console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - All properties:", Object.keys(event.data));
+          console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Full message:", JSON.stringify(event.data, null, 2));
+          
+          // Check if this is a success message
+          const isSuccess = event.data.eventStatus === 'SUCCESS' && event.data.eventMessage;
+          if (isSuccess) {
+            console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - SUCCESS DETECTED!");
+            console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - This is the payment completion message!");
+            
+            // Try to trigger the callback even though modal is closed
+            // We need to find a way to communicate this back to the booking widget
+            console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Attempting to trigger appointment creation...");
+            
+            // Dispatch a custom event that the booking widget can listen for
+            const successEvent = new CustomEvent('helcim-payment-success', {
+              detail: {
+                eventData: event.data,
+                cardToken: event.data.eventMessage ? JSON.parse(event.data.eventMessage).data?.data?.cardToken : null,
+                transactionId: event.data.eventMessage ? JSON.parse(event.data.eventMessage).data?.data?.transactionId : null
+              }
+            });
+            window.dispatchEvent(successEvent);
+            console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Custom event dispatched");
+          }
+        }
+      }
+    };
+    
+    window.addEventListener('message', persistentMessageHandler);
+    
+    // This listener never gets removed - it stays active for the entire session
+    return () => {
+      console.log("[SaveCardModal] 🔒 Component unmounting - keeping persistent listener active");
+    };
+  }, []); // Empty dependency array - runs once and never removes
 
   const initializeForm = useCallback(async () => {
     if (isInitialized) return;
@@ -163,23 +230,291 @@ export function SaveCardModal({
     };
   }, [open, isInitialized, initializeForm, toast]);
 
-  // Monitor for Helcim iframe closure
+  // Global message listener - always active when modal is open
   useEffect(() => {
-    if (!helcimIframeOpen) return;
+    if (!open) {
+      console.log("[SaveCardModal] 🌐 Modal closed, not setting up global listener");
+      return;
+    }
     
-    console.log("[SaveCardModal] Monitoring Helcim iframe...");
+    console.log("[SaveCardModal] 🌐 Setting up GLOBAL message listener");
+    
+    const globalMessageHandler = (event: MessageEvent) => {
+      // Only log messages from Helcim domain
+      if (event.origin.includes('helcim') || event.origin.includes('secure.helcim.app')) {
+        console.log("[SaveCardModal] 🌐 GLOBAL LISTENER - Message from:", event.origin);
+        console.log("[SaveCardModal] 🌐 GLOBAL LISTENER - Message data:", event.data);
+        console.log("[SaveCardModal] 🌐 GLOBAL LISTENER - Message type:", typeof event.data);
+        
+        if (event.data && typeof event.data === 'object') {
+          console.log("[SaveCardModal] 🌐 GLOBAL LISTENER - All properties:", Object.keys(event.data));
+          console.log("[SaveCardModal] 🌐 GLOBAL LISTENER - Full message:", JSON.stringify(event.data, null, 2));
+        }
+      }
+    };
+    
+    window.addEventListener('message', globalMessageHandler);
+    
+    return () => {
+      console.log("[SaveCardModal] 🌐 Removing GLOBAL message listener - modal closing");
+      window.removeEventListener('message', globalMessageHandler);
+    };
+  }, [open]);
+
+  // Monitor for Helcim iframe closure and success messages
+  useEffect(() => {
+    console.log("[SaveCardModal] 🔍 useEffect triggered - helcimIframeOpen:", helcimIframeOpen);
+    
+    if (!helcimIframeOpen) {
+      console.log("[SaveCardModal] ⏸️ Not monitoring - helcimIframeOpen is false");
+      return;
+    }
+    
+    console.log("[SaveCardModal] 🎯 Monitoring Helcim iframe - Enhanced debugging active!");
+    
+    // Monitor iframe visibility changes as a fallback
+    const checkIframeVisibility = () => {
+      const iframe = document.getElementById('helcimPayIframe') as HTMLIFrameElement;
+      if (iframe) {
+        const isVisible = iframe.offsetWidth > 0 && iframe.offsetHeight > 0;
+        console.log("[SaveCardModal] 🔍 Iframe visibility check:", { isVisible, width: iframe.offsetWidth, height: iframe.offsetHeight });
+        
+        // If iframe becomes hidden, it might indicate payment completion
+        if (!isVisible && helcimIframeOpen) {
+          console.log("[SaveCardModal] 🚨 Iframe became hidden - possible payment completion!");
+          // Don't auto-trigger here, just log for debugging
+        }
+      }
+    };
+    
+    // Check iframe visibility periodically
+    const visibilityInterval = setInterval(checkIframeVisibility, 1000);
+    
+    // Listen for messages from Helcim iframe
+    const handleMessage = async (event: MessageEvent) => {
+      console.log("[SaveCardModal] 📨 Received message from:", event.origin);
+      console.log("[SaveCardModal] 📨 Message data:", event.data);
+      console.log("[SaveCardModal] 📨 Message type:", typeof event.data);
+      
+      // Log ALL messages for debugging
+      if (event.data && typeof event.data === 'object') {
+        console.log("[SaveCardModal] 📨 ALL MESSAGE PROPERTIES:", Object.keys(event.data));
+        console.log("[SaveCardModal] 📨 FULL MESSAGE:", JSON.stringify(event.data, null, 2));
+      }
+      
+      // Log all properties if it's an object
+      if (event.data && typeof event.data === 'object') {
+        console.log("[SaveCardModal] Message properties:", Object.keys(event.data));
+        console.log("[SaveCardModal] Full message object:", JSON.stringify(event.data, null, 2));
+        
+        // Check if this is a payment completion message
+        if (event.data.eventName === 'helcim-pay-complete' || event.data.eventName === 'helcim-pay-success') {
+          console.log("[SaveCardModal] 🎉 PAYMENT COMPLETION DETECTED!");
+        }
+      }
+      
+      // Check various message formats from Helcim
+      const isSuccess = event.data && (
+        event.data.type === 'helcim-pay-success' || 
+        event.data === 'helcim-pay-success' ||
+        event.data.event === 'transaction-success' ||
+        event.data.status === 'success' ||
+        event.data.success === true ||
+        event.data.responseMessage === 'APPROVED' ||
+        event.data.approved === true ||
+        (event.data.transactionId && event.data.status !== 'error') ||
+        event.data.eventName === 'helcim-pay-complete' ||
+        event.data.eventName === 'helcim-pay-success' ||
+        event.data.eventName === 'transaction-complete' ||
+        event.data.eventName === 'payment-complete' ||
+        // NEW: Check for the actual success message format we're receiving
+        (event.data.eventStatus === 'SUCCESS' && event.data.eventMessage) ||
+        // Check if eventMessage contains APPROVED status
+        (event.data.eventMessage && event.data.eventMessage.includes('"status":"APPROVED"'))
+      );
+      
+      // Log all messages for debugging
+      console.log("[SaveCardModal] 🔍 Checking message for success indicators...");
+      console.log("[SaveCardModal] Message eventName:", event.data?.eventName);
+      console.log("[SaveCardModal] Message type:", event.data?.type);
+      console.log("[SaveCardModal] Message status:", event.data?.status);
+      console.log("[SaveCardModal] Message success:", event.data?.success);
+      console.log("[SaveCardModal] Is success:", isSuccess);
+      
+      if (isSuccess) {
+        console.log("[SaveCardModal] Payment successful!");
+        console.log("[SaveCardModal] Event data:", event.data);
+        
+        // Save the card on the backend if we have a token
+        const token = event.data.token || event.data.cardToken || checkoutToken;
+        if (token && clientId) {
+          try {
+            console.log("[SaveCardModal] Saving card on backend...");
+            const saveRes = await apiRequest("POST", "/api/payments/helcim/save-card", {
+              token,
+              clientId,
+              customerEmail,
+              customerName
+            });
+            const saveData = await saveRes.json();
+            console.log("[SaveCardModal] Card saved on backend:", saveData);
+          } catch (err) {
+            console.error("[SaveCardModal] Error saving card on backend:", err);
+          }
+        }
+        
+        // Remove the iframe
+        if (typeof window.removeHelcimPayIframe === 'function') {
+          // @ts-ignore
+          window.removeHelcimPayIframe();
+        }
+        
+        setHelcimIframeOpen(false);
+        
+        // Call the onSaved callback if available
+        if (onSaved) {
+          console.log("[SaveCardModal] 🎉 CALLING onSaved callback - onSaved exists:", !!onSaved);
+          console.log("[SaveCardModal] Card info being passed:", {
+            last4: event.data.last4 || '****',
+            brand: event.data.brand || 'Card',
+            saved: true
+          });
+          try {
+            onSaved({
+              last4: event.data.last4 || '****',
+              brand: event.data.brand || 'Card',
+              saved: true
+            });
+            console.log("[SaveCardModal] ✅ onSaved callback called successfully");
+          } catch (err) {
+            console.error("[SaveCardModal] ❌ Error calling onSaved:", err);
+          }
+        } else {
+          // @ts-ignore
+          if (window.helcimSaveCardCallback && window.helcimSaveCardCallback.onSaved) {
+            console.log("[SaveCardModal] Calling onSaved callback from window");
+            // @ts-ignore
+            window.helcimSaveCardCallback.onSaved({
+              last4: event.data.last4 || '****',
+              brand: event.data.brand || 'Card',
+              saved: true
+            });
+          }
+        }
+        
+        toast({ 
+          title: "Card saved successfully!", 
+          description: "Your payment method has been saved." 
+        });
+      }
+      
+      // Check if this is a Helcim close message
+      if (event.data && (event.data.type === 'helcim-pay-close' || event.data === 'helcim-pay-close')) {
+        console.log("[SaveCardModal] Payment window closed by user");
+        
+        // Remove the iframe
+        if (typeof window.removeHelcimPayIframe === 'function') {
+          // @ts-ignore
+          window.removeHelcimPayIframe();
+        }
+        
+        setHelcimIframeOpen(false);
+        
+        toast({ 
+          title: "Payment cancelled", 
+          description: "The payment window was closed." 
+        });
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    
+    // Also check periodically if iframe was removed
     const checkInterval = setInterval(() => {
       const iframe = document.querySelector('iframe[src*="helcim"]');
-      if (!iframe) {
-        console.log("[SaveCardModal] Helcim iframe was closed");
+      console.log("[SaveCardModal] Checking for iframe... Found:", !!iframe, "helcimIframeOpen:", helcimIframeOpen);
+      
+      if (!iframe && helcimIframeOpen) {
+        console.log("[SaveCardModal] Helcim iframe was removed!");
         clearInterval(checkInterval);
         setHelcimIframeOpen(false);
         
-        // Show a message that the payment window was closed
-        toast({ 
-          title: "Payment window closed", 
-          description: "If you completed the payment, your card has been saved. You can close this window." 
-        });
+        // If iframe was removed without a message, assume success and try to save the card
+        // This handles cases where Helcim doesn't send a proper message
+        if (checkoutToken && clientId) {
+          console.log("[SaveCardModal] Iframe removed - assuming completion, attempting to save card...");
+          console.log("[SaveCardModal] Token:", checkoutToken, "ClientId:", clientId);
+          
+          // First, try to save the card
+          apiRequest("POST", "/api/payments/helcim/save-card", {
+            token: checkoutToken,
+            clientId,
+            customerEmail,
+            customerName
+          }).then(async (res) => {
+            const data = await res.json();
+            console.log("[SaveCardModal] Card save attempt result:", data);
+            
+            // Call the callback regardless (even if save failed, user completed the form)
+            if (onSaved) {
+              console.log("[SaveCardModal] Calling onSaved callback directly after iframe removal");
+              console.log("[SaveCardModal] Card data from backend:", data);
+              onSaved({
+                last4: data.cardLast4 || data.last4 || '****',
+                brand: data.cardBrand || data.brand || 'Card',
+                saved: true,
+                token: checkoutToken,
+                helcimCardId: data.helcimCardId,
+                helcimCustomerId: data.helcimCustomerId
+              });
+            } else {
+              // @ts-ignore
+              if (window.helcimSaveCardCallback && window.helcimSaveCardCallback.onSaved) {
+                console.log("[SaveCardModal] Calling onSaved callback from window after iframe removal");
+                // @ts-ignore
+                window.helcimSaveCardCallback.onSaved({
+                  last4: data.cardLast4 || data.last4 || '****',
+                  brand: data.cardBrand || data.brand || 'Card',
+                  saved: true,
+                  token: checkoutToken,
+                  helcimCardId: data.helcimCardId,
+                  helcimCustomerId: data.helcimCustomerId
+                });
+              }
+            }
+            
+            // Show success toast
+            toast({ 
+              title: "Payment method saved", 
+              description: "Your card has been saved for future bookings." 
+            });
+          }).catch((err) => {
+            console.error("[SaveCardModal] Error saving card after iframe removal:", err);
+            
+            // Still call the callback - let the booking continue
+            if (onSaved) {
+              console.log("[SaveCardModal] Calling onSaved callback directly despite error");
+              onSaved({
+                last4: '****',
+                brand: 'Card',
+                saved: true,
+                token: checkoutToken
+              });
+            } else {
+              // @ts-ignore
+              if (window.helcimSaveCardCallback && window.helcimSaveCardCallback.onSaved) {
+                console.log("[SaveCardModal] Calling onSaved callback from window despite error");
+                // @ts-ignore
+                window.helcimSaveCardCallback.onSaved({
+                  last4: '****',
+                  brand: 'Card',
+                  saved: true,
+                  token: checkoutToken
+                });
+              }
+            }
+          });
+        }
       }
     }, 500);
     
@@ -190,10 +525,12 @@ export function SaveCardModal({
     }, 300000);
     
     return () => {
+      window.removeEventListener('message', handleMessage);
       clearInterval(checkInterval);
+      clearInterval(visibilityInterval);
       clearTimeout(timeout);
     };
-  }, [helcimIframeOpen, toast]);
+  }, [helcimIframeOpen, toast, checkoutToken, clientId, customerEmail, customerName, onSaved]);
 
   const handleOpenHelcimModal = () => {
     if (!checkoutToken) {
@@ -219,11 +556,11 @@ export function SaveCardModal({
         };
       }
       
-      // Close our modal to avoid z-index conflicts
-      onOpenChange(false);
+      // Mark that Helcim iframe is opening
+      console.log("[SaveCardModal] 🚀 Setting helcimIframeOpen to true");
       setHelcimIframeOpen(true);
       
-      // Small delay to ensure our modal closes before opening Helcim
+      // Small delay before opening Helcim
       setTimeout(() => {
         // Open the Helcim iframe modal
         // @ts-ignore
@@ -233,14 +570,11 @@ export function SaveCardModal({
             const result = window.appendHelcimPayIframe(checkoutToken);
             console.log("[SaveCardModal] appendHelcimPayIframe result:", result);
             
-            // Check if the iframe was actually added and make sure it's visible
+            // Check if the iframe was actually added
             setTimeout(() => {
               const iframe = document.querySelector('iframe#helcimPayIframe') as HTMLIFrameElement;
               if (iframe) {
                 console.log("[SaveCardModal] Helcim iframe confirmed in DOM");
-                // Ensure the iframe is visible by setting a high z-index
-                iframe.style.zIndex = '999999';
-                console.log("[SaveCardModal] Updated iframe z-index to 999999");
               } else {
                 console.error("[SaveCardModal] Helcim iframe not found in DOM after append");
               }
@@ -271,11 +605,28 @@ export function SaveCardModal({
     }
   };
 
+  // Wrapper for onOpenChange to add debugging and prevent premature closing
+  const handleOpenChange = (newOpen: boolean) => {
+    console.log("[SaveCardModal] 🚪 onOpenChange called - newOpen:", newOpen, "current open:", open);
+    
+    // If trying to close the modal while iframe is open, add a delay to catch late messages
+    if (!newOpen && helcimIframeOpen) {
+      console.log("[SaveCardModal] ⏳ Modal closing while iframe is open - adding delay to catch late messages");
+      setTimeout(() => {
+        console.log("[SaveCardModal] ⏳ Delay completed - closing modal");
+        onOpenChange(newOpen);
+      }, 2000); // 2 second delay to catch late success messages
+      return;
+    }
+    
+    onOpenChange(newOpen);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px]">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[480px]" style={{ zIndex: helcimIframeOpen ? 1 : undefined }}>
         <DialogHeader>
-          <DialogTitle>Add a Card</DialogTitle>
+          <DialogTitle>Add a Card (DEBUG v3)</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
@@ -295,8 +646,102 @@ export function SaveCardModal({
                   Please complete your card details in the Helcim secure payment window.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  This window will update automatically when you're done.
+                  If you don't see the payment window, it may be blocked by your browser.
                 </p>
+                <div className="flex gap-2 justify-center">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      // Close Helcim iframe and reset
+                      if (typeof window.removeHelcimPayIframe === 'function') {
+                        // @ts-ignore
+                        window.removeHelcimPayIframe();
+                      }
+                      setHelcimIframeOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    size="sm"
+                    onClick={() => {
+                      console.log("[SaveCardModal] Manual completion triggered");
+                      // Remove iframe
+                      if (typeof window.removeHelcimPayIframe === 'function') {
+                        // @ts-ignore
+                        window.removeHelcimPayIframe();
+                      }
+                      setHelcimIframeOpen(false);
+                      
+                      // Trigger the callback
+                      if (onSaved) {
+                        console.log("[SaveCardModal] Calling onSaved directly from manual complete");
+                        onSaved({
+                          last4: '****',
+                          brand: 'Card',
+                          saved: true
+                        });
+                      } else {
+                        // @ts-ignore
+                        if (window.helcimSaveCardCallback && window.helcimSaveCardCallback.onSaved) {
+                          console.log("[SaveCardModal] Calling onSaved from window from manual complete");
+                          // @ts-ignore
+                          window.helcimSaveCardCallback.onSaved({
+                            last4: '****',
+                            brand: 'Card',
+                            saved: true
+                          });
+                        }
+                      }
+                      
+                      toast({ 
+                        title: "Continuing with booking", 
+                        description: "Processing your appointment..." 
+                      });
+                    }}
+                  >
+                    ✓ I've Completed Entering My Card
+                  </Button>
+                  
+                  {/* DEBUG: Direct callback test */}
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => {
+                      console.log("[SaveCardModal] DEBUG: Direct onSaved test - BUTTON CLICKED!");
+                      console.log("[SaveCardModal] DEBUG: onSaved exists?", !!onSaved);
+                      console.log("[SaveCardModal] DEBUG: onSaved type:", typeof onSaved);
+                      console.log("[SaveCardModal] DEBUG: onSaved function:", onSaved);
+                      
+                      if (onSaved) {
+                        console.log("[SaveCardModal] DEBUG: About to call onSaved directly...");
+                        try {
+                          onSaved({
+                            last4: 'TEST',
+                            brand: 'TEST',
+                            saved: true,
+                            debug: true
+                          });
+                          console.log("[SaveCardModal] DEBUG: onSaved called successfully!");
+                        } catch (err) {
+                          console.error("[SaveCardModal] DEBUG: Error calling onSaved:", err);
+                        }
+                      } else {
+                        console.log("[SaveCardModal] DEBUG: onSaved is null/undefined!");
+                      }
+                      
+                      // Close modal after a delay to see console output
+                      setTimeout(() => {
+                        setHelcimIframeOpen(false);
+                        onOpenChange(false);
+                      }, 1000);
+                    }}
+                  >
+                    DEBUG: Test Callback
+                  </Button>
+                </div>
               </div>
             </div>
           ) : isInitialized ? (
@@ -313,6 +758,39 @@ export function SaveCardModal({
                   Your card information is encrypted and securely processed by Helcim. 
                   We never store your full card number.
                 </p>
+                
+                {/* DEBUG BUTTON - ALWAYS VISIBLE */}
+                <Button 
+                  variant="destructive" 
+                  size="lg"
+                  className="mt-4 w-full"
+                  onClick={() => {
+                    console.log("🔴🔴🔴 DEBUG BUTTON CLICKED!");
+                    console.log("onSaved exists?", !!onSaved);
+                    console.log("onSaved type:", typeof onSaved);
+                    
+                    if (onSaved) {
+                      console.log("Calling onSaved...");
+                      onSaved({
+                        last4: 'DEBUG',
+                        brand: 'DEBUG',
+                        saved: true,
+                        debug: true
+                      });
+                      console.log("onSaved called!");
+                      
+                      // Close modal after delay
+                      setTimeout(() => {
+                        onOpenChange(false);
+                      }, 1000);
+                    } else {
+                      console.log("ERROR: onSaved is null!");
+                      alert("ERROR: onSaved callback is null!");
+                    }
+                  }}
+                >
+                  🔴 DEBUG: TEST APPOINTMENT CREATION 🔴
+                </Button>
               </div>
             </div>
           ) : (

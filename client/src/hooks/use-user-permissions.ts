@@ -51,8 +51,19 @@ export function useUserPermissions() {
       const now = Date.now();
       const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
       
-      // Use cached permissions if available and not expired
-      if (cachedPermissionsStr && cachedPermissionsTimestamp && 
+      // For Basic Staff users, always fetch fresh permissions to avoid caching issues
+      const isBasicStaffUser = user.role === 'staff' && user.permissionGroups?.some((group: any) => 
+        group.name.toLowerCase().includes('basic')
+      );
+      
+      if (isBasicStaffUser) {
+        console.log('useUserPermissions: Clearing cache for Basic Staff user to ensure fresh permissions');
+        localStorage.removeItem(`permissions_${user.id}`);
+        localStorage.removeItem(`permissions_${user.id}_timestamp`);
+      }
+      
+      // Use cached permissions if available and not expired (and not Basic Staff)
+      if (!isBasicStaffUser && cachedPermissionsStr && cachedPermissionsTimestamp && 
           (now - parseInt(cachedPermissionsTimestamp)) < CACHE_TTL) {
         try {
           const cachedData = JSON.parse(cachedPermissionsStr);
@@ -83,6 +94,26 @@ export function useUserPermissions() {
         setPermissionGroups(userPermissions.groups || []);
         setDirectPermissions(userPermissions.directPermissions || []);
         
+            // Debug logging for Basic Staff permissions
+    if (userPermissions.groups?.some(g => g.name.toLowerCase().includes('basic'))) {
+      console.log('Basic Staff user permissions:', {
+        userId: user.id,
+        permissions: userPermissions.permissions,
+        groups: userPermissions.groups,
+        directPermissions: userPermissions.directPermissions
+      });
+      console.log('Full permissions array:', userPermissions.permissions);
+      
+      // Clear any cached permissions to force fresh data
+      try {
+        localStorage.removeItem(`permissions_${user.id}`);
+        localStorage.removeItem(`permissions_${user.id}_timestamp`);
+        console.log('Cleared cached permissions for user', user.id);
+      } catch (e) {
+        console.error('Error clearing cache:', e);
+      }
+    }
+        
         // Cache the permissions
         try {
           localStorage.setItem(`permissions_${user.id}`, JSON.stringify(userPermissions));
@@ -111,7 +142,18 @@ export function useUserPermissions() {
     // Admin users have all permissions
     if (user?.role === 'admin') return true;
     
-    return permissions.includes(permissionName);
+    const hasIt = permissions.includes(permissionName);
+    
+    // Debug logging for Basic Staff users
+    if (permissionGroups?.some(g => g.name.toLowerCase().includes('basic'))) {
+      console.log(`hasPermission('${permissionName}'): ${hasIt}`, {
+        userPermissions: permissions,
+        userRole: user?.role,
+        permissionGroups: permissionGroups
+      });
+    }
+    
+    return hasIt;
   };
 
   /**
@@ -121,7 +163,19 @@ export function useUserPermissions() {
     // Admin users have all permissions
     if (user?.role === 'admin') return true;
     
-    return permissionNames.some(name => permissions.includes(name));
+    const hasAny = permissionNames.some(name => permissions.includes(name));
+    
+    // Debug logging for Basic Staff users
+    if (permissionGroups?.some(g => g.name.toLowerCase().includes('basic'))) {
+      console.log(`hasAnyPermission([${permissionNames.join(', ')}]): ${hasAny}`, {
+        userPermissions: permissions,
+        userRole: user?.role,
+        permissionGroups: permissionGroups,
+        matchingPermissions: permissionNames.filter(name => permissions.includes(name))
+      });
+    }
+    
+    return hasAny;
   };
 
   /**

@@ -292,6 +292,14 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
           </div>
         );
       
+      case "emergency_phone":
+        return (
+          <div className="space-y-2">
+            <Label>{displayLabel}</Label>
+            <Input type="tel" placeholder={config.placeholder} disabled />
+          </div>
+        );
+      
       case "date":
         return (
           <div className="space-y-2">
@@ -382,6 +390,16 @@ export function FormViewer({ open, onOpenChange, formId }: FormViewerProps) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+        );
+
+      case "info":
+        return (
+          <div className="space-y-1">
+            <Label>{displayLabel}</Label>
+            <div className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line">
+              {(config as any)?.text || ''}
+            </div>
           </div>
         );
       

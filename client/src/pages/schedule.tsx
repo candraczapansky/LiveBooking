@@ -9,10 +9,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Search, ChevronRight, User, Plus } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthProvider";
+import { useUserPermissions } from "@/hooks/use-user-permissions";
 
 type StaffMember = {
   id: number;
   title: string;
+  userId?: number;
   user?: {
     firstName?: string;
     lastName?: string;
@@ -23,10 +26,46 @@ const SchedulePage = () => {
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
   const [searchQuery, setSearchQuery] = useState("");
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const { hasPermission } = useUserPermissions();
+
+  // Check if user can only view their own schedule
+  const canViewOwnScheduleOnly = hasPermission('view_own_schedule') && !hasPermission('view_schedules');
+  const canViewAllSchedules = hasPermission('view_schedules');
+
+  // Debug logging
+  console.log('Schedule Page Debug:', {
+    user: user,
+    userKeys: user ? Object.keys(user) : [],
+    canViewOwnScheduleOnly,
+    canViewAllSchedules,
+    hasViewOwnSchedule: hasPermission('view_own_schedule'),
+    hasViewSchedules: hasPermission('view_schedules'),
+    userStaffId: user?.staffId,
+    userId: user?.id
+  });
 
   // Fetch staff for display
-  const { data: staff = [], isLoading } = useQuery<StaffMember[]>({
+  const { data: allStaff = [], isLoading } = useQuery<StaffMember[]>({
     queryKey: ['/api/staff'],
+  });
+
+  // Filter staff based on permissions
+  // For users who can only view their own schedule, find their staff record by userId
+  const staff = canViewOwnScheduleOnly && user?.id 
+    ? allStaff.filter(staffMember => staffMember.userId === user.id)
+    : allStaff;
+
+  console.log('Schedule Page Staff Filter:', {
+    allStaffCount: allStaff.length,
+    filteredStaffCount: staff.length,
+    userId: user?.id,
+    canViewOwnScheduleOnly,
+    sampleStaff: allStaff.slice(0, 2), // Show first 2 staff members to see structure
+    filteredStaff: staff, // Show the filtered staff members
+    // Debug the filtering logic
+    staffWithUserId: allStaff.filter(s => s.userId === user?.id),
+    allStaffUserIds: allStaff.map(s => ({ id: s.id, userId: s.userId, title: s.title }))
   });
 
   // Fetch schedules to show count per staff member
@@ -68,12 +107,14 @@ const SchedulePage = () => {
     return 'US';
   };
 
-  // Filter staff based on search
-  const filteredStaff = staff.filter((staffMember: StaffMember) => {
-    const name = getStaffName(staffMember).toLowerCase();
-    const title = staffMember.title.toLowerCase();
-    return name.includes(searchQuery.toLowerCase()) || title.includes(searchQuery.toLowerCase());
-  });
+  // Filter staff based on search (only if user can view multiple staff)
+  const filteredStaff = canViewAllSchedules 
+    ? staff.filter((staffMember: StaffMember) => {
+        const name = getStaffName(staffMember).toLowerCase();
+        const title = staffMember.title.toLowerCase();
+        return name.includes(searchQuery.toLowerCase()) || title.includes(searchQuery.toLowerCase());
+      })
+    : staff; // For own schedule only, no need to filter by search
 
   const handleStaffClick = (staffId: number) => {
     setLocation(`/staff-schedule/${staffId}`);
@@ -89,35 +130,42 @@ const SchedulePage = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                                      <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                    Staff Working Hours
-                  </h1>
-                  <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
-                    Click on a staff member to set their working days and hours
-                  </p>
+                    <h1 className="text-lg lg:text-2xl font-bold text-gray-900 dark:text-gray-100">
+                      {canViewOwnScheduleOnly ? 'My Working Hours' : 'Staff Working Hours'}
+                    </h1>
+                    <p className="text-xs lg:text-sm text-gray-600 dark:text-gray-400">
+                      {canViewOwnScheduleOnly 
+                        ? 'View and manage your working days and hours'
+                        : 'Click on a staff member to set their working days and hours'
+                      }
+                    </p>
                   </div>
-                  <Button 
-                    onClick={() => setLocation('/staff-schedule')}
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Calendar className="h-4 w-4" />
-                    <span className="ml-1 hidden sm:inline">Manage All</span>
-                  </Button>
+                  {canViewAllSchedules && (
+                    <Button 
+                      onClick={() => setLocation('/staff-schedule')}
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <Calendar className="h-4 w-4" />
+                      <span className="ml-1 hidden sm:inline">Manage All</span>
+                    </Button>
+                  )}
                 </div>
                 
-                <div className="w-full">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
-                    <Input
-                      type="search"
-                      placeholder="Search staff by name..."
-                      className="pl-10 w-full min-h-[44px]"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                {canViewAllSchedules && (
+                  <div className="w-full">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400" />
+                      <Input
+                        type="search"
+                        placeholder="Search staff by name..."
+                        className="pl-10 w-full min-h-[44px]"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
             
@@ -129,11 +177,15 @@ const SchedulePage = () => {
             ) : filteredStaff?.length === 0 ? (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 <Calendar className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">No staff members found</h3>
+                <h3 className="text-lg font-medium mb-2">
+                  {canViewOwnScheduleOnly ? 'No schedule found' : 'No staff members found'}
+                </h3>
                 <p className="text-muted-foreground mb-4">
-                  {staff.length === 0 
-                    ? "Add staff members to manage their schedules." 
-                    : "No staff members match your search criteria."
+                  {canViewOwnScheduleOnly 
+                    ? "You don't have a schedule set up yet. Contact your manager to set up your working hours."
+                    : staff.length === 0 
+                      ? "Add staff members to manage their schedules." 
+                      : "No staff members match your search criteria."
                   }
                 </p>
               </div>
