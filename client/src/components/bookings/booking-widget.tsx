@@ -87,7 +87,7 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Location", "Service", "Staff", "Time", "Details"];
+const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
 
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
@@ -97,8 +97,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
-  const [showSaveCard, setShowSaveCard] = useState(false);
-  const [savedCard, setSavedCard] = useState<any | null>(null);
+  const [showSaveCardModal, setShowSaveCardModal] = useState(false);
+  const [isProcessingBooking, setIsProcessingBooking] = useState(false);
+  const [bookingData, setBookingData] = useState<BookingFormValues | null>(null);
+  const [savedCardInfo, setSavedCardInfo] = useState<any | null>(null);
+  const [createdClientId, setCreatedClientId] = useState<number | null>(null);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -122,7 +125,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       const res = await apiRequest('GET', '/api/service-categories');
       return res.json();
     },
-    enabled: open
+    enabled: open,
+    retry: 2,
+    retryDelay: 1000
   });
 
   const selectedLocationId = form.watch('locationId');
@@ -151,7 +156,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     enabled: open,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 0
+    staleTime: 0,
+    retry: 2,
+    retryDelay: 1000
   });
 
   // Fetch schedules for the selected location to detect which staff actually work there
@@ -165,7 +172,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     enabled: open,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 0
+    staleTime: 0,
+    retry: 2,
+    retryDelay: 1000
   });
 
   // Fetch appointments for the selected location to prevent double-booking
@@ -179,7 +188,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     enabled: open,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
-    staleTime: 0
+    staleTime: 0,
+    retry: 2,
+    retryDelay: 1000
   });
 
   // Force-refresh staff/schedules/appointments when entering Staff (2) or Time (3) steps
@@ -296,13 +307,15 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   const isPreparingServices = isLoadingCategories || isLoadingStaff || isLoadingSchedules || isLoadingServices || isLoadingLocationServices;
 
-  const { data: locations } = useQuery({
+  const { data: locations, isLoading: isLoadingLocations } = useQuery({
     queryKey: ['/api/locations'],
     queryFn: async () => {
       const res = await apiRequest('GET', '/api/locations');
       return res.json();
     },
-    enabled: open
+    enabled: open,
+    retry: 2,
+    retryDelay: 1000
   });
 
   // Get user details if logged in
@@ -635,10 +648,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         const next = Math.min(currentStep + 1, steps.length - 1);
         setCurrentStep(next);
         if (next === steps.length - 1) {
-          // On entering final step, prompt to save a card if logged-in user present
-          if (userId && !savedCard) {
-            setShowSaveCard(true);
-          }
+          // On entering save card step, prepare booking data
+          const values = form.getValues();
+          setBookingData(values);
         }
       }
     });
@@ -648,9 +660,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const handleSubmit = async (values: BookingFormValues) => {
+  const createAppointmentAfterPayment = async (values: BookingFormValues) => {
     try {
-      // In a real app, this would create a new appointment
       const date = new Date(values.date);
       const [hours, minutes] = values.time.split(':').map(Number);
       date.setHours(hours, minutes);
@@ -709,36 +720,130 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         staffIdToUse = parseInt(values.staffId);
       }
 
+      // Use existing userId, createdClientId, or find/create client
+      let clientId = userId || createdClientId;
+      if (!clientId) {
+        // This shouldn't happen as we create client before showing save card modal
+        // But just in case, try to find existing client by email
+        const clientsRes = await apiRequest("GET", `/api/clients?email=${encodeURIComponent(values.email)}`);
+        const clients = await clientsRes.json();
+        
+        if (clients && clients.length > 0) {
+          clientId = clients[0].id;
+        } else {
+          // Create new client
+          const newClientRes = await apiRequest("POST", "/api/clients", {
+            firstName: values.firstName,
+            lastName: values.lastName,
+            email: values.email,
+            phone: values.phone,
+            role: 'client'
+          });
+          const newClient = await newClientRes.json();
+          clientId = newClient.id;
+        }
+      }
+
       const appointmentData = {
-        clientId: userId || 1, // Use the logged-in user or default to 1 for demo
+        clientId: clientId,
         serviceId: parseInt(values.serviceId),
         staffId: Number(staffIdToUse),
         startTime: date.toISOString(),
         endTime: endTime.toISOString(),
-        status: "pending",
-        notes: values.notes
+        status: "confirmed",
+        paymentStatus: "unpaid",  // Not paid yet, just card on file
+        notes: values.notes,
+        locationId: parseInt(values.locationId),
+        totalAmount: selectedService?.price || 0
       };
       
-      await apiRequest("POST", "/api/appointments", appointmentData);
+      const appointmentRes = await apiRequest("POST", "/api/appointments", appointmentData);
+      const appointment = await appointmentRes.json();
       
-      toast({
-        title: "Booking Successful",
-        description: "Your appointment has been booked. You will receive a confirmation shortly.",
-      });
-      
-      // Reset and close
-      form.reset();
-      setCurrentStep(0);
-      onOpenChange(false);
-      
+      return appointment;
     } catch (error: any) {
-      toast({
-        title: "Booking Failed",
-        description: error.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
+      throw error;
     }
   };
+
+  const handleSubmit = async () => {
+    // Show save card modal or complete booking
+    if (currentStep === steps.length - 1 && bookingData) {
+      if (!savedCardInfo) {
+        // Need to create client first if not logged in
+        if (!userId && !createdClientId) {
+          try {
+            setIsProcessingBooking(true);
+            
+            // Try to find existing client by email
+            const clientsRes = await apiRequest("GET", `/api/clients?email=${encodeURIComponent(bookingData.email)}`);
+            const clients = await clientsRes.json();
+            
+            let clientId: number;
+            if (clients && clients.length > 0) {
+              clientId = clients[0].id;
+            } else {
+              // Create new client
+              const newClientRes = await apiRequest("POST", "/api/clients", {
+                firstName: bookingData.firstName,
+                lastName: bookingData.lastName,
+                email: bookingData.email,
+                phone: bookingData.phone,
+                role: 'client'
+              });
+              const newClient = await newClientRes.json();
+              clientId = newClient.id;
+            }
+            
+            setCreatedClientId(clientId);
+            setIsProcessingBooking(false);
+            
+            // Now show save card modal
+            setShowSaveCardModal(true);
+          } catch (error: any) {
+            setIsProcessingBooking(false);
+            toast({
+              title: "Error",
+              description: "Failed to create client profile. Please try again.",
+              variant: "destructive",
+            });
+          }
+        } else {
+          // Client exists, show save card modal
+          setShowSaveCardModal(true);
+        }
+      } else {
+        // Card already saved, create appointment
+        try {
+          setIsProcessingBooking(true);
+          const appointment = await createAppointmentAfterPayment(bookingData);
+          
+          toast({
+            title: "Booking Successful",
+            description: "Your appointment has been booked. Payment will be collected after your service.",
+          });
+          
+          // Reset and close
+          form.reset();
+          setCurrentStep(0);
+          setBookingData(null);
+          setSavedCardInfo(null);
+          setCreatedClientId(null);
+          onOpenChange(false);
+        } catch (error: any) {
+          toast({
+            title: "Booking Failed",
+            description: error.message || "Failed to create appointment. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsProcessingBooking(false);
+        }
+      }
+    }
+  };
+
+
 
   return (
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
@@ -782,38 +887,51 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {currentStep === 0 && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Location</h3>
-                <FormField
-                  control={form.control}
-                  name="locationId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Select onValueChange={(v) => {
-                          // Reset downstream selections when location changes
-                          field.onChange(v);
-                          form.setValue('serviceId', "");
-                          form.setValue('staffId', "");
-                        }} value={field.value}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Choose a location" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {locations?.map((loc: any) => (
-                              <SelectItem key={loc.id} value={String(loc.id)}>
-                                <div className="flex items-center gap-2">
-                                  <MapPin className="h-4 w-4" />
-                                  <span>{loc.name}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {isLoadingLocations ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                    <span className="ml-2 text-gray-500">Loading locations...</span>
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="locationId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={(v) => {
+                            // Reset downstream selections when location changes
+                            field.onChange(v);
+                            form.setValue('serviceId', "");
+                            form.setValue('staffId', "");
+                          }} value={field.value}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Choose a location" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {!locations || locations.length === 0 ? (
+                                <SelectItem value="no-locations" disabled>
+                                  No locations available
+                                </SelectItem>
+                              ) : (
+                                locations.map((loc: any) => (
+                                <SelectItem key={loc.id} value={String(loc.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4" />
+                                    <span>{loc.name}</span>
+                                  </div>
+                                </SelectItem>
+                              ))
+                              )}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             )}
 
@@ -836,7 +954,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                   )}
                 </div>
 
-                {isPreparingServices && (
+                {/* Loading indicator for services at location */}
+                {selectedLocationId && isPreparingServices && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Loading available services…</span>
@@ -845,7 +964,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 
                 {/* Service Categories */}
                 <div className="flex overflow-x-auto space-x-2 py-2">
-                  {isPreparingServices ? (
+                  {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
                       <Skeleton className="h-8 w-24 rounded-full" />
@@ -1214,6 +1333,62 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 )}
               </div>
             )}
+            
+            {/* Step 6: Save Card */}
+            {currentStep === 5 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Save Payment Method</h3>
+                
+                {/* Booking summary */}
+                {selectedService && (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h4 className="font-medium mb-3">Booking Summary</h4>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Service:</span>
+                          <span className="font-medium">{selectedService.name}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Date:</span>
+                          <span className="font-medium">{format(form.watch('date'), "PPP")}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Time:</span>
+                          <span className="font-medium">
+                            {timeSlots.find(slot => slot.value === form.watch('time'))?.label || form.watch('time')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Duration:</span>
+                          <span className="font-medium">{formatDuration(selectedService.duration)}</span>
+                        </div>
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex justify-between">
+                            <span className="font-medium">Service Price:</span>
+                            <span className="font-bold text-lg">{formatPrice(selectedService.price)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    <strong>No payment required now!</strong> We'll securely save your card on file for easy checkout after your appointment. You will only be charged after your service is completed.
+                  </p>
+                </div>
+                
+                {savedCardInfo && (
+                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      Card saved: {savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.cardLast4 || '****'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         </Form>
         
@@ -1233,20 +1408,72 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               Next
             </Button>
           ) : (
-            <Button type="button" onClick={form.handleSubmit(handleSubmit)}>
-              Book Appointment
+            <Button 
+              type="button" 
+              onClick={() => {
+                if (currentStep === steps.length - 2) {
+                  // Validate details before moving to payment
+                  form.handleSubmit((values) => {
+                    setBookingData(values);
+                    setCurrentStep(steps.length - 1);
+                  })();
+                } else if (currentStep === steps.length - 1) {
+                  // Save card and complete booking
+                  handleSubmit();
+                }
+              }}
+              disabled={isProcessingBooking}
+            >
+              {isProcessingBooking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                currentStep === steps.length - 2 ? "Save Card & Book" : (savedCardInfo ? "Complete Booking" : "Save Card")
+              )}
             </Button>
           )}
         </DialogFooter>
 
-        {userId && (
+        {showSaveCardModal && bookingData && (
           <SaveCardModal
-            open={showSaveCard}
-            onOpenChange={setShowSaveCard}
-            clientId={userId}
-            customerEmail={form.watch('email') || undefined}
-            customerName={`${form.watch('firstName') || ''} ${form.watch('lastName') || ''}`.trim() || undefined}
-            onSaved={(pm) => setSavedCard(pm)}
+            open={showSaveCardModal}
+            onOpenChange={setShowSaveCardModal}
+            clientId={userId || createdClientId || 0}  // Use existing user or previously created client
+            customerEmail={bookingData.email || undefined}
+            customerName={`${bookingData.firstName || ''} ${bookingData.lastName || ''}`.trim() || undefined}
+            onSaved={async (cardInfo) => {
+              setSavedCardInfo(cardInfo);
+              setShowSaveCardModal(false);
+              
+              // Now create the appointment with card on file
+              try {
+                setIsProcessingBooking(true);
+                const appointment = await createAppointmentAfterPayment(bookingData);
+                
+                toast({
+                  title: "Booking Successful",
+                  description: "Your appointment has been booked and card saved. Payment will be collected after your service.",
+                });
+                
+                // Reset and close
+                form.reset();
+                setCurrentStep(0);
+                setBookingData(null);
+                setSavedCardInfo(null);
+                setCreatedClientId(null);
+                onOpenChange(false);
+              } catch (error: any) {
+                toast({
+                  title: "Booking Failed",
+                  description: error.message || "Failed to create appointment. Please try again.",
+                  variant: "destructive",
+                });
+              } finally {
+                setIsProcessingBooking(false);
+              }
+            }}
           />
         )}
       </DialogContent>

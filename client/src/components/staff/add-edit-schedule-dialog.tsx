@@ -53,9 +53,10 @@ interface AddEditScheduleDialogProps {
   schedule?: any;
   defaultStaffId?: number;
   onSuccess?: () => void;
+  initialValues?: Partial<z.infer<typeof formSchema> & { dayOfWeek?: string }>;
 }
 
-export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId, onSuccess }: AddEditScheduleDialogProps) {
+export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId, onSuccess, initialValues }: AddEditScheduleDialogProps) {
   const queryClient = useQueryClient();
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const { toast } = useToast();
@@ -77,17 +78,24 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: useMemo(() => ({
-      staffId: schedule?.staffId?.toString() || defaultStaffId?.toString() || "",
-      daysOfWeek: schedule?.dayOfWeek ? [schedule.dayOfWeek] : [],
-      startTime: schedule?.startTime || "09:00",
-      endTime: schedule?.endTime || "17:00",
-      locationId: schedule?.locationId?.toString() || "",
-      serviceCategories: schedule?.serviceCategories || [],
-      startDate: schedule?.startDate || format(new Date(), 'yyyy-MM-dd'),
-      endDate: schedule?.endDate || "",
-      isBlocked: schedule?.isBlocked || false,
-    }), [schedule, defaultStaffId]),
+    defaultValues: useMemo(() => {
+      const iv: any = initialValues || {};
+      const ivStaffId = iv.staffId != null ? String(iv.staffId) : "";
+      const ivLocationId = iv.locationId != null ? String(iv.locationId) : "";
+      const daysFromSchedule = schedule?.dayOfWeek ? [schedule.dayOfWeek] : undefined;
+      const daysFromIv = Array.isArray(iv.daysOfWeek) ? iv.daysOfWeek : undefined;
+      return {
+        staffId: schedule?.staffId?.toString() || ivStaffId || defaultStaffId?.toString() || "",
+        daysOfWeek: daysFromSchedule || daysFromIv || [],
+        startTime: schedule?.startTime || iv.startTime || "09:00",
+        endTime: schedule?.endTime || iv.endTime || "17:00",
+        locationId: schedule?.locationId?.toString() || ivLocationId || "",
+        serviceCategories: schedule?.serviceCategories || iv.serviceCategories || [],
+        startDate: schedule?.startDate || iv.startDate || format(new Date(), 'yyyy-MM-dd'),
+        endDate: schedule?.endDate || iv.endDate || "",
+        isBlocked: (schedule?.isBlocked ?? (iv.isBlocked ?? false)) as boolean,
+      };
+    }, [schedule, defaultStaffId, initialValues]),
   });
 
   // Watch selected staff and location to filter available categories by location and staff capabilities

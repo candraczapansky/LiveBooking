@@ -1,10 +1,11 @@
-import { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect, Suspense, lazy, useMemo } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
 import { useLocation } from "@/contexts/LocationContext";
+import { useLocation as useWouterLocation } from "wouter";
 import { useSidebar } from "@/contexts/SidebarContext";
 import { apiRequest } from "@/lib/queryClient";
 const AppointmentForm = lazy(() => import("@/components/appointments/appointment-form"));
@@ -28,6 +29,19 @@ const AppointmentsPage = () => {
 
   const { selectedLocation } = useLocation();
   const { isOpen: isSidebarOpen, isMobile: isSidebarMobile } = useSidebar();
+  const [pathname] = useWouterLocation();
+
+  // Redirect when accessing the internal Client Booking page (/booking-test)
+  useEffect(() => {
+    if (pathname === "/booking-test") {
+      const externalBookingUrl = "https://a18c597c-e649-4788-842b-cc4c1c0f11dc-00-31r6my1r6s9ka.picard.replit.dev/booking";
+      try {
+        window.location.replace(externalBookingUrl);
+      } catch {
+        window.location.href = externalBookingUrl;
+      }
+    }
+  }, [pathname]);
   
   // State
   // Note: Calendar starts on daily view by default, showing all staff per location
@@ -52,10 +66,20 @@ const AppointmentsPage = () => {
   const [quickDate, setQuickDate] = useState<string | null>(null);
   const [repeatWeekly, setRepeatWeekly] = useState<boolean>(false);
   const [repeatEndDate, setRepeatEndDate] = useState<string>("");
+  // Add Block flow prefill values
+  const [blockInitialValues, setBlockInitialValues] = useState<any | null>(null);
+  const [defaultBlockStaffId, setDefaultBlockStaffId] = useState<number | undefined>(undefined);
+  // Simple Add Block dialog state
+  const [isSimpleBlockOpen, setIsSimpleBlockOpen] = useState(false);
+  const [sbStaffId, setSbStaffId] = useState<string>("");
+  const [sbDate, setSbDate] = useState<string>("");
+  const [sbStartTime, setSbStartTime] = useState<string>("09:00");
+  const [sbEndTime, setSbEndTime] = useState<string>("10:00");
+  const [sbError, setSbError] = useState<string>("");
   // Calendar color controls
   const [availableColor, setAvailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('availableColor')) || '#dbeafe');
   const [unavailableColor, setUnavailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('unavailableColor')) || '#e5e7eb');
-  const [blockedColor, setBlockedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('blockedColor')) || '#e5e7eb');
+  const [blockedColor, setBlockedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('blockedColor')) || '#fca5a5');
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -86,6 +110,8 @@ const AppointmentsPage = () => {
     refetchOnWindowFocus: true,
     staleTime: 0, // Always consider data stale
   });
+
+  
 
   const { data: services = [] } = useQuery({
     queryKey: ['/api/services', selectedLocation?.id],
@@ -122,6 +148,23 @@ const AppointmentsPage = () => {
     refetchOnWindowFocus: true,
     staleTime: 0, // Always consider data stale
   });
+
+  // Staff eligible for current location (must have at least one schedule at this location)
+  const locationStaffOptions = useMemo(() => {
+    try {
+      if (!Array.isArray(staff) || !Array.isArray(schedules)) return [] as any[];
+      if (!selectedLocation?.id) return staff as any[];
+      const locId = selectedLocation.id;
+      const staffIdsWithSchedules = new Set<number>((schedules as any[])
+        .filter((sch: any) => sch && sch.locationId === locId)
+        .map((sch: any) => Number(sch.staffId))
+        .filter((id: number) => Number.isFinite(id))
+      );
+      return (staff as any[]).filter((s: any) => staffIdsWithSchedules.has(Number(s.id)));
+    } catch {
+      return staff as any[];
+    }
+  }, [staff, schedules, selectedLocation?.id]);
 
   // Debug: Log schedules when they change
   useEffect(() => {
@@ -494,6 +537,57 @@ const AppointmentsPage = () => {
     setSelectedAppointmentId(null);
     setIsFormOpen(true);
   };
+
+  const handleAddBlock = () => {
+    try {
+      const base = selectedDate || new Date();
+      const start = new Date(base);
+      start.setSeconds(0, 0);
+      const end = new Date(start.getTime() + 60 * 60 * 1000);
+      const pad = (n: number) => String(n).padStart(2, '0');
+      setSbStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
+      setSbEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
+      setSbDate(start.toISOString().slice(0, 10));
+      if (selectedStaffFilter !== 'all') {
+        // Only prefill if the selected staff is eligible for this location
+        const n = Number(selectedStaffFilter);
+        const eligible = locationStaffOptions.some((s: any) => Number(s.id) === n);
+        setSbStaffId(eligible ? String(n) : "");
+      } else {
+        setSbStaffId("");
+      }
+      setSbError("");
+      setIsSimpleBlockOpen(true);
+    } catch (e) {
+      console.warn('Error preparing Add Block dialog:', e);
+    }
+  };
+
+  const createSimpleBlockMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const response = await apiRequest("POST", "/api/schedules", payload);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || 'Failed to create block');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      try {
+        queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+        queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+      } catch {}
+      try {
+        window.dispatchEvent(new CustomEvent('schedule-updated'));
+      } catch {}
+      setIsSimpleBlockOpen(false);
+    },
+    onError: (error) => {
+      try {
+        setSbError(error instanceof Error ? error.message : 'Failed to create block');
+      } catch {}
+    }
+  });
 
   // New: handle slot selection from calendar
   const handleSelectSlot = (slotInfo: any) => {
@@ -891,18 +985,47 @@ const AppointmentsPage = () => {
 
       staffToInclude.forEach((s: any) => {
         days.forEach((date) => {
-          const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-          (schedules as any[]).filter((sch: any) => {
-            if (!sch || sch.staffId !== s.id || sch.dayOfWeek !== dayName) return false;
-            if (selectedLocation?.id && sch.locationId !== selectedLocation.id) return false;
+          try {
+            const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
             const todayString = date.toISOString().slice(0, 10);
-            const startDateString = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
-            const endDateString = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : null;
-            return startDateString <= todayString && (!endDateString || endDateString >= todayString);
-          });
 
-          // Disable redundant clickable blocked overlays to avoid duplicate blocks on the calendar
-          // Background masks for blocked times are still rendered elsewhere for visual indication.
+            const todaysBlocked = (schedules as any[]).filter((sch: any) => {
+              if (!sch || !sch.isBlocked) return false;
+              if (sch.staffId !== s.id || sch.dayOfWeek !== dayName) return false;
+              if (selectedLocation?.id && sch.locationId != null && sch.locationId !== selectedLocation.id) return false;
+              const startDateString = typeof sch.startDate === 'string' ? sch.startDate : new Date(sch.startDate).toISOString().slice(0, 10);
+              const endDateString = sch.endDate ? (typeof sch.endDate === 'string' ? sch.endDate : new Date(sch.endDate).toISOString().slice(0, 10)) : null;
+              return startDateString <= todayString && (!endDateString || endDateString >= todayString);
+            });
+
+            todaysBlocked.forEach((sch: any) => {
+              try {
+                if (!sch.startTime || !sch.endTime) return;
+                const [startHour, startMinute] = String(sch.startTime).split(':').map(Number);
+                const [endHour, endMinute] = String(sch.endTime).split(':').map(Number);
+                if ([startHour, startMinute, endHour, endMinute].some((n) => isNaN(n))) return;
+                const start = setMinutes(setHours(startOfDay(date), startHour), startMinute);
+                const end = setMinutes(setHours(startOfDay(date), endHour), endMinute);
+                if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+
+                // Clickable overlay event
+                events.push({
+                  id: `blocked-${sch.id}-${todayString}`,
+                  title: 'Blocked',
+                  start,
+                  end,
+                  resourceId: s.id,
+                  allDay: false,
+                  type: 'blocked',
+                  resource: sch,
+                });
+              } catch (e) {
+                console.warn('Error creating blocked event:', e);
+              }
+            });
+          } catch (e) {
+            console.warn('Error processing blocked events for staff/day:', e);
+          }
         });
       });
 
@@ -1285,10 +1408,20 @@ const AppointmentsPage = () => {
                     Manage and view all client appointments
                   </p>
                 </div>
-                <Button onClick={handleAddAppointment} className="flex items-center gap-2 w-full sm:w-auto min-h-[44px]">
-                  <Plus className="h-4 w-4" />
-                  New Appointment
-                </Button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Button onClick={handleAddAppointment} className="flex items-center gap-2 min-h-[44px]">
+                    <Plus className="h-4 w-4" />
+                    New Appointment
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-[44px]"
+                    onClick={handleAddBlock}
+                  >
+                    Add Block
+                  </Button>
+                </div>
               </div>
 
               {/* Appointments Calendar */}
@@ -1431,7 +1564,7 @@ const AppointmentsPage = () => {
                     >
                       <BigCalendar
                         key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}`}
-                        blockedColor={(localStorage.getItem('blockedColor') || '#e5e7eb') as string}
+                        blockedColor={blockedColor}
                         unavailableColor={unavailableColor}
                         availableColor={availableColor}
                         events={(() => {
@@ -1632,17 +1765,105 @@ const AppointmentsPage = () => {
             setIsScheduleDialogOpen(open);
             if (!open) {
               setEditingSchedule(null);
+              setBlockInitialValues(null);
+              setDefaultBlockStaffId(undefined);
             }
           }}
           schedule={editingSchedule || undefined}
+          defaultStaffId={defaultBlockStaffId}
+          initialValues={blockInitialValues || undefined}
           onSuccess={() => {
             try {
               queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
               queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
             } catch {}
+            setBlockInitialValues(null);
+            setDefaultBlockStaffId(undefined);
           }}
         />
       </Suspense>
+
+      {/* Simple Add Block Dialog */}
+      <Dialog open={isSimpleBlockOpen} onOpenChange={(open) => {
+        setIsSimpleBlockOpen(open);
+        if (!open) {
+          setSbError("");
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Block</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium">Staff</label>
+                <Select value={sbStaffId} onValueChange={setSbStaffId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select staff" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locationStaffOptions?.map((s: any) => (
+                      <SelectItem key={s.id} value={String(s.id)}>
+                        {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Date</label>
+                <Input type="date" value={sbDate} onChange={(e) => setSbDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Start Time</label>
+                <Input type="time" value={sbStartTime} onChange={(e) => setSbStartTime(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium">End Time</label>
+                <Input type="time" value={sbEndTime} onChange={(e) => setSbEndTime(e.target.value)} />
+              </div>
+            </div>
+            {sbError && (
+              <div className="text-red-600 text-sm">{sbError}</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSimpleBlockOpen(false)}>Cancel</Button>
+            <Button onClick={() => {
+              setSbError("");
+              const toMinutes = (t: string) => {
+                const [h,m] = String(t).split(":").map((n) => parseInt(n, 10));
+                return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+              };
+              if (!sbStaffId) { setSbError('Please select a staff member.'); return; }
+              if (!sbDate) { setSbError('Please select a date.'); return; }
+              if (!sbStartTime || !sbEndTime) { setSbError('Please select start and end times.'); return; }
+              if (toMinutes(sbEndTime) <= toMinutes(sbStartTime)) { setSbError('End time must be after start time.'); return; }
+
+              try {
+                const [yy, mm, dd] = sbDate.split('-').map((n) => parseInt(n, 10));
+                const d = new Date(yy, (mm || 1) - 1, dd || 1);
+                const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
+                const payload = {
+                  staffId: parseInt(sbStaffId, 10),
+                  dayOfWeek,
+                  startTime: sbStartTime,
+                  endTime: sbEndTime,
+                  locationId: selectedLocation?.id ?? null,
+                  startDate: sbDate,
+                  endDate: sbDate,
+                  isBlocked: true,
+                  serviceCategories: [],
+                };
+                createSimpleBlockMutation.mutate(payload);
+              } catch (e) {
+                setSbError('Failed to create block.');
+              }
+            }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quick Edit/Delete for Blocked Time */}
       <Dialog open={isQuickBlockedOpen} onOpenChange={(open) => {

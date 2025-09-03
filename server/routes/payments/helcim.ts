@@ -75,7 +75,9 @@ router.post('/initialize', async (req, res) => {
     res.json({ 
       success: true, 
       token: result.data.checkoutToken,
-      secretToken: result.data.secretToken  // Include the secretToken as per Helcim docs
+      secretToken: result.data.secretToken,  // Include the secretToken as per Helcim docs
+      // Include any other fields that might be needed
+      data: result.data
     });
   } catch (error: any) {
     console.error('Helcim initialize exception:', error);
@@ -175,13 +177,16 @@ router.post('/create-customer', async (req: Request, res: Response) => {
 // Save card on file for a client via HelcimPay.js token; persist minimal card meta in DB
 router.post('/save-card', async (req: Request, res: Response) => {
   try {
-    const { token, customerId, customerEmail, customerName } = req.body || {};
+    const { token, customerId, clientId, customerEmail, customerName } = req.body || {};
     if (!token) {
       return res.status(400).json({ success: false, message: 'token is required' });
     }
 
+    // Support both customerId (legacy) and clientId (from booking widget)
     let helcimCustomerId: string | null = customerId || null;
-    if (!helcimCustomerId) {
+    
+    // If we have a clientId but no helcimCustomerId, we need to create a Helcim customer
+    if (!helcimCustomerId && (clientId || customerEmail)) {
       // Attempt to create a customer with provided info
       const firstName = (customerName || '').split(' ')[0] || undefined;
       const lastName = (customerName || '').split(' ').slice(1).join(' ') || undefined;
@@ -196,6 +201,10 @@ router.post('/save-card', async (req: Request, res: Response) => {
       if (!helcimCustomerId) {
         return res.status(502).json({ success: false, message: 'Failed to create Helcim customer' });
       }
+    }
+    
+    if (!helcimCustomerId) {
+      return res.status(400).json({ success: false, message: 'Unable to determine customer for card save' });
     }
 
     const mod2 = await import('../../services/helcim-service.js');
