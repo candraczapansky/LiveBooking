@@ -28,28 +28,33 @@ export default function SaveCardModal({
 
   // Ensure Helcim scripts exist
   const ensureScripts = useCallback(() => {
-    const hasStart = Array.from(document.scripts).some((s) => s.src.includes("helcim-pay/services/start.js"));
-    if (!hasStart) {
+    console.log("[SaveCardModal] Checking for Helcim scripts...");
+    
+    // Check for Helcim Pay.js v2 script
+    const hasV2 = Array.from(document.scripts).some((s) => s.src.includes("helcim-pay/services/start.js"));
+    if (!hasV2) {
+      console.log("[SaveCardModal] Adding Helcim Pay.js v2 script...");
       const s = document.createElement("script");
       s.type = "text/javascript";
       s.src = "https://secure.helcim.app/helcim-pay/services/start.js";
+      s.onload = () => console.log("[SaveCardModal] Helcim Pay.js v2 script loaded");
+      s.onerror = (e) => console.error("[SaveCardModal] Failed to load Helcim Pay.js v2:", e);
       document.body.appendChild(s);
-    }
-    const hasLegacy = Array.from(document.scripts).some((s) => s.src.includes("js/helcim.js"));
-    if (!hasLegacy) {
-      const s2 = document.createElement("script");
-      s2.type = "text/javascript";
-      s2.src = "https://secure.helcim.app/js/helcim.js";
-      document.body.appendChild(s2);
+    } else {
+      console.log("[SaveCardModal] Helcim Pay.js v2 script already present");
     }
   }, []);
 
   const initializeForm = useCallback(async () => {
     if (isInitialized) return;
     // @ts-ignore - helcimPay injected by script
-    if (!window.helcimPay) return;
+    if (!window.helcimPay) {
+      console.error("[SaveCardModal] helcimPay not available");
+      return;
+    }
     try {
       setIsLoading(true);
+      console.log("[SaveCardModal] Requesting Helcim token...");
       // We only need a session token to render fields; use a minimal amount
       const initRes = await apiRequest("POST", "/api/payments/helcim/initialize", {
         amount: 1,
@@ -58,22 +63,38 @@ export default function SaveCardModal({
         customerName,
       });
       const initData = await initRes.json();
+      console.log("[SaveCardModal] Helcim init response:", initData);
       if (!initRes.ok || !initData?.success || !initData?.token) {
         throw new Error(initData?.message || "Failed to initialize Helcim session");
       }
-      // @ts-ignore
-      await window.helcimPay.initialize({
-        // Account/terminal are optional for Pay.js v2 when using checkout token; include if available
-        accountId: (import.meta as any).env?.VITE_HELCIM_ACCOUNT_ID,
-        terminalId: (import.meta as any).env?.VITE_HELCIM_TERMINAL_ID,
+      
+      console.log("[SaveCardModal] Initializing helcimPay with token...");
+      // Build initialization config
+      const initConfig: any = {
         token: initData.token,
-        test: process.env.NODE_ENV !== "production",
-      });
+        test: true, // Always use test mode for now
+      };
+      
+      // Add secretToken if provided (required for some Helcim configurations)
+      if (initData.secretToken) {
+        initConfig.secretToken = initData.secretToken;
+      }
+      
+      console.log("[SaveCardModal] Init config:", { ...initConfig, token: initConfig.token?.substring(0, 20) + '...' });
+      
       // @ts-ignore
-      window.helcimPay.mount("helcim-save-card-form");
+      const initResult = await window.helcimPay.initialize(initConfig);
+      console.log("[SaveCardModal] helcimPay.initialize result:", initResult);
+      
+      console.log("[SaveCardModal] Mounting form to element...");
+      // @ts-ignore
+      const mountResult = window.helcimPay.mount("helcim-save-card-form");
+      console.log("[SaveCardModal] helcimPay.mount result:", mountResult);
+      
       setIsInitialized(true);
+      console.log("[SaveCardModal] Form initialized successfully");
     } catch (err: any) {
-      console.error("Helcim form init failed:", err);
+      console.error("[SaveCardModal] Helcim form init failed:", err);
       toast({ title: "Unable to load card form", description: err?.message || String(err), variant: "destructive" });
       onOpenChange(false);
     } finally {
@@ -83,12 +104,17 @@ export default function SaveCardModal({
 
   useEffect(() => {
     if (!open) return;
+    console.log("[SaveCardModal] Modal opened, ensuring scripts...");
     ensureScripts();
     const id = setInterval(() => {
       // @ts-ignore
       if (window.helcimPay && !isInitialized) {
+        console.log("[SaveCardModal] helcimPay available, initializing form...");
         clearInterval(id);
         initializeForm();
+      } else if (!window.helcimPay) {
+        // @ts-ignore
+        console.log("[SaveCardModal] Waiting for helcimPay...", { helcimPay: !!window.helcimPay });
       }
     }, 150);
     return () => clearInterval(id);
@@ -118,6 +144,8 @@ export default function SaveCardModal({
       const res = await apiRequest("POST", "/api/payments/helcim/save-card", {
         clientId,
         token,
+        customerEmail,
+        customerName,
       });
       const data = await res.json();
       if (!res.ok || !data?.success) {

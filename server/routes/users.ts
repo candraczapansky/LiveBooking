@@ -40,6 +40,29 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
     }
   });
 
+  // Lightweight lookup: find client(s) by exact email
+  // Used by public booking flow to determine if a profile already exists
+  app.get("/api/clients", async (req, res) => {
+    try {
+      const { email } = req.query as { email?: string };
+      const results: any[] = [];
+
+      if (email && typeof email === "string" && email.trim()) {
+        const user = await storage.getUserByEmail(email.trim());
+        if (user) {
+          const { password, ...safeUser } = user as any;
+          results.push(safeUser);
+        }
+      }
+
+      // Always return an array for compatibility with callers
+      return res.json(results);
+    } catch (error: any) {
+      console.error("Error looking up clients by email:", error);
+      return res.status(500).json({ error: "Failed to lookup clients" });
+    }
+  });
+
   // Create client (admin/staff action)
   app.post("/api/clients", validateBody(insertClientSchema), async (req, res) => {
     try {
