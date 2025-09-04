@@ -377,6 +377,5 @@ export default function createHelcimPaymentsRouter(storage?: any) {
   return router;
 }
 
-export default createHelcimPaymentsRouter;
 
 

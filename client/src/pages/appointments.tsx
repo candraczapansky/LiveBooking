@@ -127,14 +127,7 @@ const AppointmentsPage = () => {
   };
   const { user } = useContext(AuthContext);
 
-  // Clear local overrides on every page load so nothing is pre-selected
-  useEffect(() => {
-    try {
-      localStorage.setItem('arrivedAppointments', '[]');
-      localStorage.setItem('confirmedAppointments', '[]');
-      setCalendarRefreshToken((v) => v + 1);
-    } catch {}
-  }, []);
+  // Note: Do not clear local overrides; persist selections across refresh
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -1911,6 +1904,16 @@ const AppointmentsPage = () => {
                           onClick={(e) => { e.stopPropagation(); }}
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         >
+                          <div className="flex items-center justify-end">
+                            <button
+                              type="button"
+                              aria-label="Close"
+                              className="h-6 w-6 leading-none text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded"
+                              onClick={(e) => { e.stopPropagation(); setCtxMenuOpen(false); }}
+                            >
+                              ×
+                            </button>
+                          </div>
                           {(() => {
                             let isConfirmedLocal = false;
                             let isArrivedMarked = false;
