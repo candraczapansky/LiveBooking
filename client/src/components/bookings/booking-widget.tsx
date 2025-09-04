@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -81,7 +81,7 @@ const bookingSchema = z.object({
   notes: z.string().optional(),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  email: z.string(),
+  email: z.string().email("Please enter a valid email address").min(1, "Email is required"),
   phone: z.string().min(1, "Phone number is required"),
 });
 
@@ -98,11 +98,14 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  // Note: AuthContext removed since we're implementing guest booking
   const [showSaveCardModal, setShowSaveCardModal] = useState(false);
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
   const [bookingData, setBookingData] = useState<BookingFormValues | null>(null);
   const [savedCardInfo, setSavedCardInfo] = useState<any | null>(null);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
+  const [existingClient, setExistingClient] = useState<any | null>(null);
+  const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -702,7 +705,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
   };
 
-  const createAppointmentAfterPayment = async (values: BookingFormValues) => {
+  const createAppointmentAfterPayment = useCallback(async (values: BookingFormValues) => {
     try {
       console.log("[BookingWidget] createAppointmentAfterPayment called with values:", values);
       
@@ -828,12 +831,26 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     } catch (error: any) {
       throw error;
     }
-  };
+  }, [toast, queryClient]);
 
   // Listen for Helcim payment success events from the persistent listener
   useEffect(() => {
     const handleHelcimSuccess = (event: CustomEvent) => {
       console.log("[BookingWidget] 🎉 Received Helcim payment success event:", event.detail);
+      
+      // Update saved card info with the card details from the payment
+      if (event.detail.cardLast4 && event.detail.cardBrand) {
+        setSavedCardInfo({
+          last4: event.detail.cardLast4,
+          brand: event.detail.cardBrand,
+          saved: true,
+          token: event.detail.cardToken
+        });
+        console.log("[BookingWidget] 💳 Updated saved card info:", {
+          last4: event.detail.cardLast4,
+          brand: event.detail.cardBrand
+        });
+      }
       
       // Check if we have booking data to create an appointment
       if (bookingData) {
@@ -875,7 +892,21 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             
             let clientId: number;
             if (clients && clients.length > 0) {
-              clientId = clients[0].id;
+              // Found existing client
+              const existingClientData = clients[0];
+              clientId = existingClientData.id;
+              setExistingClient(existingClientData);
+              
+              // Fetch appointment history for existing client
+              try {
+                const appointmentsRes = await apiRequest("GET", `/api/appointments?clientId=${clientId}`);
+                const appointments = await appointmentsRes.json();
+                setClientAppointmentHistory(appointments || []);
+                console.log("[BookingWidget] Found existing client with appointment history:", appointments.length, "appointments");
+              } catch (error) {
+                console.error("[BookingWidget] Error fetching appointment history:", error);
+                setClientAppointmentHistory([]);
+              }
             } else {
               // Create new client
               const newClientRes = await apiRequest("POST", "/api/clients", {
@@ -887,6 +918,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               });
               const newClient = await newClientRes.json();
               clientId = newClient.id;
+              setExistingClient(null);
+              setClientAppointmentHistory([]);
             }
             
             setCreatedClientId(clientId);
@@ -1377,6 +1410,35 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Your Details</h3>
                 
+                {/* Show appointment history if existing client found */}
+                {existingClient && clientAppointmentHistory.length > 0 && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+                      Welcome back, {existingClient.firstName}! 
+                    </h4>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                      We found your account with {clientAppointmentHistory.length} previous appointment{clientAppointmentHistory.length !== 1 ? 's' : ''}.
+                    </p>
+                    <div className="space-y-2">
+                      {clientAppointmentHistory.slice(0, 3).map((appointment) => (
+                        <div key={appointment.id} className="text-xs text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 p-2 rounded">
+                          <span className="font-medium">
+                            {new Date(appointment.startTime).toLocaleDateString()} at {new Date(appointment.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                          </span>
+                          {appointment.service && (
+                            <span className="ml-2">- {appointment.service.name}</span>
+                          )}
+                        </div>
+                      ))}
+                      {clientAppointmentHistory.length > 3 && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 italic">
+                          ...and {clientAppointmentHistory.length - 3} more appointment{clientAppointmentHistory.length - 3 !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -1531,7 +1593,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 {savedCardInfo && (
                   <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Card saved: {savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.cardLast4 || '****'}
+                      Card saved: {savedCardInfo.brand || savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.last4 || savedCardInfo.cardLast4 || '****'}
                     </p>
                   </div>
                 )}

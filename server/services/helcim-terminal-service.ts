@@ -587,13 +587,26 @@ export class HelcimTerminalService {
       // Be more permissive with status detection
       let normalized: 'completed' | 'failed' | 'pending' = 'pending';
       
-      // IMPORTANT: If webhook has type "cardTransaction" with an ID,
-      // it's Helcim's minimal webhook format - assume completed since they only send for successful transactions
-      // Also check if status is explicitly set to 'completed' from our webhook handler
-      if ((payload?.type === 'cardTransaction' && transactionId) || payload?.status === 'completed') {
-        console.log('📌 Helcim cardTransaction webhook detected - marking as completed');
-        normalized = 'completed';
-      }
+      // IMPORTANT: Check the actual payment status from the webhook
+      // Don't assume cardTransaction webhooks are always successful
+      
+      // First check for explicitly failed/declined status
+      if (
+        rawStatus.includes('declined') || 
+        rawStatus.includes('failed') || 
+        rawStatus.includes('canceled') || 
+        rawStatus.includes('cancelled') ||
+        rawStatus.includes('voided') ||
+        rawStatus.includes('refunded') ||
+        payload?.approved === false ||
+        payload?.approved === 'false' ||
+        payload?.approved === 0 ||
+        payload?.status === 'failed' ||
+        payload?.status === 'cancelled'
+      ) {
+        console.log('❌ Payment declined/failed status detected in webhook');
+        normalized = 'failed';
+      } 
       // Check for success indicators
       else if (
         rawStatus.includes('approved') || 
@@ -605,18 +618,28 @@ export class HelcimTerminalService {
         payload?.approved === true ||
         payload?.approved === 'true' ||
         payload?.approved === 1 ||
-        rawStatus === 'cardtransaction' // Helcim sends type:cardTransaction for successful payments
+        payload?.status === 'completed'
       ) {
+        console.log('✅ Payment approved/completed status detected in webhook');
         normalized = 'completed';
-      } else if (
-        rawStatus.includes('declined') || 
-        rawStatus.includes('failed') || 
-        rawStatus.includes('canceled') || 
-        rawStatus.includes('cancelled') ||
-        rawStatus.includes('voided') ||
-        rawStatus.includes('refunded')
-      ) {
-        normalized = 'failed';
+      }
+      // For cardTransaction type with no clear status, check the rawPayload for more details
+      else if (payload?.type === 'cardTransaction' && transactionId) {
+        // Don't automatically assume success - check the actual payload
+        if (payload?.rawPayload) {
+          const raw = payload.rawPayload;
+          if (raw?.approved === false || raw?.status === 'declined' || raw?.response?.includes('declined')) {
+            console.log('❌ CardTransaction webhook with declined status');
+            normalized = 'failed';
+          } else if (raw?.approved === true || raw?.status === 'approved') {
+            console.log('✅ CardTransaction webhook with approved status');
+            normalized = 'completed';
+          } else {
+            console.log('⚠️ CardTransaction webhook with unclear status, keeping as pending');
+          }
+        } else {
+          console.log('⚠️ CardTransaction webhook without clear status, keeping as pending');
+        }
       }
       
       console.log('✅ Webhook normalized status:', normalized);

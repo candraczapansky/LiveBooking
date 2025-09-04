@@ -123,7 +123,9 @@ export default function SmartTerminalPaymentDialog({
       if (result.status === 'completed') {
         handlePaymentSuccess(result);
       } else if (result.status === 'failed') {
-        handlePaymentFailure(result.message || 'Payment failed');
+        // Handle both declined and failed payments
+        const errorMessage = result.message || 'Payment was declined';
+        handlePaymentFailure(errorMessage);
       } else if (result.status === 'cancelled') {
         handlePaymentCancelled();
       } else {

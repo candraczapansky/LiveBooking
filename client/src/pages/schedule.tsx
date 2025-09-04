@@ -33,17 +33,17 @@ const SchedulePage = () => {
   const canViewOwnScheduleOnly = hasPermission('view_own_schedule') && !hasPermission('view_schedules');
   const canViewAllSchedules = hasPermission('view_schedules');
 
-  // Debug logging
-  console.log('Schedule Page Debug:', {
-    user: user,
-    userKeys: user ? Object.keys(user) : [],
-    canViewOwnScheduleOnly,
-    canViewAllSchedules,
-    hasViewOwnSchedule: hasPermission('view_own_schedule'),
-    hasViewSchedules: hasPermission('view_schedules'),
-    userStaffId: user?.staffId,
-    userId: user?.id
-  });
+  // Debug logging (can be removed in production)
+  // console.log('Schedule Page Debug:', {
+  //   user: user,
+  //   userKeys: user ? Object.keys(user) : [],
+  //   canViewOwnScheduleOnly,
+  //   canViewAllSchedules,
+  //   hasViewOwnSchedule: hasPermission('view_own_schedule'),
+  //   hasViewSchedules: hasPermission('view_schedules'),
+  //   userStaffId: user?.staffId,
+  //   userId: user?.id
+  // });
 
   // Fetch staff for display
   const { data: allStaff = [], isLoading } = useQuery<StaffMember[]>({
@@ -53,20 +53,30 @@ const SchedulePage = () => {
   // Filter staff based on permissions
   // For users who can only view their own schedule, find their staff record by userId
   const staff = canViewOwnScheduleOnly && user?.id 
-    ? allStaff.filter(staffMember => staffMember.userId === user.id)
+    ? allStaff.filter(staffMember => {
+        // Add error handling and type conversion
+        const staffUserId = typeof staffMember.userId === 'string' 
+          ? parseInt(staffMember.userId) 
+          : staffMember.userId;
+        const currentUserId = typeof user.id === 'string' 
+          ? parseInt(user.id) 
+          : user.id;
+        return staffUserId === currentUserId;
+      })
     : allStaff;
 
-  console.log('Schedule Page Staff Filter:', {
-    allStaffCount: allStaff.length,
-    filteredStaffCount: staff.length,
-    userId: user?.id,
-    canViewOwnScheduleOnly,
-    sampleStaff: allStaff.slice(0, 2), // Show first 2 staff members to see structure
-    filteredStaff: staff, // Show the filtered staff members
-    // Debug the filtering logic
-    staffWithUserId: allStaff.filter(s => s.userId === user?.id),
-    allStaffUserIds: allStaff.map(s => ({ id: s.id, userId: s.userId, title: s.title }))
-  });
+  // Debug logging (can be removed in production)
+  // console.log('Schedule Page Staff Filter:', {
+  //   allStaffCount: allStaff.length,
+  //   filteredStaffCount: staff.length,
+  //   userId: user?.id,
+  //   canViewOwnScheduleOnly,
+  //   sampleStaff: allStaff.slice(0, 2), // Show first 2 staff members to see structure
+  //   filteredStaff: staff, // Show the filtered staff members
+  //   // Debug the filtering logic
+  //   staffWithUserId: allStaff.filter(s => s.userId === user?.id),
+  //   allStaffUserIds: allStaff.map(s => ({ id: s.id, userId: s.userId, title: s.title }))
+  // });
 
   // Fetch schedules to show count per staff member
   const { data: schedules = [] } = useQuery<any[]>({
@@ -92,19 +102,29 @@ const SchedulePage = () => {
   };
 
   const getStaffName = (staffMember: StaffMember) => {
-    if (staffMember.user) {
-      return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
+    try {
+      if (staffMember?.user) {
+        return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
+      }
+      return 'Unknown Staff';
+    } catch (error) {
+      console.error('Error getting staff name:', error);
+      return 'Unknown Staff';
     }
-    return 'Unknown Staff';
   };
 
   const getInitials = (staffMember: StaffMember) => {
-    if (staffMember.user) {
-      const firstName = staffMember.user.firstName || '';
-      const lastName = staffMember.user.lastName || '';
-      return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || 'US';
+    try {
+      if (staffMember?.user) {
+        const firstName = staffMember.user.firstName || '';
+        const lastName = staffMember.user.lastName || '';
+        return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase() || 'US';
+      }
+      return 'US';
+    } catch (error) {
+      console.error('Error getting staff initials:', error);
+      return 'US';
     }
-    return 'US';
   };
 
   // Filter staff based on search (only if user can view multiple staff)
@@ -119,6 +139,18 @@ const SchedulePage = () => {
   const handleStaffClick = (staffId: number) => {
     setLocation(`/staff-schedule/${staffId}`);
   };
+
+  // Add error boundary to prevent crashes
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h3 className="text-lg font-medium mb-2">Loading...</h3>
+          <p className="text-muted-foreground">Please wait while we load your data.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -192,9 +224,10 @@ const SchedulePage = () => {
             ) : (
               <div className="space-y-3">
                 {filteredStaff?.map((staffMember: StaffMember) => {
-                  const scheduleCount = getScheduleCount(staffMember.id);
-                  const staffLocations = getStaffLocations(staffMember.id);
-                  return (
+                  try {
+                    const scheduleCount = getScheduleCount(staffMember?.id || 0);
+                    const staffLocations = getStaffLocations(staffMember?.id || 0);
+                    return (
                     <Card 
                       key={staffMember.id} 
                       className="p-4 w-full shadow-sm border border-gray-200 dark:border-gray-700 rounded-xl hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 cursor-pointer"
@@ -239,7 +272,17 @@ const SchedulePage = () => {
                         </div>
                       </div>
                     </Card>
-                  );
+                    );
+                  } catch (error) {
+                    console.error('Error rendering staff member:', error, staffMember);
+                    return (
+                      <Card key={staffMember?.id || 'error'} className="p-4 w-full shadow-sm border border-red-200 rounded-xl">
+                        <div className="text-center text-red-600">
+                          <p>Error loading staff member data</p>
+                        </div>
+                      </Card>
+                    );
+                  }
                 })}
               </div>
             )}

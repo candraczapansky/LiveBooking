@@ -107,26 +107,59 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
       if (type === 'cardTransaction' && txId) {
         console.log('🎯 Processing cardTransaction webhook for transaction:', txId);
         
+        // Extract status from the payload - check for declined/cancelled indicators
+        let paymentStatus = 'pending';
+        const statusFields = [
+          payload?.status,
+          payload?.approved,
+          payload?.transactionStatus,
+          payload?.response
+        ];
+        
+        // Check for declined/cancelled/failed status
+        const statusStr = statusFields.filter(s => s != null).map(s => String(s).toLowerCase()).join(' ');
+        if (statusStr.includes('declined') || 
+            statusStr.includes('failed') || 
+            statusStr.includes('cancelled') || 
+            statusStr.includes('cancel') ||
+            statusStr.includes('voided') ||
+            statusStr.includes('refunded') ||
+            payload?.approved === false ||
+            payload?.approved === 'false' ||
+            payload?.approved === 0) {
+          paymentStatus = 'failed';
+          console.log('❌ Payment declined/failed detected in webhook');
+        } else if (payload?.approved === true || 
+                   payload?.approved === 'true' || 
+                   payload?.approved === 1 ||
+                   statusStr.includes('approved') ||
+                   statusStr.includes('completed') ||
+                   statusStr.includes('success')) {
+          paymentStatus = 'completed';
+          console.log('✅ Payment approved detected in webhook');
+        }
+        
         // Handle the webhook asynchronously to return quickly
         setImmediate(async () => {
           try {
-            // Pass the minimal webhook data to the handler
+            // Pass the webhook data to the handler with the actual status
             await (terminalService as any).handleWebhook({
               id: txId,
               transactionId: txId,
               type: 'cardTransaction',
-              // Mark as completed since Helcim only sends webhooks for successful transactions
-              status: 'completed',
+              status: paymentStatus,
+              approved: payload?.approved,
+              response: payload?.response,
+              rawPayload: payload
             });
-            console.log('✅ Webhook processing completed for transaction:', txId);
+            console.log(`✅ Webhook processing completed for transaction ${txId} with status: ${paymentStatus}`);
           } catch (err) {
             console.error('❌ Helcim webhook processing failed:', err);
-            // Even if enrichment fails, the payment was successful
-            // Store minimal data in webhook cache
+            // Store the actual status in webhook cache
             try {
               const webhookStore = (terminalService as any).webhookStore || new Map();
               webhookStore.set(String(txId), {
-                status: 'completed',
+                status: paymentStatus,
                 transactionId: txId,
                 updatedAt: Date.now(),
               });
@@ -135,7 +168,31 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
         });
       } else if (type === 'terminalCancel') {
         console.log('🚫 Terminal cancel webhook received:', payload);
-        // Handle terminal cancel if needed
+        // Handle terminal cancel
+        if (txId) {
+          setImmediate(async () => {
+            try {
+              await (terminalService as any).handleWebhook({
+                id: txId,
+                transactionId: txId,
+                type: 'terminalCancel',
+                status: 'cancelled',
+                rawPayload: payload
+              });
+              console.log('✅ Terminal cancel webhook processed for transaction:', txId);
+            } catch (err) {
+              console.error('❌ Terminal cancel webhook processing failed:', err);
+              try {
+                const webhookStore = (terminalService as any).webhookStore || new Map();
+                webhookStore.set(String(txId), {
+                  status: 'cancelled',
+                  transactionId: txId,
+                  updatedAt: Date.now(),
+                });
+              } catch {}
+            }
+          });
+        }
       }
 
       // Respond immediately with 200 OK to acknowledge receipt

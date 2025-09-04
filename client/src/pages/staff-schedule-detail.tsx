@@ -15,14 +15,21 @@ import { useAuth } from "@/contexts/AuthProvider";
 import { useUserPermissions } from "@/hooks/use-user-permissions";
 
 export default function StaffScheduleDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const staffId = parseInt(id);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingSchedule, setEditingSchedule] = useState<any>(null);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { user } = useAuth();
-  const { hasPermission } = useUserPermissions();
+  try {
+    const { id } = useParams<{ id: string }>();
+    const staffId = parseInt(id);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [editingSchedule, setEditingSchedule] = useState<any>(null);
+    const queryClient = useQueryClient();
+    const { toast } = useToast();
+    const { user } = useAuth();
+    const { hasPermission } = useUserPermissions();
+
+    console.log('StaffScheduleDetailPage: Component initialized', {
+      id,
+      staffId,
+      user: user ? { id: user.id, username: user.username, role: user.role } : null
+    });
 
   // Set document title
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
@@ -34,8 +41,23 @@ export default function StaffScheduleDetailPage() {
   const canViewOwnSchedule = hasPermission('view_own_schedule');
 
   // Check if user can access this schedule
-  const canAccessSchedule = canViewAllSchedules || (canViewOwnSchedule && user?.staffId === staffId);
-  const canEditSchedule = canEditAllSchedules || (canEditOwnSchedule && user?.staffId === staffId);
+  // For users with view_own_schedule, they can access their own schedule by matching user ID
+  const canAccessSchedule = canViewAllSchedules || (canViewOwnSchedule && user?.id && staffMember?.userId === user.id);
+  const canEditSchedule = canEditAllSchedules || (canEditOwnSchedule && user?.id && staffMember?.userId === user.id);
+
+  // Debug logging
+  console.log('Staff Schedule Detail Debug:', {
+    staffId,
+    user: user,
+    staffMember: staffMember,
+    canViewAllSchedules,
+    canViewOwnSchedule,
+    canEditAllSchedules,
+    canEditOwnSchedule,
+    canAccessSchedule,
+    canEditSchedule,
+    userStaffMatch: user?.id && staffMember?.userId === user.id
+  });
 
   // Redirect if user doesn't have permission to view this schedule
   if (!canAccessSchedule) {
@@ -59,22 +81,56 @@ export default function StaffScheduleDetailPage() {
   }
 
   // Fetch staff member details
-  const { data: staff = [] } = useQuery<any[]>({
+  const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery<any[]>({
     queryKey: ['/api/staff'],
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching staff:', error);
+    }
   });
 
   // Fetch locations for display
-  const { data: locations = [] } = useQuery<any[]>({
+  const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useQuery<any[]>({
     queryKey: ['/api/locations'],
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching locations:', error);
+    }
   });
 
   const staffMember = staff.find((s: any) => s.id === staffId);
 
+  // Add error handling for missing staff member
+  if (!staffMember && staff.length > 0) {
+    console.error('Staff member not found:', { staffId, availableStaff: staff.map(s => ({ id: s.id, userId: s.userId, title: s.title })) });
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center">Staff Member Not Found</CardTitle>
+            <CardDescription className="text-center">
+              The requested staff member could not be found.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <Link href="/schedule">
+              <Button variant="outline">Back to Schedules</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   // Fetch schedules for this staff member
-  const { data: allSchedules = [], isLoading } = useQuery<any[]>({
+  const { data: allSchedules = [], isLoading: schedulesLoading, error: schedulesError } = useQuery<any[]>({
     queryKey: ['/api/schedules'],
     staleTime: 0, // Always refetch when component mounts
     refetchOnWindowFocus: true, // Refetch when window gains focus
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching schedules:', error);
+    }
   });
 
   const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
@@ -150,15 +206,25 @@ export default function StaffScheduleDetailPage() {
   };
 
   const getStaffName = () => {
-    if (staffMember?.user) {
-      return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
+    try {
+      if (staffMember?.user) {
+        return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
+      }
+      return 'Unknown Staff';
+    } catch (error) {
+      console.error('Error getting staff name:', error);
+      return 'Unknown Staff';
     }
-    return 'Unknown Staff';
   };
 
   const getLocationName = (locationId: number) => {
-    const location = locations.find((loc: any) => loc.id === locationId);
-    return location?.name || 'Unknown Location';
+    try {
+      const location = locations.find((loc: any) => loc.id === locationId);
+      return location?.name || 'Unknown Location';
+    } catch (error) {
+      console.error('Error getting location name:', error);
+      return 'Unknown Location';
+    }
   };
 
   // Format HH:mm strings as h:mm AM/PM in Central Time (wall-clock)
@@ -194,6 +260,47 @@ export default function StaffScheduleDetailPage() {
     );
   }
 
+  // Add loading state
+  const isLoading = staffLoading || locationsLoading || schedulesLoading;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h3 className="text-lg font-medium mb-2">Loading Schedule...</h3>
+          <p className="text-muted-foreground">Please wait while we load the schedule data.</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle API errors
+  if (staffError || locationsError || schedulesError) {
+    console.error('API errors:', { staffError, locationsError, schedulesError });
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Error Loading Data</CardTitle>
+            <CardDescription className="text-center">
+              Failed to load schedule data. Please try again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              {staffError && `Staff Error: ${staffError.message}`}
+              {locationsError && `Locations Error: ${locationsError.message}`}
+              {schedulesError && `Schedules Error: ${schedulesError.message}`}
+            </p>
+            <Link href="/schedule">
+              <Button variant="outline">Back to Schedules</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center gap-4 mb-6">
@@ -210,7 +317,7 @@ export default function StaffScheduleDetailPage() {
             </div>
             <div>
               <h1 className="text-3xl font-bold">{getStaffName()}</h1>
-              <p className="text-muted-foreground">{staffMember.title}</p>
+              <p className="text-muted-foreground">{staffMember?.title || 'Unknown Title'}</p>
             </div>
           </div>
         </div>
@@ -319,7 +426,6 @@ export default function StaffScheduleDetailPage() {
                             )}
                           </div>
                           {canEditSchedule && (
-                            {canEditSchedule && (
                               <div className="flex gap-2">
                                 <Button
                                   variant="outline"
@@ -512,4 +618,27 @@ export default function StaffScheduleDetailPage() {
       />
     </div>
   );
+  } catch (error) {
+    console.error('StaffScheduleDetailPage: Component crashed', error);
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-center text-red-600">Error Loading Schedule</CardTitle>
+            <CardDescription className="text-center">
+              Something went wrong while loading the schedule. Please try again.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center">
+            <p className="text-sm text-muted-foreground mb-4">
+              Error: {error instanceof Error ? error.message : 'Unknown error'}
+            </p>
+            <Link href="/schedule">
+              <Button variant="outline">Back to Schedules</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 }

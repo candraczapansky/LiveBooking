@@ -241,29 +241,10 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
           // Base style accumulator
           const style: React.CSSProperties = { zIndex: 10, pointerEvents: 'auto' };
 
-          // Determine appointment state for coloring
+          // Determine appointment color: always use the appointment's original service color
           const eventResource: any = appointmentEvent.resource;
-          const isPaid: boolean = !!(eventResource && eventResource.paymentStatus === 'paid');
-          const isCompleted: boolean = !!(eventResource && eventResource.status === 'completed');
           const serviceColor: string | undefined = eventResource && eventResource.serviceColor ? String(eventResource.serviceColor) : undefined;
-          const isArrivedOverride: boolean = !!(eventResource && eventResource.arrivedOverride === true);
-          const isConfirmed: boolean = !!(eventResource && eventResource.status === 'confirmed');
-
-          // Paid or completed appointments should be green (#278741)
-          if (isPaid || isCompleted) {
-            style.backgroundColor = '#278741';
-            style.color = '#ffffff';
-            style.border = '1px solid #278741';
-          } else if (isArrivedOverride && arrivedColor) {
-            style.backgroundColor = arrivedColor;
-            style.color = '#ffffff';
-            style.border = `1px solid ${arrivedColor}`;
-          } else if (isConfirmed && confirmedColor) {
-            style.backgroundColor = confirmedColor;
-            style.color = '#ffffff';
-            style.border = `1px solid ${confirmedColor}`;
-          } else if (serviceColor) {
-            // Otherwise, use the service color if available
+          if (serviceColor) {
             style.backgroundColor = serviceColor;
             style.color = '#ffffff';
             style.border = `1px solid ${serviceColor}`;

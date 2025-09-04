@@ -11,6 +11,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { LogOut } from "lucide-react";
 
 const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
@@ -31,15 +32,48 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 const ClientBookingPage = () => {
   useDocumentTitle("Book an Appointment | Glo Head Spa");
-  const { isAuthenticated, login, user } = useAuth();
+  const { login, user } = useAuth();
   const [isBookingOpen, setIsBookingOpen] = useState(true);
   const { toast } = useToast();
-  const [location, navigate] = useLocation();
+  const [, navigate] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
   const [isLoginSubmitting, setIsLoginSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Custom logout function for client booking page - clears auth but stays on booking page
+  const clientLogout = () => {
+    // Clear auth data without redirecting
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('profilePicture');
+    
+    // Clear color preferences from the DOM
+    const root = document.documentElement;
+    root.style.removeProperty('--primary');
+    root.style.removeProperty('--primary-foreground');
+    root.style.removeProperty('--accent');
+    root.style.removeProperty('--ring');
+    root.style.removeProperty('--text-primary');
+    root.style.removeProperty('--text-secondary');
+    root.classList.remove('dark');
+    
+    // Dispatch event to notify components of logout
+    window.dispatchEvent(new CustomEvent('userDataUpdated', { detail: null }));
+    
+    // Close booking modal if open
+    setIsBookingOpen(false);
+    
+    // Show success message
+    toast({
+      title: "Signed Out",
+      description: "You have been signed out successfully.",
+    });
+    
+    // Force page reload to reset auth state
+    window.location.reload();
+  };
 
   
 
@@ -131,6 +165,30 @@ const ClientBookingPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
+      {/* Header with sign-out option */}
+      {user && (
+        <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <BusinessBrand size="sm" />
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Welcome, <span className="font-medium">{user.firstName} {user.lastName}</span>
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clientLogout}
+                  className="flex items-center gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign Out
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex-1 w-full mx-auto py-10 px-4 sm:px-6 lg:px-8">
         {shouldShowRegister ? (

@@ -460,9 +460,18 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
           parsedFields = [];
         }
         
+        // Normalize boolean flags so "required" is always a proper boolean
+        const normalizedFields = (parsedFields || []).map((f: any) => {
+          const cfg = f?.config || {};
+          const rawRequired = (cfg as any).required ?? (f as any).required;
+          // Treat 'indeterminate' as true (Radix tri-state), otherwise coerce to boolean
+          const required = rawRequired === 'indeterminate' ? true : Boolean(rawRequired);
+          return { ...f, config: { ...cfg, required } };
+        });
+
         return {
           ...formData,
-          fields: parsedFields,
+          fields: normalizedFields,
         };
       } catch (error) {
         console.error("Error fetching form:", error);
@@ -1172,7 +1181,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
         <div className="flex items-center space-x-2">
           <Checkbox
             checked={config.required}
-            onCheckedChange={(checked) => updateConfig({ required: checked })}
+            onCheckedChange={(checked) => updateConfig({ required: checked === true })}
           />
           <Label>Required field</Label>
         </div>

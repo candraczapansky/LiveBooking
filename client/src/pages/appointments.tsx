@@ -72,19 +72,19 @@ const AppointmentsPage = () => {
   const [ctxMenuPos, setCtxMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [ctxAppointment, setCtxAppointment] = useState<any | null>(null);
 
-  // Close context menu on outside click, escape, or scroll
+  // Close context menu on outside click, escape, or scroll (capture disabled so inner UI works)
   useEffect(() => {
     if (!ctxMenuOpen) return;
     const handleClick = () => setCtxMenuOpen(false);
     const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtxMenuOpen(false); };
     const handleScroll = () => setCtxMenuOpen(false);
-    window.addEventListener('click', handleClick, true);
-    window.addEventListener('keydown', handleKeyDown, true);
-    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('click', handleClick);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll);
     return () => {
-      window.removeEventListener('click', handleClick, true);
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('click', handleClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [ctxMenuOpen]);
   // Add Block flow prefill values
@@ -101,6 +101,30 @@ const AppointmentsPage = () => {
   const [availableColor, setAvailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('availableColor')) || '#dbeafe');
   const [unavailableColor, setUnavailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('unavailableColor')) || '#e5e7eb');
   const [blockedColor, setBlockedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('blockedColor')) || '#fca5a5');
+  const [confirmedColor, setConfirmedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('confirmedColor')) || '#fde68a');
+  const [arrivedColor, setArrivedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('arrivedColor')) || '#a5b4fc');
+  const [serviceIdMap, setServiceIdMap] = useState<Record<number, any>>({});
+  const [calendarRefreshToken, setCalendarRefreshToken] = useState<number>(0);
+
+  // Helpers to track locally which appointments have been marked "arrived"
+  const addArrivedLocal = (id: number) => {
+    try {
+      const raw = localStorage.getItem('arrivedAppointments') || '[]';
+      const ids: number[] = JSON.parse(raw);
+      if (!ids.includes(id)) {
+        ids.push(id);
+        localStorage.setItem('arrivedAppointments', JSON.stringify(ids));
+      }
+    } catch {}
+  };
+  const removeArrivedLocal = (id: number) => {
+    try {
+      const raw = localStorage.getItem('arrivedAppointments') || '[]';
+      const ids: number[] = JSON.parse(raw);
+      const next = ids.filter((x) => Number(x) !== Number(id));
+      localStorage.setItem('arrivedAppointments', JSON.stringify(next));
+    } catch {}
+  };
   const { user } = useContext(AuthContext);
 
   // Queries
@@ -150,6 +174,23 @@ const AppointmentsPage = () => {
       return response.json();
     },
   });
+
+  // Build a quick lookup map for services by ID from the loaded services list
+  useEffect(() => {
+    try {
+      const nextMap: Record<number, any> = {};
+      if (Array.isArray(services)) {
+        (services as any[]).forEach((svc: any) => {
+          if (svc && svc.id != null) {
+            nextMap[Number(svc.id)] = svc;
+          }
+        });
+      }
+      if (Object.keys(nextMap).length > 0) {
+        setServiceIdMap((prev) => ({ ...prev, ...nextMap }));
+      }
+    } catch {}
+  }, [services]);
 
   const { data: users = [] } = useQuery({
     queryKey: ['/api/users'],
@@ -259,6 +300,14 @@ const AppointmentsPage = () => {
             localStorage.setItem('blockedColor', prefs.blockedColor);
             setBlockedColor(prefs.blockedColor);
           }
+          if (prefs?.confirmedColor) {
+            localStorage.setItem('confirmedColor', prefs.confirmedColor);
+            setConfirmedColor(prefs.confirmedColor);
+          }
+          if (prefs?.arrivedColor) {
+            localStorage.setItem('arrivedColor', prefs.arrivedColor);
+            setArrivedColor(prefs.arrivedColor);
+          }
         }).catch(()=>{});
       }
     } catch {}
@@ -333,6 +382,43 @@ const AppointmentsPage = () => {
   });
   
   console.log("[AppointmentsPage] Filtered appointments:", filteredAppointments.length, "out of", appointments.length, "total appointments");
+  
+  // Ensure any services referenced by currently visible appointments are present in the map
+  useEffect(() => {
+    try {
+      if (!Array.isArray(filteredAppointments)) return;
+      const missingIds: number[] = [];
+      const seen = new Set<number>();
+      filteredAppointments.forEach((apt: any) => {
+        const sid = Number(apt?.serviceId);
+        if (Number.isFinite(sid) && !seen.has(sid)) {
+          seen.add(sid);
+          if (!serviceIdMap[sid]) {
+            missingIds.push(sid);
+          }
+        }
+      });
+      if (missingIds.length === 0) return;
+      Promise.all(
+        missingIds.map(async (id) => {
+          try {
+            const res = await apiRequest('GET', `/api/services/${id}`);
+            if (!res.ok) return null;
+            const svc = await res.json();
+            return svc && svc.id != null ? [Number(svc.id), svc] : null;
+          } catch {
+            return null;
+          }
+        })
+      ).then((pairs) => {
+        const updates: Record<number, any> = {};
+        pairs.forEach((p) => { if (p) updates[p[0]] = p[1]; });
+        if (Object.keys(updates).length > 0) {
+          setServiceIdMap((prev) => ({ ...prev, ...updates }));
+        }
+      }).catch(()=>{});
+    } catch {}
+  }, [filteredAppointments, serviceIdMap]);
 
   // Helper: Determine if a staff member has an appointment in the current calendar view
   const hasAppointmentInCurrentView = (staffId: number) => {
@@ -1544,6 +1630,14 @@ const AppointmentsPage = () => {
                           <span className="text-xs text-muted-foreground">Blocked</span>
                           <input type="color" value={blockedColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('blockedColor',v);setBlockedColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({blockedColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
                         </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Confirmed</span>
+                          <input type="color" value={confirmedColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('confirmedColor',v);setConfirmedColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({confirmedColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Arrived</span>
+                          <input type="color" value={arrivedColor} onChange={(e)=>{try{const v=e.target.value;localStorage.setItem('arrivedColor',v);setArrivedColor(v);try{const uid=(user as any)?.id||JSON.parse(localStorage.getItem('user')||'{}')?.id;if(uid){fetch(`/api/users/${uid}/color-preferences`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({arrivedColor:v})}).catch(()=>{});}}catch{} setSelectedDate((d)=>d?new Date(d):new Date());}catch{}}} className="h-7 w-9 p-0 border rounded" />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1601,12 +1695,24 @@ const AppointmentsPage = () => {
                       }}
                     >
                       <BigCalendar
-                        key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}`}
+                        key={`calendar-${schedules.length}-${selectedLocation?.id}-${filteredResources?.length}-${selectedDate ? selectedDate.toISOString().slice(0, 10) : 'no-date'}-${calendarRefreshToken}`}
                         blockedColor={blockedColor}
                         unavailableColor={unavailableColor}
                         availableColor={availableColor}
+                        confirmedColor={confirmedColor}
+                        arrivedColor={arrivedColor}
                         events={(() => {
                           try {
+                            // Read locally-marked arrived appointments to color them immediately
+                            let arrivedIds: number[] = [];
+                            try {
+                              const raw = typeof window !== 'undefined' ? (localStorage.getItem('arrivedAppointments') || '[]') : '[]';
+                              const parsed = JSON.parse(raw);
+                              if (Array.isArray(parsed)) {
+                                arrivedIds = parsed.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n));
+                              }
+                            } catch {}
+
                             const appointmentEvents = filteredAppointments?.map((apt: any) => {
                               if (!apt || !apt.startTime) {
                                 console.warn('Invalid appointment data:', apt);
@@ -1615,7 +1721,8 @@ const AppointmentsPage = () => {
 
                               try {
                                 const client = users?.find((u: any) => u.id === apt.clientId);
-                                const service = services?.find((s: any) => Number(s.id) === Number(apt.serviceId));
+                                const service = serviceIdMap?.[Number(apt.serviceId)] ?? services?.find((s: any) => Number(s.id) === Number(apt.serviceId));
+                                const isArrivedLocal = arrivedIds.includes(Number(apt.id));
                                 
                                 // Validate and parse dates
                                 let startDate: Date;
@@ -1651,14 +1758,16 @@ const AppointmentsPage = () => {
                                 
                                 return {
                                   id: apt.id,
-                                  title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || 'Unknown Service'}`,
+                                  title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || (typeof (apt as any)?.service?.name === 'string' ? (apt as any).service.name : 'Unknown Service')}`,
                                   start: startDate,
                                   end: endDate,
                                   resourceId: apt.staffId,
                                   type: 'appointment',
                                   resource: {
                                     ...apt,
-                                    serviceColor: service?.color || '#3B82F6', // Use service color or default blue
+                                    arrivedOverride: isArrivedLocal === true,
+                                    service: service || (apt as any)?.service || null,
+                                    serviceColor: (service?.color || (apt as any)?.service?.color || '#3B82F6'),
                                   },
                                 };
                               } catch (error) {
@@ -1779,42 +1888,86 @@ const AppointmentsPage = () => {
                         <div
                           style={{ position: 'fixed', left: ctxMenuPos.x, top: ctxMenuPos.y, zIndex: 9999 }}
                           className="rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+                          onMouseDown={(e) => { e.stopPropagation(); }}
                           onClick={(e) => { e.stopPropagation(); }}
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         >
+                          {(() => {
+                            const isConfirmed = String(ctxAppointment?.status || '').toLowerCase() === 'confirmed';
+                            let isArrivedMarked = false;
+                            try {
+                              const raw = (typeof window !== 'undefined' && localStorage.getItem('arrivedAppointments')) || '[]';
+                              const ids = JSON.parse(raw as string);
+                              isArrivedMarked = Array.isArray(ids) && ids.includes(Number(ctxAppointment?.id));
+                            } catch {}
+                            return (
+                              <>
+                                <label className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    className="mr-2"
+                                    checked={isConfirmed}
+                                    onChange={async (e) => {
+                                      try {
+                                        if (!ctxAppointment?.id) return;
+                                        const nextChecked = e.target.checked;
+                                        if (nextChecked) {
+                                          await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
+                                          setCtxAppointment((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
+                                        } else {
+                                          await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'pending' });
+                                          setCtxAppointment((prev: any) => prev ? { ...prev, status: 'pending' } : prev);
+                                        }
+                                        setCalendarRefreshToken((v)=>v+1);
+                                        refetch();
+                                      } catch {}
+                                    }}
+                                  />
+                                  Confirmed
+                                </label>
+
+                                <label className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    className="mr-2"
+                                    checked={isArrivedMarked}
+                                    onChange={async (e) => {
+                                      try {
+                                        if (!ctxAppointment?.id) return;
+                                        const nextChecked = e.target.checked;
+                                        if (nextChecked) {
+                                          // Mark as arrived locally and ensure status is confirmed
+                                          if (String(ctxAppointment?.status || '').toLowerCase() !== 'confirmed') {
+                                            await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
+                                            setCtxAppointment((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
+                                          }
+                                          addArrivedLocal(Number(ctxAppointment.id));
+                                        } else {
+                                          // Unmark arrived locally
+                                          removeArrivedLocal(Number(ctxAppointment.id));
+                                        }
+                                        setCalendarRefreshToken((v)=>v+1);
+                                        refetch();
+                                      } catch {}
+                                    }}
+                                  />
+                                  Arrived
+                                </label>
+                              </>
+                            );
+                          })()}
                           <button
                             className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
                             onClick={async () => {
                               try {
                                 if (!ctxAppointment?.id) return;
-                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
+                                const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
+                                if (!confirmCancel) { return; }
+                                const res = await apiRequest("POST", `/api/appointments/${ctxAppointment.id}/cancel`, { reason: 'Cancelled from calendar menu' });
+                                try { await res.json(); } catch {}
+                                removeArrivedLocal(Number(ctxAppointment.id));
                                 setCtxMenuOpen(false);
-                                refetch();
-                              } catch {}
-                            }}
-                          >
-                            Mark confirmed
-                          </button>
-                          <button
-                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
-                            onClick={async () => {
-                              try {
-                                if (!ctxAppointment?.id) return;
-                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
-                                setCtxMenuOpen(false);
-                                refetch();
-                              } catch {}
-                            }}
-                          >
-                            Mark arrived
-                          </button>
-                          <button
-                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
-                            onClick={async () => {
-                              try {
-                                if (!ctxAppointment?.id) return;
-                                await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'cancelled' });
-                                setCtxMenuOpen(false);
+                                setCalendarRefreshToken((v)=>v+1);
                                 refetch();
                               } catch {}
                             }}
