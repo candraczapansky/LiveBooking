@@ -241,13 +241,31 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
           // Base style accumulator
           const style: React.CSSProperties = { zIndex: 10, pointerEvents: 'auto' };
 
-          // Determine appointment color: always use the appointment's original service color
+          // Determine appointment color: base on service color; override if paid or confirmed
           const eventResource: any = appointmentEvent.resource;
           const serviceColor: string | undefined = eventResource && eventResource.serviceColor ? String(eventResource.serviceColor) : undefined;
+          const isPaid: boolean = !!(eventResource && String(eventResource.paymentStatus).toLowerCase() === 'paid');
+          const isConfirmedLocal: boolean = !!(eventResource && eventResource.confirmedOverride === true);
+          const isArrivedLocal: boolean = !!(eventResource && eventResource.arrivedOverride === true);
           if (serviceColor) {
             style.backgroundColor = serviceColor;
             style.color = '#ffffff';
             style.border = `1px solid ${serviceColor}`;
+          }
+          if (isPaid) {
+            style.backgroundColor = '#278741';
+            style.color = '#ffffff';
+            style.border = '1px solid #278741';
+          } else if (isArrivedLocal && arrivedColor) {
+            // If arrived is marked locally, use arrived color
+            style.backgroundColor = arrivedColor;
+            style.color = '#ffffff';
+            style.border = `1px solid ${arrivedColor}`;
+          } else if (isConfirmedLocal && confirmedColor) {
+            // If confirmed is marked locally, use confirmed color
+            style.backgroundColor = confirmedColor;
+            style.color = '#ffffff';
+            style.border = `1px solid ${confirmedColor}`;
           }
 
           // Visual hack: shrink 15-minute events beginning at :15 or :45

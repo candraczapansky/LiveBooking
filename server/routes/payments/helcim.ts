@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 
-function createHelcimPaymentsRouter(storage?: any) {
+export default function createHelcimPaymentsRouter(storage?: any) {
   const router = Router();
 
-// Initialize Helcim Pay.js session (real Helcim initialization)
-router.post('/initialize', async (req, res) => {
+  // Initialize Helcim Pay.js session (real Helcim initialization)
+  router.post('/initialize', async (req, res) => {
   try {
     const { amount, description } = req.body || {};
     // Allow amount to be 0 for card verification
@@ -98,10 +98,10 @@ router.post('/initialize', async (req, res) => {
       message: error.message || 'Failed to initialize Helcim Pay session',
     });
   }
-});
+  });
 
-// Process Helcim payment
-router.post('/process', async (req, res) => {
+  // Process Helcim payment
+  router.post('/process', async (req, res) => {
   try {
     const { token, amount, description, customerEmail, customerName } = req.body;
 
@@ -133,10 +133,10 @@ router.post('/process', async (req, res) => {
       message: error.message || 'Payment processing failed'
     });
   }
-});
+  });
 
-// Verify Helcim payment
-router.post('/verify', async (req, res) => {
+  // Verify Helcim payment
+  router.post('/verify', async (req, res) => {
   try {
     const { transactionId } = req.body;
 
@@ -161,10 +161,10 @@ router.post('/verify', async (req, res) => {
       message: error.message || 'Payment verification failed'
     });
   }
-});
+  });
 
-// Create Helcim customer for a client (if not already created) and persist helcimCustomerId
-router.post('/create-customer', async (req: Request, res: Response) => {
+  // Create Helcim customer for a client (if not already created) and persist helcimCustomerId
+  router.post('/create-customer', async (req: Request, res: Response) => {
   try {
     const { firstName, lastName, email, phone } = req.body || {};
     const mod = await import('../../services/helcim-service.js');
@@ -184,10 +184,10 @@ router.post('/create-customer', async (req: Request, res: Response) => {
     console.error('Helcim create-customer error:', error);
     res.status(500).json({ success: false, message: error?.message || 'Failed to create Helcim customer' });
   }
-});
+  });
 
-// Test endpoint to check Helcim service
-router.get('/test', async (req: Request, res: Response) => {
+  // Test endpoint to check Helcim service
+  router.get('/test', async (req: Request, res: Response) => {
   try {
     console.log('[Helcim Test] Testing Helcim service...');
     const mod = await import('../../services/helcim-service.js');
@@ -206,62 +206,65 @@ router.get('/test', async (req: Request, res: Response) => {
     console.error('[Helcim Test] Test failed:', error);
     res.status(500).json({ success: false, message: 'Helcim service test failed', error: error?.message || 'Unknown error' });
   }
-});
+  });
 
-// Save card on file for a client via HelcimPay.js token; persist minimal card meta in DB
-router.post('/save-card', async (req: Request, res: Response) => {
+  // Save card on file via HelcimPay.js token; save card info to appointment
+  router.post('/save-card', async (req: Request, res: Response) => {
   try {
-    const { token, customerId, clientId, customerEmail, customerName } = req.body || {};
+    const { token, appointmentId, clientId, customerEmail, customerName } = req.body || {};
+    
     if (!token) {
       return res.status(400).json({ success: false, message: 'token is required' });
     }
 
-    // DEV MODE: Mock successful card save when Helcim API is not available or failing
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    // Enable mock mode in development when explicitly requested or when Helcim is failing
-    const mockMode = isDevelopment || req.body.mockMode === true;
-    
-    if (mockMode && clientId) {
-      console.log('[Helcim Save Card] 🔧 Development mode - mocking card save for testing');
+    // Check if Helcim API is configured
+    const apiToken = process.env.HELCIM_API_TOKEN;
+    if (!apiToken || apiToken === '') {
+      return res.status(500).json({ success: false, message: 'Helcim API not configured. Please configure HELCIM_API_TOKEN in your environment.' });
+    }
+
+    // For appointment-based card saving, we don't need to create a Helcim customer
+    // Just save the card details to the appointment for this transaction
+    if (appointmentId) {
+      // Extract card details from the token response
+      // In production, you would get these from Helcim's tokenization response
+      const cardInfo = {
+        cardToken: token,
+        cardBrand: req.body.cardBrand || 'Card',
+        cardLast4: req.body.cardLast4 || '****',
+        cardExpMonth: req.body.cardExpMonth || 0,
+        cardExpYear: req.body.cardExpYear || 0
+      };
       
-      // Generate mock card details from token
-      const mockCardLast4 = token.slice(-4).padStart(4, '0');
-      const mockCardBrand = ['Visa', 'Mastercard', 'Amex'][Math.floor(Math.random() * 3)];
-      const mockHelcimCardId = `mock_card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const mockHelcimCustomerId = `mock_customer_${clientId}`;
-      
-      // Save to database
-      if (storage) {
+      // Save card info to the appointment
+      if (storage && storage.updateAppointment) {
         try {
-          await storage.createSavedPaymentMethod({
-            clientId: Number(clientId),
-            helcimCardId: mockHelcimCardId,
-            cardBrand: mockCardBrand,
-            cardLast4: mockCardLast4,
-            cardExpMonth: 12,
-            cardExpYear: 2026,
-            isDefault: true
+          await storage.updateAppointment(appointmentId, {
+            paymentCardToken: token,
+            paymentCardBrand: cardInfo.cardBrand,
+            paymentCardLast4: cardInfo.cardLast4,
+            paymentCardExpMonth: cardInfo.cardExpMonth,
+            paymentCardExpYear: cardInfo.cardExpYear
           });
-          console.log(`✅ Mock card saved to database for client ${clientId}`);
-        } catch (dbError) {
-          console.error('❌ Error saving mock card to database:', dbError);
+          console.log(`✅ Card info saved to appointment ${appointmentId}`);
+        } catch (dbError: any) {
+          console.error('❌ Error saving card to appointment:', dbError);
+          return res.status(500).json({ success: false, message: 'Failed to save card to appointment', error: dbError?.message });
         }
       }
       
       return res.status(201).json({
         success: true,
-        helcimCustomerId: mockHelcimCustomerId,
-        helcimCardId: mockHelcimCardId,
-        cardBrand: mockCardBrand,
-        cardLast4: mockCardLast4,
-        cardExpMonth: 12,
-        cardExpYear: 2026,
-        mockMode: true
+        message: 'Card saved to appointment',
+        appointmentId,
+        cardBrand: cardInfo.cardBrand,
+        cardLast4: cardInfo.cardLast4
       });
     }
-
+    
+    // If saving to client profile (for future use)
     // Support both customerId (legacy) and clientId (from booking widget)
-    let helcimCustomerId: string | null = customerId || null;
+    let helcimCustomerId: string | null = req.body.customerId || null;
     
     // If we have a clientId but no helcimCustomerId, we need to create a Helcim customer
     if (!helcimCustomerId && (clientId || customerEmail)) {
@@ -369,7 +372,7 @@ router.post('/save-card', async (req: Request, res: Response) => {
     console.error('Helcim save-card error:', error);
     res.status(500).json({ success: false, message: error?.message || 'Failed to save card' });
   }
-});
+  });
 
   return router;
 }
