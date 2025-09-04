@@ -104,23 +104,34 @@ router.get('/payment/:locationId/:paymentId', async (req, res) => {
     const { locationId, paymentId } = req.params;
     try { console.log('🟡 GET /api/terminal/payment/:locationId/:paymentId', { locationId, paymentId }); } catch {}
     try { log('🟡 GET /api/terminal/payment/:locationId/:paymentId'); } catch {}
-    // CRITICAL FIX: Only return completed if the webhook is for THIS specific payment
+    // CRITICAL FIX: Only return status if the webhook is for THIS specific payment
     // Must verify the webhook matches this exact paymentId to prevent false completions
     try {
       const g: any = (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__;
       if (g && 
           (g.transactionId === paymentId || g.invoiceNumber === paymentId) &&
           (Date.now() - (g.updatedAt || 0)) <= 90 * 1000) {
-        console.log('✅ Found matching webhook for payment:', paymentId);
-        return res.json({
-          success: true,
-          status: 'completed',
-          last4: g.last4,
-          transactionId: g.transactionId || paymentId,
-          amount: g.amount,
-          tipAmount: g.tipAmount,
-          baseAmount: g.baseAmount,
-        });
+        console.log(`📌 Found matching webhook for payment ${paymentId} with status: ${g.status}`);
+        
+        // Return the actual status from the webhook (could be completed or failed)
+        if (g.status === 'failed') {
+          return res.json({
+            success: false,
+            status: 'failed',
+            message: 'Payment was declined or cancelled',
+            transactionId: g.transactionId || paymentId,
+          });
+        } else if (g.status === 'completed') {
+          return res.json({
+            success: true,
+            status: 'completed',
+            last4: g.last4,
+            transactionId: g.transactionId || paymentId,
+            amount: g.amount,
+            tipAmount: g.tipAmount,
+            baseAmount: g.baseAmount,
+          });
+        }
       }
     } catch {}
     // Force bypass of conditional requests to prevent 304 during active polling
@@ -559,68 +570,134 @@ router.get('/payment/:paymentId', async (req, res) => {
     }
   });
 
-  // Helcim webhook endpoint (success-only): treat ANY POST as success confirmation
+  // Helcim webhook endpoint: properly check payment status
   router.post('/webhook', async (req, res) => {
     try {
-      try { log('🟢 POST /api/terminal/webhook (success-only)'); } catch {}
+      try { log('🟢 POST /api/terminal/webhook'); } catch {}
       try {
-        console.log('📥 Terminal webhook received (success-only). Ignoring body and marking success.', {
+        console.log('📥 Terminal webhook received. Checking payment status...', {
           headers: (req as any).headers,
         });
       } catch {}
-      // Record a global last-completed marker so polling endpoints immediately resolve
-      try {
-        (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
-          status: 'completed',
-          updatedAt: Date.now(),
-        };
-      } catch {}
-      // Attempt minimal enrichment by extracting id and invoking service (non-blocking)
-      try {
-        let txId: string | undefined;
-        let payload: any = (req as any).body || {};
-        if (!payload || (Object.keys(payload).length === 0 && (req as any).rawBody)) {
-          try { payload = JSON.parse((req as any).rawBody); } catch {}
-        }
-        if (typeof payload === 'string') {
-          try { payload = JSON.parse(payload); } catch {}
-        }
-        let maybe: any = payload?.payload ?? payload?.data ?? payload?.event ?? payload;
-        if (typeof maybe === 'string') {
-          try { maybe = JSON.parse(maybe); } catch {}
-        }
-        const candidate = maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || payload?.id;
-        if (candidate) txId = String(candidate);
-        if (txId) {
-          setImmediate(async () => {
-            try {
-              await (terminalService as any).handleWebhook({ transactionId: txId, type: 'cardTransaction' });
-            } catch (err) {
-              try { console.error('❌ Terminal webhook enrichment failed:', err); } catch {}
-            }
-          });
-        } else {
-          // No id provided; associate with the most recent active session so polling can complete
+      
+      // Parse the payload
+      let payload: any = (req as any).body || {};
+      if (!payload || (Object.keys(payload).length === 0 && (req as any).rawBody)) {
+        try { payload = JSON.parse((req as any).rawBody); } catch {}
+      }
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+      let maybe: any = payload?.payload ?? payload?.data ?? payload?.event ?? payload;
+      if (typeof maybe === 'string') {
+        try { maybe = JSON.parse(maybe); } catch {}
+      }
+      
+      // Extract transaction ID
+      let txId: string | undefined;
+      const candidate = maybe?.transactionId || maybe?.cardTransactionId || maybe?.id || maybe?.paymentId || payload?.id;
+      if (candidate) txId = String(candidate);
+      
+      // Determine payment status from webhook payload
+      let paymentStatus = 'pending';
+      const statusFields = [
+        payload?.status,
+        payload?.approved,
+        payload?.transactionStatus,
+        payload?.response,
+        maybe?.status,
+        maybe?.approved,
+        maybe?.transactionStatus,
+        maybe?.response
+      ];
+      
+      // Check for declined/cancelled/failed status
+      const statusStr = statusFields.filter(s => s != null).map(s => String(s).toLowerCase()).join(' ');
+      if (statusStr.includes('declined') || 
+          statusStr.includes('failed') || 
+          statusStr.includes('cancelled') || 
+          statusStr.includes('cancel') ||
+          statusStr.includes('voided') ||
+          statusStr.includes('refunded') ||
+          payload?.approved === false ||
+          payload?.approved === 'false' ||
+          payload?.approved === 0 ||
+          maybe?.approved === false ||
+          maybe?.approved === 'false' ||
+          maybe?.approved === 0) {
+        paymentStatus = 'failed';
+        console.log('❌ Payment declined/failed detected in terminal webhook');
+      } else if (payload?.approved === true || 
+                 payload?.approved === 'true' || 
+                 payload?.approved === 1 ||
+                 maybe?.approved === true ||
+                 maybe?.approved === 'true' ||
+                 maybe?.approved === 1 ||
+                 statusStr.includes('approved') ||
+                 statusStr.includes('completed') ||
+                 statusStr.includes('success')) {
+        paymentStatus = 'completed';
+        console.log('✅ Payment approved detected in terminal webhook');
+      }
+      
+      // Only record global marker if payment was successful AND we have the transaction ID
+      // This ensures we don't incorrectly mark other payments as complete
+      if (paymentStatus === 'completed' && txId) {
+        try {
+          (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
+            status: 'completed',
+            transactionId: txId,
+            updatedAt: Date.now(),
+          };
+        } catch {}
+      } else if (paymentStatus === 'failed' && txId) {
+        // Store failed status for this specific transaction
+        try {
+          (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
+            status: 'failed',
+            transactionId: txId,
+            updatedAt: Date.now(),
+          };
+        } catch {}
+      }
+      
+      // Attempt enrichment by invoking service (non-blocking)
+      if (txId) {
+        setImmediate(async () => {
           try {
-            const snapshot = (terminalService as any).getDebugSnapshot?.();
-            const sessions = Array.isArray(snapshot?.sessions) ? snapshot.sessions : [];
-            if (sessions.length > 0) {
-              const recent = sessions
-                .filter((s: any) => (Date.now() - (s.startedAt || 0)) <= 10 * 60 * 1000)
-                .sort((a: any, b: any) => (b.startedAt || 0) - (a.startedAt || 0))[0];
-              if (recent?.key) {
-                setImmediate(async () => {
-                  try {
-                    await (terminalService as any).handleWebhook({ invoiceNumber: String(recent.key), type: 'cardTransaction', approved: true });
-                  } catch (err) {
-                    try { console.error('❌ Terminal webhook session-association failed:', err); } catch {}
-                  }
-                });
-              }
+            await (terminalService as any).handleWebhook({ 
+              transactionId: txId, 
+              type: 'cardTransaction',
+              status: paymentStatus,
+              approved: payload?.approved || maybe?.approved,
+              response: payload?.response || maybe?.response,
+              rawPayload: payload
+            });
+          } catch (err) {
+            try { console.error('❌ Terminal webhook enrichment failed:', err); } catch {}
+          }
+        });
+      } else {
+        // No id provided; associate with the most recent active session so polling can complete
+        try {
+          const snapshot = (terminalService as any).getDebugSnapshot?.();
+          const sessions = Array.isArray(snapshot?.sessions) ? snapshot.sessions : [];
+          if (sessions.length > 0) {
+            const recent = sessions
+              .filter((s: any) => (Date.now() - (s.startedAt || 0)) <= 10 * 60 * 1000)
+              .sort((a: any, b: any) => (b.startedAt || 0) - (a.startedAt || 0))[0];
+            if (recent?.key) {
+              setImmediate(async () => {
+                try {
+                  await (terminalService as any).handleWebhook({ invoiceNumber: String(recent.key), type: 'cardTransaction', approved: true });
+                } catch (err) {
+                  try { console.error('❌ Terminal webhook session-association failed:', err); } catch {}
+                }
+              });
             }
-          } catch {}
-        }
-      } catch {}
+          }
+        } catch {}
+      }
       // Respond immediately; no further processing
       try { return res.json({ received: true }); } catch {}
       return;

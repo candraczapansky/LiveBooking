@@ -218,6 +218,17 @@ const AppointmentDetails = ({
     enabled: !!staff?.userId
   });
 
+  // Fetch saved payment methods for the client
+  const { data: savedPaymentMethods } = useQuery({
+    queryKey: ['/api/saved-payment-methods', appointment?.clientId],
+    queryFn: async () => {
+      if (!appointment?.clientId) return [];
+      const response = await apiRequest("GET", `/api/saved-payment-methods?clientId=${appointment.clientId}`);
+      return response.json();
+    },
+    enabled: !!appointment?.clientId
+  });
+
   // Ensure fresh client data when opening the edit dialog
   useEffect(() => {
     if (isEditClientOpen && appointment?.clientId) {
@@ -596,6 +607,19 @@ const AppointmentDetails = ({
     setChargeAmount(amt);
     setShowCardPayment(true);
     // Modal will be opened when user clicks "Pay Now" button
+  };
+
+  const handleSavedPaymentMethod = (paymentMethod: any) => {
+    // For now, use the existing HelcimPay.js flow
+    // The saved card information is displayed for user reference
+    // but the actual payment goes through the standard Helcim flow
+    toast({
+      title: "Using Saved Card",
+      description: `Processing payment with ${paymentMethod.cardBrand} ending in ${paymentMethod.cardLast4}. Please complete the payment form.`,
+    });
+    
+    // Open the card payment flow
+    handleCardPayment();
   };
 
   // Card payment inline handlers handled inline in JSX
@@ -1089,6 +1113,44 @@ const AppointmentDetails = ({
                             Pay with Card
                           </div>
                         </Button>
+
+                        {/* Saved Payment Methods */}
+                        {savedPaymentMethods && savedPaymentMethods.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Saved Payment Methods
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Click to use your saved card (you'll need to complete the payment form)
+                            </div>
+                            {savedPaymentMethods.map((paymentMethod: any) => (
+                              <Button
+                                key={paymentMethod.id}
+                                onClick={() => handleSavedPaymentMethod(paymentMethod)}
+                                variant="outline"
+                                className="w-full justify-start"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="h-4 w-4" />
+                                  <span>
+                                    {paymentMethod.cardBrand} ending in {paymentMethod.cardLast4}
+                                  </span>
+                                  {paymentMethod.isDefault && (
+                                    <Badge variant="secondary" className="ml-auto text-xs">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Debug info - remove this later */}
+                        {savedPaymentMethods && savedPaymentMethods.length === 0 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                            No saved payment methods found for this client. Cards are saved during the booking process.
+                          </div>
+                        )}
 
                         {/* Smart Terminal Payment */}
                         <Button

@@ -149,9 +149,12 @@ export default function SmartTerminalPayment({
           };
           handlePaymentSuccess(paymentData);
           return;
-        } else if (data.status === 'failed') {
-          console.log('❌ Payment failed:', data);
-          throw new Error(data.message || 'Payment failed');
+        } else if (data.status === 'failed' || data.status === 'cancelled') {
+          console.log('❌ Payment declined/cancelled:', data);
+          setStatus('failed');
+          const errorMessage = data.message || (data.status === 'cancelled' ? 'Payment was cancelled' : 'Payment was declined');
+          setMessage(errorMessage);
+          throw new Error(errorMessage);
         }
 
         // Update status message

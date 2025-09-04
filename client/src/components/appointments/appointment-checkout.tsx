@@ -1,15 +1,17 @@
-import { useState } from "react";
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from "react";
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, User, Clock, DollarSign, CheckCircle } from "lucide-react";
+import { Calendar, User, Clock, DollarSign, CheckCircle, CreditCard, Loader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/utils";
 import { format } from "date-fns";
+import { HelcimPayModal } from "../payment/helcim-pay-modal";
+import { SaveCardModal } from "../payment/save-card-modal";
 
 interface AppointmentDetails {
   id: number;
@@ -47,8 +49,36 @@ export default function AppointmentCheckout({
 }: AppointmentCheckoutProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [showHelcimPayModal, setShowHelcimPayModal] = useState(false);
+  const [showSaveCardModal, setShowSaveCardModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch saved payment methods for the client
+  const { data: savedPaymentMethods, isLoading: isLoadingCards } = useQuery({
+    queryKey: ['/api/saved-payment-methods', appointment.clientId],
+    queryFn: async () => {
+      if (!appointment.clientId) return [];
+      const response = await apiRequest('GET', `/api/saved-payment-methods?clientId=${appointment.clientId}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: isOpen && !!appointment.clientId
+  });
+
+  // Fetch client details for payment processing
+  const { data: clientData } = useQuery({
+    queryKey: ['/api/clients', appointment.clientId],
+    queryFn: async () => {
+      if (!appointment.clientId) return null;
+      const response = await apiRequest('GET', `/api/clients/${appointment.clientId}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: isOpen && !!appointment.clientId
+  });
 
   // Calculate base amount
   const baseAmount = appointment.totalAmount || (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
@@ -89,39 +119,53 @@ export default function AppointmentCheckout({
   };
 
   const handleCompleteAppointment = async () => {
+    if (paymentMethod === "card" && !selectedCardId && savedPaymentMethods?.length > 0) {
+      toast({
+        title: "Select a payment method",
+        description: "Please select a saved card or add a new one.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      // Record a cash payment and create staff earnings, then mark appointment complete
-      await apiRequest("POST", "/api/confirm-cash-payment", {
-        appointmentId: appointment.id,
-        amount: finalAmount,
-        notes: `Completed via calendar checkout${discountAmount > 0 && discountCode ? ` | Discount ${discountCode.toUpperCase()} -$${discountAmount.toFixed(2)}` : ''}`,
-        ...(discountAmount > 0 && discountCode ? { discountCode: discountCode.trim(), discountAmount } : {}),
-      });
+      if (paymentMethod === "cash") {
+        // Record a cash payment and create staff earnings, then mark appointment complete
+        await apiRequest("POST", "/api/confirm-cash-payment", {
+          appointmentId: appointment.id,
+          amount: finalAmount,
+          notes: `Completed via calendar checkout${discountAmount > 0 && discountCode ? ` | Discount ${discountCode.toUpperCase()} -$${discountAmount.toFixed(2)}` : ''}`,
+          ...(discountAmount > 0 && discountCode ? { discountCode: discountCode.trim(), discountAmount } : {}),
+        });
 
-      // Ensure appointment is marked completed for calendar views
-      await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
-        status: 'completed',
-        paymentStatus: 'paid',
-        totalAmount: finalAmount
-      });
+        // Ensure appointment is marked completed for calendar views
+        await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+          status: 'completed',
+          paymentStatus: 'paid',
+          totalAmount: finalAmount
+        });
 
-      toast({
-        title: "Appointment Completed",
-        description: `Appointment for ${appointment.serviceName} has been marked as completed.`,
-      });
+        toast({
+          title: "Appointment Completed",
+          description: `Appointment for ${appointment.serviceName} has been marked as completed.`,
+        });
 
-      // Invalidate related data so payroll/report pages reflect immediately
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
-      queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+        // Invalidate related data so payroll/report pages reflect immediately
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+        queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+        queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
 
-      setIsSuccess(true);
-      // Keep the success confirmation visible until the user closes it
-      // Notify parent that payment succeeded for any external updates
-      try { onSuccess(); } catch {}
+        setIsSuccess(true);
+        // Notify parent that payment succeeded for any external updates
+        try { onSuccess(); } catch {}
+      } else {
+        // Card payment - show HelcimPay modal
+        setShowHelcimPayModal(true);
+      }
     } catch (error: any) {
       console.error('Error completing appointment:', error);
       toast({
@@ -131,6 +175,59 @@ export default function AppointmentCheckout({
       });
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  // Handle Helcim payment success
+  const handleHelcimPaymentSuccess = async (paymentData: any) => {
+    try {
+      console.log("[AppointmentCheckout] Helcim payment success:", paymentData);
+      
+      // Update appointment as paid
+      await apiRequest("PUT", `/api/appointments/${appointment.id}`, {
+        status: 'completed',
+        paymentStatus: 'paid',
+        totalAmount: finalAmount,
+        paymentMethod: 'card',
+        paymentReference: paymentData.paymentId
+      });
+
+      // Create payment record
+      await apiRequest("POST", "/api/payments", {
+        clientId: appointment.clientId,
+        appointmentId: appointment.id,
+        amount: baseAmount,
+        tipAmount: 0,
+        totalAmount: finalAmount,
+        method: 'card',
+        status: 'completed',
+        type: 'appointment',
+        description: `Card payment for ${appointment.serviceName} appointment`,
+        helcimPaymentId: paymentData.paymentId,
+        paymentDate: new Date()
+      });
+
+      toast({
+        title: "Payment Successful",
+        description: `Payment of ${formatPrice(finalAmount)} has been processed.`,
+      });
+
+      // Invalidate queries
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
+
+      setShowHelcimPayModal(false);
+      setIsSuccess(true);
+      try { onSuccess(); } catch {}
+    } catch (error) {
+      console.error("[AppointmentCheckout] Error after payment:", error);
+      toast({
+        title: "Error",
+        description: "Payment was processed but failed to update appointment. Please contact support.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -224,9 +321,97 @@ export default function AppointmentCheckout({
 
               <Separator />
 
-              <div className="text-sm text-gray-600">
-                <p>This will mark the appointment as completed.</p>
-                <p className="mt-1">Note: Payment processing has been removed from this app.</p>
+              {/* Payment Method Selection */}
+              <div className="space-y-3">
+                <Label className="text-sm font-medium">Payment Method</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={paymentMethod === "cash" ? "default" : "outline"}
+                    onClick={() => setPaymentMethod("cash")}
+                    className="flex-1"
+                    disabled={isProcessing}
+                  >
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Cash
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={paymentMethod === "card" ? "default" : "outline"}
+                    onClick={() => setPaymentMethod("card")}
+                    className="flex-1"
+                    disabled={isProcessing}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Card
+                  </Button>
+                </div>
+
+                {/* Saved Cards Section */}
+                {paymentMethod === "card" && (
+                  <div className="space-y-2 mt-3">
+                    {isLoadingCards ? (
+                      <div className="flex items-center justify-center py-4">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-sm text-gray-600">Loading saved cards...</span>
+                      </div>
+                    ) : savedPaymentMethods && savedPaymentMethods.length > 0 ? (
+                      <>
+                        <Label className="text-sm">Select a saved card</Label>
+                        <div className="space-y-2">
+                          {savedPaymentMethods.map((card: any) => (
+                            <div
+                              key={card.id}
+                              className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                                selectedCardId === card.id 
+                                  ? 'border-primary bg-primary/10' 
+                                  : 'border-gray-200 hover:border-primary/50'
+                              }`}
+                              onClick={() => setSelectedCardId(card.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <CreditCard className="h-4 w-4" />
+                                  <span className="text-sm font-medium">
+                                    {card.cardBrand} •••• {card.cardLast4}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-500">
+                                  Exp: {card.cardExpMonth}/{card.cardExpYear}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowSaveCardModal(true)}
+                            className="w-full"
+                            disabled={isProcessing}
+                          >
+                            <CreditCard className="h-4 w-4 mr-2" />
+                            Add New Card
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-gray-600 mb-3">No saved cards found</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setShowSaveCardModal(true)}
+                          disabled={isProcessing}
+                        >
+                          <CreditCard className="h-4 w-4 mr-2" />
+                          Add New Card
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex space-x-2 pt-2">
@@ -241,9 +426,9 @@ export default function AppointmentCheckout({
                 <Button
                   onClick={handleCompleteAppointment}
                   className="flex-1"
-                  disabled={isProcessing}
+                  disabled={isProcessing || (paymentMethod === "card" && !savedPaymentMethods?.length && !selectedCardId)}
                 >
-                  {isProcessing ? "Completing..." : "Complete Appointment"}
+                  {isProcessing ? "Processing..." : paymentMethod === "cash" ? "Complete (Cash)" : "Process Payment"}
                 </Button>
               </div>
             </>
@@ -259,6 +444,50 @@ export default function AppointmentCheckout({
           )}
         </CardContent>
       </Card>
+
+      {/* Helcim Payment Modal */}
+      {showHelcimPayModal && (
+        <HelcimPayModal
+          open={showHelcimPayModal}
+          onOpenChange={setShowHelcimPayModal}
+          amount={finalAmount}
+          customerId={clientData?.helcimCustomerId}
+          cardId={selectedCardId ? 
+            savedPaymentMethods?.find((c: any) => c.id === selectedCardId)?.helcimCardId : 
+            undefined
+          }
+          description={`Payment for ${appointment.serviceName} appointment`}
+          onSuccess={handleHelcimPaymentSuccess}
+          onError={(error) => {
+            console.error("[AppointmentCheckout] Payment error:", error);
+            toast({
+              title: "Payment Failed",
+              description: error.message || "Failed to process payment. Please try again.",
+              variant: "destructive"
+            });
+          }}
+        />
+      )}
+
+      {/* Save Card Modal */}
+      {showSaveCardModal && clientData && (
+        <SaveCardModal
+          open={showSaveCardModal}
+          onOpenChange={setShowSaveCardModal}
+          clientId={appointment.clientId}
+          customerEmail={clientData.email}
+          customerName={`${clientData.firstName} ${clientData.lastName}`}
+          onSaved={(cardInfo) => {
+            console.log("[AppointmentCheckout] Card saved:", cardInfo);
+            queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
+            setShowSaveCardModal(false);
+            toast({
+              title: "Card Saved",
+              description: `Card ending in ${cardInfo.last4} has been saved.`
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function SaveCardModal({
   useEffect(() => {
     console.log("[SaveCardModal] 🔒 Setting up PERSISTENT message listener");
     
-    const persistentMessageHandler = (event: MessageEvent) => {
+    const persistentMessageHandler = async (event: MessageEvent) => {
       // Only log messages from Helcim domain
       if (event.origin.includes('helcim') || event.origin.includes('secure.helcim.app')) {
         console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Message from:", event.origin);
@@ -68,16 +68,69 @@ export function SaveCardModal({
             console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - SUCCESS DETECTED!");
             console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - This is the payment completion message!");
             
-            // Try to trigger the callback even though modal is closed
-            // We need to find a way to communicate this back to the booking widget
-            console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Attempting to trigger appointment creation...");
+            // Parse the event message to get card details
+            let cardToken = null;
+            let transactionId = null;
+            let cardLast4 = null;
+            let cardBrand = null;
+            
+            try {
+              const eventMessageData = JSON.parse(event.data.eventMessage);
+              const cardData = eventMessageData.data?.data;
+              cardToken = cardData?.cardToken;
+              transactionId = cardData?.transactionId;
+              cardLast4 = cardData?.cardNumber?.slice(-4);
+              cardBrand = cardData?.cardHolderName ? 'Card' : 'Card'; // Helcim doesn't provide brand in this response
+              console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Parsed card data:", { cardToken, transactionId, cardLast4, cardBrand });
+            } catch (err) {
+              console.error("[SaveCardModal] 🔒 PERSISTENT LISTENER - Error parsing event message:", err);
+            }
+            
+            // Save the card to the client's profile
+            if (cardToken) {
+              console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Saving card to client profile...");
+              
+              // Get client info from the window object (set when modal opened)
+              const clientInfo = (window as any).helcimSaveCardCallback;
+              if (clientInfo && clientInfo.clientId) {
+                try {
+                  const saveResponse = await fetch('/api/payments/helcim/save-card', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                      token: cardToken,
+                      clientId: clientInfo.clientId,
+                      customerEmail: clientInfo.customerEmail,
+                      customerName: clientInfo.customerName
+                    })
+                  });
+                  
+                  const saveResult = await saveResponse.json();
+                  console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save result:", saveResult);
+                  
+                  if (saveResult.success) {
+                    console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card saved successfully to client profile!");
+                  } else {
+                    console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save failed (non-blocking):", saveResult.message);
+                  }
+                } catch (saveErr) {
+                  console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Error saving card (non-blocking):", saveErr);
+                }
+              } else {
+                console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - No client info available for card save");
+              }
+            }
             
             // Dispatch a custom event that the booking widget can listen for
             const successEvent = new CustomEvent('helcim-payment-success', {
               detail: {
                 eventData: event.data,
-                cardToken: event.data.eventMessage ? JSON.parse(event.data.eventMessage).data?.data?.cardToken : null,
-                transactionId: event.data.eventMessage ? JSON.parse(event.data.eventMessage).data?.data?.transactionId : null
+                cardToken,
+                transactionId,
+                cardLast4,
+                cardBrand
               }
             });
             window.dispatchEvent(successEvent);
@@ -260,6 +313,26 @@ export function SaveCardModal({
       window.removeEventListener('message', globalMessageHandler);
     };
   }, [open]);
+
+  // Set client info in window object for persistent listener access
+  useEffect(() => {
+    if (open && clientId && customerEmail && customerName) {
+      (window as any).helcimSaveCardCallback = {
+        clientId,
+        customerEmail,
+        customerName
+      };
+      console.log("[SaveCardModal] Set client info in window object:", { clientId, customerEmail, customerName });
+    }
+    
+    return () => {
+      // Clean up when modal closes
+      if (!open) {
+        delete (window as any).helcimSaveCardCallback;
+        console.log("[SaveCardModal] Cleaned up client info from window object");
+      }
+    };
+  }, [open, clientId, customerEmail, customerName]);
 
   // Monitor for Helcim iframe closure and success messages
   useEffect(() => {

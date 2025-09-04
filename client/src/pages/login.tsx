@@ -97,7 +97,7 @@ const Login = () => {
       // Navigate after login
       const params = new URLSearchParams(window.location.search);
       const redirect = params.get('redirect');
-      const target = redirect && redirect.startsWith('/booking') ? redirect : '/dashboard';
+      const target = redirect && redirect.startsWith('/booking') ? redirect : '/appointments';
       try {
         window.location.assign(target);
       } catch {
