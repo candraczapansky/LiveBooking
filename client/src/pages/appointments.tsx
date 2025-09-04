@@ -127,6 +127,15 @@ const AppointmentsPage = () => {
   };
   const { user } = useContext(AuthContext);
 
+  // Clear local overrides on every page load so nothing is pre-selected
+  useEffect(() => {
+    try {
+      localStorage.setItem('arrivedAppointments', '[]');
+      localStorage.setItem('confirmedAppointments', '[]');
+      setCalendarRefreshToken((v) => v + 1);
+    } catch {}
+  }, []);
+
   // Queries
   const { data: appointments = [], refetch } = useQuery({
     queryKey: ['/api/appointments', selectedLocation?.id],
@@ -1703,13 +1712,21 @@ const AppointmentsPage = () => {
                         arrivedColor={arrivedColor}
                         events={(() => {
                           try {
-                            // Read locally-marked arrived appointments to color them immediately
+                            // Read locally-marked overrides
                             let arrivedIds: number[] = [];
+                            let confirmedIds: number[] = [];
                             try {
                               const raw = typeof window !== 'undefined' ? (localStorage.getItem('arrivedAppointments') || '[]') : '[]';
                               const parsed = JSON.parse(raw);
                               if (Array.isArray(parsed)) {
                                 arrivedIds = parsed.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n));
+                              }
+                            } catch {}
+                            try {
+                              const rawC = typeof window !== 'undefined' ? (localStorage.getItem('confirmedAppointments') || '[]') : '[]';
+                              const parsedC = JSON.parse(rawC);
+                              if (Array.isArray(parsedC)) {
+                                confirmedIds = parsedC.map((n: any) => Number(n)).filter((n: any) => Number.isFinite(n));
                               }
                             } catch {}
 
@@ -1723,6 +1740,7 @@ const AppointmentsPage = () => {
                                 const client = users?.find((u: any) => u.id === apt.clientId);
                                 const service = serviceIdMap?.[Number(apt.serviceId)] ?? services?.find((s: any) => Number(s.id) === Number(apt.serviceId));
                                 const isArrivedLocal = arrivedIds.includes(Number(apt.id));
+                                const isConfirmedLocal = confirmedIds.includes(Number(apt.id));
                                 
                                 // Validate and parse dates
                                 let startDate: Date;
@@ -1766,6 +1784,7 @@ const AppointmentsPage = () => {
                                   resource: {
                                     ...apt,
                                     arrivedOverride: isArrivedLocal === true,
+                                    confirmedOverride: isConfirmedLocal === true,
                                     service: service || (apt as any)?.service || null,
                                     serviceColor: (service?.color || (apt as any)?.service?.color || '#3B82F6'),
                                   },
@@ -1893,8 +1912,13 @@ const AppointmentsPage = () => {
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
                         >
                           {(() => {
-                            const isConfirmed = String(ctxAppointment?.status || '').toLowerCase() === 'confirmed';
+                            let isConfirmedLocal = false;
                             let isArrivedMarked = false;
+                            try {
+                              const rawC = (typeof window !== 'undefined' && localStorage.getItem('confirmedAppointments')) || '[]';
+                              const idsC = JSON.parse(rawC as string);
+                              isConfirmedLocal = Array.isArray(idsC) && idsC.includes(Number(ctxAppointment?.id));
+                            } catch {}
                             try {
                               const raw = (typeof window !== 'undefined' && localStorage.getItem('arrivedAppointments')) || '[]';
                               const ids = JSON.parse(raw as string);
@@ -1906,18 +1930,17 @@ const AppointmentsPage = () => {
                                   <input
                                     type="checkbox"
                                     className="mr-2"
-                                    checked={isConfirmed}
+                                    checked={isConfirmedLocal}
                                     onChange={async (e) => {
                                       try {
                                         if (!ctxAppointment?.id) return;
                                         const nextChecked = e.target.checked;
-                                        if (nextChecked) {
-                                          await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
-                                          setCtxAppointment((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
-                                        } else {
-                                          await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'pending' });
-                                          setCtxAppointment((prev: any) => prev ? { ...prev, status: 'pending' } : prev);
-                                        }
+                                        const rawC = localStorage.getItem('confirmedAppointments') || '[]';
+                                        const idsC: number[] = JSON.parse(rawC);
+                                        const idNum = Number(ctxAppointment.id);
+                                        const next = Array.isArray(idsC) ? idsC.filter((x) => Number(x) !== idNum) : [];
+                                        if (nextChecked) next.push(idNum);
+                                        localStorage.setItem('confirmedAppointments', JSON.stringify(next));
                                         setCalendarRefreshToken((v)=>v+1);
                                         refetch();
                                       } catch {}
@@ -1935,16 +1958,11 @@ const AppointmentsPage = () => {
                                       try {
                                         if (!ctxAppointment?.id) return;
                                         const nextChecked = e.target.checked;
+                                        const idNum = Number(ctxAppointment.id);
                                         if (nextChecked) {
-                                          // Mark as arrived locally and ensure status is confirmed
-                                          if (String(ctxAppointment?.status || '').toLowerCase() !== 'confirmed') {
-                                            await apiRequest("PUT", `/api/appointments/${ctxAppointment.id}`, { status: 'confirmed' });
-                                            setCtxAppointment((prev: any) => prev ? { ...prev, status: 'confirmed' } : prev);
-                                          }
-                                          addArrivedLocal(Number(ctxAppointment.id));
+                                          addArrivedLocal(idNum);
                                         } else {
-                                          // Unmark arrived locally
-                                          removeArrivedLocal(Number(ctxAppointment.id));
+                                          removeArrivedLocal(idNum);
                                         }
                                         setCalendarRefreshToken((v)=>v+1);
                                         refetch();

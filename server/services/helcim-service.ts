@@ -7,13 +7,16 @@ export class HelcimService {
   constructor() {
     this.apiToken = process.env.HELCIM_API_TOKEN || '';
     this.apiUrl = process.env.HELCIM_API_URL || 'https://api.helcim.com/v2';
-
-    if (!this.apiToken) {
-      throw new Error('HELCIM_API_TOKEN is not configured');
-    }
+    
+    // Don't throw error in constructor - check when making requests instead
+    // This allows the service to be imported even when API is not configured
   }
 
   private async makeRequest(endpoint: string, method: string, data?: any) {
+    if (!this.apiToken) {
+      throw new Error('HELCIM_API_TOKEN is not configured');
+    }
+    
     try {
       const response = await axios({
         method,

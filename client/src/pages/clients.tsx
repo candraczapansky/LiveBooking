@@ -78,6 +78,7 @@ import ClientNoteHistory from "@/components/client/client-note-history";
 
 
 import { PermissionGuard } from "@/components/permissions/PermissionGuard";
+import { SaveCardModal } from "@/components/payment/save-card-modal";
 type Client = {
   id: number;
   username: string;
@@ -2591,3 +2592,127 @@ const ClientsPage = () => {
 };
 
 export default ClientsPage;
+
+// Payment methods management for a specific client (save/list/set default/delete)
+function ClientPaymentMethods({ clientId, clientName }: { clientId: number; clientName: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showSaveCard, setShowSaveCard] = useState(false);
+
+  // Fetch saved payment methods for the client
+  const { data: savedPaymentMethods, isLoading: isLoadingCards } = useQuery({
+    queryKey: ['/api/saved-payment-methods', clientId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/saved-payment-methods?clientId=${clientId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!clientId,
+  });
+
+  // Fetch client details for email/name to pass into SaveCardModal
+  const { data: clientData } = useQuery({
+    queryKey: ['/api/users', clientId],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/users/${clientId}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!clientId,
+  });
+
+  const refetchCards = () => queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
+
+  const handleSetDefault = async (paymentMethodId: number) => {
+    try {
+      const res = await apiRequest('PUT', `/api/saved-payment-methods/${paymentMethodId}/default`, {});
+      if (!res.ok) throw new Error('Failed to set default card');
+      await refetchCards();
+      toast({ title: 'Default updated', description: 'Card set as default.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to update default card', variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async (paymentMethodId: number) => {
+    try {
+      const res = await apiRequest('DELETE', `/api/saved-payment-methods/${paymentMethodId}`);
+      if (!res.ok) throw new Error('Failed to delete card');
+      await refetchCards();
+      toast({ title: 'Removed', description: 'Card removed from profile.' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || 'Failed to remove card', variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="mt-4">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Payment Methods</CardTitle>
+        <Button variant="outline" size="sm" onClick={() => setShowSaveCard(true)}>
+          <CreditCard className="h-4 w-4 mr-2" />
+          Add Card
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoadingCards ? (
+          <div className="flex items-center justify-center py-4 text-sm text-gray-600">
+            Loading saved cards...
+          </div>
+        ) : savedPaymentMethods && savedPaymentMethods.length > 0 ? (
+          <div className="space-y-2">
+            {savedPaymentMethods.map((pm: any) => (
+              <div key={pm.id} className="flex items-center justify-between border rounded-md p-3">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-4 w-4" />
+                  <div className="text-sm">
+                    <div className="font-medium">
+                      {pm.cardBrand} •••• {pm.cardLast4}
+                      {pm.isDefault && (
+                        <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">Default</span>
+                      )}
+                    </div>
+                    <div className="text-xs text-gray-500">Exp: {pm.cardExpMonth}/{pm.cardExpYear}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!pm.isDefault && (
+                    <Button variant="outline" size="sm" onClick={() => handleSetDefault(pm.id)}>Make Default</Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={() => handleDelete(pm.id)}>
+                    <Trash2 className="h-4 w-4 mr-1" /> Remove
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            No saved cards yet. Click "Add Card" to securely save a card for {clientName}.
+          </div>
+        )}
+      </CardContent>
+
+      {showSaveCard && clientData && (
+        <SaveCardModal
+          open={showSaveCard}
+          onOpenChange={(open) => {
+            setShowSaveCard(open);
+            if (!open) {
+              // Ensure iframe is cleaned up and refresh list
+              refetchCards();
+            }
+          }}
+          clientId={clientId}
+          customerEmail={clientData.email}
+          customerName={`${clientData.firstName || ''} ${clientData.lastName || ''}`.trim() || clientName}
+          onSaved={() => {
+            setShowSaveCard(false);
+            refetchCards();
+            toast({ title: 'Card saved', description: 'Payment method added to profile.' });
+          }}
+        />
+      )}
+    </Card>
+  );
+}
