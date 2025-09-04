@@ -71,6 +71,7 @@ import { getInitials, getFullName } from "@/lib/utils";
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientAnalytics from "@/components/client/client-analytics";
+import ClientPhotoGallery from "@/components/client/client-photo-gallery";
 import ClientCommunication from "@/components/client/client-communication";
 import ClientSearchFilters from "@/components/client/client-search-filters";
 import ClientNoteHistory from "@/components/client/client-note-history";
@@ -1709,6 +1710,14 @@ const ClientsPage = () => {
                   <ClientFormSubmissions 
                     clientId={clientDetail.id} 
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || clientDetail.username}
+                  />
+                )}
+
+                {/* Client Photos */}
+                {clientDetail && (
+                  <ClientPhotoGallery 
+                    clientId={clientDetail.id}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                   />
                 )}
 

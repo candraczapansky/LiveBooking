@@ -139,12 +139,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         // Try without extension (will resolve to .ts in tsx, .js in Node)
         helcimModule = await import('./routes/payments/helcim');
       } catch (e2) {
-        try {
-          // Explicitly try TypeScript for development
-          helcimModule = await import('./routes/payments/helcim.ts');
-        } catch (e3) {
-          throw e2;
-        }
+        // If both attempts fail, throw the original error
+        throw e2;
       }
     }
     const modDefault = helcimModule?.default || helcimModule;
