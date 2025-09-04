@@ -71,6 +71,7 @@ import { getInitials, getFullName } from "@/lib/utils";
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientAnalytics from "@/components/client/client-analytics";
+import ClientPhotoGallery from "@/components/client/client-photo-gallery";
 import ClientCommunication from "@/components/client/client-communication";
 import ClientSearchFilters from "@/components/client/client-search-filters";
 import ClientNoteHistory from "@/components/client/client-note-history";
@@ -79,6 +80,7 @@ import ClientNoteHistory from "@/components/client/client-note-history";
 
 import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 type Client = {
   id: number;
   username: string;
@@ -141,6 +143,7 @@ const ClientsPage = () => {
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
   const [showAllClients, setShowAllClients] = useState(false);
+  const [showSaveCardEdit, setShowSaveCardEdit] = useState(false);
 
   const [location] = useLocation();
   
@@ -1688,14 +1691,33 @@ const ClientsPage = () => {
                   />
                 )}
 
-                {/* Appointment History */}
-                {clientDetail && <ClientAppointmentHistory clientId={clientDetail.id} />}
+                {/* Appointment History (Dropdown) */}
+                {clientDetail && (
+                  <div className="mt-4">
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="appointment-history">
+                        <AccordionTrigger>Appointment History</AccordionTrigger>
+                        <AccordionContent>
+                          <ClientAppointmentHistory clientId={clientDetail.id} />
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
+                  </div>
+                )}
 
                 {/* Form Submissions */}
                 {clientDetail && (
                   <ClientFormSubmissions 
                     clientId={clientDetail.id} 
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || clientDetail.username}
+                  />
+                )}
+
+                {/* Client Photos */}
+                {clientDetail && (
+                  <ClientPhotoGallery 
+                    clientId={clientDetail.id}
+                    clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                   />
                 )}
 
@@ -2386,12 +2408,37 @@ const ClientsPage = () => {
                 >
                   Test Submit
                 </Button>
+                {selectedClient && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowSaveCardEdit(true)}
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Add Card
+                  </Button>
+                )}
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
       
+      {showSaveCardEdit && selectedClient && (
+        <SaveCardModal
+          open={showSaveCardEdit}
+          onOpenChange={(open) => setShowSaveCardEdit(open)}
+          clientId={selectedClient.id}
+          customerEmail={selectedClient.email}
+          customerName={`${selectedClient.firstName || ''} ${selectedClient.lastName || ''}`.trim() || selectedClient.username}
+          onSaved={() => {
+            setShowSaveCardEdit(false);
+            try { queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] }); } catch {}
+            toast({ title: 'Card Saved', description: 'Payment method added to profile.' });
+          }}
+        />
+      )}
+
       {/* Delete Client Dialog */}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>

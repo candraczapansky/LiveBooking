@@ -9,6 +9,7 @@ interface SaveCardModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   clientId: number;
+  appointmentId?: number | null;
   customerEmail?: string;
   customerName?: string;
   onSaved?: (paymentMethod: any) => void;
@@ -18,6 +19,7 @@ export function SaveCardModal({
   open,
   onOpenChange,
   clientId,
+  appointmentId,
   customerEmail,
   customerName,
   onSaved,
@@ -102,6 +104,7 @@ export function SaveCardModal({
                     body: JSON.stringify({
                       token: cardToken,
                       clientId: clientInfo.clientId,
+                      appointmentId: clientInfo.appointmentId,
                       customerEmail: clientInfo.customerEmail,
                       customerName: clientInfo.customerName
                     })
@@ -155,28 +158,62 @@ export function SaveCardModal({
       setIsLoading(true);
       console.log("[SaveCardModal] Requesting Helcim checkout token...");
       
-      // Get a checkout token from the backend
-      const initRes = await apiRequest("POST", "/api/payments/helcim/initialize", {
-        amount: 0,  // Use 0 for card verification without charge
-        description: "Save Card",
-        customerEmail,
-        customerName,
-      });
-      const initData = await initRes.json();
+      // Helper: try multiple init endpoints for robustness across environments
+      const tryInitEndpoints = async () => {
+        const payload = {
+          amount: 0,
+          description: "Save Card",
+          customerEmail,
+          customerName,
+        } as any;
+        const endpoints = [
+          "/api/payments/helcim/initialize",
+          "/api/helcim-pay/initialize",
+        ];
+        for (const url of endpoints) {
+          try {
+            console.log("[SaveCardModal] Trying init:", url);
+            const res = await apiRequest("POST", url, payload);
+            if (!res.ok) {
+              try { const txt = await res.text(); console.log(`[SaveCardModal] Init ${url} failed:`, txt); } catch {}
+              continue;
+            }
+            const data = await res.json();
+            return { res, data } as const;
+          } catch (e) {
+            console.warn("[SaveCardModal] Init request error for", url, e);
+          }
+        }
+        throw new Error("All Helcim init endpoints failed");
+      };
+
+      // Get a checkout token from the backend (with endpoint fallbacks)
+      const { data: initData } = await tryInitEndpoints();
       console.log("[SaveCardModal] Helcim init response:", { 
         success: initData.success,
-        hasToken: !!initData.token,
+        hasToken: !!(initData.token || initData.checkoutToken),
         hasSecretToken: !!initData.secretToken
       });
       
-      if (!initRes.ok || !initData?.success || !initData?.token) {
+      const receivedToken = initData?.token || initData?.checkoutToken;
+      if (!initData?.success || !receivedToken) {
         throw new Error(initData?.message || "Failed to initialize Helcim session");
       }
       
       // Store the checkout token
-      setCheckoutToken(initData.token);
+      setCheckoutToken(receivedToken);
       setIsInitialized(true);
       console.log("[SaveCardModal] Checkout token received, ready to open Helcim modal");
+      
+      // Optional: auto-open Helcim window once initialized
+      try {
+        setTimeout(() => {
+          if (!helcimIframeOpen) {
+            console.log("[SaveCardModal] Auto-opening Helcim iframe after init");
+            try { handleOpenHelcimModal(); } catch (e) { console.warn("[SaveCardModal] Auto-open failed:", e); }
+          }
+        }, 150);
+      } catch {}
       
     } catch (err: any) {
       console.error("[SaveCardModal] Helcim init failed:", err);
@@ -319,10 +356,11 @@ export function SaveCardModal({
     if (open && clientId && customerEmail && customerName) {
       (window as any).helcimSaveCardCallback = {
         clientId,
+        appointmentId,
         customerEmail,
         customerName
       };
-      console.log("[SaveCardModal] Set client info in window object:", { clientId, customerEmail, customerName });
+      console.log("[SaveCardModal] Set client info in window object:", { clientId, appointmentId, customerEmail, customerName });
     }
     
     return () => {
@@ -426,6 +464,7 @@ export function SaveCardModal({
             const saveRes = await apiRequest("POST", "/api/payments/helcim/save-card", {
               token,
               clientId,
+              appointmentId,
               customerEmail,
               customerName
             });
@@ -522,6 +561,7 @@ export function SaveCardModal({
           apiRequest("POST", "/api/payments/helcim/save-card", {
             token: checkoutToken,
             clientId,
+            appointmentId,
             customerEmail,
             customerName
           }).then(async (res) => {
