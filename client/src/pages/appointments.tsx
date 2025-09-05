@@ -52,8 +52,30 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>("day");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('appointments.selectedDate');
+        if (stored) {
+          const ts = Number(stored);
+          if (!Number.isNaN(ts)) {
+            const d = new Date(ts);
+            if (!isNaN(d.getTime())) return d;
+          }
+        }
+      }
+    } catch {}
+    return new Date();
+  });
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const v = localStorage.getItem('appointments.calendarView');
+        if (v === 'day' || v === 'week' || v === 'month') return v;
+      }
+    } catch {}
+    return 'day';
+  });
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
@@ -128,6 +150,21 @@ const AppointmentsPage = () => {
   const { user } = useContext(AuthContext);
 
   // Note: Do not clear local overrides; persist selections across refresh
+
+  // Persist selected date and view locally so the page sticks when returning
+  useEffect(() => {
+    try {
+      if (selectedDate) {
+        localStorage.setItem('appointments.selectedDate', String(selectedDate.getTime()));
+      }
+    } catch {}
+  }, [selectedDate]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('appointments.calendarView', calendarView);
+    } catch {}
+  }, [calendarView]);
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -452,7 +489,8 @@ const AppointmentsPage = () => {
     }
   };
 
-  const filteredResources = staff.filter((s: any) => {
+  const staffList = Array.isArray(staff) ? (staff as any[]) : [];
+  const filteredResources = staffList.filter((s: any) => {
     // First apply staff filter
     if (selectedStaffFilter !== "all" && s.id !== parseInt(selectedStaffFilter)) {
       return false;
@@ -823,18 +861,18 @@ const AppointmentsPage = () => {
       const staffToShow = (() => {
         try {
           if (selectedStaffFilter !== "all") {
-            return staff.filter((s: any) => s.id === parseInt(selectedStaffFilter));
+            return staffList.filter((s: any) => s.id === parseInt(selectedStaffFilter));
           }
           
           // For day view, only show staff who are scheduled for the selected date AND location
           if (calendarView === 'day') {
             const dateToCheck = selectedDate || new Date();
-            return staff.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
+            return staffList.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
           }
           
           // For week and month views, only show staff who have schedules at the selected location
           if (selectedLocation?.id) {
-            return staff.filter((s: any) => {
+            return staffList.filter((s: any) => {
               const hasLocationSchedule = schedules.some((schedule: any) => 
                 schedule.staffId === s.id && schedule.locationId === selectedLocation.id
               );
@@ -843,7 +881,7 @@ const AppointmentsPage = () => {
           }
           
           // If no location selected, show all staff
-          return staff;
+          return staffList;
         } catch (error) {
           console.error('Error filtering staff:', error);
           return [];
@@ -881,7 +919,7 @@ const AppointmentsPage = () => {
         });
       } catch {}
 
-      const appointmentStaffToInclude = staff.filter((s: any) => staffIdsWithAppointmentsInView.has(s.id));
+      const appointmentStaffToInclude = staffList.filter((s: any) => staffIdsWithAppointmentsInView.has(s.id));
       const staffToProcess = [
         ...staffToShow,
         ...appointmentStaffToInclude.filter((s: any) => !staffToShow.some((ex: any) => ex.id === s.id))
@@ -1138,7 +1176,7 @@ const AppointmentsPage = () => {
         : [new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())];
 
       const staffToInclude = (selectedStaffFilter !== "all")
-        ? staff.filter((s: any) => s.id === parseInt(selectedStaffFilter))
+        ? staffList.filter((s: any) => s.id === parseInt(selectedStaffFilter))
         : filteredResources;
 
       staffToInclude.forEach((s: any) => {

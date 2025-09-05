@@ -554,6 +554,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
 
   // Add field to form
   const addField = (fieldType: string) => {
+    // Ensure any pending edits on the currently selected field are committed before adding a new one
+    commitPendingConfig();
     console.log("=== ADD FIELD DEBUG ===");
     console.log("Adding field type:", fieldType);
     console.log("Current fields before adding:", fields);
@@ -599,6 +601,9 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     const draft = pendingDraftRef.current;
     if (!draft) return;
     if (!selectedField || draft.fieldId !== selectedField.id) return;
+    const requiredNormalized = (draft.config?.required === 'indeterminate')
+      ? true
+      : Boolean(draft.config?.required);
     const cleanedOptions = Array.isArray(draft.inputValues?.options)
       ? draft.inputValues.options
           .map((opt: string) => (typeof opt === 'string' ? opt.replace(/\r/g, '') : ''))
@@ -607,6 +612,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
       : undefined;
     const finalConfig = {
       ...draft.config,
+      required: requiredNormalized,
       label: draft.inputValues?.label,
       placeholder: draft.inputValues?.placeholder,
       rows: draft.inputValues?.rows,
@@ -618,6 +624,38 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     };
     updateFieldConfig(draft.fieldId, finalConfig);
     pendingDraftRef.current = null;
+  };
+
+  // Resolve fields to include any pending draft config (avoids missing last edits when saving)
+  const resolveFieldsForSave = (currentFields: FormField[]) => {
+    const draft = pendingDraftRef.current;
+    if (!draft) return currentFields;
+    if (!selectedField || draft.fieldId !== selectedField.id) return currentFields;
+
+    const requiredNormalized = (draft.config?.required === 'indeterminate')
+      ? true
+      : Boolean(draft.config?.required);
+    const cleanedOptions = Array.isArray(draft.inputValues?.options)
+      ? draft.inputValues.options
+          .map((opt: string) => (typeof opt === 'string' ? opt.replace(/\r/g, '') : ''))
+          .map((opt: string) => opt.trim())
+          .filter((opt: string) => opt.length > 0)
+      : undefined;
+
+    const finalConfig = {
+      ...draft.config,
+      required: requiredNormalized,
+      label: draft.inputValues?.label,
+      placeholder: draft.inputValues?.placeholder,
+      rows: draft.inputValues?.rows,
+      maxStars: draft.inputValues?.maxStars,
+      maxSize: draft.inputValues?.maxSize,
+      min: draft.inputValues?.min,
+      max: draft.inputValues?.max,
+      ...(cleanedOptions ? { options: cleanedOptions } : {}),
+    };
+
+    return currentFields.map((f) => (f.id === draft.fieldId ? { ...f, config: finalConfig } : f));
   };
 
   // Update field configuration
@@ -1193,16 +1231,18 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
     mutationFn: async (data: FormBuilderValues) => {
       console.log("=== SAVE FORM MUTATION DEBUG ===");
       console.log("Mutation function called with data:", data);
-      console.log("Current fields state:", fields);
-      console.log("Fields length:", fields.length);
-      console.log("Fields content:", JSON.stringify(fields, null, 2));
+      // Ensure pending draft edits (e.g., Info text) are included in the save payload
+      const fieldsForSave = resolveFieldsForSave(fields);
+      console.log("Current fields state:", fieldsForSave);
+      console.log("Fields length:", fieldsForSave.length);
+      console.log("Fields content:", JSON.stringify(fieldsForSave, null, 2));
       
       const formData = {
         title: data.title,
         description: data.description,
         type: data.type,
         status: data.status,
-        fields: fields,
+        fields: fieldsForSave,
       };
 
       console.log("Form data to send:", formData);
@@ -1426,7 +1466,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
               <div className="border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                 <div className="flex space-x-8">
                   <button
-                    onClick={() => setActiveTab("builder")}
+                    onClick={() => { commitPendingConfig(); setActiveTab("builder"); }}
                     className={`py-2 px-1 border-b-2 font-medium text-sm ${
                       activeTab === "builder"
                         ? "border-blue-500 text-blue-600"
@@ -1436,7 +1476,7 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                     Form Builder
                   </button>
                   <button
-                    onClick={() => setActiveTab("preview")}
+                    onClick={() => { commitPendingConfig(); setActiveTab("preview"); }}
                     className={`py-2 px-1 border-b-2 font-medium text-sm ${
                       activeTab === "preview"
                         ? "border-blue-500 text-blue-600"
@@ -1587,6 +1627,8 @@ export function FormBuilder({ open, onOpenChange, formId }: FormBuilderProps) {
                                                   : "border-gray-200 dark:border-gray-700"
                                               }`}
                                               onClick={() => {
+                                                // Commit any draft from the previously selected field before switching
+                                                commitPendingConfig();
                                                 setSelectedField(field);
                                                 setShowFieldConfig(true);
                                               }}

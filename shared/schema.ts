@@ -490,6 +490,7 @@ export const savedPaymentMethods = pgTable("saved_payment_methods", {
   clientId: integer("client_id").notNull(),
   squareCardId: text("square_card_id"), // Optional for backward compatibility
   helcimCardId: text("helcim_card_id"),
+  helcimCustomerId: text("helcim_customer_id"), // Added to store Helcim customer ID for saved card payments
   cardBrand: text("card_brand").notNull(), // visa, mastercard, amex, etc.
   cardLast4: text("card_last4").notNull(),
   cardExpMonth: integer("card_exp_month").notNull(),

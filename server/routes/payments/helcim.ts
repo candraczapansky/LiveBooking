@@ -211,7 +211,23 @@ export default function createHelcimPaymentsRouter(storage?: any) {
   // Save card on file via HelcimPay.js token; save card info to appointment
   router.post('/save-card', async (req: Request, res: Response) => {
   try {
-    const { token, appointmentId, clientId, customerEmail, customerName } = req.body || {};
+    const { 
+      token, appointmentId, clientId, customerEmail, customerName, 
+      cardLast4, cardBrand, cardExpMonth, cardExpYear, transactionId 
+    } = req.body || {};
+    
+    console.log('[Helcim Save Card] Request body:', { 
+      token: token ? token.substring(0, 10) + '...' : 'none',
+      appointmentId,
+      clientId,
+      customerEmail,
+      customerName,
+      cardLast4,
+      cardBrand,
+      cardExpMonth,
+      cardExpYear,
+      transactionId
+    });
     
     if (!token) {
       return res.status(400).json({ success: false, message: 'token is required' });
@@ -219,7 +235,12 @@ export default function createHelcimPaymentsRouter(storage?: any) {
 
     // Check if Helcim API is configured
     const apiToken = process.env.HELCIM_API_TOKEN;
-    if (!apiToken || apiToken === '') {
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    // Disable automatic mock fallback. Only allow explicit mockMode flag.
+    const useMockMode = req.body?.mockMode === true;
+    
+    if (!isDevelopment && (!apiToken || apiToken === '')) {
       return res.status(500).json({ success: false, message: 'Helcim API not configured. Please configure HELCIM_API_TOKEN in your environment.' });
     }
 
@@ -240,7 +261,7 @@ export default function createHelcimPaymentsRouter(storage?: any) {
       if (storage && storage.updateAppointment) {
         try {
           await storage.updateAppointment(appointmentId, {
-            paymentCardToken: token,
+            paymentCardToken: token, // Persist Pay.js cardToken for later purchases
             paymentCardBrand: cardInfo.cardBrand,
             paymentCardLast4: cardInfo.cardLast4,
             paymentCardExpMonth: cardInfo.cardExpMonth,
@@ -265,6 +286,11 @@ export default function createHelcimPaymentsRouter(storage?: any) {
     // If saving to client profile (for future use)
     // Support both customerId (legacy) and clientId (from booking widget)
     let helcimCustomerId: string | null = req.body.customerId || null;
+    
+    // Handle mock mode for development
+    if (useMockMode) {
+      return res.status(400).json({ success: false, message: 'Mock mode is disabled. Remove mockMode flag to save a real card.' });
+    }
     
     // If we have a clientId but no helcimCustomerId, we need to create a Helcim customer
     if (!helcimCustomerId && (clientId || customerEmail)) {
@@ -291,8 +317,8 @@ export default function createHelcimPaymentsRouter(storage?: any) {
         });
         console.log('[Helcim Save Card] Customer created successfully:', created);
       } catch (error: any) {
-        console.error('[Helcim Save Card] Error creating customer:', error);
-        return res.status(500).json({ success: false, message: 'Failed to create Helcim customer', error: error?.message || 'Unknown error' });
+        console.error('[Helcim Save Card] Error creating customer (no mock fallback):', error);
+        return res.status(502).json({ success: false, message: 'Failed to create Helcim customer', error: error?.message || 'Unknown error' });
       }
       
       helcimCustomerId = String(created?.id || created?.customerId || created?.customer?.id || '');
@@ -304,6 +330,53 @@ export default function createHelcimPaymentsRouter(storage?: any) {
     
     if (!helcimCustomerId) {
       return res.status(400).json({ success: false, message: 'Unable to determine customer for card save' });
+    }
+
+    // If Pay.js reported a success with a transactionId, we can persist the cardToken immediately
+    if (transactionId && clientId) {
+      try {
+        if (storage) {
+          // Avoid duplicates: check for existing card by helcimCardId
+          try {
+            const existing = await storage.getSavedPaymentMethodsByClient(Number(clientId));
+            const dup = (existing || []).find((m: any) => String(m.helcimCardId) === String(token));
+            if (dup) {
+              return res.status(200).json({
+                success: true,
+                helcimCustomerId: String(dup.helcimCustomerId || helcimCustomerId),
+                helcimCardId: String(dup.helcimCardId),
+                cardBrand: dup.cardBrand,
+                cardLast4: dup.cardLast4,
+                cardExpMonth: dup.cardExpMonth,
+                cardExpYear: dup.cardExpYear,
+                note: 'Card already on file'
+              });
+            }
+          } catch {}
+          await storage.createSavedPaymentMethod({
+            clientId: Number(clientId),
+            helcimCardId: String(token),
+            helcimCustomerId: String(helcimCustomerId),
+            cardBrand: cardBrand || 'card',
+            cardLast4: cardLast4 || String(token).slice(-4).padStart(4, '0'),
+            cardExpMonth: Number(cardExpMonth || 0),
+            cardExpYear: Number(cardExpYear || 0),
+            isDefault: true,
+          } as any);
+        }
+        return res.status(201).json({
+          success: true,
+          helcimCustomerId: String(helcimCustomerId),
+          helcimCardId: String(token),
+          cardBrand: cardBrand || 'card',
+          cardLast4: cardLast4 || String(token).slice(-4).padStart(4, '0'),
+          cardExpMonth: Number(cardExpMonth || 0),
+          cardExpYear: Number(cardExpYear || 0),
+        });
+      } catch (earlyErr) {
+        console.error('[Helcim Save Card] Early persist failed:', earlyErr);
+        // Continue to attempt Helcim attach path below
+      }
     }
 
     console.log('[Helcim Save Card] Attempting to save card with:', { helcimCustomerId, token: token.substring(0, 10) + '...' });
@@ -318,14 +391,45 @@ export default function createHelcimPaymentsRouter(storage?: any) {
     
     let saved;
     try {
-      saved = await service2.saveCardToCustomer({ customerId: helcimCustomerId, token });
+      saved = await service2.saveCardToCustomer({ customerId: helcimCustomerId, token, transactionId });
       console.log('[Helcim Save Card] Card saved successfully:', saved);
     } catch (error: any) {
-      console.error('[Helcim Save Card] Error saving card to Helcim:', error);
-      return res.status(500).json({ success: false, message: 'Helcim API request failed', error: error?.message || 'Unknown error' });
+      console.error('[Helcim Save Card] Error saving card to Helcim (no mock fallback):', error);
+      // If Helcim attach failed but we do have a Pay.js token, still store it so future purchases can use cardToken
+      if (clientId) {
+        try {
+          if (storage) {
+            const fallbackData = {
+              clientId: Number(clientId),
+              helcimCardId: String(token), // Store the Pay.js cardToken
+              helcimCustomerId: String(helcimCustomerId),
+              cardBrand: cardBrand || 'card',
+              cardLast4: cardLast4 || '****',
+              cardExpMonth: Number(cardExpMonth || 0),
+              cardExpYear: Number(cardExpYear || 0),
+              isDefault: true,
+            };
+            console.warn('[Helcim Save Card] Storing Pay.js token without Helcim attach due to API error:', fallbackData);
+            await storage.createSavedPaymentMethod(fallbackData as any);
+            return res.status(201).json({
+              success: true,
+              helcimCustomerId: String(helcimCustomerId),
+              helcimCardId: String(token),
+              cardBrand: fallbackData.cardBrand,
+              cardLast4: fallbackData.cardLast4,
+              cardExpMonth: fallbackData.cardExpMonth,
+              cardExpYear: fallbackData.cardExpYear,
+              warning: 'Saved Pay.js token; Helcim attach failed. Purchases will use cardToken.'
+            });
+          }
+        } catch (dbErr) {
+          console.error('[Helcim Save Card] Failed to store Pay.js token fallback:', dbErr);
+        }
+      }
+      return res.status(502).json({ success: false, message: 'Helcim API request failed', error: error?.message || 'Unknown error' });
     }
     
-    const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id;
+    const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id || token; // Fallback to cardToken
     const brand = saved?.brand || saved?.cardBrand;
     const last4 = saved?.last4 || saved?.cardLast4;
     const expMonth = saved?.expMonth || saved?.cardExpMonth;
@@ -340,15 +444,18 @@ export default function createHelcimPaymentsRouter(storage?: any) {
       try {
         // Use the storage instance passed to the router factory
         if (storage) {
-          await storage.createSavedPaymentMethod({
+          const savedPaymentData = {
             clientId: Number(clientId),
             helcimCardId: String(helcimCardId),
+            helcimCustomerId: String(helcimCustomerId), // Store the Helcim customer ID for future payments
             cardBrand: brand || 'card',
             cardLast4: last4 || '****',
             cardExpMonth: Number(expMonth || 0),
             cardExpYear: Number(expYear || 0),
             isDefault: true // Set as default since it's the first/only card
-          });
+          };
+          console.log('[Helcim Save Card] Saving payment method to DB:', savedPaymentData);
+          await storage.createSavedPaymentMethod(savedPaymentData);
           console.log(`✅ Card saved to database for client ${clientId}`);
         } else {
           console.warn('[Helcim Save Card] Storage not available, card not saved to database');

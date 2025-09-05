@@ -158,7 +158,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       // Initialize Helcim Pay.js session (fallback)
       app.post('/api/payments/helcim/initialize', async (req: Request, res: Response) => {
         try {
-          const { amount, description } = req.body || {};
+          const { amount, description, customerId, cardId } = req.body || {};
           if (amount === undefined || amount === null) {
             return res.status(400).json({ success: false, message: 'Amount is required' });
           }
@@ -168,6 +168,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           if (!apiToken) {
             return res.status(500).json({ success: false, message: 'Helcim API token not configured' });
           }
+          
+          console.log('[Helcim Initialize] Request params:', { amount, description, customerId, cardId });
 
           const isCardSaveOnly = Number(amount) === 0 || (description && String(description).toLowerCase().includes('save card'));
           const payload: any = {
@@ -178,6 +180,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             description: description || 'Payment',
             idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           };
+          
+          // Add customer and card info if provided (for saved card payments)
+          if (customerId) {
+            payload.customerCode = customerId;
+          }
+          if (cardId) {
+            payload.cardId = cardId;
+          }
 
           const tryV2 = async () => {
             const r = await fetch(`${apiUrlV2}/helcim-pay/initialize`, {
@@ -235,7 +245,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           }
 
           const isDevelopment = process.env.NODE_ENV === 'development';
-          const mockMode = isDevelopment || req.body?.mockMode === true;
+          const mockMode = req.body?.mockMode === true; // explicit-only; do not auto-mock in dev
 
           if (mockMode && clientId) {
             const mockCardLast4 = String(token).slice(-4).padStart(4, '0');
@@ -247,6 +257,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
                   clientId: Number(clientId),
                   squareCardId: mockHelcimCardId,
                   helcimCardId: mockHelcimCardId,
+                  helcimCustomerId: `mock_customer_${clientId}`, // Store mock customer ID
                   cardBrand: mockCardBrand,
                   cardLast4: mockCardLast4,
                   cardExpMonth: 12,
@@ -284,8 +295,39 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
           const mod2 = await import('./services/helcim-service.js');
           const service2: any = (mod2 as any)?.helcimService || (mod2 as any)?.default || mod2;
-          const saved = await service2.saveCardToCustomer({ customerId: helcimCustomerId, token });
-          const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id;
+          let saved: any;
+          try {
+            saved = await service2.saveCardToCustomer({ customerId: helcimCustomerId, token });
+          } catch (e: any) {
+            // If Helcim attach fails, persist Pay.js token so purchases can use cardToken
+            if (clientId && storage) {
+              try {
+                await storage.createSavedPaymentMethod({
+                  clientId: Number(clientId),
+                  squareCardId: String(token),
+                  helcimCardId: String(token),
+                  helcimCustomerId: String(helcimCustomerId),
+                  cardBrand: 'card',
+                  cardLast4: String(token).slice(-4).padStart(4, '0'),
+                  cardExpMonth: 0,
+                  cardExpYear: 0,
+                  isDefault: true,
+                });
+              } catch {}
+              return res.status(201).json({
+                success: true,
+                helcimCustomerId: String(helcimCustomerId),
+                helcimCardId: String(token),
+                cardBrand: 'card',
+                cardLast4: String(token).slice(-4).padStart(4, '0'),
+                cardExpMonth: 0,
+                cardExpYear: 0,
+                warning: 'Saved Pay.js token; Helcim attach failed.'
+              });
+            }
+            throw e;
+          }
+          const helcimCardId = saved?.id || saved?.cardId || saved?.card?.id || token;
           const brand = saved?.brand || saved?.cardBrand || 'card';
           const last4 = saved?.last4 || saved?.cardLast4 || '****';
           const expMonth = saved?.expMonth || saved?.cardExpMonth || 0;
@@ -297,6 +339,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
                 clientId: Number(clientId),
                 squareCardId: String(helcimCardId),
                 helcimCardId: String(helcimCardId),
+                helcimCustomerId: String(helcimCustomerId), // Store Helcim customer ID
                 cardBrand: brand,
                 cardLast4: last4,
                 cardExpMonth: Number(expMonth),
@@ -322,10 +365,76 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     } catch {}
   }
 
+  // Process payment with saved card
+  app.post('/api/helcim-pay/process-saved-card', async (req: Request, res: Response) => {
+    try {
+      const { amount, customerId, cardId, description, appointmentId, clientId, tipAmount } = req.body || {};
+      
+      if (!amount || !customerId || !cardId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Amount, customerId, and cardId are required for saved card payment' 
+        });
+      }
+      
+      console.log('[Helcim Process Saved Card] Processing payment:', { amount, customerId, cardId, description });
+      
+      try {
+        // Try to process real payment through Helcim API
+        const mod = await import('./services/helcim-service.js');
+        const service: any = (mod as any)?.helcimService || (mod as any)?.default || mod;
+        
+        const paymentResult = await service.processSavedCardPayment({
+          customerId,
+          cardId, // This should be the Helcim cardToken we saved
+          amount,
+          description: description || 'Payment',
+          appointmentId,
+          clientId,
+          tipAmount
+        });
+        
+        console.log('[Helcim Process Saved Card] Payment successful:', paymentResult);
+        
+        // Extract payment details from Helcim response
+        const paymentId = paymentResult?.id || paymentResult?.paymentId || paymentResult?.transactionId;
+        const transactionId = paymentResult?.transactionId || paymentResult?.id || `${Date.now()}`;
+        const status = paymentResult?.status || paymentResult?.state || 'completed';
+        
+        return res.json({
+          success: true,
+          paymentId: String(paymentId),
+          transactionId: String(transactionId),
+          amount: amount,
+          customerId: customerId,
+          cardId: cardId,
+          status: status,
+          message: 'Payment processed successfully',
+          helcimResponse: paymentResult
+        });
+        
+      } catch (helcimError: any) {
+        console.error('[Helcim Process Saved Card] Helcim API error (no mock fallback):', helcimError?.message || helcimError);
+        return res.status(502).json({
+          success: false,
+          message: helcimError?.message || 'Helcim API unavailable',
+          error: helcimError
+        });
+      }
+      
+    } catch (err: any) {
+      console.error('[Helcim Process Saved Card] Error:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: err?.message || 'Failed to process saved card payment' 
+      });
+    }
+  });
+  
   // Explicit aliases to ensure Helcim init is always available (prevents 404 in some envs)
   app.post('/api/helcim-pay/initialize', async (req: Request, res: Response) => {
     try {
-      const { amount, description } = req.body || {};
+      const { amount, description, customerId, cardId } = req.body || {};
       if (amount === undefined || amount === null) {
         return res.status(400).json({ success: false, message: 'Amount is required' });
       }
@@ -334,6 +443,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       if (!apiToken) {
         return res.status(500).json({ success: false, message: 'Helcim API token not configured' });
       }
+      
+      console.log('[Helcim Initialize] Request params:', { amount, description, customerId, cardId });
+      
       const isCardSaveOnly = Number(amount) === 0 || (description && String(description).toLowerCase().includes('save card'));
       const payload: any = {
         amount: isCardSaveOnly ? 0 : Number(amount),
@@ -343,6 +455,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         description: description || 'Payment',
         idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       };
+      
+      // Add customer and card info if provided (for saved card payments)
+      if (customerId) {
+        payload.customerCode = customerId;
+      }
+      if (cardId) {
+        payload.cardId = cardId;
+      }
       const tryV2 = async () => {
         const r = await fetch(`${apiUrlV2}/helcim-pay/initialize`, {
           method: 'POST',
@@ -383,26 +503,37 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
-  app.post('/api/payments/helcim/initialize', async (req: Request, res: Response) => {
-    try {
-      const { amount, description } = req.body || {};
-      if (amount === undefined || amount === null) {
-        return res.status(400).json({ success: false, message: 'Amount is required' });
-      }
-      const apiToken = process.env.HELCIM_API_TOKEN;
-      const apiUrlV2 = process.env.HELCIM_API_URL || 'https://api.helcim.com/v2';
-      if (!apiToken) {
-        return res.status(500).json({ success: false, message: 'Helcim API token not configured' });
-      }
-      const isCardSaveOnly = Number(amount) === 0 || (description && String(description).toLowerCase().includes('save card'));
-      const payload: any = {
-        amount: isCardSaveOnly ? 0 : Number(amount),
-        currency: 'USD',
-        paymentType: isCardSaveOnly ? 'verify' : 'purchase',
-        test: process.env.NODE_ENV !== 'production',
-        description: description || 'Payment',
-        idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      };
+        app.post('/api/payments/helcim/initialize', async (req: Request, res: Response) => {
+        try {
+          const { amount, description, customerId, cardId } = req.body || {};
+          if (amount === undefined || amount === null) {
+            return res.status(400).json({ success: false, message: 'Amount is required' });
+          }
+          const apiToken = process.env.HELCIM_API_TOKEN;
+          const apiUrlV2 = process.env.HELCIM_API_URL || 'https://api.helcim.com/v2';
+          if (!apiToken) {
+            return res.status(500).json({ success: false, message: 'Helcim API token not configured' });
+          }
+          
+          console.log('[Helcim Initialize] Request params:', { amount, description, customerId, cardId });
+          
+          const isCardSaveOnly = Number(amount) === 0 || (description && String(description).toLowerCase().includes('save card'));
+          const payload: any = {
+            amount: isCardSaveOnly ? 0 : Number(amount),
+            currency: 'USD',
+            paymentType: isCardSaveOnly ? 'verify' : 'purchase',
+            test: process.env.NODE_ENV !== 'production',
+            description: description || 'Payment',
+            idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          };
+          
+          // Add customer and card info if provided (for saved card payments)
+          if (customerId) {
+            payload.customerCode = customerId;
+          }
+          if (cardId) {
+            payload.cardId = cardId;
+          }
       const tryV2 = async () => {
         const r = await fetch(`${apiUrlV2}/helcim-pay/initialize`, {
           method: 'POST',

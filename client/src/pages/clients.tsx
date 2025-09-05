@@ -72,6 +72,8 @@ import ClientAppointmentHistory from "@/components/client/client-appointment-his
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientAnalytics from "@/components/client/client-analytics";
 import ClientPhotoGallery from "@/components/client/client-photo-gallery";
+import ClientAddNote from "@/components/client/client-add-note";
+import ClientAddPhoto from "@/components/client/client-add-photo";
 import ClientCommunication from "@/components/client/client-communication";
 import ClientSearchFilters from "@/components/client/client-search-filters";
 import ClientNoteHistory from "@/components/client/client-note-history";
@@ -136,6 +138,9 @@ const ClientsPage = () => {
     return () => clearTimeout(handler);
   }, [searchQuery]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addNoteDialogOpen, setAddNoteDialogOpen] = useState(false);
+  const [addPhotoDialogOpen, setAddPhotoDialogOpen] = useState(false);
+  const [clientPhotosRefreshKey, setClientPhotosRefreshKey] = useState<number>(0);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -1718,7 +1723,20 @@ const ClientsPage = () => {
                   <ClientPhotoGallery 
                     clientId={clientDetail.id}
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
+                    refreshKey={clientPhotosRefreshKey}
                   />
+                )}
+
+                {/* Actions: Add Note / Add Photo */}
+                {clientDetail && (
+                  <div className="flex items-center gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setAddNoteDialogOpen(true)}>
+                      <FileText className="h-4 w-4 mr-2" /> Add Note
+                    </Button>
+                    <Button variant="outline" onClick={() => setAddPhotoDialogOpen(true)}>
+                      <Upload className="h-4 w-4 mr-2" /> Add Photo
+                    </Button>
+                  </div>
                 )}
 
                 {/* Notes History */}
@@ -2064,6 +2082,50 @@ const ClientsPage = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Note Dialog */}
+      <Dialog open={addNoteDialogOpen} onOpenChange={setAddNoteDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Note</DialogTitle>
+            <DialogDescription>Create a note on this client profile.</DialogDescription>
+          </DialogHeader>
+          {clientDetail && (
+            <ClientAddNote
+              clientId={clientDetail.id}
+              onCreated={async () => {
+                setAddNoteDialogOpen(false);
+                try {
+                  await queryClient.invalidateQueries({ queryKey: [`/api/note-history/client/${clientDetail.id}`] });
+                } catch {}
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Photo Dialog */}
+      <Dialog open={addPhotoDialogOpen} onOpenChange={setAddPhotoDialogOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Photo</DialogTitle>
+            <DialogDescription>Attach a photo to one of the client's appointments.</DialogDescription>
+          </DialogHeader>
+          {clientDetail && (
+            <ClientAddPhoto
+              clientId={clientDetail.id}
+              onUploaded={async () => {
+                setAddPhotoDialogOpen(false);
+                try {
+                  await queryClient.invalidateQueries({ queryKey: ["/api/appointments/client", clientDetail.id] });
+                  await queryClient.invalidateQueries({ queryKey: ["/api/appointments"] });
+                } catch {}
+                setClientPhotosRefreshKey((v) => v + 1);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
       
@@ -2656,6 +2718,25 @@ function ClientPaymentMethods({ clientId, clientName }: { clientId: number; clie
     },
     enabled: !!clientId,
   });
+
+  // Listen for helcimCardSaved event to refresh the list
+  useEffect(() => {
+    const handleCardSaved = (event: CustomEvent) => {
+      console.log('[ClientPaymentMethods] Received helcimCardSaved event:', event.detail);
+      // Refresh the cards list
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods', clientId] });
+      toast({ 
+        title: 'Card saved successfully', 
+        description: 'Payment method has been added to the profile.' 
+      });
+    };
+
+    window.addEventListener('helcimCardSaved', handleCardSaved as any);
+    
+    return () => {
+      window.removeEventListener('helcimCardSaved', handleCardSaved as any);
+    };
+  }, [clientId, queryClient, toast]);
 
   // Fetch client details for email/name to pass into SaveCardModal
   const { data: clientData } = useQuery({

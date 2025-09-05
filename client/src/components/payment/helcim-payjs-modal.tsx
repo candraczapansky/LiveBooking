@@ -16,6 +16,7 @@ interface HelcimPayJsModalProps {
   appointmentId?: number;
   clientId?: number;
   tipAmount?: number;
+  savedCard?: any; // Saved card information if using saved payment method
 }
 
 export default function HelcimPayJsModal({
@@ -30,6 +31,7 @@ export default function HelcimPayJsModal({
   appointmentId,
   clientId,
   tipAmount,
+  savedCard,
 }: HelcimPayJsModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -126,10 +128,78 @@ export default function HelcimPayJsModal({
     await loadScript('https://secure.helcim.app/helcim-pay/services/start.js', 'helcim-pay-sdk');
   };
 
-  // Initialize Helcim Pay.js and mount form when dialog opens
+  // Process saved card payment directly without showing form
+  useEffect(() => {
+    if (!open || !savedCard) return;
+    
+    const processSavedCardPayment = async () => {
+      setIsLoading(true);
+      try {
+        console.log('[HelcimPayJs] Processing saved card payment directly:', savedCard);
+        
+        // Process payment directly with saved card
+        const response = await apiRequest("POST", "/api/helcim-pay/process-saved-card", {
+          amount,
+          customerId: savedCard.helcimCustomerId || savedCard.helcimCardId, // Try both fields
+          cardId: savedCard.helcimCardId,
+          description: description || "Payment",
+          appointmentId,
+          clientId,
+          tipAmount
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to process saved card payment");
+        }
+        
+        const paymentData = await response.json();
+        console.log('[HelcimPayJs] Saved card payment successful:', paymentData);
+        
+        // Add additional fields to match expected response format
+        const fullResponse = {
+          ...paymentData,
+          approvalNumber: paymentData.approvalNumber || paymentData.transactionId,
+          transactionId: paymentData.transactionId,
+          cardToken: savedCard.helcimCardId,
+          amount: amount,
+          tipAmount: tipAmount || 0
+        };
+        
+        toast({
+          title: "Payment Successful",
+          description: `Payment of $${amount.toFixed(2)} has been processed using ${savedCard.cardBrand} ending in ${savedCard.cardLast4}.`,
+        });
+        
+        if (onSuccess) {
+          onSuccess(fullResponse);
+        }
+        
+        onOpenChange(false);
+      } catch (error: any) {
+        console.error('[HelcimPayJs] Saved card payment error:', error);
+        toast({
+          title: "Payment Failed",
+          description: error.message || "Failed to process payment with saved card. Please try again.",
+          variant: "destructive"
+        });
+        if (onError) {
+          onError(error);
+        }
+        onOpenChange(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    processSavedCardPayment();
+  }, [open, savedCard, amount, description, appointmentId, clientId, tipAmount, onSuccess, onError, onOpenChange, toast]);
+
+  // Initialize Helcim Pay.js and mount form when dialog opens (for new card payments)
   useEffect(() => {
     if (!open) return;
     if (mountedRef.current) return;
+    if (savedCard) return; // Skip if using saved card
     
     mountedRef.current = true;
     console.log("[HelcimPayJs] Modal opened, initializing...");

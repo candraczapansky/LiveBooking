@@ -68,6 +68,8 @@ type BookingWidgetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId?: number;
+  overlayColor?: string;
+  variant?: 'default' | 'mobile';
 };
 
 const bookingSchema = z.object({
@@ -92,7 +94,7 @@ const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
 
-const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
+const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'default' }: BookingWidgetProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,6 +107,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [savedCardInfo, setSavedCardInfo] = useState<any | null>(null);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
   const [createdAppointmentId, setCreatedAppointmentId] = useState<number | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [existingClient, setExistingClient] = useState<any | null>(null);
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
 
@@ -1061,46 +1064,64 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
 
   return (
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
+      <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
+        variant === 'mobile'
+          ? "static inset-auto left-0 right-0 top-auto transform-none w-full max-w-[360px] mx-auto mt-4 rounded-lg p-0 overflow-visible overflow-x-hidden border border-white/20 dark:border-white/10 bg-transparent z-auto"
+          : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
+      } style={{ backgroundColor: variant === 'mobile' ? 'transparent' : (overlayColor || 'rgba(255,255,255,0.90)') }}>
         <DialogHeader>
-          <DialogTitle className="text-xl">Book an Appointment</DialogTitle>
+          <DialogTitle className={variant === 'mobile' ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>
-        
+        {/* Mobile width constraint wrapper start */}
+        <div className={variant === 'mobile' ? "mx-auto w-full max-w-[360px] sticky top-[64px] z-10" : ""}>
+
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-6">
-          {steps.map((step, index) => (
-            <div key={index} className="flex items-center">
-              <div 
-                className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                  currentStep >= index 
-                    ? "bg-primary text-white" 
-                    : "border-2 border-gray-300 text-gray-500"
-                }`}
-              >
-                {index + 1}
+        {variant === 'mobile' ? (
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full h-8 w-8 flex items-center justify-center bg-primary text-white">
+                {currentStep + 1}
               </div>
-              <div className="ml-2">
-                <div className={`text-sm font-medium ${
-                  currentStep >= index 
-                    ? "text-gray-900 dark:text-gray-100" 
-                    : "text-gray-500 dark:text-gray-400"
-                }`}>
-                  {step}
-                </div>
-              </div>
-              {index < steps.length - 1 && (
-                <div className="hidden sm:block w-8 h-0.5 ml-2 mr-2 bg-gray-200 dark:bg-gray-700"></div>
-              )}
+              <div className="text-sm font-medium text-foreground">{steps[currentStep]}</div>
             </div>
-          ))}
-        </div>
+            <div className="text-xs text-foreground/70">{currentStep + 1} / {steps.length}</div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mb-6">
+            {steps.map((step, index) => (
+              <div key={index} className="flex items-center">
+                <div 
+                  className={`rounded-full h-8 w-8 flex items-center justify-center ${
+                    currentStep >= index 
+                      ? "bg-primary text-white" 
+                      : "border-2 border-foreground/60 text-foreground/70"
+                  }`}
+                >
+                  {index + 1}
+                </div>
+                <div className="ml-2">
+                  <div className={`text-sm font-medium ${
+                    currentStep >= index 
+                      ? "text-foreground" 
+                      : "text-foreground/70"
+                  }`}>
+                    {step}
+                  </div>
+                </div>
+                {index < steps.length - 1 && (
+                  <div className="hidden sm:block w-8 h-0.5 ml-2 mr-2 bg-foreground/40"></div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} noValidate>
             {/* Step 1: Location Selection */}
             {currentStep === 0 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Location</h3>
+                <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Location</h3>
                 {isLoadingLocations ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
@@ -1120,7 +1141,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                             form.setValue('serviceId', "");
                             form.setValue('staffId', "");
                           }} value={field.value}>
-                            <SelectTrigger>
+                            <SelectTrigger className={variant === 'mobile' ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}>
                               <SelectValue placeholder="Choose a location" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1152,16 +1173,16 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 2: Service Selection */}
             {currentStep === 1 && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Service</h3>
+                <div className={`flex items-center ${variant === 'mobile' ? 'gap-2 justify-start flex-wrap' : 'justify-between'}`}>
+                  <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Service</h3>
                   {selectedCategoryId && (
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto sm:max-w-none">
                       <Input 
                         type="text" 
                         placeholder="Search services..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 pr-4 py-2 text-sm"
+                        className={`${variant === 'mobile' ? 'pl-8 pr-4 h-10 text-base w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
                       />
                       <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
@@ -1177,7 +1198,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 )}
                 
                 {/* Service Categories */}
-                <div className="flex overflow-x-auto space-x-2 py-2">
+                <div className={variant === 'mobile' ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1195,9 +1216,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <Button
                         key={category.id}
                         type="button"
-                        variant={selectedCategoryId === category.id.toString() ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10"
                         onClick={() => handleCategoryChange(category.id.toString())}
                       >
                         {category.name}
@@ -1239,15 +1260,15 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                                     onClick={() => field.onChange(service.id.toString())}
                                   >
                                     <CardContent className="p-4">
-                                      <div className="flex justify-between items-start">
+                                      <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                         <div>
-                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">{service.name}</h4>
-                                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{service.description}</p>
+                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 break-words">{service.name}</h4>
+                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${variant === 'mobile' ? 'break-words' : ''}`}>{service.description}</p>
                                           <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
                                         </div>
-                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-right">
                                           {formatPrice(service.price)}
                                         </div>
                                       </div>
@@ -1269,7 +1290,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 3: Staff Selection */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Staff Member</h3>
+                <h3 className="text-lg font-medium text-foreground">Select Staff Member</h3>
                 
                 <FormField
                   control={form.control}
@@ -1343,7 +1364,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 4: Date and Time Selection */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Date & Time</h3>
+                <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select Date & Time</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -1357,7 +1378,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className="w-full pl-3 text-left font-normal min-h-[44px] justify-start"
+                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${variant === 'mobile' ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1368,7 +1389,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 z-[90]" align="start">
+                          <PopoverContent className={`w-auto p-0 z-[90] ${variant === 'mobile' ? 'max-w-[92vw] w-[92vw] mr-2' : ''}`} align="start">
                             <Calendar
                               mode="single"
                               selected={field.value}
@@ -1406,7 +1427,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                         <FormLabel>Time</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger className="min-h-[44px]">
+                            <SelectTrigger className={variant === 'mobile' ? 'min-h-[36px] h-9 text-sm' : 'min-h-[44px]'}>
                               <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>
@@ -1441,7 +1462,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 5: Customer Details */}
             {currentStep === 4 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Your Details</h3>
+                <h3 className="text-lg font-medium text-foreground">Your Details</h3>
                 
                 {/* Show appointment history if existing client found */}
                 {existingClient && clientAppointmentHistory.length > 0 && (
@@ -1580,7 +1601,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 6: Save Card */}
             {currentStep === 5 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Save Payment Method</h3>
+                <h3 className="text-lg font-medium text-foreground">Save Payment Method</h3>
                 
                 {/* Booking summary */}
                 {selectedService && (
@@ -1630,90 +1651,76 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                     </p>
                   </div>
                 )}
+
+                {bookingConfirmed && (
+                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <h4 className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">Booking Confirmed</h4>
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      Your appointment has been booked and your card has been saved securely.
+                    </p>
+                    {selectedService && (
+                      <div className="mt-2 text-sm text-green-800 dark:text-green-200">
+                        <div><strong>Service:</strong> {selectedService.name}</div>
+                        <div><strong>Date:</strong> {format(form.watch('date'), "PPP")}</div>
+                        <div><strong>Time:</strong> {timeSlots.find(slot => slot.value === form.watch('time'))?.label || form.watch('time')}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </form>
         </Form>
         
-        <DialogFooter className="flex justify-between mt-4">
+        <DialogFooter className={`flex justify-between mt-4 ${variant === 'mobile' ? 'flex-wrap gap-2' : ''}`}>
           {currentStep > 0 ? (
-            <Button type="button" variant="outline" onClick={prevStep}>
+            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
               Back
             </Button>
           ) : (
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           )}
           
           {currentStep < steps.length - 1 ? (
-            <Button type="button" onClick={nextStep}>
+            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
               Next
             </Button>
           ) : (
-            <Button 
-              type="button" 
-              onClick={() => {
-                if (currentStep === steps.length - 2) {
-                  // Validate details before moving to payment
-                  form.handleSubmit((values) => {
-                    setBookingData(values);
-                    setCurrentStep(steps.length - 1);
-                  })();
-                } else if (currentStep === steps.length - 1) {
-                  // Save card and complete booking
-                  handleSubmit();
-                }
-              }}
-              disabled={isProcessingBooking}
-            >
-              {isProcessingBooking ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                currentStep === steps.length - 2 ? "Save Card & Book" : (savedCardInfo ? "Complete Booking" : "Save Card")
-              )}
-            </Button>
+            bookingConfirmed ? null : (
+              <Button 
+                type="button" 
+                variant="outline"
+                className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
+                onClick={() => {
+                  if (currentStep === steps.length - 2) {
+                    // Validate details before moving to payment
+                    form.handleSubmit((values) => {
+                      setBookingData(values);
+                      setCurrentStep(steps.length - 1);
+                    })();
+                  } else if (currentStep === steps.length - 1) {
+                    // Save card and complete booking
+                    handleSubmit();
+                  }
+                }}
+                disabled={isProcessingBooking}
+              >
+                {isProcessingBooking ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  currentStep === steps.length - 2 ? "Save Card & Book" : (savedCardInfo ? "Complete Booking" : "Save Card")
+                )}
+              </Button>
+            )
           )}
         </DialogFooter>
-
-        {showSaveCardModal && bookingData && (
-          <SaveCardModal
-            open={showSaveCardModal}
-            onOpenChange={setShowSaveCardModal}
-            clientId={userId || createdClientId || 0}  // Use existing user or previously created client
-            appointmentId={createdAppointmentId}  // Pass the appointment ID for saving card to appointment
-            customerEmail={bookingData.email || form.getValues('email') || undefined}
-            customerName={`${bookingData.firstName || form.getValues('firstName') || ''} ${bookingData.lastName || form.getValues('lastName') || ''}`.trim() || undefined}
-            onSaved={async (cardInfo) => {
-              console.log("[BookingWidget] 🎉🎉🎉 onSaved callback triggered with:", cardInfo);
-              console.log("[BookingWidget] Card save successful!");
-              
-              setSavedCardInfo(cardInfo);
-              setShowSaveCardModal(false);
-              
-              // Appointment already created, just show success
-              toast({
-                title: "Booking Successful",
-                description: "Your appointment has been booked and card information saved.",
-              });
-              
-              // Reset and close
-              form.reset();
-              setCurrentStep(0);
-              setBookingData(null);
-              setSavedCardInfo(null);
-              setCreatedClientId(null);
-              setCreatedAppointmentId(null);
-              setExistingClient(null);
-              setClientAppointmentHistory([]);
-              setIsProcessingBooking(false);
-              onOpenChange(false);
-            }}
-          />
-        )}
+        {/* Mobile width constraint wrapper end */}
+        </div>
       </DialogContent>
     </Dialog>
   );

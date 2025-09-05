@@ -37,24 +37,60 @@ export function HelcimPayModal({
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialize Helcim payment session
+  // Initialize Helcim payment session or process saved card payment
   const initializePayment = async () => {
     if (!open || isInitialized) return;
 
     setIsProcessing(true);
     try {
-      console.log("[HelcimPayModal] Initializing payment session...", {
+      // Check if this is a saved card payment
+      if (customerId && cardId) {
+        console.log("[HelcimPayModal] Processing saved card payment...", {
+          amount,
+          customerId,
+          cardId,
+          description
+        });
+        
+        // Process payment directly with saved card
+        const response = await apiRequest("POST", "/api/helcim-pay/process-saved-card", {
+          amount,
+          customerId,
+          cardId,
+          description: description || "Payment"
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || "Failed to process saved card payment");
+        }
+        
+        const paymentData = await response.json();
+        console.log("[HelcimPayModal] Saved card payment successful:", paymentData);
+        
+        // Trigger success immediately for saved card
+        toast({
+          title: "Payment Successful",
+          description: `Payment of ${formatPrice(amount)} has been processed using your saved card.`,
+        });
+        
+        if (onSuccess) {
+          onSuccess(paymentData);
+        }
+        
+        onOpenChange(false);
+        return; // Exit early for saved card payment
+      }
+      
+      // Regular payment flow (new card)
+      console.log("[HelcimPayModal] Initializing new payment session...", {
         amount,
-        customerId,
-        cardId,
         description
       });
 
-      // Initialize Helcim Pay session
+      // Initialize Helcim Pay session for new card
       const response = await apiRequest("POST", "/api/helcim-pay/initialize", {
         amount,
-        customerId,
-        cardId,
         description: description || "Payment"
       });
 
@@ -194,11 +230,15 @@ export function HelcimPayModal({
           {isProcessing && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-8 w-8 animate-spin" />
-              <span className="ml-2">Initializing payment...</span>
+              <span className="ml-2">
+                {customerId && cardId 
+                  ? "Processing payment with saved card..." 
+                  : "Initializing payment..."}
+              </span>
             </div>
           )}
 
-          {isInitialized && !isProcessing && (
+          {isInitialized && !isProcessing && !customerId && !cardId && (
             <>
               <div id="helcim-pay-iframe-container" className="min-h-[400px]">
                 {/* Helcim iframe will be inserted here */}

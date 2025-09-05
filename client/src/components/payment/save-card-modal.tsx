@@ -75,15 +75,51 @@ export function SaveCardModal({
             let transactionId = null;
             let cardLast4 = null;
             let cardBrand = null;
+            let cardExpMonth = null;
+            let cardExpYear = null;
             
             try {
               const eventMessageData = JSON.parse(event.data.eventMessage);
+              console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Full event data:", eventMessageData);
+              
               const cardData = eventMessageData.data?.data;
               cardToken = cardData?.cardToken;
               transactionId = cardData?.transactionId;
               cardLast4 = cardData?.cardNumber?.slice(-4);
-              cardBrand = cardData?.cardHolderName ? 'Card' : 'Card'; // Helcim doesn't provide brand in this response
-              console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Parsed card data:", { cardToken, transactionId, cardLast4, cardBrand });
+              cardBrand = cardData?.cardType || cardData?.cardBrand || 'Card';
+              const cardCustomerCode = cardData?.customerCode;
+              
+              // Try multiple fields for expiration date
+              const expiryFields = [
+                cardData?.expiryDate,
+                cardData?.cardExpiry,
+                cardData?.expiry,
+                cardData?.expirationDate,
+                eventMessageData.data?.expiryDate,
+                eventMessageData.expiryDate
+              ];
+              
+              for (const expField of expiryFields) {
+                if (expField) {
+                  // Format could be MM/YY, MMYY, MM/YYYY, etc.
+                  const expiry = String(expField).replace(/\D/g, ''); // Remove non-digits
+                  if (expiry.length >= 4) {
+                    cardExpMonth = parseInt(expiry.substring(0, 2));
+                    // Handle both YY and YYYY formats
+                    const yearPart = expiry.substring(2);
+                    if (yearPart.length === 2) {
+                      cardExpYear = 2000 + parseInt(yearPart);
+                    } else if (yearPart.length === 4) {
+                      cardExpYear = parseInt(yearPart);
+                    }
+                    break; // Found expiry, stop looking
+                  }
+                }
+              }
+              
+              console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Parsed card data:", { 
+                cardToken, transactionId, cardLast4, cardBrand, cardExpMonth, cardExpYear 
+              });
             } catch (err) {
               console.error("[SaveCardModal] 🔒 PERSISTENT LISTENER - Error parsing event message:", err);
             }
@@ -96,25 +132,37 @@ export function SaveCardModal({
               const clientInfo = (window as any).helcimSaveCardCallback;
               if (clientInfo && clientInfo.clientId) {
                 try {
-                  const saveResponse = await fetch('/api/payments/helcim/save-card', {
+                  const payload = {
+                    token: cardToken,
+                    clientId: clientInfo.clientId,
+                    appointmentId: clientInfo.appointmentId,
+                    customerEmail: clientInfo.customerEmail,
+                    customerName: clientInfo.customerName,
+                    customerId: cardCustomerCode,
+                    cardLast4: cardLast4,
+                    cardBrand: cardBrand,
+                    cardExpMonth: cardExpMonth,
+                    cardExpYear: cardExpYear,
+                    transactionId: transactionId
+                  };
+                  // Use the live payments router; alias isn't mounted in this environment
+                  let saveResponse = await fetch('/api/payments/helcim/save-card', {
                     method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                      token: cardToken,
-                      clientId: clientInfo.clientId,
-                      appointmentId: clientInfo.appointmentId,
-                      customerEmail: clientInfo.customerEmail,
-                      customerName: clientInfo.customerName
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                   });
+                  // No fallback to legacy alias; server enforces live-only
                   
                   const saveResult = await saveResponse.json();
                   console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save result:", saveResult);
                   
-                  if (saveResult.success) {
+                  if (saveResponse.ok && saveResult.success) {
                     console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card saved successfully to client profile!");
+                    try {
+                      const evt = new CustomEvent('helcimCardSaved', { detail: saveResult });
+                      window.dispatchEvent(evt);
+                      console.log('[SaveCardModal] Dispatched helcimCardSaved');
+                    } catch {}
                   } else {
                     console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save failed (non-blocking):", saveResult.message);
                   }

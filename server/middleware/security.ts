@@ -42,6 +42,8 @@ export function securityHeaders() {
             // Allow Unlayer editor
             "https://editor.unlayer.com",
             "https://*.unlayer.com",
+            // Allow Replit beacon script for hosted environments
+            "https://replit.com",
           ],
           // Some browsers distinguish between script elements and other script sources
           scriptSrcElem: [
@@ -53,6 +55,8 @@ export function securityHeaders() {
             "https://*.helcim.com",
             "https://editor.unlayer.com",
             "https://*.unlayer.com",
+            // Allow Replit beacon script for hosted environments
+            "https://replit.com",
           ],
           styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://editor.unlayer.com", "https://*.unlayer.com"],
           imgSrc: ["'self'", "data:", "blob:", "https:", "https://editor.unlayer.com", "https://*.unlayer.com"],
