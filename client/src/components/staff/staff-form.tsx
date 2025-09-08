@@ -109,6 +109,13 @@ const StaffForm = ({ open, onOpenChange, staffId }: StaffFormProps) => {
   const { data: staffQueryData, isLoading } = useQuery({
     queryKey: ['/api/staff', staffId],
     enabled: !!staffId && open,
+    queryFn: async () => {
+      const response = await fetch(`/api/staff/${staffId}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch staff member');
+      return response.json();
+    }
   });
 
   // Once we know the staff record (for userId), fetch the related user (optional fallback)

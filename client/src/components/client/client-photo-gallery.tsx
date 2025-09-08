@@ -11,6 +11,7 @@ import { Calendar, Clock, Image as ImageIcon, Download } from "lucide-react";
 type ClientPhotoGalleryProps = {
   clientId: number;
   clientName: string;
+  refreshKey?: number | string;
 };
 
 type AppointmentSummary = {
@@ -48,7 +49,7 @@ const photoTypeColors: Record<AppointmentPhoto["photoType"], string> = {
   progress: "bg-purple-100 text-purple-800",
 };
 
-export default function ClientPhotoGallery({ clientId, clientName }: ClientPhotoGalleryProps) {
+export default function ClientPhotoGallery({ clientId, clientName, refreshKey }: ClientPhotoGalleryProps) {
   const { toast } = useToast();
   const [photos, setPhotos] = useState<ClientPhoto[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -100,7 +101,7 @@ export default function ClientPhotoGallery({ clientId, clientName }: ClientPhoto
       }
     };
     loadAllPhotos();
-  }, [appointments, toast]);
+  }, [appointments, toast, refreshKey]);
 
   const hasNoPhotos = useMemo(() => !isLoading && photos.length === 0, [isLoading, photos.length]);
 

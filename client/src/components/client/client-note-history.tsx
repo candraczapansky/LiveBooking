@@ -225,14 +225,19 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {noteHistory.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              No notes found for this client.
-            </div>
-          ) : (
-            <ScrollArea className="h-96">
-              <div className="space-y-4">
-                {noteHistory.map((note) => (
+          {(() => {
+            const displayedNotes = noteHistory.filter(n => !/^\s*\[Photo Upload\]/i.test(n.noteContent || ""));
+            if (displayedNotes.length === 0) {
+              return (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  No notes found for this client.
+                </div>
+              );
+            }
+            return (
+              <ScrollArea className="h-96">
+                <div className="space-y-4">
+                  {displayedNotes.map((note) => (
                   <div
                     key={note.id}
                     className="border rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
@@ -254,9 +259,6 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                         
                         <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
                           {note.noteContent}
-                          <span className="ml-2 align-text-bottom inline-block">
-                            <PhotoInline note={note} size={40} />
-                          </span>
                         </div>
                         
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
@@ -268,12 +270,7 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                             <User className="h-3 w-3" />
                             {note.createdByRole}
                           </div>
-                          {/* Small inline thumbnail if a photo is attached */}
-                          {(() => {
-                            const m = note.noteContent.match(/\(photoId:\s*(\d+)\)/);
-                            if (!m) return null;
-                            return <PhotoThumb photoId={m[1]} />;
-                          })()}
+                          {/* Photo thumbnails suppressed in note history */}
                         </div>
                       </div>
                       
@@ -289,10 +286,11 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
+                  ))}
+                </div>
+              </ScrollArea>
+            );
+          })()}
         </CardContent>
       </Card>
 
@@ -332,15 +330,7 @@ export default function ClientNoteHistory({ clientId, clientName }: ClientNoteHi
                     <p className="text-sm whitespace-pre-wrap">
                       {selectedNote.noteContent}
                     </p>
-                    {isLoadingPhoto ? (
-                      <div className="text-xs text-gray-500">Loading photo…</div>
-                    ) : attachedPhotoData ? (
-                      <img
-                        src={attachedPhotoData}
-                        alt="Attached photo"
-                        className="w-full max-h-64 object-contain rounded border"
-                      />
-                    ) : null}
+                    {/* Attached photo display suppressed in note details */}
                   </div>
                 </div>
                 

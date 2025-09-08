@@ -28,7 +28,8 @@ import {
   ChevronDown,
   Mail,
   ShoppingBag,
-  Shield
+  Shield,
+  Palette
 } from 'lucide-react';
 
 // Normalize any known misspellings at render time
@@ -776,6 +777,18 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                             isOpen={isOpen}
                             onClick={handleItemClick}
                           />
+                        </div>
+                        <div className="mt-1">
+                          {hasAnyPermission(["view_business_settings", "edit_business_settings"]) && (
+                            <SidebarItem
+                              icon={<Palette className="w-5 h-5" strokeWidth={1.75} />}
+                              label="Booking Design"
+                              href="/booking-design"
+                              isActive={location === "/booking-design"}
+                              isOpen={isOpen}
+                              onClick={handleItemClick}
+                            />
+                          )}
                         </div>
                         {user?.role === 'admin' && (
                           <div className="mt-1">

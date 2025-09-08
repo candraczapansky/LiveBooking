@@ -1330,8 +1330,11 @@ Glo Head Spa`,
         throw new Error(`Cannot delete user - has ${relatedStaffServices.length} associated staff services. Please delete or reassign staff services first.`);
       }
       
-      // Check for related staff records
-      const relatedStaff = await db.select().from(staff).where(eq(staff.userId, id));
+      // Check for related staff records (select only stable columns to avoid optional column issues like photo_url)
+      const relatedStaff = await db
+        .select({ id: staff.id })
+        .from(staff)
+        .where(eq(staff.userId, id));
       console.log(`DatabaseStorage: Found ${relatedStaff.length} related staff records for user ${id}`);
       
       if (relatedStaff.length > 0) {

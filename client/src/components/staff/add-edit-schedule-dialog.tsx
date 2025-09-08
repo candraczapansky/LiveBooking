@@ -59,6 +59,8 @@ interface AddEditScheduleDialogProps {
 export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultStaffId, onSuccess, initialValues }: AddEditScheduleDialogProps) {
   const queryClient = useQueryClient();
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [isSingleDate, setIsSingleDate] = useState<boolean>(false);
+  const [isIndefinite, setIsIndefinite] = useState<boolean>(false);
   const { toast } = useToast();
 
   // Fetch staff for dropdown
@@ -98,9 +100,62 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
     }, [schedule, defaultStaffId, initialValues]),
   });
 
+  // Helper function to convert HH:mm:ss to HH:mm format
+  const formatTimeForInput = (time: string | undefined): string => {
+    if (!time) return "09:00";
+    // If time is in HH:mm:ss format, convert to HH:mm
+    if (time.includes(':')) {
+      const parts = time.split(':');
+      if (parts.length >= 2) {
+        return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+      }
+    }
+    return time;
+  };
+
+  // Reset form when schedule prop changes (when editing an existing schedule)
+  useEffect(() => {
+    if (schedule && open) {
+      const formValues = {
+        staffId: schedule.staffId?.toString() || defaultStaffId?.toString() || "",
+        daysOfWeek: schedule.dayOfWeek ? [schedule.dayOfWeek] : [],
+        startTime: formatTimeForInput(schedule.startTime),
+        endTime: formatTimeForInput(schedule.endTime),
+        locationId: schedule.locationId?.toString() || "",
+        serviceCategories: schedule.serviceCategories || [],
+        startDate: schedule.startDate || format(new Date(), 'yyyy-MM-dd'),
+        endDate: schedule.endDate || "",
+        isBlocked: schedule.isBlocked || false,
+      };
+      form.reset(formValues);
+      setSelectedDays(formValues.daysOfWeek);
+      setIsSingleDate(!schedule.endDate);
+      setIsIndefinite(false);
+    } else if (!schedule && open) {
+      // Reset to default values when adding a new schedule
+      const iv: any = initialValues || {};
+      const formValues = {
+        staffId: iv.staffId != null ? String(iv.staffId) : defaultStaffId?.toString() || "",
+        daysOfWeek: Array.isArray(iv.daysOfWeek) ? iv.daysOfWeek : [],
+        startTime: iv.startTime || "09:00",
+        endTime: iv.endTime || "17:00",
+        locationId: iv.locationId != null ? String(iv.locationId) : "",
+        serviceCategories: iv.serviceCategories || [],
+        startDate: iv.startDate || format(new Date(), 'yyyy-MM-dd'),
+        endDate: iv.endDate || "",
+        isBlocked: iv.isBlocked || false,
+      };
+      form.reset(formValues);
+      setSelectedDays(formValues.daysOfWeek);
+      setIsSingleDate(false);
+      setIsIndefinite(false);
+    }
+  }, [schedule, open, form, defaultStaffId, initialValues]);
+
   // Watch selected staff and location to filter available categories by location and staff capabilities
   const watchLocationId = form.watch('locationId');
   const watchStaffId = form.watch('staffId');
+  const watchStartDate = form.watch('startDate');
 
   // Show all service categories (no location/staff filtering)
   const visibleCategories = useMemo(() => {
@@ -116,6 +171,70 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
       form.setValue('serviceCategories', filtered);
     }
   }, [visibleCategories, form]);
+
+  // Initialize flags based on existing schedule when editing
+  useEffect(() => {
+    try {
+      if (!schedule) {
+        setIsSingleDate(false);
+        setIsIndefinite(false);
+        return;
+      }
+      const hasEndDate = !!schedule.endDate;
+      setIsIndefinite(!hasEndDate);
+      // Single date if startDate === endDate (same calendar day) and not indefinite
+      if (schedule.startDate && schedule.endDate) {
+        const sd = String(schedule.startDate).slice(0, 10);
+        const ed = String(schedule.endDate).slice(0, 10);
+        setIsSingleDate(sd === ed);
+      } else {
+        setIsSingleDate(false);
+      }
+    } catch {}
+  }, [schedule]);
+
+  // Helper to compute day name from YYYY-MM-DD
+  const getDayNameFromDate = (dateString?: string) => {
+    try {
+      if (!dateString) return undefined;
+      const [y, m, d] = String(dateString).split('-').map((p) => parseInt(p));
+      if (!y || !m || !d) return undefined;
+      const dt = new Date(y, m - 1, d);
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      return days[dt.getDay()];
+    } catch {
+      return undefined;
+    }
+  };
+
+  // Keep daysOfWeek and endDate in sync with single-date / indefinite toggles
+  useEffect(() => {
+    try {
+      if (isSingleDate) {
+        const dayName = getDayNameFromDate(watchStartDate);
+        if (dayName) {
+          form.setValue('daysOfWeek', [dayName]);
+        }
+        // For single date, endDate mirrors startDate
+        if (watchStartDate) {
+          form.setValue('endDate', watchStartDate);
+        }
+        // Turning on single-date should turn off indefinite
+        if (isIndefinite) setIsIndefinite(false);
+      }
+    } catch {}
+  }, [isSingleDate, watchStartDate, form]);
+
+  useEffect(() => {
+    try {
+      if (isIndefinite) {
+        // Clear endDate when indefinite
+        form.setValue('endDate', "");
+        // Turning on indefinite should turn off single-date
+        if (isSingleDate) setIsSingleDate(false);
+      }
+    } catch {}
+  }, [isIndefinite, form]);
 
   const createScheduleMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -165,8 +284,20 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
         predicate: (query) => query.queryKey[0] === '/api/schedules'
       });
       
-      // Dispatch custom event to notify other components
-      window.dispatchEvent(new CustomEvent('schedule-updated'));
+      // Dispatch custom event with details to notify other components
+      try {
+        const detail = {
+          staffId: parseInt(String(form.getValues('staffId')) || String(schedule?.staffId || '0')),
+          locationId: parseInt(String(form.getValues('locationId')) || String(schedule?.locationId || '0')),
+          daysOfWeek: (Array.isArray(form.getValues('daysOfWeek')) && form.getValues('daysOfWeek').length > 0)
+            ? form.getValues('daysOfWeek')
+            : (schedule?.dayOfWeek ? [schedule.dayOfWeek] : []),
+          startDate: String(form.getValues('startDate') || schedule?.startDate || ''),
+        } as any;
+        window.dispatchEvent(new CustomEvent('schedule-updated', { detail } as any));
+      } catch {
+        window.dispatchEvent(new CustomEvent('schedule-updated'));
+      }
       
       // Call parent callback for additional refresh
       onSuccess?.();
@@ -191,14 +322,15 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     if (schedule) {
       // For editing, keep the original day and update other fields
-      const effectiveDay = (data.daysOfWeek && data.daysOfWeek[0]) || schedule.dayOfWeek;
+      const computedDayFromDate = isSingleDate ? getDayNameFromDate(data.startDate) : undefined;
+      const effectiveDay = computedDayFromDate || (data.daysOfWeek && data.daysOfWeek[0]) || schedule.dayOfWeek;
       const scheduleData = {
         ...data,
         dayOfWeek: effectiveDay,
         staffId: parseInt(data.staffId),
         locationId: parseInt(data.locationId),
         serviceCategories: data.serviceCategories || [],
-        endDate: data.endDate || null,
+        endDate: isIndefinite ? null : (isSingleDate ? data.startDate : (data.endDate || null)),
         isBlocked: data.isBlocked || false,
       };
       console.log("Submitting schedule edit with data:", scheduleData);
@@ -213,17 +345,29 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
           locationId: parseInt(data.locationId),
           serviceCategories: data.serviceCategories || [],
           startDate: data.startDate,
-          endDate: data.endDate || null,
           isBlocked: data.isBlocked || false,
-        };
+        } as any;
 
-        // Create schedules sequentially for each selected day
-        for (const day of data.daysOfWeek) {
-          const scheduleData = {
+        if (isSingleDate) {
+          const singleDay = getDayNameFromDate(data.startDate);
+          if (!singleDay) throw new Error("Invalid start date for single-date schedule");
+          const payload = {
             ...baseScheduleData,
-            dayOfWeek: day,
+            dayOfWeek: singleDay,
+            endDate: data.startDate,
           };
-          await createScheduleMutation.mutateAsync(scheduleData);
+          await createScheduleMutation.mutateAsync(payload);
+        } else {
+          const endDateToUse = isIndefinite ? null : (data.endDate || null);
+          // Create schedules sequentially for each selected day
+          for (const day of data.daysOfWeek) {
+            const scheduleData = {
+              ...baseScheduleData,
+              dayOfWeek: day,
+              endDate: endDateToUse,
+            };
+            await createScheduleMutation.mutateAsync(scheduleData);
+          }
         }
 
         // Close dialog and show success message after all schedules are created
@@ -239,8 +383,18 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
         // Additional cache clearing for any potential related queries
         queryClient.removeQueries({ queryKey: ['/api/schedules'] });
         
-        // Dispatch custom event to notify other components
-        window.dispatchEvent(new CustomEvent('schedule-updated'));
+        // Dispatch custom event with details to notify other components
+        try {
+          const detail = {
+            staffId: parseInt(String(data.staffId)),
+            locationId: parseInt(String(data.locationId)),
+            daysOfWeek: Array.isArray(data.daysOfWeek) ? data.daysOfWeek : [],
+            startDate: String(data.startDate || ''),
+          } as any;
+          window.dispatchEvent(new CustomEvent('schedule-updated', { detail } as any));
+        } catch {
+          window.dispatchEvent(new CustomEvent('schedule-updated'));
+        }
         
         // Call the onSuccess callback if provided
         if (onSuccess) {
@@ -279,10 +433,17 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
   ];
 
   const getStaffName = (staffMember: any) => {
-    if (staffMember.user) {
-      return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
+    try {
+      const u = staffMember?.user || {};
+      const first = (u.firstName || '').trim();
+      const last = (u.lastName || '').trim();
+      const full = `${first} ${last}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
+      return 'Unknown Staff';
+    } catch {
+      return 'Unknown Staff';
     }
-    return 'Unknown Staff';
   };
 
   return (
@@ -299,6 +460,30 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Scheduling scope options */}
+            <div className="grid grid-cols-1 gap-2">
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  checked={isSingleDate}
+                  onCheckedChange={(checked) => setIsSingleDate(Boolean(checked))}
+                />
+                <div className="space-y-1 leading-none">
+                  <FormLabel>Single date only</FormLabel>
+                  <p className="text-sm text-muted-foreground">Apply this schedule only on the selected start date.</p>
+                </div>
+              </div>
+              <div className="flex items-start space-x-3">
+                <Checkbox
+                  checked={isIndefinite}
+                  onCheckedChange={(checked) => setIsIndefinite(Boolean(checked))}
+                />
+                <div className="space-y-1 leading-none">
+                  <FormLabel>Indefinite</FormLabel>
+                  <p className="text-sm text-muted-foreground">No end date. This schedule continues until changed.</p>
+                </div>
+              </div>
+            </div>
+
             <FormField
               control={form.control}
               name="staffId"
@@ -330,7 +515,10 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
               render={() => (
                 <FormItem>
                   <FormLabel>Days of Week</FormLabel>
-                  <div className="grid grid-cols-2 gap-2">
+                  {isSingleDate && (
+                    <p className="text-xs text-muted-foreground mb-1">Single date selected. Day is derived from the Start Date.</p>
+                  )}
+                  <div className="grid grid-cols-2 gap-2 opacity-100">
                     {daysOfWeek.map((day) => (
                       <FormField
                         key={day}
@@ -345,6 +533,7 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                             >
                               <FormControl>
                                 <Checkbox
+                                  disabled={isSingleDate}
                                   checked={isChecked}
                                   onCheckedChange={(checked) => {
                                     const current: string[] = field.value || [];
@@ -512,8 +701,13 @@ export function AddEditScheduleDialog({ open, onOpenChange, schedule, defaultSta
                   <FormItem>
                     <FormLabel>End Date (Optional)</FormLabel>
                     <FormControl>
-                      <Input type="date" {...field} />
+                      <Input type="date" disabled={isIndefinite || isSingleDate} {...field} />
                     </FormControl>
+                    {(isIndefinite || isSingleDate) && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {isIndefinite ? 'Indefinite is on; end date not required.' : 'Single date is on; end date equals start date.'}
+                      </p>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}

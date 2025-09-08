@@ -179,7 +179,6 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
         step={15}
         timeslots={4}
         scrollToTime={minTime}
-        dayLayoutAlgorithm={'no-overlap'}
         resources={resources}
         resourceIdAccessor="resourceId"
         resourceTitleAccessor="resourceTitle"

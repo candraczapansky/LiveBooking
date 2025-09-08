@@ -36,6 +36,7 @@ import { registerMembershipRoutes } from "./routes/memberships.js";
 import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
 import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerBookingDesignRoutes } from "./routes/booking-design.js";
 // Custom schema for staff service with custom rates
 const staffServiceWithRatesSchema = insertStaffServiceSchema.extend({
     customRate: z.number().nullable().optional(),
@@ -83,6 +84,8 @@ export async function registerRoutes(app, storage, autoRenewalService) {
     registerNoteTemplateRoutes(app, storage);
     registerNoteHistoryRoutes(app, storage);
     registerReportRoutes(app, storage);
+    // Booking design routes
+    registerBookingDesignRoutes(app, storage);
     // Register external API routes (health, services, staff availability, webhook)
     registerExternalRoutes(app, storage);
     // Register terminal routes
@@ -119,7 +122,7 @@ export async function registerRoutes(app, storage, autoRenewalService) {
             }
             const usersById = new Map(users.map((u) => [u.id, u]));
             const enriched = filteredByLocation.map((s) => {
-                const u = usersById.get(s.userId);
+                const u = usersById.get(Number(s.userId));
                 return {
                     ...s,
                     user: u

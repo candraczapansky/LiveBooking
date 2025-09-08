@@ -40,24 +40,7 @@ export function registerAppointmentPhotoRoutes(app, storage) {
             uploadedBy: photoData.uploadedBy,
             uploadedByRole: photoData.uploadedByRole || "staff",
         });
-        // Also record a note entry for this upload so it appears in client notes
-        try {
-            const inlineData = typeof photoData.photoData === 'string' ? photoData.photoData : '';
-            await storage.createNoteHistory({
-                clientId: appointment.clientId,
-                appointmentId,
-                // Embed the data URL directly so the UI can render without another fetch
-                noteContent: `[Photo Upload] ${photoData.photoType}${photoData.description ? `: ${photoData.description}` : ''} (photoId: ${newPhoto.id})\n\n${inlineData}`,
-                noteType: 'appointment',
-                // Without auth context, attribute to a system/staff placeholder like other flows
-                createdBy: 1,
-                createdByRole: 'staff'
-            });
-        }
-        catch (err) {
-            // Log but do not fail the photo upload
-            LoggerService.error('Failed to create note history for photo upload', { ...context, appointmentId }, err);
-        }
+        // Do not auto-create note history entries for photo uploads
         LoggerService.info("Appointment photo uploaded", { ...context, appointmentId, photoId: newPhoto.id });
         res.status(201).json(newPhoto);
     }));

@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -68,6 +69,8 @@ type BookingWidgetProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId?: number;
+  overlayColor?: string;
+  variant?: 'default' | 'mobile';
 };
 
 const bookingSchema = z.object({
@@ -87,12 +90,14 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
+const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card", "Account"];
+const saveCardStepIndex = steps.indexOf("Save Card");
+const accountStepIndex = steps.indexOf("Account");
 
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
 
-const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
+const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'default' }: BookingWidgetProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -105,8 +110,24 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const [savedCardInfo, setSavedCardInfo] = useState<any | null>(null);
   const [createdClientId, setCreatedClientId] = useState<number | null>(null);
   const [createdAppointmentId, setCreatedAppointmentId] = useState<number | null>(null);
+  const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [existingClient, setExistingClient] = useState<any | null>(null);
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
+  const [wantsAccountInvite, setWantsAccountInvite] = useState<boolean>(false);
+  // Detect narrow screens in the widget itself as a fallback to ensure mobile view
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 640px)');
+      const update = () => setIsNarrow(!!mq.matches);
+      if (mq.addEventListener) mq.addEventListener('change', update); else // @ts-ignore
+        mq.addListener(update);
+      update();
+      return () => { if (mq.removeEventListener) mq.removeEventListener('change', update); else // @ts-ignore
+        mq.removeListener(update); };
+    } catch {}
+  }, []);
+  const isMobileView = variant === 'mobile' || isNarrow;
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -170,8 +191,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const { data: schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = useQuery({
     queryKey: ['/api/schedules', selectedLocationId, currentStep],
     queryFn: async () => {
-      // Always fetch all schedules so we can treat null locationId as global
-      const res = await apiRequest('GET', '/api/schedules');
+      // Fetch schedules for the selected location only to avoid cross-location availability
+      const endpoint = selectedLocationId ? `/api/schedules?locationId=${selectedLocationId}` : '/api/schedules';
+      const res = await apiRequest('GET', endpoint);
       return res.json();
     },
     enabled: open,
@@ -236,14 +258,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               .map((sch: any) => Number(sch.staffId))))
           : [];
 
-        const staffIdsAtLocation = (Array.isArray(staff) && selectedLocationId)
-          ? (staff as any[])
-              .filter((s: any) => String(s.locationId) === String(selectedLocationId))
-              .map((s: any) => Number(s.id))
-          : [];
-
-        // Use union to include anyone with a schedule matching location or assigned to this location
-        const staffIdsToUseSet = new Set<number>([...staffIdsFromSchedules, ...staffIdsAtLocation]);
+        // Only include staff who actually have a schedule at this location
+        const staffIdsToUseSet = new Set<number>([...staffIdsFromSchedules]);
         const staffIdsToUse: number[] = Array.from(staffIdsToUseSet);
 
         if (staffIdsToUse.length === 0) {
@@ -383,7 +399,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const staffIdsFromSchedulesSet = new Set<number>(
     Array.isArray(schedules)
       ? (schedules as any[])
-          .filter((sch: any) => !sch.isBlocked && (sch.locationId == null || String(sch.locationId) === String(selectedLocationId)))
+          .filter((sch: any) => !sch.isBlocked)
           .map((sch: any) => Number(sch.staffId))
       : []
   );
@@ -391,12 +407,12 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
   const availableStaff = useMemo(() => {
     if (!Array.isArray(staff) || !selectedServiceId) return [] as any[];
     const svcIdNum = parseInt(selectedServiceId);
-    // Start from eligibleStaffIds (union) so Step 3 matches Step 2 service map
-    const baseIds = eligibleStaffIds.length > 0 ? eligibleStaffIds : Array.from(new Set<number>([...staffIdsFromSchedulesSet]));
+    // Start strictly from staff with schedules at this location
+    const baseIds = Array.from(new Set<number>([...staffIdsFromSchedulesSet]));
     const finalIds = baseIds.filter((id) => {
       const svcSet = staffServiceIdsMap.get(Number(id));
       const canDoService = !!svcSet && svcSet.has(svcIdNum);
-      const hasSched = useScheduleFilter ? staffIdsFromSchedulesSet.has(Number(id)) : true;
+      const hasSched = staffIdsFromSchedulesSet.has(Number(id));
       return canDoService && hasSched;
     });
     const staffById = new Map<number, any>((Array.isArray(staff) ? staff : []).map((s: any) => [Number(s.id), s]));
@@ -466,7 +482,6 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     const svc: any = selectedService;
 
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
-      const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
       const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
         const currentDateString = formatDateForComparison(selectedFormDate);
         const startDateString = typeof schedule.startDate === 'string'
@@ -481,8 +496,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
         const targetDay = String(dayName).trim().toLowerCase();
 
-        // Treat null locationId as global, matching any selected location
-        if (selectedLocationId && schedule.locationId != null && String(schedule.locationId) !== String(selectedLocationId)) return false;
+        // Schedules here are already filtered by location via the query above
         return Number(schedule.staffId) === Number(staffIdNum) &&
           scheduleDay === targetDay &&
           startDateString <= currentDateString &&
@@ -547,7 +561,6 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       const staffHasAvailabilityOnDay = (staffIdNum: number, day: Date) => {
         const dayName = getDayName(day);
         const currentDateString = formatDateForComparison(day);
-        const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
         const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
           .filter((schedule: any) => {
             if (Number(schedule.staffId) !== Number(staffIdNum)) return false;
@@ -647,6 +660,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       ['staffId'],
       ['date', 'time'],
       ['firstName', 'lastName', 'email', 'phone'],
+      [], // Save Card step - validation handled by processor
+      [], // Account step - optional
     ];
 
     const currentFields = fields[currentStep];
@@ -660,8 +675,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
         const next = Math.min(currentStep + 1, steps.length - 1);
         console.log(`[BookingWidget] Validation passed, moving to step ${next}`);
         setCurrentStep(next);
-        if (next === steps.length - 1) {
-          // On entering save card step, prepare booking data
+        if (next === saveCardStepIndex) {
+          // On entering Save Card step, prepare booking data
           const values = form.getValues();
           console.log("[BookingWidget] Preparing booking data for save card step:", values);
           
@@ -879,8 +894,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
       setBookingData(latestValues);
     }
     
-    // Show save card modal or complete booking
-    if (currentStep === steps.length - 1 && latestValues) {
+    // Handle Save Card step submission (or legacy last-step submission)
+    if ((currentStep === saveCardStepIndex || currentStep === steps.length - 1) && latestValues) {
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -935,6 +950,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
               // Now show save card modal with appointment ID
               setShowSaveCardModal(true);
               setIsProcessingBooking(false);
+              // Move to Account step
+              try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
             } catch (appointmentError: any) {
               setIsProcessingBooking(false);
               toast({
@@ -963,6 +980,8 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             // Now show save card modal with appointment ID
             setShowSaveCardModal(true);
             setIsProcessingBooking(false);
+            // Move to Account step
+            try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
           } catch (appointmentError: any) {
             setIsProcessingBooking(false);
             toast({
@@ -973,7 +992,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
           }
         }
       } else {
-        // Card already saved, create appointment
+        // Card already saved, create appointment then proceed to Account step
         if (!bookingData) {
           toast({
             title: "Error",
@@ -1021,29 +1040,18 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             }
           });
           
-          // Debug: Log the created appointment and force a manual refetch
+          // Debug: Log the created appointment
           console.log("[BookingWidget] Appointment created successfully:", appointment);
-          console.log("[BookingWidget] Forcing manual refetch of appointments...");
           
-          // Force a manual refetch of the appointments page query specifically
-          setTimeout(() => {
-            queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
-            queryClient.refetchQueries({ queryKey: ['/api/appointments', bookingData.locationId] });
-            console.log("[BookingWidget] Manual refetch completed");
-          }, 100);
+          // Proceed to Account step instead of closing immediately
+          try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
           
           toast({
             title: "Booking Successful",
             description: "Your appointment has been booked. Payment will be collected after your service.",
           });
-          
-          // Reset and close
-          form.reset();
-          setCurrentStep(0);
-          setBookingData(null);
-          setSavedCardInfo(null);
-          setCreatedClientId(null);
-          onOpenChange(false);
+
+          // Do not close yet; allow optional Account step
         } catch (error: any) {
           toast({
             title: "Booking Failed",
@@ -1057,50 +1065,109 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
     }
   };
 
+  // Finalize after optional Account step
+  const finishAccountStep = async () => {
+    try {
+      const values = form.getValues();
+      const email = values?.email || (existingClient?.email);
+      const clientId = createdClientId || existingClient?.id || null;
+      if (wantsAccountInvite && email) {
+        try {
+          await apiRequest('POST', '/api/auth/password-reset', { email });
+        } catch (e) {
+          console.warn('Password reset email request failed:', e);
+        }
+        if (clientId) {
+          try {
+            await apiRequest('PATCH', `/api/users/${clientId}`, {
+              wantsAccountInvite: true,
+              accountInviteSentAt: new Date().toISOString(),
+            });
+          } catch (e) {
+            console.warn('Failed to persist invite flags:', e);
+          }
+        }
+      }
+    } finally {
+      try {
+        // Close and reset dialog
+        form.reset();
+        setCurrentStep(0);
+        setBookingData(null);
+        setSavedCardInfo(null);
+        setCreatedClientId(null);
+        setExistingClient(null);
+        setClientAppointmentHistory([]);
+        setWantsAccountInvite(false);
+        onOpenChange(false);
+      } catch {}
+    }
+  };
+
 
 
   return (
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-xl">Book an Appointment</DialogTitle>
+      <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
+        isMobileView
+          ? "booking-mobile-overlay fixed left-2 right-2 top-24 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
+          : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
+      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
+        <DialogHeader className={isMobileView ? "p-0" : ""}>
+          <DialogTitle className={isMobileView ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>
-        
+        {/* Mobile width constraint wrapper start */}
+        <div className={isMobileView ? "w-full mx-auto" : ""} style={isMobileView ? {
+            maxWidth: 'min(420px, calc(100vw - 1rem - env(safe-area-inset-left) - env(safe-area-inset-right)))'
+          } : undefined}>
+
         {/* Progress Steps */}
-        <div className="flex items-center justify-between mb-6">
-          {steps.map((step, index) => (
-            <div key={index} className="flex items-center">
-              <div 
-                className={`rounded-full h-8 w-8 flex items-center justify-center ${
-                  currentStep >= index 
-                    ? "bg-primary text-white" 
-                    : "border-2 border-gray-300 text-gray-500"
-                }`}
-              >
-                {index + 1}
+        {isMobileView ? (
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full h-8 w-8 flex items-center justify-center bg-primary text-white">
+                {currentStep + 1}
               </div>
-              <div className="ml-2">
-                <div className={`text-sm font-medium ${
-                  currentStep >= index 
-                    ? "text-gray-900 dark:text-gray-100" 
-                    : "text-gray-500 dark:text-gray-400"
-                }`}>
-                  {step}
-                </div>
-              </div>
-              {index < steps.length - 1 && (
-                <div className="hidden sm:block w-8 h-0.5 ml-2 mr-2 bg-gray-200 dark:bg-gray-700"></div>
-              )}
+              <div className="text-sm font-medium text-foreground">{steps[currentStep]}</div>
             </div>
-          ))}
-        </div>
+            <div className="text-xs text-foreground/70">{currentStep + 1} / {steps.length}</div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between mb-6">
+            {steps.map((step, index) => (
+              <div key={index} className="flex items-center">
+                <div 
+                  className={`rounded-full h-8 w-8 flex items-center justify-center ${
+                    currentStep >= index 
+                      ? "bg-primary text-white" 
+                      : "border-2 border-foreground/60 text-foreground/70"
+                  }`}
+                >
+                  {index + 1}
+                </div>
+                <div className="ml-2">
+                  <div className={`text-sm font-medium ${
+                    currentStep >= index 
+                      ? "text-foreground" 
+                      : "text-foreground/70"
+                  }`}>
+                    {step}
+                  </div>
+                </div>
+                {index < steps.length - 1 && (
+                  <div className="hidden sm:block w-8 h-0.5 ml-2 mr-2 bg-foreground/40"></div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} noValidate>
             {/* Step 1: Location Selection */}
             {currentStep === 0 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Location</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Location</h3>
                 {isLoadingLocations ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
@@ -1120,10 +1187,10 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                             form.setValue('serviceId', "");
                             form.setValue('staffId', "");
                           }} value={field.value}>
-                            <SelectTrigger>
+                            <SelectTrigger className={isMobileView ? 'min-h-[40px] h-10 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
                               <SelectValue placeholder="Choose a location" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                               {!locations || locations.length === 0 ? (
                                 <SelectItem value="no-locations" disabled>
                                   No locations available
@@ -1152,16 +1219,16 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 2: Service Selection */}
             {currentStep === 1 && (
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select a Service</h3>
+                <div className={`flex items-center ${isMobileView ? 'gap-2 justify-start flex-wrap' : 'justify-between'}`}>
+                  <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Service</h3>
                   {selectedCategoryId && (
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto sm:max-w-none">
                       <Input 
                         type="text" 
                         placeholder="Search services..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 pr-4 py-2 text-sm"
+                        className={`${isMobileView ? 'pl-8 pr-4 h-10 text-base w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
                       />
                       <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
@@ -1177,7 +1244,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                 )}
                 
                 {/* Service Categories */}
-                <div className="flex overflow-x-auto space-x-2 py-2">
+                <div className={isMobileView ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1195,9 +1262,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <Button
                         key={category.id}
                         type="button"
-                        variant={selectedCategoryId === category.id.toString() ? "default" : "outline"}
+                        variant="outline"
                         size="sm"
-                        className="rounded-full whitespace-nowrap"
+                        className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10"
                         onClick={() => handleCategoryChange(category.id.toString())}
                       >
                         {category.name}
@@ -1239,15 +1306,15 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                                     onClick={() => field.onChange(service.id.toString())}
                                   >
                                     <CardContent className="p-4">
-                                      <div className="flex justify-between items-start">
+                                      <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                         <div>
-                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">{service.name}</h4>
-                                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{service.description}</p>
+                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 break-words">{service.name}</h4>
+                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${isMobileView ? 'break-words' : ''}`}>{service.description}</p>
                                           <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
                                         </div>
-                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-right">
                                           {formatPrice(service.price)}
                                         </div>
                                       </div>
@@ -1269,7 +1336,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 3: Staff Selection */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Staff Member</h3>
+                <h3 className="text-lg font-medium text-foreground">Select Staff Member</h3>
                 
                 <FormField
                   control={form.control}
@@ -1318,7 +1385,13 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                                   </div>
                                   <div className="ml-4">
                                     <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                      {staffMember.user ? `${staffMember.user.firstName || ""} ${staffMember.user.lastName || ""}`.trim() : "Unknown Staff"}
+                                      {(() => {
+                                        const u = (staffMember as any)?.user || {};
+                                        const first = (u.firstName || '').trim();
+                                        const last = (u.lastName || '').trim();
+                                        const full = `${first} ${last}`.trim();
+                                        return full || u.username || 'Unknown Staff';
+                                      })()}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
                                   </div>
@@ -1343,7 +1416,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 4: Date and Time Selection */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Select Date & Time</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select Date & Time</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -1357,7 +1430,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className="w-full pl-3 text-left font-normal min-h-[44px] justify-start"
+                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1368,7 +1441,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0 z-[90]" align="start">
+                          <PopoverContent className={`w-auto p-0 z-[90] ${isMobileView ? 'max-w-[92vw] w-[92vw] mr-2' : ''}`} align="start">
                             <Calendar
                               mode="single"
                               selected={field.value}
@@ -1406,11 +1479,11 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                         <FormLabel>Time</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger className="min-h-[44px]">
+                            <SelectTrigger className={isMobileView ? 'min-h-[36px] h-9 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
                               <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                             {availableTimeSlots.map((slot) => (
                               <SelectItem key={slot.value} value={slot.value}>
                                 {slot.label}
@@ -1441,7 +1514,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             {/* Step 5: Customer Details */}
             {currentStep === 4 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Your Details</h3>
+                <h3 className="text-lg font-medium text-foreground">Your Details</h3>
                 
                 {/* Show appointment history if existing client found */}
                 {existingClient && clientAppointmentHistory.length > 0 && (
@@ -1480,7 +1553,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="John" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1494,7 +1567,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Doe" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="Doe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1511,6 +1584,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input 
+                            className="text-foreground placeholder:text-muted-foreground"
                             type="text" 
                             placeholder="Enter email address" 
                             autoComplete="off"
@@ -1534,7 +1608,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="(123) 456-7890" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1550,6 +1624,7 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                       <FormLabel>Notes (Optional)</FormLabel>
                       <FormControl>
                         <Textarea 
+                          className="text-foreground placeholder:text-muted-foreground"
                           placeholder="Any special requests or information for your appointment..."
                           {...field}
                           value={field.value || ""}
@@ -1578,9 +1653,9 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
             )}
             
             {/* Step 6: Save Card */}
-            {currentStep === 5 && (
+            {currentStep === saveCardStepIndex && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Save Payment Method</h3>
+                <h3 className="text-lg font-medium text-foreground">Save Payment Method</h3>
                 
                 {/* Booking summary */}
                 {selectedService && (
@@ -1630,90 +1705,88 @@ const BookingWidget = ({ open, onOpenChange, userId }: BookingWidgetProps) => {
                     </p>
                   </div>
                 )}
+
+                {bookingConfirmed && (
+                  <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg border border-green-200 dark:border-green-800">
+                    <h4 className="text-sm font-medium text-green-900 dark:text-green-100 mb-1">Booking Confirmed</h4>
+                    <p className="text-sm text-green-800 dark:text-green-200">
+                      Your appointment has been booked and your card has been saved securely.
+                    </p>
+                    {selectedService && (
+                      <div className="mt-2 text-sm text-green-800 dark:text-green-200">
+                        <div><strong>Service:</strong> {selectedService.name}</div>
+                        <div><strong>Date:</strong> {format(form.watch('date'), "PPP")}</div>
+                        <div><strong>Time:</strong> {timeSlots.find(slot => slot.value === form.watch('time'))?.label || form.watch('time')}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 7: Optional Account Creation */}
+            {currentStep === accountStepIndex && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground">Create an Account (Optional)</h3>
+                <div className="text-sm text-foreground/80">
+                  Create a password to manage appointments faster next time. We can email you a secure link to set your password.
+                </div>
+                <div className="flex items-start gap-3">
+                  <Checkbox id="wantsAccountInvite" checked={wantsAccountInvite} onCheckedChange={(v:any) => setWantsAccountInvite(!!v)} />
+                  <label htmlFor="wantsAccountInvite" className="text-sm leading-tight cursor-pointer select-none">
+                    Email me a link to create my account
+                  </label>
+                </div>
+                {existingClient && (
+                  <div className="text-xs text-foreground/60">
+                    We found an existing profile for {existingClient.firstName} {existingClient.lastName}. We'll send the link to {existingClient.email}.
+                  </div>
+                )}
               </div>
             )}
           </form>
         </Form>
         
-        <DialogFooter className="flex justify-between mt-4">
+        <DialogFooter className={`flex justify-between mt-4 ${isMobileView ? 'flex-wrap gap-2' : ''}`}>
           {currentStep > 0 ? (
-            <Button type="button" variant="outline" onClick={prevStep}>
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
               Back
             </Button>
           ) : (
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           )}
           
-          {currentStep < steps.length - 1 ? (
-            <Button type="button" onClick={nextStep}>
+          {currentStep < saveCardStepIndex && (
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
               Next
             </Button>
-          ) : (
-            <Button 
-              type="button" 
-              onClick={() => {
-                if (currentStep === steps.length - 2) {
-                  // Validate details before moving to payment
-                  form.handleSubmit((values) => {
-                    setBookingData(values);
-                    setCurrentStep(steps.length - 1);
-                  })();
-                } else if (currentStep === steps.length - 1) {
-                  // Save card and complete booking
-                  handleSubmit();
-                }
-              }}
+          )}
+          {currentStep === saveCardStepIndex && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
+              onClick={handleSubmit}
               disabled={isProcessingBooking}
             >
-              {isProcessingBooking ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                currentStep === steps.length - 2 ? "Save Card & Book" : (savedCardInfo ? "Complete Booking" : "Save Card")
-              )}
+              {isProcessingBooking ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>) : (savedCardInfo ? 'Continue' : 'Save Card & Continue')}
+            </Button>
+          )}
+          {currentStep === accountStepIndex && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
+              onClick={finishAccountStep}
+            >
+              Finish
             </Button>
           )}
         </DialogFooter>
-
-        {showSaveCardModal && bookingData && (
-          <SaveCardModal
-            open={showSaveCardModal}
-            onOpenChange={setShowSaveCardModal}
-            clientId={userId || createdClientId || 0}  // Use existing user or previously created client
-            appointmentId={createdAppointmentId}  // Pass the appointment ID for saving card to appointment
-            customerEmail={bookingData.email || form.getValues('email') || undefined}
-            customerName={`${bookingData.firstName || form.getValues('firstName') || ''} ${bookingData.lastName || form.getValues('lastName') || ''}`.trim() || undefined}
-            onSaved={async (cardInfo) => {
-              console.log("[BookingWidget] 🎉🎉🎉 onSaved callback triggered with:", cardInfo);
-              console.log("[BookingWidget] Card save successful!");
-              
-              setSavedCardInfo(cardInfo);
-              setShowSaveCardModal(false);
-              
-              // Appointment already created, just show success
-              toast({
-                title: "Booking Successful",
-                description: "Your appointment has been booked and card information saved.",
-              });
-              
-              // Reset and close
-              form.reset();
-              setCurrentStep(0);
-              setBookingData(null);
-              setSavedCardInfo(null);
-              setCreatedClientId(null);
-              setCreatedAppointmentId(null);
-              setExistingClient(null);
-              setClientAppointmentHistory([]);
-              setIsProcessingBooking(false);
-              onOpenChange(false);
-            }}
-          />
-        )}
+        {/* Mobile width constraint wrapper end */}
+        </div>
       </DialogContent>
     </Dialog>
   );

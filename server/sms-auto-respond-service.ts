@@ -745,7 +745,7 @@ export class SMSAutoRespondService {
     try {
       // Try to find existing client by phone number
       const users = await this.storage.getAllUsers();
-      let client = users.find((u: any) => 
+      let client: any = users.find((u: any) => 
         u.phone && u.phone.replace(/\D/g, '') === phoneNumber.replace(/\D/g, '')
       );
 

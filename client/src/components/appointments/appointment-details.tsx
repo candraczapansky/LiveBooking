@@ -108,6 +108,7 @@ const AppointmentDetails = ({
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
   const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
+  const [selectedSavedCard, setSelectedSavedCard] = useState<any>(null);
   // Staff edit dialog removed
 
   // Inline photo upload removed; handled by standalone AppointmentPhotos
@@ -563,12 +564,17 @@ const AppointmentDetails = ({
         discountAmount: appliedDiscountCode ? discountAmount : 0,
         discountCode: appliedDiscountCode || null,
         method: "cash",
-        status: "completed"
+        status: "completed",
+        type: "appointment_payment",
+        processedAt: new Date(),
+        paymentDate: new Date(),
+        tipAmount: tipAmount || 0
       });
 
       // Update appointment payment status
       await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
         ...appointment,
+        status: "completed",
         paymentStatus: "paid",
         tipAmount: tipAmount || 0,
         totalAmount: finalAmount
@@ -609,17 +615,103 @@ const AppointmentDetails = ({
     // Modal will be opened when user clicks "Pay Now" button
   };
 
-  const handleSavedPaymentMethod = (paymentMethod: any) => {
-    // For now, use the existing HelcimPay.js flow
-    // The saved card information is displayed for user reference
-    // but the actual payment goes through the standard Helcim flow
-    toast({
-      title: "Using Saved Card",
-      description: `Processing payment with ${paymentMethod.cardBrand} ending in ${paymentMethod.cardLast4}. Please complete the payment form.`,
+  const handleSavedPaymentMethod = async (paymentMethod: any) => {
+    // Process saved card payment directly without modal
+    console.log('[SavedCardPayment] Processing with saved card:', paymentMethod);
+    
+    // Guard: prevent mock IDs from being used in live processing
+    const isMock = (val: any) => typeof val === 'string' && /^(mock_|test_)/i.test(val);
+    if (isMock(paymentMethod?.helcimCardId) || isMock(paymentMethod?.helcimCustomerId)) {
+      toast({
+        title: "Saved card needs updating",
+        description: "This saved card was created in test mode. Please add a card again to process live payments.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const amt = getAppointmentChargeAmount();
+    setChargeAmount(amt);
+    
+    // Show a loading toast
+    const loadingToast = toast({
+      title: "Processing Payment",
+      description: `Using ${paymentMethod.cardBrand} ending in ${paymentMethod.cardLast4}...`,
+      duration: 100000, // Keep it open until we dismiss it
     });
     
-    // Open the card payment flow
-    handleCardPayment();
+    try {
+      // Process payment directly with saved card
+      const response = await apiRequest("POST", "/api/helcim-pay/process-saved-card", {
+        amount: amt,
+        customerId: paymentMethod.helcimCustomerId || paymentMethod.helcimCardId,
+        cardId: paymentMethod.helcimCardId,
+        description: `Card payment for ${service?.name || 'Appointment'}`,
+        appointmentId: appointment?.id,
+        clientId: appointment?.clientId,
+        tipAmount: tipAmount || 0
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to process saved card payment");
+      }
+      
+      const paymentData = await response.json();
+      console.log('[SavedCardPayment] Payment successful:', paymentData);
+      
+      // Update appointment as paid
+      await apiRequest('PUT', `/api/appointments/${appointment?.id}`, {
+        status: 'completed',
+        paymentStatus: 'paid',
+        tipAmount: tipAmount || 0,
+        totalAmount: amt,
+        paymentMethod: 'card',
+        paymentReference: paymentData.paymentId
+      });
+      
+      // Create payment record
+      await apiRequest('POST', '/api/payments', {
+        appointmentId: appointment?.id,
+        clientId: appointment?.clientId,
+        amount: amt - (tipAmount || 0),
+        tipAmount: tipAmount || 0,
+        totalAmount: amt,
+        method: 'card',
+        status: 'completed',
+        type: 'appointment',
+        description: `Card payment for ${service?.name || 'Appointment'}`,
+        helcimPaymentId: paymentData.paymentId,
+        transactionId: paymentData.transactionId
+      });
+      
+      // Dismiss loading toast and show success
+      loadingToast.dismiss();
+      
+      toast({
+        title: "Payment Successful",
+        description: `Payment of ${formatPrice(amt)} has been processed.`,
+      });
+      
+      // Refresh data
+      queryClient.invalidateQueries(['/api/appointments']);
+      queryClient.invalidateQueries(['/api/payments']);
+      
+      // Reset UI states
+      setShowPaymentOptions(false);
+      setShowCardPayment(false);
+      setChargeAmount(null);
+      setTipAmount(0);
+      
+    } catch (error: any) {
+      console.error('[SavedCardPayment] Payment error:', error);
+      loadingToast.dismiss();
+      toast({
+        title: "Payment Failed",
+        description: error.message || "Failed to process payment with saved card.",
+        variant: "destructive"
+      });
+    }
   };
 
   // Card payment inline handlers handled inline in JSX
@@ -1236,12 +1328,18 @@ const AppointmentDetails = ({
                         </div>
                         <HelcimPayJsModal
                           open={showHelcimModal}
-                          onOpenChange={setShowHelcimModal}
+                          onOpenChange={(open) => {
+                            setShowHelcimModal(open);
+                            if (!open) {
+                              setSelectedSavedCard(null); // Clear selection when modal closes
+                            }
+                          }}
                           amount={calculateFinalAmount()}
                           description={`Card payment for ${service?.name || 'Appointment'}`}
                           appointmentId={appointment.id}
                           clientId={appointment.clientId}
                           tipAmount={tipAmount}
+                          savedCard={selectedSavedCard}
                           onSuccess={async (_response: any) => {
                             try {
                               await apiRequest('PUT', `/api/appointments/${appointment.id}`, {

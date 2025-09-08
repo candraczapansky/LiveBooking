@@ -37,7 +37,7 @@ const NoteTemplates = lazy(() => import("@/pages/note-templates"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Schedule = lazy(() => import("@/pages/schedule"));
 const StaffSchedule = lazy(() => import("@/pages/staff-schedule"));
-const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail-simple"));
+const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail"));
 const ClientBooking = lazy(() => import("@/pages/client-booking"));
 const ClientBookingTest = lazy(() => import("@/pages/appointments"));
 const PointOfSale = lazy(() => import("@/pages/pos"));
@@ -80,6 +80,7 @@ const HelpNoteTemplatesDetailed = lazy(() => import("@/pages/help/note-templates
 const HelpScheduleDetailed = lazy(() => import("@/pages/help/schedule-detailed"));
 const HelpStaffScheduleDetailed = lazy(() => import("@/pages/help/staff-schedule-detailed"));
 const HelpMembershipsDetailed = lazy(() => import("@/pages/help/memberships-detailed"));
+const BookingDesign = lazy(() => import("@/pages/booking-design"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -159,6 +160,11 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/booking-test" component={ClientBookingTest} />
+          <Route path="/booking-design" component={() => (
+            <ProtectedRoute anyPermissions={["view_business_settings", "edit_business_settings"]}>
+              <BookingDesign />
+            </ProtectedRoute>
+          )} />
           <Route path="/services" component={Services} />
           <Route path="/clients" component={Clients} />
           <Route path="/clients/:clientId" component={Clients} />
@@ -249,7 +255,7 @@ export default function App() {
   const isForgotPasswordRoute = location.startsWith('/forgot-password');
   const isForgotPasswordSmsRoute = location.startsWith('/forgot-password-sms');
   // Treat only /booking as minimal page (no MainLayout/header). Do not include /booking-test
-  const isBookingRoute = location === '/booking';
+  const isBookingRoute = pathOnly === '/booking';
 
   if (isResetPasswordRoute) {
     return (

@@ -282,6 +282,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Apply text color CSS custom properties
     root.style.setProperty('--text-primary', primaryHsl, 'important');
     root.style.setProperty('--text-secondary', secondaryHsl, 'important');
+    // Also sync Tailwind foreground variables so text color applies globally
+    root.style.setProperty('--foreground', primaryHsl, 'important');
+    root.style.setProperty('--muted-foreground', secondaryHsl, 'important');
     
     // Persist for early initialization
     try {

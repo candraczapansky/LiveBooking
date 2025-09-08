@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import express, { type Express, type Request, type Response } from "express";
 import type { IStorage } from "../storage.js";
 import { asyncHandler } from "../utils/errors.js";
 
@@ -30,9 +30,19 @@ export function registerBookingDesignRoutes(app: Express, storage: IStorage) {
   }));
 
   // Update booking design settings
-  app.put("/api/booking-design", asyncHandler(async (req: Request, res: Response) => {
+  // Accept large payload via text to bypass global JSON 10mb limit
+  app.put("/api/booking-design", express.text({ type: '*/*', limit: '50mb' }), asyncHandler(async (req: Request, res: Response) => {
     try {
-      const payload = req.body || {};
+      let payload: any = {};
+      try {
+        if (typeof req.body === 'string') {
+          payload = JSON.parse(req.body || '{}');
+        } else if (req.body && typeof req.body === 'object') {
+          payload = req.body;
+        }
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid design payload' });
+      }
       const serialized = JSON.stringify(payload);
       const existing = await (storage as any).getSystemConfig?.(CONFIG_KEY);
       if (existing) {

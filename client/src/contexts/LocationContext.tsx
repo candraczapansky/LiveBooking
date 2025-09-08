@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from '@/contexts/AuthProvider';
+import { AuthContext } from '@/contexts/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 
 type Location = {
@@ -46,7 +46,7 @@ export const LocationProvider = ({ children }: LocationProviderProps) => {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   // Fetch locations only when authenticated to avoid 401-driven redirect loops
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated } = useContext(AuthContext);
   const { data: locations = [], isLoading } = useQuery<Location[]>({
     queryKey: ['/api/locations'],
     enabled: isAuthenticated,

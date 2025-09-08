@@ -451,7 +451,10 @@ export default function AppointmentCheckout({
           open={showHelcimPayModal}
           onOpenChange={setShowHelcimPayModal}
           amount={finalAmount}
-          customerId={clientData?.helcimCustomerId}
+          customerId={selectedCardId ? 
+            savedPaymentMethods?.find((c: any) => c.id === selectedCardId)?.helcimCustomerId :
+            clientData?.helcimCustomerId
+          }
           cardId={selectedCardId ? 
             savedPaymentMethods?.find((c: any) => c.id === selectedCardId)?.helcimCardId : 
             undefined

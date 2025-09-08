@@ -52,8 +52,30 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>("day");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('appointments.selectedDate');
+        if (stored) {
+          const ts = Number(stored);
+          if (!Number.isNaN(ts)) {
+            const d = new Date(ts);
+            if (!isNaN(d.getTime())) return d;
+          }
+        }
+      }
+    } catch {}
+    return new Date();
+  });
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const v = localStorage.getItem('appointments.calendarView');
+        if (v === 'day' || v === 'week' || v === 'month') return v;
+      }
+    } catch {}
+    return 'day';
+  });
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
@@ -128,6 +150,21 @@ const AppointmentsPage = () => {
   const { user } = useContext(AuthContext);
 
   // Note: Do not clear local overrides; persist selections across refresh
+
+  // Persist selected date and view locally so the page sticks when returning
+  useEffect(() => {
+    try {
+      if (selectedDate) {
+        localStorage.setItem('appointments.selectedDate', String(selectedDate.getTime()));
+      }
+    } catch {}
+  }, [selectedDate]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('appointments.calendarView', calendarView);
+    } catch {}
+  }, [calendarView]);
 
   // Queries
   const { data: appointments = [], refetch } = useQuery({
@@ -333,34 +370,43 @@ const AppointmentsPage = () => {
   // Helper: Check if a staff member is scheduled for a specific date and location
   const isStaffScheduledForDate = (staffId: number, date: Date, locationId?: number) => {
     if (!schedules || schedules.length === 0) return false;
-    
+
     const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const dateString = date.toISOString().slice(0, 10);
-    
+
+    const toLocalYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${da}`;
+    };
+
+    const dateString = toLocalYMD(date);
+
     // Find schedules for this staff on this day
     const staffSchedules = schedules.filter((schedule: any) => {
       const matchesStaff = schedule.staffId === staffId;
-      const matchesDay = schedule.dayOfWeek === dayName;
-      
+      const matchesDay = String(schedule.dayOfWeek || '').toLowerCase() === String(dayName || '').toLowerCase();
+
       // Check if the schedule is at the selected location (if location filtering is enabled)
       const matchesLocation = !locationId || schedule.locationId == null || schedule.locationId === locationId;
-      
-      // Check if the schedule is active for this date
-      const startDateString = typeof schedule.startDate === 'string' 
-        ? schedule.startDate 
-        : new Date(schedule.startDate).toISOString().slice(0, 10);
-      const endDateString = schedule.endDate 
-        ? (typeof schedule.endDate === 'string' 
-          ? schedule.endDate 
-          : new Date(schedule.endDate).toISOString().slice(0, 10))
+
+      // Check if the schedule is active for this date (compare in local time)
+      const startDateString = typeof schedule.startDate === 'string'
+        ? schedule.startDate
+        : toLocalYMD(new Date(schedule.startDate));
+
+      const endDateString = schedule.endDate
+        ? (typeof schedule.endDate === 'string'
+          ? schedule.endDate
+          : toLocalYMD(new Date(schedule.endDate)))
         : null;
-      
+
       const matchesStartDate = startDateString <= dateString;
       const matchesEndDate = !endDateString || endDateString >= dateString;
-      
+
       return matchesStaff && matchesDay && matchesLocation && matchesStartDate && matchesEndDate;
     });
-    
+
     return staffSchedules.length > 0;
   };
 
@@ -452,7 +498,8 @@ const AppointmentsPage = () => {
     }
   };
 
-  const filteredResources = staff.filter((s: any) => {
+  const staffList = Array.isArray(staff) ? (staff as any[]) : [];
+  const filteredResources = staffList.filter((s: any) => {
     // First apply staff filter
     if (selectedStaffFilter !== "all" && s.id !== parseInt(selectedStaffFilter)) {
       return false;
@@ -482,7 +529,7 @@ const AppointmentsPage = () => {
     // For week and month views, only show staff who have schedules at the selected location
     if (selectedLocation?.id) {
       const hasLocationSchedule = schedules.some((schedule: any) => 
-        schedule.staffId === s.id && schedule.locationId === selectedLocation.id
+        schedule.staffId === s.id && (schedule.locationId == null || schedule.locationId === selectedLocation.id)
       );
 
       if (!hasLocationSchedule) {
@@ -823,18 +870,18 @@ const AppointmentsPage = () => {
       const staffToShow = (() => {
         try {
           if (selectedStaffFilter !== "all") {
-            return staff.filter((s: any) => s.id === parseInt(selectedStaffFilter));
+            return staffList.filter((s: any) => s.id === parseInt(selectedStaffFilter));
           }
           
           // For day view, only show staff who are scheduled for the selected date AND location
           if (calendarView === 'day') {
             const dateToCheck = selectedDate || new Date();
-            return staff.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
+            return staffList.filter((s: any) => isStaffScheduledForDate(s.id, dateToCheck, selectedLocation?.id));
           }
           
           // For week and month views, only show staff who have schedules at the selected location
           if (selectedLocation?.id) {
-            return staff.filter((s: any) => {
+            return staffList.filter((s: any) => {
               const hasLocationSchedule = schedules.some((schedule: any) => 
                 schedule.staffId === s.id && schedule.locationId === selectedLocation.id
               );
@@ -843,7 +890,7 @@ const AppointmentsPage = () => {
           }
           
           // If no location selected, show all staff
-          return staff;
+          return staffList;
         } catch (error) {
           console.error('Error filtering staff:', error);
           return [];
@@ -881,7 +928,7 @@ const AppointmentsPage = () => {
         });
       } catch {}
 
-      const appointmentStaffToInclude = staff.filter((s: any) => staffIdsWithAppointmentsInView.has(s.id));
+      const appointmentStaffToInclude = staffList.filter((s: any) => staffIdsWithAppointmentsInView.has(s.id));
       const staffToProcess = [
         ...staffToShow,
         ...appointmentStaffToInclude.filter((s: any) => !staffToShow.some((ex: any) => ex.id === s.id))
@@ -945,15 +992,21 @@ const AppointmentsPage = () => {
                   const matchesDay = sch.dayOfWeek === dayName;
                   const matchesLocation = !selectedLocation?.id || sch.locationId == null || sch.locationId === selectedLocation.id;
                   
-                  // Fix date comparison logic
-                  const todayString = date.toISOString().slice(0, 10);
+                  // Fix date comparison logic: use local YYYY-MM-DD to avoid UTC off-by-one
+                  const toLocalYMD = (d: Date) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const da = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${da}`;
+                  };
+                  const todayString = toLocalYMD(date);
                   let startDateString: string;
                   let endDateString: string | null;
                   
                   try {
                     startDateString = typeof sch.startDate === 'string' 
                       ? sch.startDate 
-                      : new Date(sch.startDate).toISOString().slice(0, 10);
+                      : toLocalYMD(new Date(sch.startDate));
                   } catch (e) {
                     console.warn('Error parsing schedule start date:', e);
                     return false;
@@ -963,7 +1016,7 @@ const AppointmentsPage = () => {
                     endDateString = sch.endDate 
                       ? (typeof sch.endDate === 'string' 
                         ? sch.endDate 
-                        : new Date(sch.endDate).toISOString().slice(0, 10))
+                        : toLocalYMD(new Date(sch.endDate)))
                       : null;
                   } catch (e) {
                     console.warn('Error parsing schedule end date:', e);
@@ -1138,7 +1191,7 @@ const AppointmentsPage = () => {
         : [new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate())];
 
       const staffToInclude = (selectedStaffFilter !== "all")
-        ? staff.filter((s: any) => s.id === parseInt(selectedStaffFilter))
+        ? staffList.filter((s: any) => s.id === parseInt(selectedStaffFilter))
         : filteredResources;
 
       staffToInclude.forEach((s: any) => {
@@ -1333,6 +1386,14 @@ const AppointmentsPage = () => {
         .rbc-event {
           cursor: pointer !important;
           overflow: hidden !important; /* clip content to event bounds to prevent bleed-over */
+          width: 100% !important; /* Force events to take full width of their container */
+          left: 0 !important; /* Start at the left edge */
+        }
+        
+        /* Ensure events in resource columns take full width */
+        .rbc-day-slot .rbc-events-container .rbc-event {
+          width: calc(100% - 2px) !important; /* Full width minus small margin for borders */
+          left: 0 !important;
         }
         
         /* Fix calendar grid scrolling */
@@ -1612,7 +1673,13 @@ const AppointmentsPage = () => {
                             </SelectItem>
                             {locationStaffOptions?.map((s: any) => (
                               <SelectItem key={s.id} value={s.id.toString()}>
-                                {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                                {(() => {
+                                  const u = s?.user || {};
+                                  const first = (u.firstName || '').trim();
+                                  const last = (u.lastName || '').trim();
+                                  const full = `${first} ${last}`.trim();
+                                  return full || u.username || 'Unknown Staff';
+                                })()}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1789,11 +1856,18 @@ const AppointmentsPage = () => {
                             }).filter(Boolean) || [];
                             
                             const blockedEvents = getClickableBlockedEvents();
+                            // Fallback: also render background availability as regular events so they always show
+                            const backgroundAsEvents = getBackgroundEvents();
                             console.log('📅 Valid appointment events created:', appointmentEvents.length);
                             console.log('⛔ Clickable blocked events created:', blockedEvents.length);
+                            console.log('🎨 Background-as-events created:', Array.isArray(backgroundAsEvents) ? backgroundAsEvents.length : 0);
                             
-                            // Ensure appointment events are returned after background strips (drawn earlier)
-                            return [...appointmentEvents, ...blockedEvents];
+                            // Draw background availability first, then appointments, then clickable blocked overlays
+                            return [
+                              ...(Array.isArray(backgroundAsEvents) ? backgroundAsEvents : []),
+                              ...appointmentEvents,
+                              ...blockedEvents,
+                            ];
                           } catch (error) {
                             console.error('Error creating appointment events:', error);
                             return [];
@@ -1810,7 +1884,13 @@ const AppointmentsPage = () => {
                         })()}
                         resources={(calendarResources || filteredResources || [])?.map((s: any) => ({
                           resourceId: s.id,
-                          resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
+                          resourceTitle: (() => {
+                            const u = s?.user || {};
+                            const first = (u.firstName || '').trim();
+                            const last = (u.lastName || '').trim();
+                            const full = `${first} ${last}`.trim();
+                            return full || u.username || 'Unknown Staff';
+                          })(),
                         })) || []}
                         onPreSelectResource={(rid) => {
                           try {
@@ -2080,7 +2160,13 @@ const AppointmentsPage = () => {
                   <SelectContent>
                     {locationStaffOptions?.map((s: any) => (
                       <SelectItem key={s.id} value={String(s.id)}>
-                        {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                        {(() => {
+                          const u = s?.user || {};
+                          const first = (u.firstName || '').trim();
+                          const last = (u.lastName || '').trim();
+                          const full = `${first} ${last}`.trim();
+                          return full || u.username || 'Unknown Staff';
+                        })()}
                       </SelectItem>
                     ))}
                   </SelectContent>

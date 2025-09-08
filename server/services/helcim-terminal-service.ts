@@ -710,6 +710,35 @@ export class HelcimTerminalService {
             // Extract total amount from Helcim (includes tip)
             const totalAmount = t?.amount || t?.totalAmount || t?.transactionAmount || t?.total || payload?.amount;
             
+            // If initial webhook didn't indicate outcome, derive it from enriched details
+            if (normalized !== 'completed' && normalized !== 'failed') {
+              const enrichedRaw = String(
+                t?.status || t?.result || t?.outcome || t?.type || t?.approved || ''
+              ).toLowerCase();
+              const enrichedApproved = t?.approved === true || String(t?.approved).toLowerCase() === 'true';
+              if (
+                enrichedApproved ||
+                enrichedRaw.includes('approved') ||
+                enrichedRaw.includes('success') ||
+                enrichedRaw.includes('completed') ||
+                enrichedRaw.includes('captured') ||
+                enrichedRaw.includes('sale')
+              ) {
+                console.log('✅ Enriched transaction indicates completion');
+                normalized = 'completed';
+              } else if (
+                enrichedRaw.includes('declined') ||
+                enrichedRaw.includes('failed') ||
+                enrichedRaw.includes('voided') ||
+                enrichedRaw.includes('refunded') ||
+                enrichedRaw.includes('canceled') ||
+                enrichedRaw.includes('cancelled')
+              ) {
+                console.log('❌ Enriched transaction indicates failure');
+                normalized = 'failed';
+              }
+            }
+
             // Helcim doesn't return tip as separate field, so calculate it from session data
             let tipAmount = 0;
             let baseAmount = totalAmount;
