@@ -234,6 +234,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       totalAmount: amount,
       method: 'cash',
       status: 'completed',
+      type: 'appointment_payment',
       notes: notes || 'Cash payment',
       processedAt: new Date(),
     });

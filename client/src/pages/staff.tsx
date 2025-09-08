@@ -178,7 +178,9 @@ const StaffPage = () => {
   const { data: staff, isLoading } = useQuery({
     queryKey: ['/api/staff'],
     queryFn: async () => {
-      const response = await fetch('/api/staff');
+      const response = await fetch('/api/staff', {
+        credentials: 'include',
+      });
       if (!response.ok) throw new Error('Failed to fetch staff');
       return response.json();
     }
@@ -308,6 +310,7 @@ const StaffPage = () => {
   const filteredStaff = staff?.filter((staffMember: StaffMember) =>
     staffMember.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    staffMember.user?.username?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     staffMember.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (staffMember.user?.phone && staffMember.user.phone.includes(searchQuery))
@@ -425,7 +428,7 @@ const StaffPage = () => {
                       className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
                     >
                       <span className="text-sm lg:text-base font-semibold text-gray-900 dark:text-gray-100">
-                        {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                        {getFullName(staffMember.user?.firstName, staffMember.user?.lastName, staffMember.user?.username)}
                       </span>
                     </button>
                   ))}
@@ -445,7 +448,7 @@ const StaffPage = () => {
             <AlertDialogDescription>
               This will permanently delete the staff member{' '}
               <span className="font-semibold">
-                {staffToDelete && getFullName(staffToDelete.user.firstName, staffToDelete.user.lastName)}
+                {staffToDelete && getFullName(staffToDelete.user.firstName, staffToDelete.user.lastName, staffToDelete.user.username)}
               </span>{' '}
               and remove their access to the system. This action cannot be undone.
             </AlertDialogDescription>

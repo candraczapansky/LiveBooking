@@ -35,7 +35,41 @@ export function HelcimPayModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [scriptLoaded, setScriptLoaded] = useState(false);
   const { toast } = useToast();
+
+  // Ensure Helcim scripts are loaded
+  const ensureHelcimScript = async () => {
+    // Check if script is already loaded
+    const existingScript = document.getElementById('helcim-pay-script');
+    if (existingScript || (window as any).appendHelcimPayIframe) {
+      console.log("[HelcimPayModal] Helcim script already loaded");
+      setScriptLoaded(true);
+      return;
+    }
+
+    // Load the script
+    return new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.id = 'helcim-pay-script';
+      script.type = 'text/javascript';
+      script.src = 'https://secure.helcim.app/helcim-pay/services/start.js';
+      script.async = true;
+
+      script.onload = () => {
+        console.log("[HelcimPayModal] Helcim script loaded successfully");
+        setScriptLoaded(true);
+        resolve();
+      };
+
+      script.onerror = () => {
+        console.error("[HelcimPayModal] Failed to load Helcim script");
+        reject(new Error("Failed to load payment system"));
+      };
+
+      document.head.appendChild(script);
+    });
+  };
 
   // Initialize Helcim payment session or process saved card payment
   const initializePayment = async () => {
@@ -88,6 +122,9 @@ export function HelcimPayModal({
         description
       });
 
+      // Ensure Helcim script is loaded first
+      await ensureHelcimScript();
+
       // Initialize Helcim Pay session for new card
       const response = await apiRequest("POST", "/api/helcim-pay/initialize", {
         amount,
@@ -99,10 +136,11 @@ export function HelcimPayModal({
         throw new Error(error.message || "Failed to initialize payment");
       }
 
-      const { checkoutToken } = await response.json();
-      console.log("[HelcimPayModal] Received checkout token:", checkoutToken);
+      const { checkoutToken, token, secretToken } = await response.json();
+      const finalToken = checkoutToken || token;
+      console.log("[HelcimPayModal] Received checkout token:", finalToken);
       
-      setSessionToken(checkoutToken);
+      setSessionToken(finalToken);
       setIsInitialized(true);
 
       // Wait for Helcim script and then append iframe
@@ -110,18 +148,18 @@ export function HelcimPayModal({
         try {
           // @ts-ignore
           if (typeof window.appendHelcimPayIframe === 'function') {
-            console.log("[HelcimPayModal] Appending Helcim iframe...");
+            console.log("[HelcimPayModal] Appending Helcim iframe with token:", finalToken);
             // @ts-ignore
-            window.appendHelcimPayIframe(checkoutToken);
+            window.appendHelcimPayIframe(finalToken);
           } else {
-            console.error("[HelcimPayModal] Helcim Pay script not loaded");
+            console.error("[HelcimPayModal] Helcim Pay script not loaded - window.appendHelcimPayIframe not found");
             throw new Error("Payment system not available");
           }
         } catch (err) {
           console.error("[HelcimPayModal] Error appending iframe:", err);
           throw err;
         }
-      }, 100);
+      }, 500);
 
     } catch (error: any) {
       console.error("[HelcimPayModal] Error initializing payment:", error);
@@ -143,8 +181,57 @@ export function HelcimPayModal({
   useEffect(() => {
     if (!open || !sessionToken) return;
 
+    const handleMessage = (event: MessageEvent) => {
+      // Only handle messages from Helcim domain
+      if (!event.origin.includes('helcim')) return;
+      
+      console.log("[HelcimPayModal] Received message from Helcim:", event.data);
+      
+      // Check for success or error in the message
+      if (event.data && typeof event.data === 'object') {
+        if (event.data.eventStatus === 'SUCCESS' && event.data.eventMessage) {
+          try {
+            const eventData = JSON.parse(event.data.eventMessage);
+            console.log("[HelcimPayModal] Payment successful via message:", eventData);
+            
+            toast({
+              title: "Payment Successful",
+              description: `Payment of ${formatPrice(amount)} has been processed.`,
+            });
+            
+            if (onSuccess) {
+              onSuccess({
+                paymentId: eventData.data?.data?.transactionId,
+                transactionId: eventData.data?.data?.transactionId,
+                amount: amount,
+                ...eventData.data?.data
+              });
+            }
+            
+            onOpenChange(false);
+          } catch (e) {
+            console.error("[HelcimPayModal] Error parsing success message:", e);
+          }
+        } else if (event.data.eventStatus === 'ERROR' || event.data.error) {
+          console.error("[HelcimPayModal] Payment error via message:", event.data);
+          
+          toast({
+            title: "Payment Failed",
+            description: event.data.message || "Payment processing failed",
+            variant: "destructive"
+          });
+          
+          if (onError) {
+            onError(event.data);
+          }
+          
+          onOpenChange(false);
+        }
+      }
+    };
+
     const handleSuccess = (event: CustomEvent) => {
-      console.log("[HelcimPayModal] Payment success:", event.detail);
+      console.log("[HelcimPayModal] Payment success via custom event:", event.detail);
       
       if (event.detail.checkoutToken === sessionToken) {
         toast({
@@ -161,7 +248,7 @@ export function HelcimPayModal({
     };
 
     const handleError = (event: CustomEvent) => {
-      console.error("[HelcimPayModal] Payment error:", event.detail);
+      console.error("[HelcimPayModal] Payment error via custom event:", event.detail);
       
       if (event.detail.checkoutToken === sessionToken) {
         const errorMessage = event.detail.message || "Payment failed";
@@ -180,10 +267,12 @@ export function HelcimPayModal({
       }
     };
 
+    window.addEventListener('message', handleMessage);
     window.addEventListener('helcim-payment-success', handleSuccess as EventListener);
     window.addEventListener('helcim-payment-error', handleError as EventListener);
 
     return () => {
+      window.removeEventListener('message', handleMessage);
       window.removeEventListener('helcim-payment-success', handleSuccess as EventListener);
       window.removeEventListener('helcim-payment-error', handleError as EventListener);
     };
@@ -238,7 +327,7 @@ export function HelcimPayModal({
             </div>
           )}
 
-          {isInitialized && !isProcessing && !customerId && !cardId && (
+          {isInitialized && !isProcessing && !cardId && (
             <>
               <div id="helcim-pay-iframe-container" className="min-h-[400px]">
                 {/* Helcim iframe will be inserted here */}

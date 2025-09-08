@@ -112,10 +112,11 @@ export default function StaffScheduleDetailSimplePage() {
         },
         body: JSON.stringify({
           staffId,
-          dayOfWeek: data.dayOfWeek,
+          dayOfWeek: toCalendarDay(data.dayOfWeek),
           startTime: data.startTime,
           endTime: data.endTime,
-          locationId: parseInt(data.locationId)
+          locationId: parseInt(data.locationId),
+          startDate: (() => { const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const da = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${da}`; })()
         }),
       });
       if (!response.ok) {
@@ -126,6 +127,7 @@ export default function StaffScheduleDetailSimplePage() {
     onSuccess: () => {
       toast.success('Schedule created successfully');
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      try { window.dispatchEvent(new CustomEvent('schedule-updated')); } catch {}
       setIsDialogOpen(false);
       resetForm();
     },
@@ -144,7 +146,7 @@ export default function StaffScheduleDetailSimplePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          dayOfWeek: data.dayOfWeek,
+          dayOfWeek: toCalendarDay(data.dayOfWeek),
           startTime: data.startTime,
           endTime: data.endTime,
           locationId: parseInt(data.locationId)
@@ -158,6 +160,7 @@ export default function StaffScheduleDetailSimplePage() {
     onSuccess: () => {
       toast.success('Schedule updated successfully');
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      try { window.dispatchEvent(new CustomEvent('schedule-updated')); } catch {}
       setIsDialogOpen(false);
       resetForm();
     },
@@ -205,6 +208,25 @@ export default function StaffScheduleDetailSimplePage() {
     }
   };
 
+  // Normalize dayOfWeek to calendar format (e.g., "Monday")
+  const toCalendarDay = (day: string) => {
+    try {
+      const map: Record<string, string> = {
+        monday: 'Monday',
+        tuesday: 'Tuesday',
+        wednesday: 'Wednesday',
+        thursday: 'Thursday',
+        friday: 'Friday',
+        saturday: 'Saturday',
+        sunday: 'Sunday',
+      };
+      const key = String(day || '').toLowerCase();
+      return map[key] || day;
+    } catch {
+      return day;
+    }
+  };
+
   // Get staff name safely
   const getStaffName = () => {
     try {
@@ -237,7 +259,7 @@ export default function StaffScheduleDetailSimplePage() {
 
   const openEditDialog = (schedule: any) => {
     setFormData({
-      dayOfWeek: schedule.dayOfWeek || '',
+      dayOfWeek: (schedule.dayOfWeek || '').toString().toLowerCase(),
       startTime: schedule.startTime || '',
       endTime: schedule.endTime || '',
       locationId: schedule.locationId || selectedLocation?.id || ''

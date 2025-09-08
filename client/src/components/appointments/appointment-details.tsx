@@ -564,12 +564,17 @@ const AppointmentDetails = ({
         discountAmount: appliedDiscountCode ? discountAmount : 0,
         discountCode: appliedDiscountCode || null,
         method: "cash",
-        status: "completed"
+        status: "completed",
+        type: "appointment_payment",
+        processedAt: new Date(),
+        paymentDate: new Date(),
+        tipAmount: tipAmount || 0
       });
 
       // Update appointment payment status
       await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
         ...appointment,
+        status: "completed",
         paymentStatus: "paid",
         tipAmount: tipAmount || 0,
         totalAmount: finalAmount
@@ -682,6 +687,7 @@ const AppointmentDetails = ({
       
       // Dismiss loading toast and show success
       loadingToast.dismiss();
+      
       toast({
         title: "Payment Successful",
         description: `Payment of ${formatPrice(amt)} has been processed.`,

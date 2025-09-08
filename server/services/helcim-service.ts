@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
 
 export class HelcimService {
   private apiToken: string;
@@ -47,15 +48,28 @@ export class HelcimService {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
-        message: error.message
+        message: error.message,
+        fullError: JSON.stringify(error.response?.data, null, 2),
+        requestBody: JSON.stringify(data, null, 2)
       });
       
+      // Log specific Helcim error details
+      if (error.response?.data?.errors) {
+        console.error('[HelcimService] Helcim API errors:', error.response.data.errors);
+      }
+      if (error.response?.data?.message) {
+        console.error('[HelcimService] Helcim error message:', error.response.data.message);
+      }
+      
       if (error.response) {
+        // Pass the full error details along
         const errorMessage = error.response.data?.message || 
                            error.response.data?.error || 
                            error.response.data?.errors?.[0]?.message ||
                            `Helcim API request failed with status ${error.response.status}`;
-        throw new Error(errorMessage);
+        const enhancedError: any = new Error(errorMessage);
+        enhancedError.response = error.response;
+        throw enhancedError;
       }
       throw error;
     }
@@ -129,21 +143,12 @@ export class HelcimService {
     // Try the main purchase endpoint with card verification
     // Using UUID v4 format for idempotencyKey
     
-    // Generate a proper UUID v4 format idempotencyKey
-    const generateUUID = () => {
-      // crypto.randomUUID() generates a proper UUID v4
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-      }
-      // Fallback to manual generation if crypto.randomUUID is not available
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-    
-    const idempotencyKey = generateUUID();
+    // Generate idempotencyKey - UUID v4 format required by Helcim
+    const idempotencyKey = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
     
     try {
       // First attempt: Try with UUID format idempotencyKey
@@ -181,7 +186,7 @@ export class HelcimService {
       
       // Try without nested cardData
       try {
-        const newIdempotencyKey = generateUUID(); // Generate new UUID for retry
+        const newIdempotencyKey = Math.random().toString(36).substring(2, 15); // Generate new idempotencyKey for retry
         const payload = {
           paymentType: 'verify',
           amount: 0.01,
@@ -262,89 +267,76 @@ export class HelcimService {
     // For saved card payments, Helcim uses the customer code and card ID
     // The payment needs to reference the stored card on file
     
-    // Generate proper UUID v4 for idempotencyKey
-    const generateUUID = () => {
-      // crypto.randomUUID() generates a proper UUID v4
-      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-      }
-      // Fallback to manual generation if crypto.randomUUID is not available
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-    
-    const idempotencyKey = generateUUID();
+    // Generate proper UUID v4 for idempotencyKey using the uuid library
+    const idempotencyKey = uuidv4();
     
     try {
       // Try the /payment/purchase endpoint with the saved card
       // For saved cards in Helcim, we need to use the cardToken that was returned when the card was saved
       // The cardId is actually the token that represents the saved card
+      
       const payload: any = {
-        paymentType: 'purchase',
         amount: amount, // Amount in dollars
-        currency: 'CAD',
-        customerCode: customerId,
-        // For saved cards, use the cardToken in cardData
+        currency: this.defaultCurrency,
+        customerCode: customerId, // Must use customerCode (CST format) not numeric ID
         cardData: {
           cardToken: cardId  // The cardId stored in our DB is actually the Helcim card token
         },
-        ipAddress: '127.0.0.1',
-        idempotencyKey: idempotencyKey
+        ipAddress: '127.0.0.1'
       };
       
       console.log('[HelcimService] Attempting payment with saved card');
-      const result = await this.makeRequest('/payment/purchase', 'POST', payload);
+      console.log('[HelcimService] Payment payload:', JSON.stringify(payload, null, 2));
+      console.log('[HelcimService] Idempotency Key:', idempotencyKey);
+      console.log('[HelcimService] API Token configured:', !!process.env.HELCIM_API_TOKEN);
+      console.log('[HelcimService] API URL:', this.apiUrl);
       
-      console.log('[HelcimService] Saved card payment successful:', result);
-      return result;
+      // Make the request with idempotency-key in headers
+      const url = `${this.apiUrl}/payment/purchase`;
+      console.log(`[HelcimService] Making POST request to: ${url}`);
+      
+      const response = await axios({
+        method: 'POST',
+        url,
+        headers: {
+          'api-token': this.apiToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'idempotency-key': idempotencyKey  // Add idempotency key to headers
+        },
+        data: payload
+      });
+
+      console.log('[HelcimService] Saved card payment successful:', response.data);
+      return response.data;
       
     } catch (error: any) {
       console.error('[HelcimService] Saved card payment failed:', error);
+      console.error('[HelcimService] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       
-      // Try an alternative approach - using the card token stored with the customer
-      try {
-        console.log('[HelcimService] Trying alternative approach with customer cards');
-        
-        // First, get the customer's saved cards
-        const customerCards = await this.makeRequest(`/customers/${customerId}/cards`, 'GET');
-        console.log('[HelcimService] Customer cards:', customerCards);
-        
-        // Find the specific card
-        const card = Array.isArray(customerCards) 
-          ? customerCards.find((c: any) => String(c.id) === String(cardId) || String(c.cardId) === String(cardId))
-          : customerCards;
-          
-        if (!card) {
-          throw new Error(`Card ${cardId} not found for customer ${customerId}`);
-        }
-        
-        // Process payment with the card details
-        // Reuse the same generateUUID function
-        const retryIdempotencyKey = generateUUID();
-        const paymentPayload: any = {
-          paymentType: 'purchase',
-          amount: amount,
-          currency: 'CAD',
-          customerCode: customerId,
-          cardData: {
-            // Use the card token for payment - this is the key for saved cards
-            cardToken: card.cardToken || card.token || card.id || card.cardId
-          },
-          ipAddress: '127.0.0.1',
-          idempotencyKey: retryIdempotencyKey
-        };
-        
-        const paymentResult = await this.makeRequest('/payment/purchase', 'POST', paymentPayload);
-        console.log('[HelcimService] Alternative payment successful:', paymentResult);
-        return paymentResult;
-        
-      } catch (retryError: any) {
-        console.error('[HelcimService] Alternative payment approach also failed:', retryError);
-        throw error; // Throw the original error
+      // Log specific Helcim error details
+      if (error.response?.data?.errors) {
+        console.error('[HelcimService] Helcim API errors:', error.response.data.errors);
       }
+      if (error.response?.data?.message) {
+        console.error('[HelcimService] Helcim error message:', error.response.data.message);
+      }
+      
+      // Throw the original error with more context
+      if (error.response) {
+        const errorMessage = error.response.data?.message || 
+                           error.response.data?.error || 
+                           error.response.data?.errors?.[0]?.message ||
+                           `Helcim API request failed with status ${error.response.status}`;
+        const enhancedError: any = new Error(errorMessage);
+        enhancedError.response = error.response;
+        throw enhancedError;
+      }
+      throw error;
     }
   }
 }

@@ -28,16 +28,14 @@ export default function createHelcimPaymentsRouter(storage?: any) {
       amount: isCardSaveOnly ? 0 : Number(amount),
       currency: 'USD',
       paymentType: isCardSaveOnly ? 'verify' : 'purchase',  // Use 'verify' for $0 auth
-      test: process.env.NODE_ENV !== 'production',
+      test: false,  // Use real mode to create actual customers and cards
       description: description || 'Payment',
       idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
     } as any;
 
-    console.log('[Helcim] Initializing:', { 
-      paymentType: payload.paymentType, 
-      amount: payload.amount,
-      description: payload.description 
-    });
+    console.log('[Helcim] Initializing with FULL payload:', JSON.stringify(payload, null, 2));
+    console.log('[Helcim] Test mode is:', payload.test);
+    console.log('[Helcim] Environment:', process.env.NODE_ENV);
 
     // Try V2 first (api-token header)
     const tryV2 = async () => {
@@ -84,6 +82,9 @@ export default function createHelcimPaymentsRouter(storage?: any) {
       result = v1;
     }
 
+    console.log('[Helcim] Initialization response:', JSON.stringify(result.data, null, 2));
+    console.log('[Helcim] Is this test mode?:', result.data.test || result.data.testMode || 'Not specified in response');
+    
     res.json({ 
       success: true, 
       token: result.data.checkoutToken,
@@ -175,10 +176,12 @@ export default function createHelcimPaymentsRouter(storage?: any) {
       email,
       phone,
     });
-    const helcimCustomerId = created?.id || created?.customerId || created?.customer?.id;
+    // IMPORTANT: We need the customerCode (CST format), not the numeric ID!
+    const helcimCustomerId = created?.customerCode || created?.customer?.customerCode;
     if (!helcimCustomerId) {
-      return res.status(502).json({ success: false, message: 'Failed to create Helcim customer', details: created });
+      return res.status(502).json({ success: false, message: 'Failed to create Helcim customer - no customer code', details: created });
     }
+    console.log('[Helcim Booking] Using customer code:', helcimCustomerId);
     res.json({ success: true, customerId: String(helcimCustomerId) });
   } catch (error: any) {
     console.error('Helcim create-customer error:', error);
@@ -321,11 +324,13 @@ export default function createHelcimPaymentsRouter(storage?: any) {
         return res.status(502).json({ success: false, message: 'Failed to create Helcim customer', error: error?.message || 'Unknown error' });
       }
       
-      helcimCustomerId = String(created?.id || created?.customerId || created?.customer?.id || '');
+      // IMPORTANT: We need the customerCode (CST format), not the numeric ID!
+      helcimCustomerId = String(created?.customerCode || created?.customer?.customerCode || '');
       if (!helcimCustomerId) {
-        console.error('[Helcim Save Card] No customer ID returned from Helcim:', created);
-        return res.status(502).json({ success: false, message: 'Failed to create Helcim customer - no ID returned', details: created });
+        console.error('[Helcim Save Card] No customer code returned from Helcim:', created);
+        return res.status(502).json({ success: false, message: 'Failed to create Helcim customer - no customer code returned', details: created });
       }
+      console.log('[Helcim Save Card] Using customer code:', helcimCustomerId);
     }
     
     if (!helcimCustomerId) {

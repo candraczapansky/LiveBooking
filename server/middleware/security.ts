@@ -101,7 +101,8 @@ export function securityHeaders() {
             "blob:",
           ],
           objectSrc: ["'none'"],
-          ...(cspReportUri ? { reportUri: [cspReportUri] } : {}),
+          // reportUri is deprecated and inconsistently parsed by browsers. If reporting is needed,
+          // configure a Report-To endpoint via headers at the proxy/web server layer instead.
         },
       },
       hsts: {

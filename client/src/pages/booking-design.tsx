@@ -338,7 +338,7 @@ export default function BookingDesignPage() {
                     <TabsTrigger value="desktop">Desktop</TabsTrigger>
                     <TabsTrigger value="mobile">Mobile</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="desktop" className="mt-4">
+                  <TabsContent value="desktop" className="mt-4" forceMount>
                     <div className="w-full overflow-x-auto bg-gray-50 dark:bg-gray-900 p-4 rounded border">
                       <div className="mx-auto w-[1280px] h-[800px] bg-white dark:bg-gray-950 rounded shadow border overflow-hidden">
                         <iframe
@@ -350,7 +350,7 @@ export default function BookingDesignPage() {
                       </div>
                     </div>
                   </TabsContent>
-                  <TabsContent value="mobile" className="mt-4">
+                  <TabsContent value="mobile" className="mt-4" forceMount>
                     <div className="w-full flex justify-center bg-gray-50 dark:bg-gray-900 p-4 rounded border">
                       <div className="relative w-[390px] h-[844px] rounded-[36px] border-[10px] border-gray-800 dark:border-gray-200 bg-black shadow-xl overflow-hidden">
                         <iframe

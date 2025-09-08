@@ -94,14 +94,7 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
       const txId = payload?.id;
       const type = payload?.type;
 
-      // Record a global last-completed marker for polling endpoints to detect completion.
-      try {
-        (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
-          status: 'completed',
-          updatedAt: Date.now(),
-          transactionId: txId,
-        };
-      } catch {}
+      // Do not set any global completion markers here; wait until status is verified below
 
       // Process webhook based on type
       if (type === 'cardTransaction' && txId) {

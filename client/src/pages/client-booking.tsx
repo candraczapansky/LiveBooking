@@ -50,7 +50,6 @@ const ClientBookingPage = () => {
   useDocumentTitle("Book an Appointment | Glo Head Spa");
   const { login, user } = useAuth();
   const [isBookingOpen, setIsBookingOpen] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -176,27 +175,6 @@ const ClientBookingPage = () => {
     // Stay on the public booking page when closing to avoid entering internal app UI
     // Intentionally no navigation on close for the public client flow
   };
-
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 640px)');
-    const update = () => setIsMobile(!!mq.matches);
-    try {
-      mq.addEventListener('change', update);
-    } catch {
-      // Safari
-      // @ts-ignore
-      mq.addListener(update);
-    }
-    update();
-    return () => {
-      try {
-        mq.removeEventListener('change', update);
-      } catch {
-        // @ts-ignore
-        mq.removeListener(update);
-      }
-    };
-  }, []);
 
   // Booking design state
   const [design, setDesign] = useState<BookingDesign | null>(null);
@@ -383,18 +361,21 @@ const ClientBookingPage = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <BusinessBrand size="sm" />
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <span className="hidden sm:inline text-sm text-gray-600 dark:text-gray-400">
                   Welcome, <span className="font-medium">{user.firstName} {user.lastName}</span>
+                </span>
+                <span className="sm:hidden text-sm text-gray-600 dark:text-gray-400 font-medium">
+                  {user.firstName}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={clientLogout}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign Out
+                  <span className="hidden sm:inline">Sign Out</span>
                 </Button>
               </div>
             </div>
@@ -402,7 +383,7 @@ const ClientBookingPage = () => {
         </div>
       )}
 
-      <main className="flex-1 w-full mx-auto py-10 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 w-full mx-auto py-6 sm:py-10 px-4 sm:px-6 lg:px-8">
         {shouldShowRegister ? (
           <div className="w-full">
             {showLogin ? (
@@ -590,11 +571,11 @@ const ClientBookingPage = () => {
           <div className="max-w-5xl mx-auto w-full">
             {design?.showTabs !== false ? (
               <Tabs defaultValue="book" className="w-full">
-                <TabsList className="grid grid-cols-4 backdrop-blur-sm border border-white/20 dark:border-white/10" style={{ backgroundColor: overlayColor }}>
-                  <TabsTrigger value="about" className="text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">About</TabsTrigger>
-                  <TabsTrigger value="services" className="text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Services</TabsTrigger>
-                  <TabsTrigger value="contact" className="text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Contact</TabsTrigger>
-                  <TabsTrigger value="book" className="text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Book</TabsTrigger>
+                <TabsList className="flex flex-nowrap justify-between gap-2 overflow-x-auto whitespace-nowrap backdrop-blur-sm border border-white/20 dark:border-white/10 h-auto px-2" style={{ backgroundColor: overlayColor }}>
+                  <TabsTrigger value="about" className="flex-1 text-xs sm:text-sm py-2 text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">About</TabsTrigger>
+                  <TabsTrigger value="services" className="flex-1 text-xs sm:text-sm py-2 text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Services</TabsTrigger>
+                  <TabsTrigger value="contact" className="flex-1 text-xs sm:text-sm py-2 text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Contact</TabsTrigger>
+                  <TabsTrigger value="book" className="flex-1 text-xs sm:text-sm py-2 text-foreground bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:bg-foreground/10">Book</TabsTrigger>
                 </TabsList>
                 <TabsContent value="about">
                   <div className="bg-white/80 dark:bg-gray-900/80 rounded-lg p-6 border">
@@ -619,11 +600,11 @@ const ClientBookingPage = () => {
                   </div>
                 </TabsContent>
                 <TabsContent value="book">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-extrabold text-foreground mb-4">
+                  <div className="text-center mb-4 sm:mb-8 hidden sm:block">
+                    <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2 sm:mb-4">
                       Book Your Appointment
                     </h2>
-                    <p className="max-w-2xl mx-auto text-foreground">
+                    <p className="max-w-2xl mx-auto text-sm sm:text-base text-foreground px-2 sm:px-0">
                       Select from our wide range of services and choose a time that works for you.
                     </p>
                   </div>
@@ -632,17 +613,16 @@ const ClientBookingPage = () => {
                     onOpenChange={handleOpenChange}
                     userId={user?.id}
                     overlayColor={overlayColor}
-                    variant={isMobile ? 'mobile' : 'default'}
                   />
                 </TabsContent>
               </Tabs>
             ) : (
               <>
-                <div className="text-center mb-8">
-                  <h2 className="text-3xl font-extrabold text-foreground mb-4">
+                <div className="text-center mb-4 sm:mb-8 hidden sm:block">
+                  <h2 className="text-2xl sm:text-3xl font-extrabold text-foreground mb-2 sm:mb-4">
                     Book Your Appointment
                   </h2>
-                  <p className="max-w-2xl mx-auto text-foreground">
+                  <p className="max-w-2xl mx-auto text-sm sm:text-base text-foreground px-2 sm:px-0">
                     Select from our wide range of services and choose a time that works for you.
                   </p>
                 </div>
@@ -650,7 +630,6 @@ const ClientBookingPage = () => {
                   open={isBookingOpen} 
                   onOpenChange={handleOpenChange}
                   userId={user?.id}
-                  variant={isMobile ? 'mobile' : 'default'}
                 />
               </>
             )}

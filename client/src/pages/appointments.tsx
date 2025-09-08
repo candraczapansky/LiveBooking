@@ -370,34 +370,43 @@ const AppointmentsPage = () => {
   // Helper: Check if a staff member is scheduled for a specific date and location
   const isStaffScheduledForDate = (staffId: number, date: Date, locationId?: number) => {
     if (!schedules || schedules.length === 0) return false;
-    
+
     const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-    const dateString = date.toISOString().slice(0, 10);
-    
+
+    const toLocalYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${da}`;
+    };
+
+    const dateString = toLocalYMD(date);
+
     // Find schedules for this staff on this day
     const staffSchedules = schedules.filter((schedule: any) => {
       const matchesStaff = schedule.staffId === staffId;
-      const matchesDay = schedule.dayOfWeek === dayName;
-      
+      const matchesDay = String(schedule.dayOfWeek || '').toLowerCase() === String(dayName || '').toLowerCase();
+
       // Check if the schedule is at the selected location (if location filtering is enabled)
       const matchesLocation = !locationId || schedule.locationId == null || schedule.locationId === locationId;
-      
-      // Check if the schedule is active for this date
-      const startDateString = typeof schedule.startDate === 'string' 
-        ? schedule.startDate 
-        : new Date(schedule.startDate).toISOString().slice(0, 10);
-      const endDateString = schedule.endDate 
-        ? (typeof schedule.endDate === 'string' 
-          ? schedule.endDate 
-          : new Date(schedule.endDate).toISOString().slice(0, 10))
+
+      // Check if the schedule is active for this date (compare in local time)
+      const startDateString = typeof schedule.startDate === 'string'
+        ? schedule.startDate
+        : toLocalYMD(new Date(schedule.startDate));
+
+      const endDateString = schedule.endDate
+        ? (typeof schedule.endDate === 'string'
+          ? schedule.endDate
+          : toLocalYMD(new Date(schedule.endDate)))
         : null;
-      
+
       const matchesStartDate = startDateString <= dateString;
       const matchesEndDate = !endDateString || endDateString >= dateString;
-      
+
       return matchesStaff && matchesDay && matchesLocation && matchesStartDate && matchesEndDate;
     });
-    
+
     return staffSchedules.length > 0;
   };
 
@@ -520,7 +529,7 @@ const AppointmentsPage = () => {
     // For week and month views, only show staff who have schedules at the selected location
     if (selectedLocation?.id) {
       const hasLocationSchedule = schedules.some((schedule: any) => 
-        schedule.staffId === s.id && schedule.locationId === selectedLocation.id
+        schedule.staffId === s.id && (schedule.locationId == null || schedule.locationId === selectedLocation.id)
       );
 
       if (!hasLocationSchedule) {
@@ -983,15 +992,21 @@ const AppointmentsPage = () => {
                   const matchesDay = sch.dayOfWeek === dayName;
                   const matchesLocation = !selectedLocation?.id || sch.locationId == null || sch.locationId === selectedLocation.id;
                   
-                  // Fix date comparison logic
-                  const todayString = date.toISOString().slice(0, 10);
+                  // Fix date comparison logic: use local YYYY-MM-DD to avoid UTC off-by-one
+                  const toLocalYMD = (d: Date) => {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const da = String(d.getDate()).padStart(2, '0');
+                    return `${y}-${m}-${da}`;
+                  };
+                  const todayString = toLocalYMD(date);
                   let startDateString: string;
                   let endDateString: string | null;
                   
                   try {
                     startDateString = typeof sch.startDate === 'string' 
                       ? sch.startDate 
-                      : new Date(sch.startDate).toISOString().slice(0, 10);
+                      : toLocalYMD(new Date(sch.startDate));
                   } catch (e) {
                     console.warn('Error parsing schedule start date:', e);
                     return false;
@@ -1001,7 +1016,7 @@ const AppointmentsPage = () => {
                     endDateString = sch.endDate 
                       ? (typeof sch.endDate === 'string' 
                         ? sch.endDate 
-                        : new Date(sch.endDate).toISOString().slice(0, 10))
+                        : toLocalYMD(new Date(sch.endDate)))
                       : null;
                   } catch (e) {
                     console.warn('Error parsing schedule end date:', e);
@@ -1371,6 +1386,14 @@ const AppointmentsPage = () => {
         .rbc-event {
           cursor: pointer !important;
           overflow: hidden !important; /* clip content to event bounds to prevent bleed-over */
+          width: 100% !important; /* Force events to take full width of their container */
+          left: 0 !important; /* Start at the left edge */
+        }
+        
+        /* Ensure events in resource columns take full width */
+        .rbc-day-slot .rbc-events-container .rbc-event {
+          width: calc(100% - 2px) !important; /* Full width minus small margin for borders */
+          left: 0 !important;
         }
         
         /* Fix calendar grid scrolling */
@@ -1650,7 +1673,13 @@ const AppointmentsPage = () => {
                             </SelectItem>
                             {locationStaffOptions?.map((s: any) => (
                               <SelectItem key={s.id} value={s.id.toString()}>
-                                {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                                {(() => {
+                                  const u = s?.user || {};
+                                  const first = (u.firstName || '').trim();
+                                  const last = (u.lastName || '').trim();
+                                  const full = `${first} ${last}`.trim();
+                                  return full || u.username || 'Unknown Staff';
+                                })()}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1827,11 +1856,18 @@ const AppointmentsPage = () => {
                             }).filter(Boolean) || [];
                             
                             const blockedEvents = getClickableBlockedEvents();
+                            // Fallback: also render background availability as regular events so they always show
+                            const backgroundAsEvents = getBackgroundEvents();
                             console.log('📅 Valid appointment events created:', appointmentEvents.length);
                             console.log('⛔ Clickable blocked events created:', blockedEvents.length);
+                            console.log('🎨 Background-as-events created:', Array.isArray(backgroundAsEvents) ? backgroundAsEvents.length : 0);
                             
-                            // Ensure appointment events are returned after background strips (drawn earlier)
-                            return [...appointmentEvents, ...blockedEvents];
+                            // Draw background availability first, then appointments, then clickable blocked overlays
+                            return [
+                              ...(Array.isArray(backgroundAsEvents) ? backgroundAsEvents : []),
+                              ...appointmentEvents,
+                              ...blockedEvents,
+                            ];
                           } catch (error) {
                             console.error('Error creating appointment events:', error);
                             return [];
@@ -1848,7 +1884,13 @@ const AppointmentsPage = () => {
                         })()}
                         resources={(calendarResources || filteredResources || [])?.map((s: any) => ({
                           resourceId: s.id,
-                          resourceTitle: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff',
+                          resourceTitle: (() => {
+                            const u = s?.user || {};
+                            const first = (u.firstName || '').trim();
+                            const last = (u.lastName || '').trim();
+                            const full = `${first} ${last}`.trim();
+                            return full || u.username || 'Unknown Staff';
+                          })(),
                         })) || []}
                         onPreSelectResource={(rid) => {
                           try {
@@ -2118,7 +2160,13 @@ const AppointmentsPage = () => {
                   <SelectContent>
                     {locationStaffOptions?.map((s: any) => (
                       <SelectItem key={s.id} value={String(s.id)}>
-                        {s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Staff'}
+                        {(() => {
+                          const u = s?.user || {};
+                          const first = (u.firstName || '').trim();
+                          const last = (u.lastName || '').trim();
+                          const full = `${first} ${last}`.trim();
+                          return full || u.username || 'Unknown Staff';
+                        })()}
                       </SelectItem>
                     ))}
                   </SelectContent>

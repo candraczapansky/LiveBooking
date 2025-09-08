@@ -176,7 +176,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             amount: isCardSaveOnly ? 0 : Number(amount),
             currency: 'USD',
             paymentType: isCardSaveOnly ? 'verify' : 'purchase',
-            test: process.env.NODE_ENV !== 'production',
+            test: false,  // Use real mode to create actual customers and cards
             description: description || 'Payment',
             idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           };
@@ -365,10 +365,166 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     } catch {}
   }
 
+  // Test endpoint to create a customer directly
+  app.post('/api/helcim-pay/test-create-customer', async (req: Request, res: Response) => {
+    try {
+      const mod = await import('./services/helcim-service.js');
+      const service: any = (mod as any)?.helcimService || (mod as any)?.default || mod;
+      
+      if (!service) {
+        return res.status(500).json({ success: false, message: 'Helcim service not available' });
+      }
+      
+      // Create a test customer
+      const testCustomer = await service.createCustomer({
+        firstName: 'Test',
+        lastName: 'Customer',
+        email: `test${Date.now()}@example.com`
+      });
+      
+      console.log('[Test Create Customer] Result:', testCustomer);
+      
+      return res.json({
+        success: true,
+        customer: testCustomer,
+        customerCode: testCustomer?.customerCode,
+        customerId: testCustomer?.id || testCustomer?.customerId,
+        isCST: testCustomer?.customerCode?.startsWith('CST')
+      });
+      
+    } catch (error: any) {
+      console.error('[Test Create Customer] Error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create test customer',
+        error: error.message,
+        details: error?.response?.data
+      });
+    }
+  });
+  
+  // Diagnostic endpoint to check Helcim API status
+  app.get('/api/helcim-pay/diagnostic', async (req: Request, res: Response) => {
+    try {
+      const apiToken = process.env.HELCIM_API_TOKEN;
+      const apiUrl = process.env.HELCIM_API_URL || 'https://api.helcim.com/v2';
+      
+      if (!apiToken) {
+        return res.json({
+          success: false,
+          message: 'No API token configured',
+          hasToken: false
+        });
+      }
+      
+      // Try to fetch account info to determine if we're in test or live mode
+      const response = await fetch(`${apiUrl}/account`, {
+        method: 'GET',
+        headers: {
+          'api-token': apiToken,
+          'Accept': 'application/json'
+        }
+      });
+      
+      const data = await response.json();
+      
+      return res.json({
+        success: response.ok,
+        hasToken: true,
+        tokenPrefix: apiToken.substring(0, 10) + '...',
+        apiUrl: apiUrl,
+        accountData: data,
+        isTestMode: data?.testMode || data?.test || data?.mode === 'test' || false,
+        environment: process.env.NODE_ENV,
+        status: response.status
+      });
+      
+    } catch (error: any) {
+      return res.json({
+        success: false,
+        message: 'Failed to check API status',
+        error: error.message
+      });
+    }
+  });
+  
+  // Verify saved card exists in Helcim
+  app.post('/api/helcim-pay/verify-saved-card', async (req: Request, res: Response) => {
+    try {
+      const { customerId } = req.body;
+      
+      if (!customerId) {
+        return res.status(400).json({ success: false, message: 'Customer ID required' });
+      }
+      
+      // Check if this customer exists in Helcim
+      const apiToken = process.env.HELCIM_API_TOKEN;
+      const apiUrl = process.env.HELCIM_API_URL || 'https://api.helcim.com/v2';
+      
+      try {
+        const mod = await import('./services/helcim-service.js');
+        const service: any = (mod as any)?.helcimService || (mod as any)?.default || mod;
+        
+        // For customer codes (CST format), we need to search by customerCode
+        // Helcim's /customers endpoint with a code requires a search, not direct lookup
+        let response;
+        if (customerId.startsWith('CST')) {
+          // Search for customer by code
+          try {
+            const searchResponse = await service.makeRequest(`/customers?customerCode=${customerId}`, 'GET');
+            if (searchResponse?.customers && searchResponse.customers.length > 0) {
+              response = searchResponse.customers[0];
+            } else {
+              throw new Error('Customer not found');
+            }
+          } catch (e) {
+            // If search fails, try direct lookup (some API versions support it)
+            response = await service.makeRequest(`/customers/${customerId}`, 'GET');
+          }
+        } else {
+          // Numeric ID - direct lookup
+          response = await service.makeRequest(`/customers/${customerId}`, 'GET');
+        }
+        
+        return res.json({
+          success: true,
+          customerExists: true,
+          customerId: customerId,
+          customerData: response
+        });
+      } catch (error: any) {
+        if (error.message?.includes('404') || error.message?.includes('Invalid customerId')) {
+          return res.json({
+            success: false,
+            customerExists: false,
+            customerId: customerId,
+            message: 'Customer does not exist in Helcim. Card needs to be re-added.'
+          });
+        }
+        throw error;
+      }
+    } catch (err: any) {
+      console.error('[Verify Saved Card] Error:', err);
+      return res.status(500).json({ 
+        success: false, 
+        message: err?.message || 'Failed to verify saved card' 
+      });
+    }
+  });
+
   // Process payment with saved card
   app.post('/api/helcim-pay/process-saved-card', async (req: Request, res: Response) => {
     try {
       const { amount, customerId, cardId, description, appointmentId, clientId, tipAmount } = req.body || {};
+      
+      console.log('[Process Saved Card] Request received:', {
+        customerId,
+        cardId,
+        amount,
+        appointmentId,
+        hasApiToken: !!process.env.HELCIM_API_TOKEN,
+        apiTokenPrefix: process.env.HELCIM_API_TOKEN?.substring(0, 10) + '...'
+      });
       
       if (!amount || !customerId || !cardId) {
         return res.status(400).json({ 
@@ -379,8 +535,18 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       
       console.log('[Helcim Process Saved Card] Processing payment:', { amount, customerId, cardId, description });
       
+      // Check if Helcim API is configured
+      const apiToken = process.env.HELCIM_API_TOKEN;
+      if (!apiToken) {
+        console.error('[Helcim Process Saved Card] HELCIM_API_TOKEN not configured');
+        return res.status(500).json({ 
+          success: false, 
+          message: 'Payment processing not configured. Please contact support.' 
+        });
+      }
+      
       try {
-        // Try to process real payment through Helcim API
+        // Process real payment through Helcim API
         const mod = await import('./services/helcim-service.js');
         const service: any = (mod as any)?.helcimService || (mod as any)?.default || mod;
         
@@ -414,11 +580,19 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         });
         
       } catch (helcimError: any) {
-        console.error('[Helcim Process Saved Card] Helcim API error (no mock fallback):', helcimError?.message || helcimError);
+        console.error('[Helcim Process Saved Card] Helcim API error:', helcimError?.message || helcimError);
+        console.error('[Helcim Process Saved Card] Full error details:', {
+          message: helcimError?.message,
+          response: helcimError?.response?.data,
+          status: helcimError?.response?.status
+        });
+        
+        // Return the actual error with helpful message
         return res.status(502).json({
           success: false,
-          message: helcimError?.message || 'Helcim API unavailable',
-          error: helcimError
+          message: 'Payment processing failed. The saved card may not be properly configured with Helcim. Please try adding the card again or use a different payment method.',
+          error: helcimError?.message || 'Helcim API error',
+          details: helcimError?.response?.data || null
         });
       }
       
@@ -451,7 +625,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         amount: isCardSaveOnly ? 0 : Number(amount),
         currency: 'USD',
         paymentType: isCardSaveOnly ? 'verify' : 'purchase',
-        test: process.env.NODE_ENV !== 'production',
+        test: false,  // Use real mode to create actual customers and cards
         description: description || 'Payment',
         idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
       };
@@ -522,7 +696,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
             amount: isCardSaveOnly ? 0 : Number(amount),
             currency: 'USD',
             paymentType: isCardSaveOnly ? 'verify' : 'purchase',
-            test: process.env.NODE_ENV !== 'production',
+            test: false,  // Use real mode to create actual customers and cards
             description: description || 'Payment',
             idempotencyKey: `hpjs_${Date.now()}_${Math.random().toString(36).slice(2)}`,
           };
@@ -586,30 +760,31 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         : staff;
 
       // Enrich staff with linked user info so the client can access email/phone
-      let users: any[] = [];
-      try {
-        users = await storage.getAllUsers();
-      } catch (e) {
-        users = [];
-      }
-      const usersById = new Map<number, any>(users.map((u: any) => [u.id, u]));
-
-      const enriched = filteredByLocation.map((s: any) => {
-        const u = usersById.get(s.userId);
-        return {
-          ...s,
-          user: u
-            ? {
-                id: u.id,
-                username: u.username,
-                firstName: u.firstName,
-                lastName: u.lastName,
-                email: u.email,
-                phone: u.phone,
-              }
-            : undefined,
-        };
-      });
+      // Fetch user data for each staff member individually to ensure we get the data
+      const enriched = await Promise.all(
+        filteredByLocation.map(async (s: any) => {
+          let user = null;
+          try {
+            user = await storage.getUser(s.userId);
+          } catch (e) {
+            console.error(`Error fetching user ${s.userId} for staff ${s.id}:`, e);
+          }
+          
+          return {
+            ...s,
+            user: user
+              ? {
+                  id: user.id,
+                  username: user.username,
+                  firstName: user.firstName || '',
+                  lastName: user.lastName || '',
+                  email: user.email,
+                  phone: user.phone || '',
+                }
+              : null,
+          };
+        })
+      );
 
       res.json(enriched);
     } catch (error) {
@@ -664,7 +839,30 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       if (!staffMember) {
         return res.status(404).json({ error: "Staff member not found" });
       }
-      res.json(staffMember);
+
+      // Enrich with user data
+      let user = null;
+      try {
+        user = await storage.getUser(staffMember.userId);
+      } catch (e) {
+        console.error(`Error fetching user ${staffMember.userId} for staff ${staffMember.id}:`, e);
+      }
+
+      const enrichedStaff = {
+        ...staffMember,
+        user: user
+          ? {
+              id: user.id,
+              username: user.username,
+              firstName: user.firstName || '',
+              lastName: user.lastName || '',
+              email: user.email,
+              phone: user.phone || '',
+            }
+          : null,
+      };
+
+      res.json(enrichedStaff);
     } catch (error) {
       console.error("Error getting staff member:", error);
       res.status(500).json({
@@ -1106,7 +1304,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
 
       if (locationIdParam) {
         const locationId = parseInt(locationIdParam);
-        schedules = schedules.filter(s => s.locationId === locationId);
+        // Include global schedules (null location) along with the specified location
+        schedules = schedules.filter(s => s.locationId == null || s.locationId === locationId);
       }
 
       return res.json(schedules);

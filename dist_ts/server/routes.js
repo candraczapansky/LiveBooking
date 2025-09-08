@@ -122,7 +122,7 @@ export async function registerRoutes(app, storage, autoRenewalService) {
             }
             const usersById = new Map(users.map((u) => [u.id, u]));
             const enriched = filteredByLocation.map((s) => {
-                const u = usersById.get(s.userId);
+                const u = usersById.get(Number(s.userId));
                 return {
                     ...s,
                     user: u

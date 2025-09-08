@@ -77,6 +77,7 @@ export function SaveCardModal({
             let cardBrand = null;
             let cardExpMonth = null;
             let cardExpYear = null;
+            let cardCustomerCode = null;
             
             try {
               const eventMessageData = JSON.parse(event.data.eventMessage);
@@ -87,7 +88,7 @@ export function SaveCardModal({
               transactionId = cardData?.transactionId;
               cardLast4 = cardData?.cardNumber?.slice(-4);
               cardBrand = cardData?.cardType || cardData?.cardBrand || 'Card';
-              const cardCustomerCode = cardData?.customerCode;
+              cardCustomerCode = cardData?.customerCode;
               
               // Try multiple fields for expiration date
               const expiryFields = [
@@ -158,13 +159,16 @@ export function SaveCardModal({
                   
                   if (saveResponse.ok && saveResult.success) {
                     console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card saved successfully to client profile!");
+                    console.log("[SaveCardModal] 🔒 PERSISTENT LISTENER - Save result:", saveResult);
                     try {
                       const evt = new CustomEvent('helcimCardSaved', { detail: saveResult });
                       window.dispatchEvent(evt);
-                      console.log('[SaveCardModal] Dispatched helcimCardSaved');
-                    } catch {}
+                      console.log('[SaveCardModal] 🔒 PERSISTENT LISTENER - Dispatched helcimCardSaved event to refresh client cards');
+                    } catch (evtErr) {
+                      console.error('[SaveCardModal] 🔒 PERSISTENT LISTENER - Error dispatching event:', evtErr);
+                    }
                   } else {
-                    console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save failed (non-blocking):", saveResult.message);
+                    console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Card save failed (non-blocking):", saveResult?.message || 'Unknown error');
                   }
                 } catch (saveErr) {
                   console.warn("[SaveCardModal] 🔒 PERSISTENT LISTENER - Error saving card (non-blocking):", saveErr);

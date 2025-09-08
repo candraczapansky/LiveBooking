@@ -54,10 +54,17 @@ export default function StaffSchedulePage() {
   };
 
   const getStaffName = (staffMember: any) => {
-    if (staffMember.user) {
-      return `${staffMember.user.firstName} ${staffMember.user.lastName}`;
+    try {
+      const u = staffMember?.user || {};
+      const first = (u.firstName || '').trim();
+      const last = (u.lastName || '').trim();
+      const full = `${first} ${last}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
+      return 'Unknown Staff';
+    } catch {
+      return 'Unknown Staff';
     }
-    return 'Unknown Staff';
   };
 
   const getInitials = (staffMember: any) => {

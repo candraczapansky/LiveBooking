@@ -37,7 +37,7 @@ const NoteTemplates = lazy(() => import("@/pages/note-templates"));
 const Settings = lazy(() => import("@/pages/settings"));
 const Schedule = lazy(() => import("@/pages/schedule"));
 const StaffSchedule = lazy(() => import("@/pages/staff-schedule"));
-const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail-simple"));
+const StaffScheduleDetail = lazy(() => import("@/pages/staff-schedule-detail"));
 const ClientBooking = lazy(() => import("@/pages/client-booking"));
 const ClientBookingTest = lazy(() => import("@/pages/appointments"));
 const PointOfSale = lazy(() => import("@/pages/pos"));

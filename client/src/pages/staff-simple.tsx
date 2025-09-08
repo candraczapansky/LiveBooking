@@ -181,6 +181,13 @@ const StaffPageSimple = () => {
 
   const { data: staff, isLoading } = useQuery({
     queryKey: ['/api/staff'],
+    queryFn: async () => {
+      const response = await fetch('/api/staff', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch staff');
+      return response.json();
+    }
   });
 
   const deleteStaffMutation = useMutation({
@@ -211,9 +218,12 @@ const StaffPageSimple = () => {
     },
   });
 
-  const getFullName = (firstName?: string, lastName?: string) => {
-    if (!firstName && !lastName) return "Unknown User";
-    return `${firstName || ""} ${lastName || ""}`.trim();
+  const getFullName = (firstName?: string, lastName?: string, username?: string) => {
+    const first = (firstName || '').trim();
+    const last = (lastName || '').trim();
+    const full = `${first} ${last}`.trim();
+    if (full) return full;
+    return username || "Unknown User";
   };
 
   const getInitials = (firstName?: string, lastName?: string) => {
@@ -378,7 +388,7 @@ const StaffPageSimple = () => {
                     className="w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none"
                   >
                     <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100">
-                      {getFullName(staffMember.user?.firstName, staffMember.user?.lastName)}
+                      {getFullName(staffMember.user?.firstName, staffMember.user?.lastName, staffMember.user?.username)}
                     </span>
                   </button>
                 ))}

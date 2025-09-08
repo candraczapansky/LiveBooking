@@ -34,30 +34,40 @@ export default function StaffScheduleDetailPage() {
   // Set document title
   useDocumentTitle("Staff Working Hours | Glo Head Spa");
 
+  // Fetch staff member details first (needed for permission checks)
+  const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery<any[]>({
+    queryKey: ['/api/staff'],
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching staff:', error);
+    }
+  });
+
+  // Determine the staff member for this page
+  const staffMember = staff.find((s: any) => s.id === staffId);
+
   // Check permissions
   const canEditAllSchedules = hasPermission('edit_schedules');
   const canEditOwnSchedule = hasPermission('edit_own_schedule');
   const canViewAllSchedules = hasPermission('view_schedules');
   const canViewOwnSchedule = hasPermission('view_own_schedule');
 
-  // Check if user can access this schedule
-  // For users with view_own_schedule, they can access their own schedule by matching user ID
+  // Check if user can access this schedule (safe after staffMember is defined)
   const canAccessSchedule = canViewAllSchedules || (canViewOwnSchedule && user?.id && staffMember?.userId === user.id);
   const canEditSchedule = canEditAllSchedules || (canEditOwnSchedule && user?.id && staffMember?.userId === user.id);
 
-  // Debug logging
-  console.log('Staff Schedule Detail Debug:', {
-    staffId,
-    user: user,
-    staffMember: staffMember,
-    canViewAllSchedules,
-    canViewOwnSchedule,
-    canEditAllSchedules,
-    canEditOwnSchedule,
-    canAccessSchedule,
-    canEditSchedule,
-    userStaffMatch: user?.id && staffMember?.userId === user.id
-  });
+  // While loading staff, avoid premature access checks
+  if (staffLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <h3 className="text-lg font-medium mb-2">Loading Schedule...</h3>
+          <p className="text-muted-foreground">Please wait while we load the schedule data.</p>
+        </div>
+      </div>
+    );
+  }
 
   // Redirect if user doesn't have permission to view this schedule
   if (!canAccessSchedule) {
@@ -80,15 +90,6 @@ export default function StaffScheduleDetailPage() {
     );
   }
 
-  // Fetch staff member details
-  const { data: staff = [], isLoading: staffLoading, error: staffError } = useQuery<any[]>({
-    queryKey: ['/api/staff'],
-    retry: 1,
-    onError: (error) => {
-      console.error('Error fetching staff:', error);
-    }
-  });
-
   // Fetch locations for display
   const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useQuery<any[]>({
     queryKey: ['/api/locations'],
@@ -97,8 +98,6 @@ export default function StaffScheduleDetailPage() {
       console.error('Error fetching locations:', error);
     }
   });
-
-  const staffMember = staff.find((s: any) => s.id === staffId);
 
   // Add error handling for missing staff member
   if (!staffMember && staff.length > 0) {
@@ -207,9 +206,12 @@ export default function StaffScheduleDetailPage() {
 
   const getStaffName = () => {
     try {
-      if (staffMember?.user) {
-        return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
-      }
+      const u = staffMember?.user || {};
+      const first = (u.firstName || '').trim();
+      const last = (u.lastName || '').trim();
+      const full = `${first} ${last}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
       return 'Unknown Staff';
     } catch (error) {
       console.error('Error getting staff name:', error);
@@ -443,7 +445,6 @@ export default function StaffScheduleDetailPage() {
                                 </Button>
                               </div>
                             )}
-                          )}
                         </div>
                       ))}
                     </div>

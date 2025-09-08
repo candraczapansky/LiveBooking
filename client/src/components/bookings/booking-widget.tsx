@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
@@ -89,7 +90,9 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
+const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card", "Account"];
+const saveCardStepIndex = steps.indexOf("Save Card");
+const accountStepIndex = steps.indexOf("Account");
 
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
@@ -110,6 +113,21 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [existingClient, setExistingClient] = useState<any | null>(null);
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
+  const [wantsAccountInvite, setWantsAccountInvite] = useState<boolean>(false);
+  // Detect narrow screens in the widget itself as a fallback to ensure mobile view
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    try {
+      const mq = window.matchMedia('(max-width: 640px)');
+      const update = () => setIsNarrow(!!mq.matches);
+      if (mq.addEventListener) mq.addEventListener('change', update); else // @ts-ignore
+        mq.addListener(update);
+      update();
+      return () => { if (mq.removeEventListener) mq.removeEventListener('change', update); else // @ts-ignore
+        mq.removeListener(update); };
+    } catch {}
+  }, []);
+  const isMobileView = variant === 'mobile' || isNarrow;
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -173,8 +191,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const { data: schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = useQuery({
     queryKey: ['/api/schedules', selectedLocationId, currentStep],
     queryFn: async () => {
-      // Always fetch all schedules so we can treat null locationId as global
-      const res = await apiRequest('GET', '/api/schedules');
+      // Fetch schedules for the selected location only to avoid cross-location availability
+      const endpoint = selectedLocationId ? `/api/schedules?locationId=${selectedLocationId}` : '/api/schedules';
+      const res = await apiRequest('GET', endpoint);
       return res.json();
     },
     enabled: open,
@@ -239,14 +258,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               .map((sch: any) => Number(sch.staffId))))
           : [];
 
-        const staffIdsAtLocation = (Array.isArray(staff) && selectedLocationId)
-          ? (staff as any[])
-              .filter((s: any) => String(s.locationId) === String(selectedLocationId))
-              .map((s: any) => Number(s.id))
-          : [];
-
-        // Use union to include anyone with a schedule matching location or assigned to this location
-        const staffIdsToUseSet = new Set<number>([...staffIdsFromSchedules, ...staffIdsAtLocation]);
+        // Only include staff who actually have a schedule at this location
+        const staffIdsToUseSet = new Set<number>([...staffIdsFromSchedules]);
         const staffIdsToUse: number[] = Array.from(staffIdsToUseSet);
 
         if (staffIdsToUse.length === 0) {
@@ -386,7 +399,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const staffIdsFromSchedulesSet = new Set<number>(
     Array.isArray(schedules)
       ? (schedules as any[])
-          .filter((sch: any) => !sch.isBlocked && (sch.locationId == null || String(sch.locationId) === String(selectedLocationId)))
+          .filter((sch: any) => !sch.isBlocked)
           .map((sch: any) => Number(sch.staffId))
       : []
   );
@@ -394,12 +407,12 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const availableStaff = useMemo(() => {
     if (!Array.isArray(staff) || !selectedServiceId) return [] as any[];
     const svcIdNum = parseInt(selectedServiceId);
-    // Start from eligibleStaffIds (union) so Step 3 matches Step 2 service map
-    const baseIds = eligibleStaffIds.length > 0 ? eligibleStaffIds : Array.from(new Set<number>([...staffIdsFromSchedulesSet]));
+    // Start strictly from staff with schedules at this location
+    const baseIds = Array.from(new Set<number>([...staffIdsFromSchedulesSet]));
     const finalIds = baseIds.filter((id) => {
       const svcSet = staffServiceIdsMap.get(Number(id));
       const canDoService = !!svcSet && svcSet.has(svcIdNum);
-      const hasSched = useScheduleFilter ? staffIdsFromSchedulesSet.has(Number(id)) : true;
+      const hasSched = staffIdsFromSchedulesSet.has(Number(id));
       return canDoService && hasSched;
     });
     const staffById = new Map<number, any>((Array.isArray(staff) ? staff : []).map((s: any) => [Number(s.id), s]));
@@ -469,7 +482,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     const svc: any = selectedService;
 
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
-      const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
       const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
         const currentDateString = formatDateForComparison(selectedFormDate);
         const startDateString = typeof schedule.startDate === 'string'
@@ -484,8 +496,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
         const targetDay = String(dayName).trim().toLowerCase();
 
-        // Treat null locationId as global, matching any selected location
-        if (selectedLocationId && schedule.locationId != null && String(schedule.locationId) !== String(selectedLocationId)) return false;
+        // Schedules here are already filtered by location via the query above
         return Number(schedule.staffId) === Number(staffIdNum) &&
           scheduleDay === targetDay &&
           startDateString <= currentDateString &&
@@ -550,7 +561,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       const staffHasAvailabilityOnDay = (staffIdNum: number, day: Date) => {
         const dayName = getDayName(day);
         const currentDateString = formatDateForComparison(day);
-        const locIdNum = selectedLocationId ? Number(selectedLocationId) : undefined;
         const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : [])
           .filter((schedule: any) => {
             if (Number(schedule.staffId) !== Number(staffIdNum)) return false;
@@ -650,6 +660,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       ['staffId'],
       ['date', 'time'],
       ['firstName', 'lastName', 'email', 'phone'],
+      [], // Save Card step - validation handled by processor
+      [], // Account step - optional
     ];
 
     const currentFields = fields[currentStep];
@@ -663,8 +675,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         const next = Math.min(currentStep + 1, steps.length - 1);
         console.log(`[BookingWidget] Validation passed, moving to step ${next}`);
         setCurrentStep(next);
-        if (next === steps.length - 1) {
-          // On entering save card step, prepare booking data
+        if (next === saveCardStepIndex) {
+          // On entering Save Card step, prepare booking data
           const values = form.getValues();
           console.log("[BookingWidget] Preparing booking data for save card step:", values);
           
@@ -882,8 +894,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       setBookingData(latestValues);
     }
     
-    // Show save card modal or complete booking
-    if (currentStep === steps.length - 1 && latestValues) {
+    // Handle Save Card step submission (or legacy last-step submission)
+    if ((currentStep === saveCardStepIndex || currentStep === steps.length - 1) && latestValues) {
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -938,6 +950,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               // Now show save card modal with appointment ID
               setShowSaveCardModal(true);
               setIsProcessingBooking(false);
+              // Move to Account step
+              try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
             } catch (appointmentError: any) {
               setIsProcessingBooking(false);
               toast({
@@ -966,6 +980,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             // Now show save card modal with appointment ID
             setShowSaveCardModal(true);
             setIsProcessingBooking(false);
+            // Move to Account step
+            try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
           } catch (appointmentError: any) {
             setIsProcessingBooking(false);
             toast({
@@ -976,7 +992,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           }
         }
       } else {
-        // Card already saved, create appointment
+        // Card already saved, create appointment then proceed to Account step
         if (!bookingData) {
           toast({
             title: "Error",
@@ -1024,29 +1040,18 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             }
           });
           
-          // Debug: Log the created appointment and force a manual refetch
+          // Debug: Log the created appointment
           console.log("[BookingWidget] Appointment created successfully:", appointment);
-          console.log("[BookingWidget] Forcing manual refetch of appointments...");
           
-          // Force a manual refetch of the appointments page query specifically
-          setTimeout(() => {
-            queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
-            queryClient.refetchQueries({ queryKey: ['/api/appointments', bookingData.locationId] });
-            console.log("[BookingWidget] Manual refetch completed");
-          }, 100);
+          // Proceed to Account step instead of closing immediately
+          try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
           
           toast({
             title: "Booking Successful",
             description: "Your appointment has been booked. Payment will be collected after your service.",
           });
-          
-          // Reset and close
-          form.reset();
-          setCurrentStep(0);
-          setBookingData(null);
-          setSavedCardInfo(null);
-          setCreatedClientId(null);
-          onOpenChange(false);
+
+          // Do not close yet; allow optional Account step
         } catch (error: any) {
           toast({
             title: "Booking Failed",
@@ -1060,23 +1065,64 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     }
   };
 
+  // Finalize after optional Account step
+  const finishAccountStep = async () => {
+    try {
+      const values = form.getValues();
+      const email = values?.email || (existingClient?.email);
+      const clientId = createdClientId || existingClient?.id || null;
+      if (wantsAccountInvite && email) {
+        try {
+          await apiRequest('POST', '/api/auth/password-reset', { email });
+        } catch (e) {
+          console.warn('Password reset email request failed:', e);
+        }
+        if (clientId) {
+          try {
+            await apiRequest('PATCH', `/api/users/${clientId}`, {
+              wantsAccountInvite: true,
+              accountInviteSentAt: new Date().toISOString(),
+            });
+          } catch (e) {
+            console.warn('Failed to persist invite flags:', e);
+          }
+        }
+      }
+    } finally {
+      try {
+        // Close and reset dialog
+        form.reset();
+        setCurrentStep(0);
+        setBookingData(null);
+        setSavedCardInfo(null);
+        setCreatedClientId(null);
+        setExistingClient(null);
+        setClientAppointmentHistory([]);
+        setWantsAccountInvite(false);
+        onOpenChange(false);
+      } catch {}
+    }
+  };
+
 
 
   return (
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
-        variant === 'mobile'
-          ? "static inset-auto left-0 right-0 top-auto transform-none w-full max-w-[360px] mx-auto mt-4 rounded-lg p-0 overflow-visible overflow-x-hidden border border-white/20 dark:border-white/10 bg-transparent z-auto"
+        isMobileView
+          ? "booking-mobile-overlay fixed left-2 right-2 top-24 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
           : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
-      } style={{ backgroundColor: variant === 'mobile' ? 'transparent' : (overlayColor || 'rgba(255,255,255,0.90)') }}>
-        <DialogHeader>
-          <DialogTitle className={variant === 'mobile' ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
+      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
+        <DialogHeader className={isMobileView ? "p-0" : ""}>
+          <DialogTitle className={isMobileView ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>
         {/* Mobile width constraint wrapper start */}
-        <div className={variant === 'mobile' ? "mx-auto w-full max-w-[360px] sticky top-[64px] z-10" : ""}>
+        <div className={isMobileView ? "w-full mx-auto" : ""} style={isMobileView ? {
+            maxWidth: 'min(420px, calc(100vw - 1rem - env(safe-area-inset-left) - env(safe-area-inset-right)))'
+          } : undefined}>
 
         {/* Progress Steps */}
-        {variant === 'mobile' ? (
+        {isMobileView ? (
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="rounded-full h-8 w-8 flex items-center justify-center bg-primary text-white">
@@ -1121,7 +1167,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 1: Location Selection */}
             {currentStep === 0 && (
               <div className="space-y-4">
-                <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Location</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Location</h3>
                 {isLoadingLocations ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
@@ -1141,10 +1187,10 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             form.setValue('serviceId', "");
                             form.setValue('staffId', "");
                           }} value={field.value}>
-                            <SelectTrigger className={variant === 'mobile' ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}>
+                            <SelectTrigger className={isMobileView ? 'min-h-[40px] h-10 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
                               <SelectValue placeholder="Choose a location" />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                               {!locations || locations.length === 0 ? (
                                 <SelectItem value="no-locations" disabled>
                                   No locations available
@@ -1173,8 +1219,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 2: Service Selection */}
             {currentStep === 1 && (
               <div className="space-y-4">
-                <div className={`flex items-center ${variant === 'mobile' ? 'gap-2 justify-start flex-wrap' : 'justify-between'}`}>
-                  <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Service</h3>
+                <div className={`flex items-center ${isMobileView ? 'gap-2 justify-start flex-wrap' : 'justify-between'}`}>
+                  <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Service</h3>
                   {selectedCategoryId && (
                     <div className="relative w-full sm:w-auto sm:max-w-none">
                       <Input 
@@ -1182,7 +1228,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                         placeholder="Search services..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className={`${variant === 'mobile' ? 'pl-8 pr-4 h-10 text-base w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
+                        className={`${isMobileView ? 'pl-8 pr-4 h-10 text-base w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
                       />
                       <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
@@ -1198,7 +1244,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                 )}
                 
                 {/* Service Categories */}
-                <div className={variant === 'mobile' ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
+                <div className={isMobileView ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1263,7 +1309,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                       <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                         <div>
                                           <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 break-words">{service.name}</h4>
-                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${variant === 'mobile' ? 'break-words' : ''}`}>{service.description}</p>
+                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${isMobileView ? 'break-words' : ''}`}>{service.description}</p>
                                           <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
@@ -1339,7 +1385,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                   </div>
                                   <div className="ml-4">
                                     <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                      {staffMember.user ? `${staffMember.user.firstName || ""} ${staffMember.user.lastName || ""}`.trim() : "Unknown Staff"}
+                                      {(() => {
+                                        const u = (staffMember as any)?.user || {};
+                                        const first = (u.firstName || '').trim();
+                                        const last = (u.lastName || '').trim();
+                                        const full = `${first} ${last}`.trim();
+                                        return full || u.username || 'Unknown Staff';
+                                      })()}
                                     </h4>
                                     <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
                                   </div>
@@ -1364,7 +1416,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 4: Date and Time Selection */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <h3 className={variant === 'mobile' ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select Date & Time</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select Date & Time</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -1378,7 +1430,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${variant === 'mobile' ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
+                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1389,7 +1441,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
-                          <PopoverContent className={`w-auto p-0 z-[90] ${variant === 'mobile' ? 'max-w-[92vw] w-[92vw] mr-2' : ''}`} align="start">
+                          <PopoverContent className={`w-auto p-0 z-[90] ${isMobileView ? 'max-w-[92vw] w-[92vw] mr-2' : ''}`} align="start">
                             <Calendar
                               mode="single"
                               selected={field.value}
@@ -1427,11 +1479,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                         <FormLabel>Time</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger className={variant === 'mobile' ? 'min-h-[36px] h-9 text-sm' : 'min-h-[44px]'}>
+                            <SelectTrigger className={isMobileView ? 'min-h-[36px] h-9 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
                               <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>
-                          <SelectContent>
+                          <SelectContent className="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                             {availableTimeSlots.map((slot) => (
                               <SelectItem key={slot.value} value={slot.value}>
                                 {slot.label}
@@ -1501,7 +1553,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="John" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1515,7 +1567,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Doe" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="Doe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1532,6 +1584,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input 
+                            className="text-foreground placeholder:text-muted-foreground"
                             type="text" 
                             placeholder="Enter email address" 
                             autoComplete="off"
@@ -1555,7 +1608,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <FormItem>
                         <FormLabel>Phone</FormLabel>
                         <FormControl>
-                          <Input placeholder="(123) 456-7890" {...field} />
+                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="(123) 456-7890" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1571,6 +1624,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <FormLabel>Notes (Optional)</FormLabel>
                       <FormControl>
                         <Textarea 
+                          className="text-foreground placeholder:text-muted-foreground"
                           placeholder="Any special requests or information for your appointment..."
                           {...field}
                           value={field.value || ""}
@@ -1599,7 +1653,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             )}
             
             {/* Step 6: Save Card */}
-            {currentStep === 5 && (
+            {currentStep === saveCardStepIndex && (
               <div className="space-y-4">
                 <h3 className="text-lg font-medium text-foreground">Save Payment Method</h3>
                 
@@ -1669,54 +1723,66 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                 )}
               </div>
             )}
+
+            {/* Step 7: Optional Account Creation */}
+            {currentStep === accountStepIndex && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium text-foreground">Create an Account (Optional)</h3>
+                <div className="text-sm text-foreground/80">
+                  Create a password to manage appointments faster next time. We can email you a secure link to set your password.
+                </div>
+                <div className="flex items-start gap-3">
+                  <Checkbox id="wantsAccountInvite" checked={wantsAccountInvite} onCheckedChange={(v:any) => setWantsAccountInvite(!!v)} />
+                  <label htmlFor="wantsAccountInvite" className="text-sm leading-tight cursor-pointer select-none">
+                    Email me a link to create my account
+                  </label>
+                </div>
+                {existingClient && (
+                  <div className="text-xs text-foreground/60">
+                    We found an existing profile for {existingClient.firstName} {existingClient.lastName}. We'll send the link to {existingClient.email}.
+                  </div>
+                )}
+              </div>
+            )}
           </form>
         </Form>
         
-        <DialogFooter className={`flex justify-between mt-4 ${variant === 'mobile' ? 'flex-wrap gap-2' : ''}`}>
+        <DialogFooter className={`flex justify-between mt-4 ${isMobileView ? 'flex-wrap gap-2' : ''}`}>
           {currentStep > 0 ? (
-            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
               Back
             </Button>
           ) : (
-            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
           )}
           
-          {currentStep < steps.length - 1 ? (
-            <Button type="button" variant="outline" className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
+          {currentStep < saveCardStepIndex && (
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
               Next
             </Button>
-          ) : (
-            bookingConfirmed ? null : (
-              <Button 
-                type="button" 
-                variant="outline"
-                className={`${variant === 'mobile' ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
-                onClick={() => {
-                  if (currentStep === steps.length - 2) {
-                    // Validate details before moving to payment
-                    form.handleSubmit((values) => {
-                      setBookingData(values);
-                      setCurrentStep(steps.length - 1);
-                    })();
-                  } else if (currentStep === steps.length - 1) {
-                    // Save card and complete booking
-                    handleSubmit();
-                  }
-                }}
-                disabled={isProcessingBooking}
-              >
-                {isProcessingBooking ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  currentStep === steps.length - 2 ? "Save Card & Book" : (savedCardInfo ? "Complete Booking" : "Save Card")
-                )}
-              </Button>
-            )
+          )}
+          {currentStep === saveCardStepIndex && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
+              onClick={handleSubmit}
+              disabled={isProcessingBooking}
+            >
+              {isProcessingBooking ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>) : (savedCardInfo ? 'Continue' : 'Save Card & Continue')}
+            </Button>
+          )}
+          {currentStep === accountStepIndex && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
+              onClick={finishAccountStep}
+            >
+              Finish
+            </Button>
           )}
         </DialogFooter>
         {/* Mobile width constraint wrapper end */}

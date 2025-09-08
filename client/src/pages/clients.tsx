@@ -147,7 +147,7 @@ const ClientsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
-  const [showAllClients, setShowAllClients] = useState(false);
+  const [showAllClients, setShowAllClients] = useState(true);
   const [showSaveCardEdit, setShowSaveCardEdit] = useState(false);
 
   const [location] = useLocation();

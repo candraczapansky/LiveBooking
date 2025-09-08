@@ -38,6 +38,10 @@ export const users = pgTable("users", {
   notes: text("notes"), // Client notes for staff reference
   birthday: date("birthday"), // Client's birthday for marketing campaigns
 
+  // Optional client account invitation preferences
+  wantsAccountInvite: boolean("wants_account_invite").default(false),
+  accountInviteSentAt: timestamp("account_invite_sent_at"),
+
   createdAt: timestamp("created_at").defaultNow(),
 });
 

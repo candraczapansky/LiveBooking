@@ -78,6 +78,22 @@ button svg:not([data-hamburger]) {
   @apply text-primary-foreground;
 }
 
+/* Booking dialog mobile hardening */
+@media (max-width: 640px) {
+  /* Mobile dialog default: safe full-width unless a component provides its own overlay class */
+  [data-radix-dialog-content]:not(.booking-mobile-overlay) {
+    left: 0 !important;
+    top: 0 !important;
+    transform: none !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin: 0 !important;
+    padding-left: max(env(safe-area-inset-left), 8px) !important;
+    padding-right: max(env(safe-area-inset-right), 8px) !important;
+    box-sizing: border-box !important;
+  }
+}
+
 /* Email Editor */
 .email-template-editor {
   @apply h-full w-full flex flex-col;

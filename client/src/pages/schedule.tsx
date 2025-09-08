@@ -103,9 +103,12 @@ const SchedulePage = () => {
 
   const getStaffName = (staffMember: StaffMember) => {
     try {
-      if (staffMember?.user) {
-        return `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim() || 'Unknown Staff';
-      }
+      const u: any = staffMember?.user || {};
+      const first = (u.firstName || '').trim();
+      const last = (u.lastName || '').trim();
+      const full = `${first} ${last}`.trim();
+      if (full) return full;
+      if (u.username) return u.username;
       return 'Unknown Staff';
     } catch (error) {
       console.error('Error getting staff name:', error);
