@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, CreditCard } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -42,6 +44,7 @@ export function SaveCardModal({
   const [isInitialized, setIsInitialized] = useState(false);
   const [checkoutToken, setCheckoutToken] = useState<string | null>(null);
   const [helcimIframeOpen, setHelcimIframeOpen] = useState(false);
+  const [policyAgreed, setPolicyAgreed] = useState(false);
   const { toast } = useToast();
 
   // Debug modal state changes
@@ -257,15 +260,7 @@ export function SaveCardModal({
       setIsInitialized(true);
       console.log("[SaveCardModal] Checkout token received, ready to open Helcim modal");
       
-      // Optional: auto-open Helcim window once initialized
-      try {
-        setTimeout(() => {
-          if (!helcimIframeOpen) {
-            console.log("[SaveCardModal] Auto-opening Helcim iframe after init");
-            try { handleOpenHelcimModal(); } catch (e) { console.warn("[SaveCardModal] Auto-open failed:", e); }
-          }
-        }, 150);
-      } catch {}
+      // Optional auto-open disabled: require explicit user consent (policyAgreed)
       
     } catch (err: any) {
       console.error("[SaveCardModal] Helcim init failed:", err);
@@ -286,6 +281,7 @@ export function SaveCardModal({
       setIsInitialized(false);
       setCheckoutToken(null);
       setHelcimIframeOpen(false);
+      setPolicyAgreed(false);
       
       // Clean up Helcim iframe if it exists when modal closes
       // @ts-ignore
@@ -789,7 +785,7 @@ export function SaveCardModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[480px]" style={{ zIndex: helcimIframeOpen ? 1 : undefined }}>
+      <DialogContent className="sm:max-w-[480px] w-auto sm:w-auto" style={{ zIndex: helcimIframeOpen ? 1 : undefined, width: "auto", maxWidth: "min(480px, calc(100vw - 2rem))", padding: "16px" }}>
         <DialogHeader>
           <DialogTitle>Add a Card (DEBUG v3)</DialogTitle>
         </DialogHeader>
@@ -802,9 +798,6 @@ export function SaveCardModal({
             </div>
           ) : helcimIframeOpen ? (
             <div className="space-y-4">
-              <div className="flex justify-center py-4">
-                <CreditCard className="h-12 w-12 text-primary animate-pulse" />
-              </div>
               <div className="text-center space-y-2">
                 <p className="font-medium">Payment window is open</p>
                 <p className="text-sm text-muted-foreground">
@@ -817,6 +810,7 @@ export function SaveCardModal({
                   <Button 
                     variant="outline" 
                     size="sm"
+                    className="text-black dark:text-black hover:text-black"
                     onClick={() => {
                       // Close Helcim iframe and reset
                       if (typeof window.removeHelcimPayIframe === 'function') {
@@ -910,52 +904,15 @@ export function SaveCardModal({
               </div>
             </div>
           ) : isInitialized ? (
-            <div className="space-y-4">
-              <div className="flex justify-center py-4">
-                <CreditCard className="h-12 w-12 text-primary" />
-              </div>
-              <div className="text-center space-y-2">
-                <p className="font-medium">Ready to add your card</p>
-                <p className="text-sm text-muted-foreground">
-                  Click the button below to open Helcim's secure payment window.
+            <div className="space-y-2">
+              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-left space-y-2 border border-gray-200 dark:border-gray-700">
+                <p className="text-sm text-black">
+                  <strong>Cancellation policy:</strong> $30 fee if you cancel within 24 hours of the appointment, and the full service charge for no‑shows.
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Your card information is encrypted and securely processed by Helcim. 
-                  We never store your full card number.
-                </p>
-                
-                {/* DEBUG BUTTON - ALWAYS VISIBLE */}
-                <Button 
-                  variant="destructive" 
-                  size="lg"
-                  className="mt-4 w-full"
-                  onClick={() => {
-                    console.log("🔴🔴🔴 DEBUG BUTTON CLICKED!");
-                    console.log("onSaved exists?", !!onSaved);
-                    console.log("onSaved type:", typeof onSaved);
-                    
-                    if (onSaved) {
-                      console.log("Calling onSaved...");
-                      onSaved({
-                        last4: 'DEBUG',
-                        brand: 'DEBUG',
-                        saved: true,
-                        debug: true
-                      });
-                      console.log("onSaved called!");
-                      
-                      // Close modal after delay
-                      setTimeout(() => {
-                        onOpenChange(false);
-                      }, 1000);
-                    } else {
-                      console.log("ERROR: onSaved is null!");
-                      alert("ERROR: onSaved callback is null!");
-                    }
-                  }}
-                >
-                  🔴 DEBUG: TEST APPOINTMENT CREATION 🔴
-                </Button>
+                <div className="flex items-start gap-2 pt-1">
+                  <Checkbox id="policyAgree" checked={policyAgreed} onCheckedChange={(v) => setPolicyAgreed(!!v)} />
+                  <Label htmlFor="policyAgree" className="text-sm leading-snug cursor-pointer text-black">I have read and agree to the cancellation policy.</Label>
+                </div>
               </div>
             </div>
           ) : (
@@ -971,13 +928,14 @@ export function SaveCardModal({
             variant="outline" 
             onClick={() => onOpenChange(false)} 
             disabled={isLoading}
+            className="text-black dark:text-black hover:text-black"
           >
             {helcimIframeOpen ? "Close" : "Cancel"}
           </Button>
           {!helcimIframeOpen && (
             <Button 
               onClick={handleOpenHelcimModal} 
-              disabled={isLoading || !isInitialized}
+              disabled={isLoading || !isInitialized || !policyAgreed}
             >
               {isLoading ? (
                 <>
@@ -985,10 +943,7 @@ export function SaveCardModal({
                   Loading...
                 </>
               ) : (
-                <>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Open Secure Payment
-                </>
+                <>Open Secure Payment</>
               )}
             </Button>
           )}
