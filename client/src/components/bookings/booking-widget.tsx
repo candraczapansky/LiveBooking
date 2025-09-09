@@ -31,13 +31,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, Clock, Search, MapPin, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock, Search, MapPin, Loader2, CreditCard } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -90,9 +89,8 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card", "Account"];
+const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
 const saveCardStepIndex = steps.indexOf("Save Card");
-const accountStepIndex = steps.indexOf("Account");
 
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
@@ -113,9 +111,12 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [existingClient, setExistingClient] = useState<any | null>(null);
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
-  const [wantsAccountInvite, setWantsAccountInvite] = useState<boolean>(false);
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [confirmationData, setConfirmationData] = useState<any>(null);
   // Detect narrow screens in the widget itself as a fallback to ensure mobile view
   const [isNarrow, setIsNarrow] = useState(false);
+  
+  
   useEffect(() => {
     try {
       const mq = window.matchMedia('(max-width: 640px)');
@@ -661,7 +662,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       ['date', 'time'],
       ['firstName', 'lastName', 'email', 'phone'],
       [], // Save Card step - validation handled by processor
-      [], // Account step - optional
     ];
 
     const currentFields = fields[currentStep];
@@ -851,7 +851,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   // Listen for Helcim payment success events from the persistent listener
   useEffect(() => {
-    const handleHelcimSuccess = (event: CustomEvent) => {
+    const handleHelcimSuccess = async (event: CustomEvent) => {
       console.log("[BookingWidget] 🎉 Received Helcim payment success event:", event.detail);
       
       // Update saved card info with the card details from the payment
@@ -871,31 +871,62 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       // Check if we have booking data to create an appointment
       if (bookingData) {
         console.log("[BookingWidget] 🚀 Creating appointment after payment success...");
-        createAppointmentAfterPayment(bookingData);
+        
+        // Save confirmation data first
+        const confirmData = {
+          service: selectedService,
+          date: bookingData.date,
+          time: bookingData.time,
+          timeLabel: timeSlots.find(slot => slot.value === bookingData.time)?.label || bookingData.time
+        };
+        setConfirmationData(confirmData);
+        
+        try {
+          const appointment = await createAppointmentAfterPayment(bookingData);
+          console.log("[BookingWidget] Appointment created:", appointment);
+          setBookingConfirmed(true);
+          
+          // Close main dialog and show confirmation
+          onOpenChange(false);
+          
+          setTimeout(() => {
+            setShowConfirmation(true);
+            toast({
+              title: "Success! 🎉",
+              description: "Your appointment has been booked successfully!",
+            });
+          }, 500);
+        } catch (error) {
+          console.error("[BookingWidget] Error creating appointment:", error);
+          toast({
+            title: "Error",
+            description: "Failed to create appointment. Please contact support.",
+            variant: "destructive",
+          });
+        }
       } else {
         console.log("[BookingWidget] ⚠️ No booking data available for appointment creation");
       }
     };
 
-    window.addEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+    window.addEventListener('helcim-payment-success', handleHelcimSuccess as any);
     
     return () => {
-      window.removeEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+      window.removeEventListener('helcim-payment-success', handleHelcimSuccess as any);
     };
-  }, [bookingData, createAppointmentAfterPayment]);
+  }, [bookingData, createAppointmentAfterPayment, selectedService, timeSlots, onOpenChange, toast]);
 
   const handleSubmit = async () => {
     // Get the latest form values
     const latestValues = form.getValues();
-    console.log("[BookingWidget] handleSubmit - Latest form values:", latestValues);
     
     // Update bookingData with latest values
     if (latestValues) {
       setBookingData(latestValues);
     }
     
-    // Handle Save Card step submission (or legacy last-step submission)
-    if ((currentStep === saveCardStepIndex || currentStep === steps.length - 1) && latestValues) {
+    // Handle Save Card step submission
+    if (currentStep === saveCardStepIndex && latestValues) {
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -940,26 +971,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             
             setCreatedClientId(clientId);
             
-            // Create appointment first
-            try {
-              console.log("[BookingWidget] Creating appointment before card save...");
-              const appointment = await createAppointmentAfterPayment(latestValues);
-              setCreatedAppointmentId(appointment.id);
-              console.log("[BookingWidget] Appointment created with ID:", appointment.id);
-              
-              // Now show save card modal with appointment ID
-              setShowSaveCardModal(true);
-              setIsProcessingBooking(false);
-              // Move to Account step
-              try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
-            } catch (appointmentError: any) {
-              setIsProcessingBooking(false);
-              toast({
-                title: "Error",
-                description: "Failed to create appointment. Please try again.",
-                variant: "destructive",
-              });
-            }
+            // Show save card modal FIRST (appointment will be created after card is saved)
+            setShowSaveCardModal(true);
+            setIsProcessingBooking(false);
           } catch (error: any) {
             setIsProcessingBooking(false);
             toast({
@@ -969,30 +983,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             });
           }
         } else {
-          // Client exists, create appointment first then show card modal
-          try {
-            setIsProcessingBooking(true);
-            console.log("[BookingWidget] Creating appointment before card save...");
-            const appointment = await createAppointmentAfterPayment(latestValues);
-            setCreatedAppointmentId(appointment.id);
-            console.log("[BookingWidget] Appointment created with ID:", appointment.id);
-            
-            // Now show save card modal with appointment ID
-            setShowSaveCardModal(true);
-            setIsProcessingBooking(false);
-            // Move to Account step
-            try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
-          } catch (appointmentError: any) {
-            setIsProcessingBooking(false);
-            toast({
-              title: "Error",
-              description: "Failed to create appointment. Please try again.",
-              variant: "destructive",
-            });
-          }
+          // Client exists, show save card modal FIRST (appointment will be created after card is saved)
+          setShowSaveCardModal(true);
+          setIsProcessingBooking(false);
         }
       } else {
-        // Card already saved, create appointment then proceed to Account step
+        // Card already saved, check if appointment is already created
+        if (bookingConfirmed && createdAppointmentId) {
+          // Appointment already created, show confirmation
+          setShowConfirmation(true);
+          return;
+        }
+        
+        // Card saved but appointment not created yet (shouldn't happen but handle it)
         if (!bookingData) {
           toast({
             title: "Error",
@@ -1043,15 +1046,33 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           // Debug: Log the created appointment
           console.log("[BookingWidget] Appointment created successfully:", appointment);
           
-          // Proceed to Account step instead of closing immediately
-          try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
+          // Booking complete
+          setBookingConfirmed(true);
           
+          // Save confirmation data before closing dialog
+          const formData = form.getValues();
+          const confirmData = {
+            service: selectedService,
+            date: formData.date,
+            time: formData.time,
+            timeLabel: timeSlots.find(slot => slot.value === formData.time)?.label || formData.time
+          };
+          setConfirmationData(confirmData);
+          
+          // Show confirmation popup immediately
+          setShowConfirmation(true);
+          
+          // Add toast to confirm
           toast({
-            title: "Booking Successful",
-            description: "Your appointment has been booked. Payment will be collected after your service.",
+            title: "Success! 🎉",
+            description: "Your appointment has been booked successfully!",
           });
+          
+          // Close main dialog after showing confirmation
+          setTimeout(() => {
+            onOpenChange(false);
+          }, 500);
 
-          // Do not close yet; allow optional Account step
         } catch (error: any) {
           toast({
             title: "Booking Failed",
@@ -1065,48 +1086,34 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     }
   };
 
-  // Finalize after optional Account step
-  const finishAccountStep = async () => {
-    try {
-      const values = form.getValues();
-      const email = values?.email || (existingClient?.email);
-      const clientId = createdClientId || existingClient?.id || null;
-      if (wantsAccountInvite && email) {
-        try {
-          await apiRequest('POST', '/api/auth/password-reset', { email });
-        } catch (e) {
-          console.warn('Password reset email request failed:', e);
-        }
-        if (clientId) {
-          try {
-            await apiRequest('PATCH', `/api/users/${clientId}`, {
-              wantsAccountInvite: true,
-              accountInviteSentAt: new Date().toISOString(),
-            });
-          } catch (e) {
-            console.warn('Failed to persist invite flags:', e);
-          }
-        }
-      }
-    } finally {
-      try {
-        // Close and reset dialog
-        form.reset();
-        setCurrentStep(0);
-        setBookingData(null);
-        setSavedCardInfo(null);
-        setCreatedClientId(null);
-        setExistingClient(null);
-        setClientAppointmentHistory([]);
-        setWantsAccountInvite(false);
-        onOpenChange(false);
-      } catch {}
-    }
+  // Close dialog and reset form
+  const closeAndReset = () => {
+    // Reset all state
+    form.reset();
+    setCurrentStep(0);
+    setSearchQuery("");
+    setSelectedCategoryId(null);
+    setIsProcessingBooking(false);
+    setBookingData(null);
+    setSavedCardInfo(null);
+    setCreatedClientId(null);
+    setCreatedAppointmentId(null);
+    setBookingConfirmed(false);
+    setExistingClient(null);
+    setClientAppointmentHistory([]);
+    setShowConfirmation(false);
+    setConfirmationData(null);
+    
+    // Reopen the booking widget at step 1
+    setTimeout(() => {
+      onOpenChange(true);
+    }, 100);
   };
 
 
 
   return (
+    <>
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
@@ -1698,12 +1705,46 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </p>
                 </div>
                 
-                {savedCardInfo && (
+                {savedCardInfo ? (
                   <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       Card saved: {savedCardInfo.brand || savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.last4 || savedCardInfo.cardLast4 || '****'}
                     </p>
                   </div>
+                ) : (
+                  <Card className="border-2 border-primary/50 shadow-lg">
+                    <CardContent className="pt-6">
+                      <div className="text-center space-y-4">
+                        <CreditCard className="h-16 w-16 text-primary mx-auto" />
+                        <div className="space-y-2">
+                          <p className="text-lg font-medium text-foreground">
+                            Final Step: Add Your Payment Method
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Your card will be saved securely and charged after your service
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={isProcessingBooking}
+                          size="lg"
+                          className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90"
+                        >
+                          {isProcessingBooking ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="mr-2 h-5 w-5" />
+                              Add Payment Method & Complete Booking
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {bookingConfirmed && (
@@ -1724,71 +1765,195 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               </div>
             )}
 
-            {/* Step 7: Optional Account Creation */}
-            {currentStep === accountStepIndex && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">Create an Account (Optional)</h3>
-                <div className="text-sm text-foreground/80">
-                  Create a password to manage appointments faster next time. We can email you a secure link to set your password.
-                </div>
-                <div className="flex items-start gap-3">
-                  <Checkbox id="wantsAccountInvite" checked={wantsAccountInvite} onCheckedChange={(v:any) => setWantsAccountInvite(!!v)} />
-                  <label htmlFor="wantsAccountInvite" className="text-sm leading-tight cursor-pointer select-none">
-                    Email me a link to create my account
-                  </label>
-                </div>
-                {existingClient && (
-                  <div className="text-xs text-foreground/60">
-                    We found an existing profile for {existingClient.firstName} {existingClient.lastName}. We'll send the link to {existingClient.email}.
-                  </div>
-                )}
-              </div>
-            )}
           </form>
         </Form>
         
         <DialogFooter className={`flex justify-between mt-4 ${isMobileView ? 'flex-wrap gap-2' : ''}`}>
-          {currentStep > 0 ? (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
-              Back
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-          )}
-          
-          {currentStep < saveCardStepIndex && (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
-              Next
-            </Button>
-          )}
-          {currentStep === saveCardStepIndex && (
-            <Button
-              type="button"
-              variant="outline"
-              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
-              onClick={handleSubmit}
-              disabled={isProcessingBooking}
-            >
-              {isProcessingBooking ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>) : (savedCardInfo ? 'Continue' : 'Save Card & Continue')}
-            </Button>
-          )}
-          {currentStep === accountStepIndex && (
-            <Button
-              type="button"
-              variant="outline"
-              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
-              onClick={finishAccountStep}
-            >
-              Finish
-            </Button>
+          {/* Hide buttons on step 6 (Save Card step) */}
+          {currentStep !== saveCardStepIndex && (
+            <>
+              {currentStep > 0 ? (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
+                  Back
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={closeAndReset}>
+                  Cancel
+                </Button>
+              )}
+              
+              {currentStep < saveCardStepIndex && (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
+                  Next
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
         {/* Mobile width constraint wrapper end */}
         </div>
       </DialogContent>
+      
+      {/* Save Card Modal */}
+      {showSaveCardModal && (
+        <SaveCardModal
+          open={showSaveCardModal}
+          onOpenChange={setShowSaveCardModal}
+          clientId={userId || createdClientId || 0}
+          appointmentId={null}  // Don't pass appointment ID since we haven't created it yet
+          customerEmail={bookingData?.email}
+          customerName={bookingData ? `${bookingData.firstName} ${bookingData.lastName}` : ''}
+          onSaved={async (paymentMethod) => {
+            setSavedCardInfo(paymentMethod);
+            setShowSaveCardModal(false);
+            
+            // Save confirmation data first
+            const confirmData = {
+              service: selectedService,
+              date: bookingData?.date,
+              time: bookingData?.time,
+              timeLabel: timeSlots.find(slot => slot.value === bookingData?.time)?.label || bookingData?.time
+            };
+            setConfirmationData(confirmData);
+            
+            // NOW create the appointment after card is successfully saved
+            try {
+              if (bookingData) {
+                const appointment = await createAppointmentAfterPayment(bookingData);
+                setCreatedAppointmentId(appointment.id);
+                setBookingConfirmed(true);
+              }
+            } catch (appointmentError: any) {
+              toast({
+                title: "Partial Success",
+                description: "Card saved but appointment creation failed. Please contact support.",
+                variant: "destructive",
+              });
+            } finally {
+              // Always show confirmation popup regardless of appointment creation success
+              setIsProcessingBooking(false);
+              onOpenChange(false);
+              
+              // Show confirmation popup after a delay
+              setTimeout(() => {
+                setShowConfirmation(true);
+                
+                // Show appropriate toast
+                if (bookingConfirmed || createdAppointmentId) {
+                  toast({
+                    title: "Success! 🎉",
+                    description: "Your appointment has been booked successfully!",
+                  });
+                }
+              }, 500);
+            }
+          }}
+        />
+      )}
     </Dialog>
+    
+    {/* Appointment Confirmed Popup - Outside main dialog */}
+    {showConfirmation ? (
+      <div 
+        style={{ 
+          position: 'fixed', 
+          top: '0px', 
+          left: '0px', 
+          right: '0px', 
+          bottom: '0px', 
+          zIndex: 999999, 
+          backgroundColor: 'rgba(0, 0, 0, 0.8)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          pointerEvents: 'auto'
+        }}
+      >
+        <div 
+          style={{ 
+            backgroundColor: 'white', 
+            padding: '40px', 
+            borderRadius: '12px', 
+            maxWidth: '500px', 
+            width: '90%', 
+            color: 'black',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}
+        >
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
+            Appointment Confirmed! 🎉
+          </h2>
+          <p style={{ marginBottom: '20px', textAlign: 'center' }}>
+            Your appointment has been successfully booked!
+          </p>
+          {confirmationData && confirmationData.service && (
+            <div style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ marginBottom: '10px' }}><strong>Service:</strong> {confirmationData.service.name}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Date:</strong> {confirmationData.date ? format(confirmationData.date, "PPP") : ""}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Time:</strong> {confirmationData.timeLabel}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Duration:</strong> {formatDuration(confirmationData.service.duration)}</div>
+              <div><strong>Price:</strong> {formatPrice(confirmationData.service.price)}</div>
+            </div>
+          )}
+          <p style={{ marginBottom: '20px', textAlign: 'center', fontSize: '14px', color: '#666' }}>
+            You will receive a confirmation email with your appointment details.
+          </p>
+          <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
+            <button
+              onClick={() => {
+                closeAndReset();
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                backgroundColor: '#000', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '6px', 
+                fontSize: '16px', 
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Book Another Appointment
+            </button>
+            <button
+              onClick={() => {
+                // Reset everything and close completely
+                form.reset();
+                setCurrentStep(0);
+                setSearchQuery("");
+                setSelectedCategoryId(null);
+                setIsProcessingBooking(false);
+                setBookingData(null);
+                setSavedCardInfo(null);
+                setCreatedClientId(null);
+                setCreatedAppointmentId(null);
+                setBookingConfirmed(false);
+                setExistingClient(null);
+                setClientAppointmentHistory([]);
+                setShowConfirmation(false);
+                setConfirmationData(null);
+                onOpenChange(false);
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                backgroundColor: 'transparent', 
+                color: '#000', 
+                border: '1px solid #ccc', 
+                borderRadius: '6px', 
+                fontSize: '16px', 
+                cursor: 'pointer' 
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 };
 

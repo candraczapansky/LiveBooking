@@ -613,6 +613,7 @@ const ClientBookingPage = () => {
                     onOpenChange={handleOpenChange}
                     userId={user?.id}
                     overlayColor={overlayColor}
+                    key="booking-widget-1"
                   />
                 </TabsContent>
               </Tabs>
@@ -630,22 +631,13 @@ const ClientBookingPage = () => {
                   open={isBookingOpen} 
                   onOpenChange={handleOpenChange}
                   userId={user?.id}
+                  key="booking-widget-2"
                 />
               </>
             )}
           </div>
         )}
       </main>
-
-      <footer className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-sm text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2">
-            <span>&copy; {new Date().getFullYear()}</span>
-            <BusinessBrand size="sm" showLogo={false} showName={true} />
-            <span>. All rights reserved.</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
