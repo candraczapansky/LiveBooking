@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
+import { toCentralWallTime } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { formatDuration, formatPrice } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -31,13 +32,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { SaveCardModal } from "@/components/payment/save-card-modal";
 import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, Clock, Search, MapPin, Loader2 } from "lucide-react";
+import { CalendarIcon, Clock, Search, MapPin, Loader2, CreditCard } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -90,9 +90,8 @@ const bookingSchema = z.object({
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
 
-const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card", "Account"];
+const steps = ["Location", "Service", "Staff", "Time", "Details", "Save Card"];
 const saveCardStepIndex = steps.indexOf("Save Card");
-const accountStepIndex = steps.indexOf("Account");
 
 // Special sentinel value representing "Any available staff"
 const ANY_STAFF_ID = "any";
@@ -113,9 +112,12 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [bookingConfirmed, setBookingConfirmed] = useState<boolean>(false);
   const [existingClient, setExistingClient] = useState<any | null>(null);
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
-  const [wantsAccountInvite, setWantsAccountInvite] = useState<boolean>(false);
+  const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [confirmationData, setConfirmationData] = useState<any>(null);
   // Detect narrow screens in the widget itself as a fallback to ensure mobile view
   const [isNarrow, setIsNarrow] = useState(false);
+  
+  
   useEffect(() => {
     try {
       const mq = window.matchMedia('(max-width: 640px)');
@@ -206,15 +208,18 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   // Fetch appointments for the selected location to prevent double-booking
   const { data: appointments = [], refetch: refetchAppointments } = useQuery({
-    queryKey: ['/api/appointments', selectedLocationId],
+    queryKey: ['/api/appointments'],
     queryFn: async () => {
-      const endpoint = selectedLocationId ? `/api/appointments?locationId=${selectedLocationId}` : '/api/appointments';
+      // IMPORTANT: We fetch ALL appointments, not filtered by location
+      // This prevents double-booking staff across different locations
+      const endpoint = '/api/appointments';
       const res = await apiRequest('GET', endpoint);
       return res.json();
     },
-    enabled: open,
+    enabled: true,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    refetchInterval: 15000,
     staleTime: 0,
     retry: 2,
     retryDelay: 1000
@@ -444,23 +449,52 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   const timeSlots = generateTimeSlots();
 
-  // Restrict appointments to the selected location to avoid cross-location blocking
+  // Get all appointments for availability checking (NOT filtered by location)
+  // Staff can't be in two places at once, so we check ALL their appointments
   const appointmentsForAvailability = useMemo(() => {
     try {
       const list: any[] = Array.isArray(appointments) ? (appointments as any[]) : [];
-      if (!selectedLocationId) return list;
-      return list.filter((apt: any) => String(apt.locationId) === String(selectedLocationId));
+      // IMPORTANT: Return ALL appointments, not filtered by location
+      // This ensures staff can't be double-booked across locations
+      return list;
     } catch {
       return [] as any[];
     }
-  }, [appointments, selectedLocationId]);
+  }, [appointments]);
 
   // Helpers for schedule filtering
   const getDayName = (date: Date) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[date.getDay()];
+    const centralDate = toCentralWallTime(date);
+    return days[centralDate.getDay()];
   };
-  const formatDateForComparison = (date: Date) => format(date, 'yyyy-MM-dd');
+  const formatDateForComparison = (date: Date) => {
+    const centralDate = toCentralWallTime(date);
+    return format(centralDate, 'yyyy-MM-dd');
+  };
+  const toCentralMinutesOfDay = (input: Date | string) => {
+    const d = toCentralWallTime(input);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+
+  // Resolve a service duration (including buffers) by serviceId, with a conservative fallback
+  const getServiceDurationWithBuffers = (serviceId: number): number => {
+    const sources: any[] = [];
+    if (Array.isArray(allowedServicesAtLocation)) sources.push(...(allowedServicesAtLocation as any[]));
+    if (Array.isArray(allowedServices)) sources.push(...(allowedServices as any[]));
+    if (Array.isArray(servicesAtLocation)) sources.push(...(servicesAtLocation as any[]));
+    const svc = sources.find((s: any) => Number(s?.id) === Number(serviceId));
+    if (svc) {
+      const base = Number(svc.duration || 0);
+      const before = Number(svc.bufferTimeBefore || 0);
+      const after = Number(svc.bufferTimeAfter || 0);
+      const total = base + before + after;
+      // Default to at least 60 minutes to be safe if duration is zero/invalid
+      return total > 0 ? total : 60;
+    }
+    // Conservative default if service not found
+    return 60;
+  };
   const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => {
     const toMinutes = (t: string) => {
       const parts = String(t).trim().split(':');
@@ -473,15 +507,43 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     const end = toMinutes(endTime);
     return slot >= start && slot < end;
   };
+  // Ensure a slot range fits entirely within a schedule window
+  const isRangeWithinSchedule = (slotStartMin: number, slotEndMin: number, schedule: any) => {
+    const toMinutes = (t: string) => {
+      const parts = String(t).trim().split(':');
+      const hours = Number(parts[0] || 0);
+      const minutes = Number(parts[1] || 0);
+      return hours * 60 + minutes;
+    };
+    const schedStart = toMinutes(schedule.startTime);
+    const schedEnd = toMinutes(schedule.endTime);
+    return slotStartMin >= schedStart && slotEndMin <= schedEnd;
+  };
 
   // Compute available time slots based on staff schedule and existing appointments
   const getAvailableTimeSlots = () => {
     if (!selectedFormDate) return timeSlots;
 
     const dayName = getDayName(selectedFormDate);
-    const svc: any = selectedService;
+    // Resolve service robustly to ensure duration/buffers are applied when filtering
+    const svc: any = selectedServiceId
+      ? (
+          selectedService ||
+          (Array.isArray(allowedServicesAtLocation) ? (allowedServicesAtLocation as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null) ||
+          (Array.isArray(allowedServices) ? (allowedServices as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null) ||
+          (Array.isArray(servicesAtLocation) ? (servicesAtLocation as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null)
+        )
+      : null;
 
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
+      // Debug logging for specific case
+      const dateStr = selectedFormDate.toISOString().substring(0, 10);
+      const isDebugCase = (staffIdNum === 3 && dateStr === '2025-09-10' && slotValue === '11:00');
+      
+      if (isDebugCase) {
+        console.log('🔍 DEBUG: Checking Hailey (ID 3) availability for 11:00 AM on Sep 10, 2025');
+      }
+
       const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
         const currentDateString = formatDateForComparison(selectedFormDate);
         const startDateString = typeof schedule.startDate === 'string'
@@ -504,30 +566,91 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           !schedule.isBlocked;
       });
 
-      if (staffSchedules.length === 0) return false;
-      const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slotValue, schedule.startTime, schedule.endTime));
-      if (!withinSchedule) return false;
+      if (isDebugCase) {
+        console.log('  - Staff schedules found:', staffSchedules.length);
+      }
 
-      if (!svc) return true;
+      if (staffSchedules.length === 0) return false;
 
       const [hours, minutes] = String(slotValue).split(':').map(Number);
-      const appointmentStart = new Date(selectedFormDate);
-      appointmentStart.setHours(hours, minutes, 0, 0);
+      // If a service is selected but cannot be resolved, be conservative and block the slot
+      if (!svc) return !selectedServiceId;
+      // Compute slot start/end as Central minutes-of-day (robust against timezone/epoch issues)
+      const slotStartMin = hours * 60 + minutes;
       const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
-      const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+      const slotEndMin = slotStartMin + totalDuration;
+      // Require full containment within at least one schedule window
+      const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(slotStartMin, slotEndMin, schedule));
+      if (!withinSchedule) return false;
 
-      const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
-        .filter((apt: any) => apt.staffId === staffIdNum)
-        .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
+      // Get all appointments for this staff member
+      const allStaffAppts = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
+        .filter((apt: any) => Number(apt.staffId) === Number(staffIdNum));
+      
+      if (isDebugCase) {
+        console.log('  - Total appointments for staff:', allStaffAppts.length);
+      }
+
+      // Filter for same date
+      const sameDateAppts = allStaffAppts.filter((apt: any) => {
+        const aptCentral = toCentralWallTime(apt.startTime);
+        const selectedCentral = toCentralWallTime(selectedFormDate);
+        return aptCentral.toDateString() === selectedCentral.toDateString();
+      });
+
+      if (isDebugCase) {
+        console.log('  - Same date appointments:', sameDateAppts.length);
+        sameDateAppts.forEach(apt => {
+          const t = new Date(apt.startTime);
+          console.log('    • ID:', apt.id, '| Time:', t.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'}), '| Status:', apt.status);
+        });
+      }
+
+      const staffAppointments = sameDateAppts
+        .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
         .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
+      if (isDebugCase) {
+        console.log('  - Active appointments:', staffAppointments.length);
+      }
+
       for (const apt of staffAppointments) {
-        const existingStart = new Date(apt.startTime);
-        const existingEnd = new Date(apt.endTime);
-        if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
+        // Compare using Central minutes-of-day
+        const aptStartMin = toCentralMinutesOfDay(apt.startTime);
+        let aptEndMin = apt.endTime ? toCentralMinutesOfDay(apt.endTime) : aptStartMin;
+
+        // Guard: if the appointment has no proper end or zero duration, infer from service or default to 60m
+        if (!apt.endTime || aptEndMin <= aptStartMin) {
+          const inferredDuration = getServiceDurationWithBuffers(Number(apt.serviceId));
+          aptEndMin = aptStartMin + inferredDuration;
+        }
+
+        // Hard guard: exact start match should always block
+        if (slotStartMin === aptStartMin) {
+          if (isDebugCase) {
+            console.log('  ❌ BLOCKED: Exact start-time match with appointment', apt.id);
+          }
+          return false;
+        }
+
+        if (isDebugCase) {
+          console.log('  - Checking overlap with appointment', apt.id);
+          console.log('    Existing (min):', aptStartMin, '-', aptEndMin);
+          console.log('    New slot (min):', slotStartMin, '-', slotEndMin);
+        }
+
+        if (slotStartMin < aptEndMin && slotEndMin > aptStartMin) {
+          if (isDebugCase) {
+            console.log('  ❌ BLOCKED: Time slot conflicts with appointment', apt.id);
+          }
           return false;
         }
       }
+      
+      if (isDebugCase) {
+        console.log('  ✅ AVAILABLE: No conflicts found');
+      }
+      
       return true;
     };
 
@@ -545,7 +668,21 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     return timeSlots;
   };
 
-  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointmentsForAvailability, timeSlots]);
+  const availableTimeSlots = useMemo(
+    getAvailableTimeSlots,
+    [
+      selectedStaffId,
+      selectedFormDate,
+      selectedServiceId,
+      selectedService,
+      allowedServicesAtLocation,
+      allowedServices,
+      servicesAtLocation,
+      schedules,
+      appointmentsForAvailability,
+      timeSlots,
+    ]
+  );
 
   // Compute available days (next 30 days) based on staff schedules, service duration and existing appointments
   const availableDatesSet = useMemo(() => {
@@ -585,17 +722,20 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         if (staffSchedules.length === 0) return false;
 
         const appointmentsForDay = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
-          .filter((apt: any) => apt.staffId === staffIdNum)
-          .filter((apt: any) => new Date(apt.startTime).toDateString() === day.toDateString())
+          .filter((apt: any) => Number(apt.staffId) === Number(staffIdNum))
+          .filter((apt: any) => toCentralWallTime(apt.startTime).toDateString() === toCentralWallTime(day).toDateString())
+          .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
           .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
         for (const slot of timeSlots) {
-          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
-          if (!withinSchedule) continue;
           const [hours, minutes] = String(slot.value).split(':').map(Number);
+          const slotStartMin = hours * 60 + minutes;
+          const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
+          const slotEndMin = slotStartMin + totalDuration;
+          const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(slotStartMin, slotEndMin, schedule));
+          if (!withinSchedule) continue;
           const appointmentStart = new Date(day);
           appointmentStart.setHours(hours, minutes, 0, 0);
-          const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
           const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
           let overlaps = false;
           for (const apt of appointmentsForDay) {
@@ -661,7 +801,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       ['date', 'time'],
       ['firstName', 'lastName', 'email', 'phone'],
       [], // Save Card step - validation handled by processor
-      [], // Account step - optional
     ];
 
     const currentFields = fields[currentStep];
@@ -772,13 +911,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               !schedule.isBlocked;
           });
           if (staffSchedules.length === 0) continue;
-          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(values.time, schedule.startTime, schedule.endTime));
+          // Ensure selected time + duration fits entirely within schedule
+          const [hh, mm] = String(values.time).split(':').map(Number);
+          const startMin = hh * 60 + mm;
+          const serviceDurationMin = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
+          const endMin = startMin + serviceDurationMin;
+          const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(startMin, endMin, schedule));
           if (!withinSchedule) continue;
           const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
           const appointmentEnd = new Date(date.getTime() + totalDuration * 60000);
           const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
             .filter((apt: any) => apt.staffId === staffIdNum)
             .filter((apt: any) => new Date(apt.startTime).toDateString() === date.toDateString())
+            .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
             .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
           let overlaps = false;
           for (const apt of staffAppointments) {
@@ -851,7 +996,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   // Listen for Helcim payment success events from the persistent listener
   useEffect(() => {
-    const handleHelcimSuccess = (event: CustomEvent) => {
+    const handleHelcimSuccess = async (event: CustomEvent) => {
       console.log("[BookingWidget] 🎉 Received Helcim payment success event:", event.detail);
       
       // Update saved card info with the card details from the payment
@@ -871,7 +1016,42 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       // Check if we have booking data to create an appointment
       if (bookingData) {
         console.log("[BookingWidget] 🚀 Creating appointment after payment success...");
-        createAppointmentAfterPayment(bookingData);
+        
+        // Save confirmation data first
+        const confirmData = {
+          service: selectedService,
+          date: bookingData.date,
+          time: bookingData.time,
+          timeLabel: timeSlots.find(slot => slot.value === bookingData.time)?.label || bookingData.time
+        };
+        console.log("[BookingWidget] Setting confirmation data from event listener:", confirmData);
+        setConfirmationData(confirmData);
+        
+        try {
+          const appointment = await createAppointmentAfterPayment(bookingData);
+          console.log("[BookingWidget] Appointment created from event listener:", appointment);
+          setBookingConfirmed(true);
+          
+          // Close main dialog and show confirmation
+          console.log("[BookingWidget] Closing dialog and showing confirmation from event listener");
+          onOpenChange(false);
+          
+          setTimeout(() => {
+            console.log("[BookingWidget] Showing confirmation popup from event listener");
+            setShowConfirmation(true);
+            toast({
+              title: "Success! 🎉",
+              description: "Your appointment has been booked successfully!",
+            });
+          }, 500);
+        } catch (error) {
+          console.error("[BookingWidget] Error creating appointment from event listener:", error);
+          toast({
+            title: "Error",
+            description: "Failed to create appointment. Please contact support.",
+            variant: "destructive",
+          });
+        }
       } else {
         console.log("[BookingWidget] ⚠️ No booking data available for appointment creation");
       }
@@ -882,20 +1062,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     return () => {
       window.removeEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
     };
-  }, [bookingData, createAppointmentAfterPayment]);
+  }, [bookingData, createAppointmentAfterPayment, selectedService, timeSlots, onOpenChange, toast]);
 
   const handleSubmit = async () => {
     // Get the latest form values
     const latestValues = form.getValues();
-    console.log("[BookingWidget] handleSubmit - Latest form values:", latestValues);
     
     // Update bookingData with latest values
     if (latestValues) {
       setBookingData(latestValues);
     }
     
-    // Handle Save Card step submission (or legacy last-step submission)
-    if ((currentStep === saveCardStepIndex || currentStep === steps.length - 1) && latestValues) {
+    // Handle Save Card step submission
+    if (currentStep === saveCardStepIndex && latestValues) {
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -940,26 +1119,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             
             setCreatedClientId(clientId);
             
-            // Create appointment first
-            try {
-              console.log("[BookingWidget] Creating appointment before card save...");
-              const appointment = await createAppointmentAfterPayment(latestValues);
-              setCreatedAppointmentId(appointment.id);
-              console.log("[BookingWidget] Appointment created with ID:", appointment.id);
-              
-              // Now show save card modal with appointment ID
-              setShowSaveCardModal(true);
-              setIsProcessingBooking(false);
-              // Move to Account step
-              try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
-            } catch (appointmentError: any) {
-              setIsProcessingBooking(false);
-              toast({
-                title: "Error",
-                description: "Failed to create appointment. Please try again.",
-                variant: "destructive",
-              });
-            }
+            // Show save card modal FIRST (appointment will be created after card is saved)
+            setShowSaveCardModal(true);
+            setIsProcessingBooking(false);
           } catch (error: any) {
             setIsProcessingBooking(false);
             toast({
@@ -969,30 +1131,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             });
           }
         } else {
-          // Client exists, create appointment first then show card modal
-          try {
-            setIsProcessingBooking(true);
-            console.log("[BookingWidget] Creating appointment before card save...");
-            const appointment = await createAppointmentAfterPayment(latestValues);
-            setCreatedAppointmentId(appointment.id);
-            console.log("[BookingWidget] Appointment created with ID:", appointment.id);
-            
-            // Now show save card modal with appointment ID
-            setShowSaveCardModal(true);
-            setIsProcessingBooking(false);
-            // Move to Account step
-            try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
-          } catch (appointmentError: any) {
-            setIsProcessingBooking(false);
-            toast({
-              title: "Error",
-              description: "Failed to create appointment. Please try again.",
-              variant: "destructive",
-            });
-          }
+          // Client exists, show save card modal FIRST (appointment will be created after card is saved)
+          setShowSaveCardModal(true);
+          setIsProcessingBooking(false);
         }
       } else {
-        // Card already saved, create appointment then proceed to Account step
+        // Card already saved, check if appointment is already created
+        if (bookingConfirmed && createdAppointmentId) {
+          // Appointment already created, show confirmation
+          setShowConfirmation(true);
+          return;
+        }
+        
+        // Card saved but appointment not created yet (shouldn't happen but handle it)
         if (!bookingData) {
           toast({
             title: "Error",
@@ -1043,15 +1194,36 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           // Debug: Log the created appointment
           console.log("[BookingWidget] Appointment created successfully:", appointment);
           
-          // Proceed to Account step instead of closing immediately
-          try { setCurrentStep(accountStepIndex >= 0 ? accountStepIndex : steps.length - 1); } catch {}
+          // Booking complete
+          setBookingConfirmed(true);
           
+          // Save confirmation data before closing dialog
+          const formData = form.getValues();
+          const confirmData = {
+            service: selectedService,
+            date: formData.date,
+            time: formData.time,
+            timeLabel: timeSlots.find(slot => slot.value === formData.time)?.label || formData.time
+          };
+          console.log("[BookingWidget] Non-card path - Setting confirmation data:", confirmData);
+          setConfirmationData(confirmData);
+          
+          // Show confirmation popup immediately
+          console.log("[BookingWidget] Non-card path - Setting showConfirmation to true");
+          setShowConfirmation(true);
+          
+          // Add toast to confirm
           toast({
-            title: "Booking Successful",
-            description: "Your appointment has been booked. Payment will be collected after your service.",
+            title: "Success! 🎉",
+            description: "Your appointment has been booked successfully!",
           });
+          
+          // Close main dialog after showing confirmation
+          setTimeout(() => {
+            console.log("[BookingWidget] Non-card path - Closing main dialog");
+            onOpenChange(false);
+          }, 500);
 
-          // Do not close yet; allow optional Account step
         } catch (error: any) {
           toast({
             title: "Booking Failed",
@@ -1065,48 +1237,29 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     }
   };
 
-  // Finalize after optional Account step
-  const finishAccountStep = async () => {
-    try {
-      const values = form.getValues();
-      const email = values?.email || (existingClient?.email);
-      const clientId = createdClientId || existingClient?.id || null;
-      if (wantsAccountInvite && email) {
-        try {
-          await apiRequest('POST', '/api/auth/password-reset', { email });
-        } catch (e) {
-          console.warn('Password reset email request failed:', e);
-        }
-        if (clientId) {
-          try {
-            await apiRequest('PATCH', `/api/users/${clientId}`, {
-              wantsAccountInvite: true,
-              accountInviteSentAt: new Date().toISOString(),
-            });
-          } catch (e) {
-            console.warn('Failed to persist invite flags:', e);
-          }
-        }
-      }
-    } finally {
-      try {
-        // Close and reset dialog
-        form.reset();
-        setCurrentStep(0);
-        setBookingData(null);
-        setSavedCardInfo(null);
-        setCreatedClientId(null);
-        setExistingClient(null);
-        setClientAppointmentHistory([]);
-        setWantsAccountInvite(false);
-        onOpenChange(false);
-      } catch {}
-    }
+  // Close dialog and reset form
+  const closeAndReset = () => {
+    form.reset();
+    setCurrentStep(0);
+    setSearchQuery("");
+    setSelectedCategoryId(null);
+    setIsProcessingBooking(false);
+    setBookingData(null);
+    setSavedCardInfo(null);
+    setCreatedClientId(null);
+    setCreatedAppointmentId(null);
+    setBookingConfirmed(false);
+    setExistingClient(null);
+    setClientAppointmentHistory([]);
+    setShowConfirmation(false);
+    setConfirmationData(null);
+    onOpenChange(false);
   };
 
 
 
   return (
+    <>
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
@@ -1243,8 +1396,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </div>
                 )}
                 
-                {/* Service Categories */}
-                <div className={isMobileView ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
+                {/* Service Categories (two rows; first row up to 8) */}
+                <div className={isMobileView ? 'space-y-2 py-2 -mx-2 px-2' : 'space-y-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1253,23 +1406,49 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <Skeleton className="h-8 w-28 rounded-full" />
                     </>
                   ) : (
-                    categories?.filter((category: Category) => {
-                      if (!selectedLocationId) return true;
-                      // Show category only if at least one allowed service at this location belongs to it
-                      if (!allowedServicesAtLocation || allowedServicesAtLocation.length === 0) return false;
-                      return allowedServicesAtLocation.some((svc: any) => svc.categoryId === category.id);
-                    }).map((category: Category) => (
-                      <Button
-                        key={category.id}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10"
-                        onClick={() => handleCategoryChange(category.id.toString())}
-                      >
-                        {category.name}
-                      </Button>
-                    ))
+                    (() => {
+                      const filtered = (categories || []).filter((category: Category) => {
+                        if (!selectedLocationId) return true;
+                        if (!allowedServicesAtLocation || allowedServicesAtLocation.length === 0) return false;
+                        return (allowedServicesAtLocation as any[]).some((svc: any) => svc.categoryId === category.id);
+                      });
+                      const row1 = filtered.slice(0, 6);
+                      const row2 = filtered.slice(6, 12);
+                      return (
+                        <>
+                          <div className="flex flex-wrap gap-2 w-full">
+                            {row1.map((category: Category) => (
+                              <Button
+                                key={`row1-${category.id}`}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10 max-w-[220px] truncate px-3"
+                                onClick={() => handleCategoryChange(category.id.toString())}
+                              >
+                                {category.name}
+                              </Button>
+                            ))}
+                          </div>
+                          {row2.length > 0 && (
+                            <div className="flex flex-wrap gap-2 w-full">
+                              {row2.map((category: Category) => (
+                                <Button
+                                  key={`row2-${category.id}`}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10 max-w-[220px] truncate px-3"
+                                  onClick={() => handleCategoryChange(category.id.toString())}
+                                >
+                                  {category.name}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
                   )}
                 </div>
                 
@@ -1300,7 +1479,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     key={service.id}
                                     className={`cursor-pointer transition-all hover:shadow-md ${
                                       field.value === service.id.toString()
-                                        ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                        ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                                     }`}
                                     onClick={() => field.onChange(service.id.toString())}
@@ -1308,13 +1487,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     <CardContent className="p-4">
                                       <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                         <div>
-                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 break-words">{service.name}</h4>
-                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${isMobileView ? 'break-words' : ''}`}>{service.description}</p>
-                                          <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                          <h4 className={`text-base font-medium ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'} break-words`}>{service.name}</h4>
+                                          <p className={`text-sm mt-1 ${isMobileView ? 'break-words' : ''} ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{service.description}</p>
+                                          <div className={`mt-2 flex items-center text-sm ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
                                         </div>
-                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-right">
+                                        <div className={`text-lg font-semibold sm:text-right ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                                           {formatPrice(service.price)}
                                         </div>
                                       </div>
@@ -1350,7 +1529,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               key="any-staff"
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === ANY_STAFF_ID
-                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(ANY_STAFF_ID)}
@@ -1361,8 +1540,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     *
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">Any available staff</h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">We'll assign a qualified staff member for this service.</p>
+                                    <h4 className={`text-base font-medium ${field.value === ANY_STAFF_ID ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>Any available staff</h4>
+                                    <p className={`text-sm ${field.value === ANY_STAFF_ID ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>We'll assign a qualified staff member for this service.</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1373,7 +1552,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               key={staffMember.id}
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === staffMember.id.toString()
-                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(staffMember.id.toString())}
@@ -1384,7 +1563,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     {`${staffMember.user?.firstName?.[0] || ""}${staffMember.user?.lastName?.[0] || ""}`}
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                    <h4 className={`text-base font-medium ${field.value === staffMember.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                                       {(() => {
                                         const u = (staffMember as any)?.user || {};
                                         const first = (u.firstName || '').trim();
@@ -1393,7 +1572,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                         return full || u.username || 'Unknown Staff';
                                       })()}
                                     </h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
+                                    <p className={`text-sm ${field.value === staffMember.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{staffMember.title}</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1430,7 +1609,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
+                                className={`w-full px-4 text-left font-normal leading-none justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'h-10 min-h-[40px] text-base' : 'h-12 min-h-[48px] text-base'} py-0 flex items-center`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1475,11 +1654,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     control={form.control}
                     name="time"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>Time</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger className={isMobileView ? 'min-h-[36px] h-9 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
+                            <SelectTrigger className={isMobileView ? 'h-10 min-h-[40px] leading-none text-base bg-transparent text-foreground border-foreground py-0 px-4' : 'h-12 min-h-[48px] leading-none text-base bg-transparent text-foreground border-foreground py-0 px-4'}>
                               <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>
@@ -1698,12 +1877,46 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </p>
                 </div>
                 
-                {savedCardInfo && (
+                {savedCardInfo ? (
                   <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       Card saved: {savedCardInfo.brand || savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.last4 || savedCardInfo.cardLast4 || '****'}
                     </p>
                   </div>
+                ) : (
+                  <Card className="border-2 border-primary/50 shadow-lg">
+                    <CardContent className="pt-6">
+                      <div className="text-center space-y-4">
+                        <CreditCard className="h-16 w-16 text-primary mx-auto" />
+                        <div className="space-y-2">
+                          <p className="text-lg font-medium text-foreground">
+                            Final Step: Add Your Payment Method
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            Your card will be saved securely and charged after your service
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleSubmit}
+                          disabled={isProcessingBooking}
+                          size="lg"
+                          className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90"
+                        >
+                          {isProcessingBooking ? (
+                            <>
+                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="mr-2 h-5 w-5" />
+                              Add Payment Method & Complete Booking
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {bookingConfirmed && (
@@ -1724,71 +1937,170 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               </div>
             )}
 
-            {/* Step 7: Optional Account Creation */}
-            {currentStep === accountStepIndex && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">Create an Account (Optional)</h3>
-                <div className="text-sm text-foreground/80">
-                  Create a password to manage appointments faster next time. We can email you a secure link to set your password.
-                </div>
-                <div className="flex items-start gap-3">
-                  <Checkbox id="wantsAccountInvite" checked={wantsAccountInvite} onCheckedChange={(v:any) => setWantsAccountInvite(!!v)} />
-                  <label htmlFor="wantsAccountInvite" className="text-sm leading-tight cursor-pointer select-none">
-                    Email me a link to create my account
-                  </label>
-                </div>
-                {existingClient && (
-                  <div className="text-xs text-foreground/60">
-                    We found an existing profile for {existingClient.firstName} {existingClient.lastName}. We'll send the link to {existingClient.email}.
-                  </div>
-                )}
-              </div>
-            )}
           </form>
         </Form>
         
         <DialogFooter className={`flex justify-between mt-4 ${isMobileView ? 'flex-wrap gap-2' : ''}`}>
-          {currentStep > 0 ? (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
-              Back
-            </Button>
-          ) : (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-          )}
-          
-          {currentStep < saveCardStepIndex && (
-            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
-              Next
-            </Button>
-          )}
-          {currentStep === saveCardStepIndex && (
-            <Button
-              type="button"
-              variant="outline"
-              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
-              onClick={handleSubmit}
-              disabled={isProcessingBooking}
-            >
-              {isProcessingBooking ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Processing...</>) : (savedCardInfo ? 'Continue' : 'Save Card & Continue')}
-            </Button>
-          )}
-          {currentStep === accountStepIndex && (
-            <Button
-              type="button"
-              variant="outline"
-              className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`}
-              onClick={finishAccountStep}
-            >
-              Finish
-            </Button>
+          {/* Hide buttons on step 6 (Save Card step) */}
+          {currentStep !== saveCardStepIndex && (
+            <>
+              {currentStep > 0 ? (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
+                  Back
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={closeAndReset}>
+                  Cancel
+                </Button>
+              )}
+              
+              {currentStep < saveCardStepIndex && (
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
+                  Next
+                </Button>
+              )}
+            </>
           )}
         </DialogFooter>
         {/* Mobile width constraint wrapper end */}
         </div>
       </DialogContent>
+      
+      {/* Save Card Modal */}
+      {showSaveCardModal && (
+        <SaveCardModal
+          open={showSaveCardModal}
+          onOpenChange={setShowSaveCardModal}
+          clientId={userId || createdClientId || 0}
+          appointmentId={null}  // Don't pass appointment ID since we haven't created it yet
+          customerEmail={bookingData?.email}
+          customerName={bookingData ? `${bookingData.firstName} ${bookingData.lastName}` : ''}
+          onSaved={async (paymentMethod) => {
+            console.log("[BookingWidget] onSaved callback triggered with payment method:", paymentMethod);
+            setSavedCardInfo(paymentMethod);
+            setShowSaveCardModal(false);
+            
+            // Save confirmation data first
+            const confirmData = {
+              service: selectedService,
+              date: bookingData?.date,
+              time: bookingData?.time,
+              timeLabel: timeSlots.find(slot => slot.value === bookingData?.time)?.label || bookingData?.time
+            };
+            console.log("[BookingWidget] Preparing confirmation data:", confirmData);
+            setConfirmationData(confirmData);
+            
+            // NOW create the appointment after card is successfully saved
+            try {
+              if (bookingData) {
+                console.log("[BookingWidget] Creating appointment with booking data:", bookingData);
+                const appointment = await createAppointmentAfterPayment(bookingData);
+                console.log("[BookingWidget] Appointment created successfully with ID:", appointment.id);
+                setCreatedAppointmentId(appointment.id);
+                setBookingConfirmed(true);
+              } else {
+                console.error("[BookingWidget] No booking data available!");
+              }
+            } catch (appointmentError: any) {
+              console.error("[BookingWidget] Error creating appointment:", appointmentError);
+              toast({
+                title: "Partial Success",
+                description: "Card saved but appointment creation failed. Please contact support.",
+                variant: "destructive",
+              });
+            } finally {
+              // Always show confirmation popup regardless of appointment creation success
+              console.log("[BookingWidget] Closing dialog and showing confirmation");
+              setIsProcessingBooking(false);
+              onOpenChange(false);
+              
+              // Show confirmation popup after a delay
+              setTimeout(() => {
+                console.log("[BookingWidget] Setting showConfirmation to true");
+                setShowConfirmation(true);
+                
+                // Show appropriate toast
+                if (bookingConfirmed || createdAppointmentId) {
+                  toast({
+                    title: "Success! 🎉",
+                    description: "Your appointment has been booked successfully!",
+                  });
+                }
+              }, 500);
+            }
+          }}
+        />
+      )}
     </Dialog>
+    
+    {/* Appointment Confirmed Popup - Outside main dialog */}
+    {showConfirmation ? (
+      <div 
+        style={{ 
+          position: 'fixed', 
+          top: '0px', 
+          left: '0px', 
+          right: '0px', 
+          bottom: '0px', 
+          zIndex: 999999, 
+          backgroundColor: 'rgba(0, 0, 0, 0.8)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          pointerEvents: 'auto'
+        }}
+      >
+        <div 
+          style={{ 
+            backgroundColor: 'white', 
+            padding: '40px', 
+            borderRadius: '12px', 
+            maxWidth: '500px', 
+            width: '90%', 
+            color: 'black',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+          }}
+        >
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
+            Appointment Confirmed! 🎉
+          </h2>
+          <p style={{ marginBottom: '20px', textAlign: 'center' }}>
+            Your appointment has been successfully booked!
+          </p>
+          {confirmationData && confirmationData.service && (
+            <div style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
+              <div style={{ marginBottom: '10px' }}><strong>Service:</strong> {confirmationData.service.name}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Date:</strong> {confirmationData.date ? format(confirmationData.date, "PPP") : ""}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Time:</strong> {confirmationData.timeLabel}</div>
+              <div style={{ marginBottom: '10px' }}><strong>Duration:</strong> {formatDuration(confirmationData.service.duration)}</div>
+              <div><strong>Price:</strong> {formatPrice(confirmationData.service.price)}</div>
+            </div>
+          )}
+          <p style={{ marginBottom: '20px', textAlign: 'center', fontSize: '14px', color: '#666' }}>
+            You will receive a confirmation email with your appointment details.
+          </p>
+          <button
+            onClick={() => {
+              console.log("[BookingWidget] Done button clicked");
+              closeAndReset();
+            }}
+            style={{ 
+              width: '100%', 
+              padding: '12px', 
+              backgroundColor: '#000', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '6px', 
+              fontSize: '16px', 
+              cursor: 'pointer' 
+            }}
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 };
 

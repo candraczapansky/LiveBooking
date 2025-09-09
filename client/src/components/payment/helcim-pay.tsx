@@ -99,7 +99,7 @@ export default function HelcimPay({
         // @ts-ignore
         terminalId: import.meta.env.VITE_HELCIM_TERMINAL_ID,
         token: initData.token,
-        test: process.env.NODE_ENV !== 'production',
+        test: false,  // Always use production mode to save real cards
       });
 
       // Mount the payment form
