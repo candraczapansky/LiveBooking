@@ -45,6 +45,10 @@ const DialogContent = React.forwardRef<
         "w-[calc(100vw-2rem)] sm:w-full max-w-[calc(100vw-2rem)] sm:max-w-lg",
         className
       )}
+      onInteractOutside={(event) => {
+        // Prevent closing when clicking outside the dialog
+        event.preventDefault()
+      }}
       {...props}
     >
       {children}

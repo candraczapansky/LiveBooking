@@ -2245,7 +2245,7 @@ const MarketingPage = () => {
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="absolute inset-0 bg-black/70" onClick={() => setShowEmailEditor(false)} />
+          <div className="absolute inset-0 bg-black/70" />
           <div className="relative inset-0 h-screen w-screen bg-background flex flex-col">
             <div className="flex items-center justify-between p-4 border-b shrink-0">
               <h2 className="text-lg font-semibold">Email Template Editor</h2>
