@@ -1900,7 +1900,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                           onClick={handleSubmit}
                           disabled={isProcessingBooking}
                           size="lg"
-                          className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90"
+                          variant="outline"
+                          className="w-full h-12 text-base font-semibold border-foreground text-black dark:text-black hover:text-black bg-transparent hover:bg-transparent"
                         >
                           {isProcessingBooking ? (
                             <>

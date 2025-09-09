@@ -302,6 +302,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // Computed values
   const selectedServiceId = form.watch("serviceId");
   const startTimeString = form.watch("time");
+  const selectedAddOnId = form.watch("addOnServiceId");
+  const selectedAddOn = (Array.isArray(addOnMapping) ? addOnMapping : []).find((s: any) => s.id.toString() === selectedAddOnId);
   
   const selectedService = services?.find((s: any) => s.id.toString() === selectedServiceId);
 
@@ -420,25 +422,43 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   // Load appointment data when editing
   useEffect(() => {
     if (appointment && appointmentId && appointmentId > 0) {
-      // Parse the ISO string to get the correct time
-      const isoString = appointment.startTime;
-      
-      // Extract the time directly from the ISO string (ignoring timezone conversion)
-      // Example: "2025-07-05T14:30:00.000Z" -> extract "14:30"
-      const timeMatch = isoString.match(/T(\d{2}):(\d{2})/);
-      const appointmentTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}` : '10:00';
-      
-      // Create date object for the date part
-      const utcDate = new Date(isoString);
-      const appointmentDate = new Date(utcDate.getFullYear(), utcDate.getMonth(), utcDate.getDate());
-      
+      // Normalize startTime to a Date
+      let start: Date | null = null;
+      try {
+        if (appointment.startTime instanceof Date) {
+          start = appointment.startTime as Date;
+        } else if (typeof appointment.startTime === 'string') {
+          // Support both ISO strings and legacy "YYYY-MM-DD HH:MM:SS" formats
+          const str = appointment.startTime as string;
+          start = str.includes('T') || str.includes('Z')
+            ? new Date(str)
+            : (() => {
+                const [datePart, timePart = '00:00:00'] = str.split(' ');
+                const [y, m, d] = datePart.split('-').map(Number);
+                const [hh = 0, mm = 0, ss = 0] = timePart.split(':').map(Number);
+                return new Date(y, (m || 1) - 1, d || 1, hh, mm, ss);
+              })();
+        }
+      } catch {}
 
-      
+      // Fallback to current date if parsing failed
+      if (!start || isNaN(start.getTime())) {
+        start = new Date();
+      }
+
+      // Extract time in HH:MM (24h)
+      const hh = String(start.getHours()).padStart(2, '0');
+      const mm = String(start.getMinutes()).padStart(2, '0');
+      const appointmentTime = `${hh}:${mm}`;
+
+      // Date-only object (local)
+      const appointmentDate = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
       console.log('Resetting form with appointment data:', {
         staffId: appointment.staffId?.toString(),
-        serviceId: appointment.serviceId?.toString(), 
+        serviceId: appointment.serviceId?.toString(),
         clientId: appointment.clientId?.toString(),
-        originalAppointment: appointment
+        start,
       });
 
       form.reset({
@@ -449,16 +469,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: appointmentTime,
         notes: appointment.notes || "",
       });
-      
+
       // Set client search value to the selected client's name for editing
       const selectedClient = clients?.find((client: any) => client.id.toString() === appointment.clientId?.toString());
-      if (selectedClient) {
-        setClientSearchValue(`${selectedClient.firstName} ${selectedClient.lastName}`);
-      } else {
-        setClientSearchValue("");
-      }
-      
-
+      setClientSearchValue(selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : "");
     }
   }, [appointment, appointmentId]);
 
@@ -1259,6 +1273,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                       </>
                     )}
                     <p><strong>End Time:</strong> {endTime}</p>
+                  </div>
+                </div>
+              )}
+
+              {selectedAddOn && (
+                <div className="bg-muted p-3 rounded-md text-sm">
+                  <div className="flex items-center mb-1">
+                    <span className="font-medium">Selected Add-On</span>
+                  </div>
+                  <div className="pl-6">
+                    <p><strong>Name:</strong> {selectedAddOn.name}</p>
+                    {selectedAddOn.duration ? (
+                      <p><strong>Duration:</strong> +{selectedAddOn.duration} minutes</p>
+                    ) : null}
+                    <p><strong>Price:</strong> {formatPrice(selectedAddOn.price || 0)}</p>
                   </div>
                 </div>
               )}
