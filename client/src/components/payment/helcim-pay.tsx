@@ -194,7 +194,7 @@ export default function HelcimPay({
 
   return (
     <div className="fixed inset-0 z-[9999]">
-      <div className="absolute inset-0 bg-black/80 z-[0]" onClick={() => onOpenChange(false)} />
+      <div className="absolute inset-0 bg-black/80 z-[0]" />
       <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
         <div className="pointer-events-auto bg-background w-[95vw] sm:max-w-[425px] max-h-[95vh] p-6 rounded-lg shadow-lg z-[2] isolate">
           <div className="space-y-1">

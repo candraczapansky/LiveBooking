@@ -355,8 +355,9 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     // Persist any add-ons passed for this appointment (optional field addOnServiceIds[])
     try {
-      const addOnServiceIds = Array.isArray((req.body as any).addOnServiceIds)
-        ? (req.body as any).addOnServiceIds.map((n: any) => parseInt(n))
+      const raw = (req as any)._rawBody || req.body;
+      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
+        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
         : [];
       if (addOnServiceIds.length > 0) {
         await storage.setAddOnsForAppointment(newAppointment.id, addOnServiceIds);
@@ -719,7 +720,19 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       // Don't fail the appointment creation if notifications fail
     }
 
-    res.status(201).json(newAppointment);
+    // Enrich response with add-ons and computed total
+    try {
+      const addOns = await storage.getAddOnServiceObjectsForAppointment(newAppointment.id);
+      const svc = await storage.getService(newAppointment.serviceId);
+      const basePrice = Number((svc as any)?.price ?? 0) || 0;
+      const addOnTotal = Array.isArray(addOns) ? addOns.reduce((sum: number, s: any) => sum + (Number(s?.price ?? 0) || 0), 0) : 0;
+      const computedTotalAmount = (newAppointment as any).totalAmount && Number((newAppointment as any).totalAmount) > 0
+        ? Number((newAppointment as any).totalAmount)
+        : basePrice + addOnTotal;
+      res.status(201).json({ ...newAppointment, addOns, computedTotalAmount });
+    } catch {
+      res.status(201).json(newAppointment);
+    }
   }));
 
   // Get appointment by ID
@@ -861,6 +874,17 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);
+
+    // Optionally update add-ons if provided in request
+    try {
+      const raw = (req as any)._rawBody || req.body;
+      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
+        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
+        : [];
+      if (addOnServiceIds.length > 0) {
+        await storage.setAddOnsForAppointment(appointmentId, addOnServiceIds);
+      }
+    } catch {}
 
     LoggerService.logAppointment("updated", appointmentId, context);
 

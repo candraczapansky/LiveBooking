@@ -49,6 +49,8 @@ export function validateRequest(schema: any) {
     console.log("🔍 DEBUG: validateRequest middleware hit for path:", req.path);
     console.log("🔍 DEBUG: Request body:", JSON.stringify(req.body, null, 2));
     try {
+      // Preserve raw body for routes that need additional fields not covered by schema (e.g., add-ons)
+      (req as any)._rawBody = req.body;
       const validatedData = schema.parse(req.body);
       req.body = validatedData;
       console.log("🔍 DEBUG: Validation successful");

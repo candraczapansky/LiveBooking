@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { toCentralWallTime } from "@/lib/utils";
@@ -116,6 +116,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [confirmationData, setConfirmationData] = useState<any>(null);
   // Detect narrow screens in the widget itself as a fallback to ensure mobile view
   const [isNarrow, setIsNarrow] = useState(false);
+  const [mobileTopOffset, setMobileTopOffset] = useState<number>(200);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   
   
   useEffect(() => {
@@ -130,6 +132,36 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     } catch {}
   }, []);
   const isMobileView = variant === 'mobile' || isNarrow;
+
+  useEffect(() => {
+    if (!isMobileView) return;
+    try {
+      const headerEl = document.querySelector('header') as HTMLElement | null;
+      const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+      // Add extra spacing below header to avoid covering any menu/tabs
+      const extraSpacing = 120; // px
+      const computed = Math.max(200, Math.round(headerHeight + extraSpacing));
+      setMobileTopOffset(computed);
+    } catch {}
+  }, [isMobileView]);
+
+  // Ensure the dialog overlay does not cover the mobile header/menu
+  useEffect(() => {
+    if (!isMobileView || !open) return;
+    try {
+      const overlayEl = (contentRef.current?.previousElementSibling || null) as HTMLElement | null;
+      if (overlayEl) {
+        overlayEl.style.top = `${mobileTopOffset}px`;
+        overlayEl.style.height = `calc(100vh - ${mobileTopOffset}px)`;
+      }
+      return () => {
+        if (overlayEl) {
+          overlayEl.style.top = '';
+          overlayEl.style.height = '';
+        }
+      };
+    } catch {}
+  }, [isMobileView, open, mobileTopOffset]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -1261,11 +1293,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   return (
     <>
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
-      <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
+      <DialogContent ref={contentRef} onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
-          ? "booking-mobile-overlay fixed left-2 right-2 top-24 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
+          ? "booking-mobile-overlay fixed left-2 right-2 top-32 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
           : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
-      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
+      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)', top: mobileTopOffset } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
         <DialogHeader className={isMobileView ? "p-0" : ""}>
           <DialogTitle className={isMobileView ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>

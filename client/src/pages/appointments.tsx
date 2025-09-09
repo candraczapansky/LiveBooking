@@ -828,8 +828,14 @@ const AppointmentsPage = () => {
     setIsFormOpen(true);
   };
 
-  const handleAppointmentClick = (appointmentId: number) => {
-    // Open appointment details instead of form
+  const handleAppointmentClick = async (appointmentId: number) => {
+    // Fetch latest appointment details (to include add-ons) then open details
+    try {
+      const res = await apiRequest("GET", `/api/appointments/${appointmentId}`);
+      const full = await res.json();
+      // If addOns present, pass to details by setting the same id (details fetches again itself)
+      // We still show details; backend now returns addOns so details will render them.
+    } catch {}
     setDetailsAppointmentId(appointmentId);
     setIsDetailsOpen(true);
   };
