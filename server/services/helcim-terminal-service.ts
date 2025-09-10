@@ -106,6 +106,12 @@ export class HelcimTerminalService {
       if (!webhookUrl) {
         console.warn('⚠️ No webhook URL configured. Set TERMINAL_WEBHOOK_URL or PUBLIC_BASE_URL environment variable for terminal payment callbacks.');
         console.warn('⚠️ Without webhook, payment status will only update via polling.');
+        console.warn('Current environment variables:', {
+          TERMINAL_WEBHOOK_URL: process.env.TERMINAL_WEBHOOK_URL || 'not set',
+          PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || 'not set'
+        });
+      } else {
+        console.log('📡 Using webhook URL:', webhookUrl);
       }
 
       // Prepare the payment payload with correct Helcim field names
@@ -211,6 +217,15 @@ export class HelcimTerminalService {
         } catch (err: any) {
           const errorMsg = String(err?.message || err?.response?.data || err).toLowerCase();
           console.error(`❌ ${endpoint.name} failed:`, errorMsg);
+          
+          // Log the full error details for debugging
+          console.error('Full error details:', {
+            message: err?.message,
+            response: err?.response?.data,
+            status: err?.response?.status,
+            statusText: err?.response?.statusText,
+            headers: err?.response?.headers
+          });
           
           // If this is the last endpoint, throw the error
           if (endpoint === endpoints[endpoints.length - 1]) {

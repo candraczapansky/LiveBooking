@@ -588,21 +588,11 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         });
         
         // Return the actual error with helpful message
-        // If the card was saved in test mode, it won't work with production API
-        const isTestModeError = helcimError?.message?.includes('test') || 
-                               helcimError?.response?.data?.message?.includes('test') ||
-                               helcimError?.response?.status === 404;
-        
-        const errorMessage = isTestModeError 
-          ? 'This card was saved in test mode and cannot be used for real payments. Please add your card again to save it properly.'
-          : 'Payment processing failed. The saved card may not be properly configured with Helcim. Please try adding the card again or use a different payment method.';
-        
         return res.status(502).json({
           success: false,
-          message: errorMessage,
+          message: 'Payment processing failed. The saved card may not be properly configured with Helcim. Please try adding the card again or use a different payment method.',
           error: helcimError?.message || 'Helcim API error',
-          details: helcimError?.response?.data || null,
-          isTestModeError
+          details: helcimError?.response?.data || null
         });
       }
       
