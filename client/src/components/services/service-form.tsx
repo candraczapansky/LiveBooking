@@ -83,6 +83,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
+  const [addOnSearchQuery, setAddOnSearchQuery] = useState("");
   const { selectedLocation, defaultLocation } = useLocation();
 
   const { data: serviceCategories } = useQuery({
@@ -167,6 +168,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
   useEffect(() => {
     if (!open) {
       form.reset();
+      setAddOnSearchQuery("");
     }
   }, [open, form]);
 
@@ -179,8 +181,9 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
         // Fallback approach: fetch all staff-service assignments and filter by serviceId
         fetch(`/api/staff-services`).then(res => res.json()),
         fetch(`/api/services/${serviceId}/locations`).then(res => res.json()).catch(() => ({ locationIds: [], isRestricted: false })),
+        fetch(`/api/services/${serviceId}/add-on-bases`).then(res => res.json()).catch(() => ({ baseServiceIds: [] })),
       ])
-        .then(([serviceData, allAssignments, locationsPayload]) => {
+        .then(([serviceData, allAssignments, locationsPayload, addOnBases]) => {
           const assignmentsForService = Array.isArray(allAssignments)
             ? allAssignments.filter((a: any) => a && a.serviceId === serviceId)
             : [];
@@ -209,6 +212,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
             assignedStaff: assignedStaff,
             requiredDevices: serviceData.requiredDevices || [],
             locationIds: Array.isArray(locationsPayload?.locationIds) ? locationsPayload.locationIds.map((n: any) => Number(n)) : [],
+            appliesToServiceIds: Array.isArray(addOnBases?.baseServiceIds) ? addOnBases.baseServiceIds : [],
           });
           setIsLoading(false);
         })
@@ -774,37 +778,66 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
                     <FormField
                       control={form.control}
                       name="appliesToServiceIds"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Applies To Services</FormLabel>
-                          <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
-                            {Array.isArray(allServices) && allServices.filter((s: any) => !s.isAddOn).map((svc: any) => {
-                              const checked = (field.value || []).includes(svc.id);
-                              return (
-                                <div key={svc.id} className="flex items-center space-x-2">
-                                  <Checkbox
-                                    id={`applies-${svc.id}`}
-                                    checked={checked}
-                                    onCheckedChange={(isChecked) => {
-                                      const current = field.value || [];
-                                      if (isChecked) {
-                                        field.onChange([...current, svc.id]);
-                                      } else {
-                                        field.onChange(current.filter((id: number) => id !== svc.id));
-                                      }
-                                    }}
-                                  />
-                                  <label htmlFor={`applies-${svc.id}`} className="text-sm cursor-pointer">
-                                    {svc.name}
-                                  </label>
+                      render={({ field }) => {
+                        const filteredServices = Array.isArray(allServices) 
+                          ? allServices.filter((s: any) => 
+                              !s.isAddOn && 
+                              s.name.toLowerCase().includes(addOnSearchQuery.toLowerCase())
+                            )
+                          : [];
+                        
+                        return (
+                          <FormItem>
+                            <FormLabel>Applies To Services</FormLabel>
+                            <div className="space-y-2">
+                              <Input
+                                type="text"
+                                placeholder="Search services..."
+                                value={addOnSearchQuery}
+                                onChange={(e) => setAddOnSearchQuery(e.target.value)}
+                                className="w-full"
+                              />
+                              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto border rounded-md p-3">
+                                {filteredServices.length === 0 ? (
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    {addOnSearchQuery ? "No services found matching your search" : "No services available"}
+                                  </div>
+                                ) : (
+                                  filteredServices.map((svc: any) => {
+                                    const checked = (field.value || []).includes(svc.id);
+                                    return (
+                                      <div key={svc.id} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`applies-${svc.id}`}
+                                          checked={checked}
+                                          onCheckedChange={(isChecked) => {
+                                            const current = field.value || [];
+                                            if (isChecked) {
+                                              field.onChange([...current, svc.id]);
+                                            } else {
+                                              field.onChange(current.filter((id: number) => id !== svc.id));
+                                            }
+                                          }}
+                                        />
+                                        <label htmlFor={`applies-${svc.id}`} className="text-sm cursor-pointer">
+                                          {svc.name}
+                                        </label>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                              {field.value && field.value.length > 0 && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {field.value.length} service{field.value.length !== 1 ? 's' : ''} selected
                                 </div>
-                              );
-                            })}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Select the main services this add-on can be added to.</div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">Select the main services this add-on can be added to.</div>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </AccordionContent>
                 </AccordionItem>

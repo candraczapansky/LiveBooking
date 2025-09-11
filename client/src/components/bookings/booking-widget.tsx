@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
 import { toCentralWallTime } from "@/lib/utils";
@@ -19,6 +19,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -40,6 +41,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CalendarIcon, Clock, Search, MapPin, Loader2, CreditCard } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Service = {
   id: number;
@@ -86,6 +88,12 @@ const bookingSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address").min(1, "Email is required"),
   phone: z.string().min(1, "Phone number is required"),
+  addOnServiceIds: z.array(z.string()).optional(),
+  // Recurring appointment fields
+  isRecurring: z.boolean().optional(),
+  recurringFrequency: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+  recurringCount: z.number().min(2).max(52).optional(),
+  recurringEndDate: z.date().optional(),
 });
 
 type BookingFormValues = z.infer<typeof bookingSchema>;
@@ -102,6 +110,43 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Add calendar alignment styles
+  React.useEffect(() => {
+    const styleId = 'booking-calendar-alignment-fix';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        .booking-calendar-wrapper table {
+          width: 100%;
+        }
+        .booking-calendar-wrapper thead tr,
+        .booking-calendar-wrapper tbody tr {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 0;
+        }
+        .booking-calendar-wrapper th,
+        .booking-calendar-wrapper td {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+        }
+        .booking-calendar-wrapper button {
+          margin: 0 auto;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    return () => {
+      const style = document.getElementById(styleId);
+      if (style) {
+        style.remove();
+      }
+    };
+  }, []);
   // Note: AuthContext removed since we're implementing guest booking
   const [showSaveCardModal, setShowSaveCardModal] = useState(false);
   const [isProcessingBooking, setIsProcessingBooking] = useState(false);
@@ -114,6 +159,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [clientAppointmentHistory, setClientAppointmentHistory] = useState<any[]>([]);
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
   const [confirmationData, setConfirmationData] = useState<any>(null);
+  const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
   // Detect narrow screens in the widget itself as a fallback to ensure mobile view
   const [isNarrow, setIsNarrow] = useState(false);
   const [mobileTopOffset, setMobileTopOffset] = useState<number>(200);
@@ -176,6 +222,12 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       lastName: "",
       email: "",
       phone: "",
+      addOnServiceIds: [],
+      // Recurring appointment defaults
+      isRecurring: false,
+      recurringFrequency: undefined,
+      recurringCount: undefined,
+      recurringEndDate: undefined,
     },
   });
 
@@ -424,11 +476,35 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     : null;
   const selectedStaffId = form.watch('staffId');
   const selectedFormDate = form.watch('date');
+  
+  // Fetch available add-ons for the selected service
+  const { data: availableAddOns } = useQuery({
+    queryKey: ['/api/services', selectedServiceId, 'addons-for-base'],
+    queryFn: async () => {
+      if (!selectedServiceId) return [];
+      // Fetch all services and filter for add-ons that apply to this base service
+      const allServices = await (await apiRequest('GET', '/api/services')).json();
+      const results: any[] = [];
+      for (const svc of allServices) {
+        if (!svc?.isAddOn) continue;
+        try {
+          const mapping = await (await apiRequest('GET', `/api/services/${svc.id}/add-on-bases`)).json();
+          const baseIds: number[] = (mapping?.baseServiceIds || []).map((n: any) => Number(n));
+          if (baseIds.includes(Number(selectedServiceId))) {
+            results.push(svc);
+          }
+        } catch {}
+      }
+      return results;
+    },
+    enabled: open && !!selectedServiceId,
+  });
 
-  // Reset selected staff when service changes
+  // Reset selected staff and add-ons when service changes
   useEffect(() => {
     if (open) {
       form.setValue('staffId', "");
+      setSelectedAddOnIds([]);
     }
   }, [selectedServiceId]);
 
@@ -567,6 +643,22 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         )
       : null;
 
+    // Filter out past times if the selected date is today
+    const now = new Date();
+    const isToday = selectedFormDate.toDateString() === now.toDateString();
+    
+    let filteredTimeSlots = timeSlots;
+    if (isToday) {
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      
+      filteredTimeSlots = timeSlots.filter(slot => {
+        const [slotHours, slotMinutes] = slot.value.split(':').map(Number);
+        // Return true if the slot time is in the future
+        return (slotHours > currentHours) || (slotHours === currentHours && slotMinutes > currentMinutes);
+      });
+    }
+
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
       // Debug logging for specific case
       const dateStr = selectedFormDate.toISOString().substring(0, 10);
@@ -688,16 +780,16 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
     if (selectedStaffId && selectedStaffId !== ANY_STAFF_ID) {
       const staffIdNum = parseInt(selectedStaffId);
-      return timeSlots.filter(slot => isStaffAvailableForSlot(staffIdNum, slot.value));
+      return filteredTimeSlots.filter(slot => isStaffAvailableForSlot(staffIdNum, slot.value));
     }
 
     if (selectedStaffId === ANY_STAFF_ID) {
       const staffList: any[] = Array.isArray(availableStaff) ? (availableStaff as any[]) : [];
       if (!selectedServiceId || staffList.length === 0) return [];
-      return timeSlots.filter(slot => staffList.some(s => isStaffAvailableForSlot(Number(s.id), slot.value)));
+      return filteredTimeSlots.filter(slot => staffList.some(s => isStaffAvailableForSlot(Number(s.id), slot.value)));
     }
 
-    return timeSlots;
+    return filteredTimeSlots;
   };
 
   const availableTimeSlots = useMemo(
@@ -759,7 +851,21 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
           .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
-        for (const slot of timeSlots) {
+        // Filter out past times if checking today's availability
+        const now = new Date();
+        const isToday = day.toDateString() === now.toDateString();
+        let slotsToCheck = timeSlots;
+        
+        if (isToday) {
+          const currentHours = now.getHours();
+          const currentMinutes = now.getMinutes();
+          slotsToCheck = timeSlots.filter(slot => {
+            const [slotHours, slotMinutes] = slot.value.split(':').map(Number);
+            return (slotHours > currentHours) || (slotHours === currentHours && slotMinutes > currentMinutes);
+          });
+        }
+
+        for (const slot of slotsToCheck) {
           const [hours, minutes] = String(slot.value).split(':').map(Number);
           const slotStartMin = hours * 60 + minutes;
           const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
@@ -1002,29 +1108,103 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         }
       }
 
-      const appointmentData = {
-        clientId: clientId,
-        serviceId: parseInt(values.serviceId),
-        staffId: Number(staffIdToUse),
-        startTime: date.toISOString(),
-        endTime: endTime.toISOString(),
-        status: "confirmed",
-        paymentStatus: "unpaid",  // Not paid yet, just card on file
-        notes: values.notes,
-        locationId: parseInt(values.locationId),
-        totalAmount: selectedService?.price || 0
-      };
-      
-      console.log("[BookingWidget] Creating appointment with data:", appointmentData);
-      const appointmentRes = await apiRequest("POST", "/api/appointments", appointmentData);
-      const appointment = await appointmentRes.json();
-      console.log("[BookingWidget] Appointment created:", appointment);
-      
-      return appointment;
+      // Calculate total amount including add-ons
+      let totalAmount = selectedService?.price || 0;
+      if (selectedAddOnIds.length > 0 && availableAddOns) {
+        const selectedAddOnsData = availableAddOns.filter((addOn: any) => 
+          selectedAddOnIds.includes(addOn.id.toString())
+        );
+        totalAmount += selectedAddOnsData.reduce((sum: number, addOn: any) => 
+          sum + (addOn.price || 0), 0
+        );
+      }
+
+      // Check if this is a recurring appointment
+      if (values.isRecurring && values.recurringFrequency && values.recurringCount) {
+        console.log("[BookingWidget] Creating recurring appointments:", {
+          frequency: values.recurringFrequency,
+          count: values.recurringCount
+        });
+        
+        // Create array of appointment dates
+        const appointmentDates = [];
+        let currentDate = new Date(date);
+        
+        for (let i = 0; i < values.recurringCount; i++) {
+          if (i > 0) {
+            // Calculate next date based on frequency
+            if (values.recurringFrequency === 'weekly') {
+              currentDate.setDate(currentDate.getDate() + 7);
+            } else if (values.recurringFrequency === 'biweekly') {
+              currentDate.setDate(currentDate.getDate() + 14);
+            } else if (values.recurringFrequency === 'monthly') {
+              currentDate.setMonth(currentDate.getMonth() + 1);
+            }
+          }
+          
+          const appointmentDate = new Date(currentDate);
+          appointmentDate.setHours(hours, minutes);
+          
+          const appointmentEndTime = new Date(appointmentDate);
+          if (selectedService) {
+            appointmentEndTime.setMinutes(appointmentEndTime.getMinutes() + selectedService.duration);
+          }
+          
+          appointmentDates.push({
+            startTime: appointmentDate.toISOString(),
+            endTime: appointmentEndTime.toISOString()
+          });
+        }
+        
+        // Create recurring appointments data
+        const recurringData = {
+          clientId: clientId,
+          serviceId: parseInt(values.serviceId),
+          staffId: Number(staffIdToUse),
+          status: "confirmed",
+          paymentStatus: "unpaid",
+          notes: values.notes,
+          locationId: parseInt(values.locationId),
+          totalAmount: totalAmount,
+          addOnServiceIds: selectedAddOnIds.map(id => parseInt(id)),
+          recurringAppointments: appointmentDates,
+          recurringFrequency: values.recurringFrequency,
+          recurringCount: values.recurringCount
+        };
+        
+        console.log("[BookingWidget] Creating recurring appointments with data:", recurringData);
+        const appointmentRes = await apiRequest("POST", "/api/appointments/recurring", recurringData);
+        const appointments = await appointmentRes.json();
+        console.log("[BookingWidget] Recurring appointments created:", appointments);
+        
+        return appointments[0]; // Return first appointment for UI purposes
+      } else {
+        // Single appointment
+        const appointmentData = {
+          clientId: clientId,
+          serviceId: parseInt(values.serviceId),
+          staffId: Number(staffIdToUse),
+          startTime: date.toISOString(),
+          endTime: endTime.toISOString(),
+          status: "confirmed",
+          paymentStatus: "unpaid",  // Not paid yet, just card on file
+          notes: values.notes,
+          locationId: parseInt(values.locationId),
+          totalAmount: totalAmount,
+          addOnServiceIds: selectedAddOnIds.map(id => parseInt(id))
+        };
+        
+        console.log("[BookingWidget] Creating appointment with data:", appointmentData);
+        const appointmentRes = await apiRequest("POST", "/api/appointments", appointmentData);
+        const appointment = await appointmentRes.json();
+        console.log("[BookingWidget] Appointment created:", appointment);
+        
+        return appointment;
+      }
     } catch (error: any) {
       throw error;
     }
-  }, [toast, queryClient]);
+  }, [selectedAddOnIds, availableAddOns, toast, queryClient]);
 
   // Listen for Helcim payment success events from the persistent listener
   useEffect(() => {
@@ -1056,20 +1236,17 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           time: bookingData.time,
           timeLabel: timeSlots.find(slot => slot.value === bookingData.time)?.label || bookingData.time
         };
-        console.log("[BookingWidget] Setting confirmation data from event listener:", confirmData);
         setConfirmationData(confirmData);
         
         try {
           const appointment = await createAppointmentAfterPayment(bookingData);
-          console.log("[BookingWidget] Appointment created from event listener:", appointment);
+          console.log("[BookingWidget] Appointment created:", appointment);
           setBookingConfirmed(true);
           
           // Close main dialog and show confirmation
-          console.log("[BookingWidget] Closing dialog and showing confirmation from event listener");
           onOpenChange(false);
           
           setTimeout(() => {
-            console.log("[BookingWidget] Showing confirmation popup from event listener");
             setShowConfirmation(true);
             toast({
               title: "Success! 🎉",
@@ -1077,7 +1254,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             });
           }, 500);
         } catch (error) {
-          console.error("[BookingWidget] Error creating appointment from event listener:", error);
+          console.error("[BookingWidget] Error creating appointment:", error);
           toast({
             title: "Error",
             description: "Failed to create appointment. Please contact support.",
@@ -1089,10 +1266,10 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       }
     };
 
-    window.addEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+    window.addEventListener('helcim-payment-success', handleHelcimSuccess as any);
     
     return () => {
-      window.removeEventListener('helcim-payment-success', handleHelcimSuccess as EventListener);
+      window.removeEventListener('helcim-payment-success', handleHelcimSuccess as any);
     };
   }, [bookingData, createAppointmentAfterPayment, selectedService, timeSlots, onOpenChange, toast]);
 
@@ -1237,11 +1414,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             time: formData.time,
             timeLabel: timeSlots.find(slot => slot.value === formData.time)?.label || formData.time
           };
-          console.log("[BookingWidget] Non-card path - Setting confirmation data:", confirmData);
           setConfirmationData(confirmData);
           
           // Show confirmation popup immediately
-          console.log("[BookingWidget] Non-card path - Setting showConfirmation to true");
           setShowConfirmation(true);
           
           // Add toast to confirm
@@ -1252,7 +1427,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           
           // Close main dialog after showing confirmation
           setTimeout(() => {
-            console.log("[BookingWidget] Non-card path - Closing main dialog");
             onOpenChange(false);
           }, 500);
 
@@ -1271,6 +1445,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   // Close dialog and reset form
   const closeAndReset = () => {
+    // Reset all state
     form.reset();
     setCurrentStep(0);
     setSearchQuery("");
@@ -1285,7 +1460,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     setClientAppointmentHistory([]);
     setShowConfirmation(false);
     setConfirmationData(null);
-    onOpenChange(false);
+    
+    // Reopen the booking widget at step 1
+    setTimeout(() => {
+      onOpenChange(true);
+    }, 100);
   };
 
 
@@ -1541,6 +1720,55 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     )}
                   />
                 )}
+                
+                {/* Add-On Selection - shown when service is selected and has add-ons */}
+                {selectedServiceId && availableAddOns && availableAddOns.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <h4 className="text-base font-medium text-foreground">Available Add-Ons (Optional)</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {availableAddOns.map((addOn: any) => (
+                        <Card
+                          key={addOn.id}
+                          className={`cursor-pointer transition-all hover:shadow-md ${
+                            selectedAddOnIds.includes(addOn.id.toString())
+                              ? "border-primary ring-2 ring-primary ring-opacity-50 bg-[hsla(var(--primary),0.08)]"
+                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                          }`}
+                          onClick={() => {
+                            if (selectedAddOnIds.includes(addOn.id.toString())) {
+                              setSelectedAddOnIds(selectedAddOnIds.filter(id => id !== addOn.id.toString()));
+                            } else {
+                              setSelectedAddOnIds([...selectedAddOnIds, addOn.id.toString()]);
+                            }
+                          }}
+                        >
+                          <CardContent className="p-3">
+                            <div className="flex justify-between items-start gap-2">
+                              <div className="flex-1">
+                                <h5 className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                  {addOn.name}
+                                </h5>
+                                {addOn.description && (
+                                  <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                                    {addOn.description}
+                                  </p>
+                                )}
+                                {addOn.duration > 0 && (
+                                  <div className="mt-1 flex items-center text-xs text-gray-500 dark:text-gray-400">
+                                    <Clock className="h-3 w-3 mr-1" /> +{formatDuration(addOn.duration)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                +{formatPrice(addOn.price)}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             
@@ -1653,28 +1881,30 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent className={`w-auto p-0 z-[90] ${isMobileView ? 'max-w-[92vw] w-[92vw] mr-2' : ''}`} align="start">
-                            <Calendar
-                              mode="single"
-                              selected={field.value}
-                              onSelect={(d) => d && field.onChange(d)}
-                              modifiers={{
-                                available: (date) => availableDatesSet.has(formatDateForComparison(date))
-                              }}
-                              modifiersClassNames={{
-                                available: "relative after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[2px] after:h-1.5 after:w-1.5 after:rounded-full after:bg-primary"
-                              }}
-                              classNames={{
-                                day_selected:
-                                  "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground"
-                              }}
-                              disabled={(date) => {
-                                const today = new Date();
-                                today.setHours(0, 0, 0, 0);
-                                const max = addDays(today, 30);
-                                return date < today || date > max;
-                              }}
-                              initialFocus
-                            />
+                            <div className="booking-calendar-wrapper">
+                              <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={(d) => d && field.onChange(d)}
+                                modifiers={{
+                                  available: (date) => availableDatesSet.has(formatDateForComparison(date))
+                                }}
+                                modifiersClassNames={{
+                                  available: "relative after:content-[''] after:absolute after:left-1/2 after:-translate-x-1/2 after:bottom-[2px] after:h-1.5 after:w-1.5 after:rounded-full after:bg-primary"
+                                }}
+                                classNames={{
+                                  day_selected:
+                                    "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground"
+                                }}
+                                disabled={(date) => {
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  const max = addDays(today, 30);
+                                  return date < today || date > max;
+                                }}
+                                initialFocus
+                              />
+                            </div>
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -1716,6 +1946,31 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <p className="text-sm"><strong>Service:</strong> {selectedService.name}</p>
                       <p className="text-sm"><strong>Duration:</strong> {formatDuration(selectedService.duration)}</p>
                       <p className="text-sm"><strong>Price:</strong> {formatPrice(selectedService.price)}</p>
+                      {selectedAddOnIds.length > 0 && availableAddOns && (
+                        <>
+                          <div className="mt-2 pt-2 border-t">
+                            <p className="text-sm font-semibold mb-1">Add-Ons:</p>
+                            {availableAddOns
+                              .filter((addOn: any) => selectedAddOnIds.includes(addOn.id.toString()))
+                              .map((addOn: any) => (
+                                <p key={addOn.id} className="text-sm text-gray-600 dark:text-gray-400 ml-2">
+                                  • {addOn.name} - {formatPrice(addOn.price)}
+                                  {addOn.duration > 0 && ` (+${formatDuration(addOn.duration)})`}
+                                </p>
+                              ))}
+                          </div>
+                          <div className="mt-2 pt-2 border-t">
+                            <p className="text-sm font-semibold">
+                              Total: {formatPrice(
+                                selectedService.price + 
+                                availableAddOns
+                                  .filter((addOn: any) => selectedAddOnIds.includes(addOn.id.toString()))
+                                  .reduce((sum: number, addOn: any) => sum + (addOn.price || 0), 0)
+                              )}
+                            </p>
+                          </div>
+                        </>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -1846,6 +2101,104 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   )}
                 />
                 
+                {/* Recurring Appointment Options */}
+                <div className="space-y-4 border-t pt-4 mt-4">
+                  <FormField
+                    control={form.control}
+                    name="isRecurring"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>
+                            Make this a recurring appointment
+                          </FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Schedule multiple appointments at regular intervals
+                          </p>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+                  
+                  {form.watch('isRecurring') && (
+                    <div className="space-y-4 pl-6">
+                      <FormField
+                        control={form.control}
+                        name="recurringFrequency"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Frequency</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="text-foreground">
+                                  <SelectValue placeholder="Select frequency" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="weekly">Weekly (every week)</SelectItem>
+                                <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
+                                <SelectItem value="monthly">Monthly (every month)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={form.control}
+                        name="recurringCount"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Number of Appointments</FormLabel>
+                            <Select
+                              onValueChange={(value) => field.onChange(Number(value))}
+                              defaultValue={field.value?.toString()}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="text-foreground">
+                                  <SelectValue placeholder="Select number of appointments" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {[2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 26, 52].map((num) => (
+                                  <SelectItem key={num} value={num.toString()}>
+                                    {num} appointments
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Total number of appointments to schedule (including the first one)
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      {form.watch('recurringFrequency') && form.watch('recurringCount') && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            <strong>Preview:</strong> This will create {form.watch('recurringCount')} appointments, 
+                            scheduled {form.watch('recurringFrequency') === 'weekly' ? 'every week' : 
+                                     form.watch('recurringFrequency') === 'biweekly' ? 'every 2 weeks' : 
+                                     'every month'} starting from {format(form.watch('date'), "PPP")}.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
                 {/* Booking summary */}
                 {selectedService && (
                   <Card className="mt-4">
@@ -1856,7 +2209,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <p className="text-sm"><strong>Time:</strong> {
                         timeSlots.find(slot => slot.value === form.watch('time'))?.label || form.watch('time')
                       }</p>
-                      <p className="text-sm"><strong>Price:</strong> {formatPrice(selectedService.price)}</p>
+                      {form.watch('isRecurring') && form.watch('recurringFrequency') && form.watch('recurringCount') && (
+                        <>
+                          <p className="text-sm"><strong>Recurring:</strong> {form.watch('recurringCount')} appointments, {
+                            form.watch('recurringFrequency') === 'weekly' ? 'weekly' :
+                            form.watch('recurringFrequency') === 'biweekly' ? 'bi-weekly' :
+                            'monthly'
+                          }</p>
+                          <p className="text-sm"><strong>Total Price:</strong> {formatPrice((selectedService.price || 0) * (form.watch('recurringCount') || 1))}</p>
+                        </>
+                      )}
+                      {!form.watch('isRecurring') && (
+                        <p className="text-sm"><strong>Price:</strong> {formatPrice(selectedService.price)}</p>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -1933,7 +2298,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                           disabled={isProcessingBooking}
                           size="lg"
                           variant="outline"
-                          className="w-full h-12 text-base font-semibold border-foreground text-black dark:text-black hover:text-black bg-transparent hover:bg-transparent"
+                          className="w-full h-12 text-base font-semibold border-foreground !text-black hover:!text-black focus:!text-black disabled:!text-black bg-transparent hover:bg-transparent"
                         >
                           {isProcessingBooking ? (
                             <>
@@ -2009,7 +2374,6 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           customerEmail={bookingData?.email}
           customerName={bookingData ? `${bookingData.firstName} ${bookingData.lastName}` : ''}
           onSaved={async (paymentMethod) => {
-            console.log("[BookingWidget] onSaved callback triggered with payment method:", paymentMethod);
             setSavedCardInfo(paymentMethod);
             setShowSaveCardModal(false);
             
@@ -2020,22 +2384,16 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               time: bookingData?.time,
               timeLabel: timeSlots.find(slot => slot.value === bookingData?.time)?.label || bookingData?.time
             };
-            console.log("[BookingWidget] Preparing confirmation data:", confirmData);
             setConfirmationData(confirmData);
             
             // NOW create the appointment after card is successfully saved
             try {
               if (bookingData) {
-                console.log("[BookingWidget] Creating appointment with booking data:", bookingData);
                 const appointment = await createAppointmentAfterPayment(bookingData);
-                console.log("[BookingWidget] Appointment created successfully with ID:", appointment.id);
                 setCreatedAppointmentId(appointment.id);
                 setBookingConfirmed(true);
-              } else {
-                console.error("[BookingWidget] No booking data available!");
               }
             } catch (appointmentError: any) {
-              console.error("[BookingWidget] Error creating appointment:", appointmentError);
               toast({
                 title: "Partial Success",
                 description: "Card saved but appointment creation failed. Please contact support.",
@@ -2043,13 +2401,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               });
             } finally {
               // Always show confirmation popup regardless of appointment creation success
-              console.log("[BookingWidget] Closing dialog and showing confirmation");
               setIsProcessingBooking(false);
               onOpenChange(false);
               
               // Show confirmation popup after a delay
               setTimeout(() => {
-                console.log("[BookingWidget] Setting showConfirmation to true");
                 setShowConfirmation(true);
                 
                 // Show appropriate toast
@@ -2095,10 +2451,12 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           }}
         >
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
-            Appointment Confirmed! 🎉
+            {form.watch('isRecurring') ? 'Recurring Appointments Confirmed! 🎉' : 'Appointment Confirmed! 🎉'}
           </h2>
           <p style={{ marginBottom: '20px', textAlign: 'center' }}>
-            Your appointment has been successfully booked!
+            {form.watch('isRecurring') 
+              ? `Your ${form.watch('recurringCount')} recurring appointments have been successfully booked!`
+              : 'Your appointment has been successfully booked!'}
           </p>
           {confirmationData && confirmationData.service && (
             <div style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
@@ -2106,30 +2464,79 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               <div style={{ marginBottom: '10px' }}><strong>Date:</strong> {confirmationData.date ? format(confirmationData.date, "PPP") : ""}</div>
               <div style={{ marginBottom: '10px' }}><strong>Time:</strong> {confirmationData.timeLabel}</div>
               <div style={{ marginBottom: '10px' }}><strong>Duration:</strong> {formatDuration(confirmationData.service.duration)}</div>
-              <div><strong>Price:</strong> {formatPrice(confirmationData.service.price)}</div>
+              {form.watch('isRecurring') && (
+                <>
+                  <div style={{ marginBottom: '10px' }}><strong>Frequency:</strong> {
+                    form.watch('recurringFrequency') === 'weekly' ? 'Weekly' :
+                    form.watch('recurringFrequency') === 'biweekly' ? 'Bi-weekly' :
+                    'Monthly'
+                  }</div>
+                  <div style={{ marginBottom: '10px' }}><strong>Total Appointments:</strong> {form.watch('recurringCount')}</div>
+                  <div><strong>Total Price:</strong> {formatPrice((confirmationData.service.price || 0) * (form.watch('recurringCount') || 1))}</div>
+                </>
+              )}
+              {!form.watch('isRecurring') && (
+                <div><strong>Price:</strong> {formatPrice(confirmationData.service.price)}</div>
+              )}
             </div>
           )}
           <p style={{ marginBottom: '20px', textAlign: 'center', fontSize: '14px', color: '#666' }}>
-            You will receive a confirmation email with your appointment details.
+            {form.watch('isRecurring')
+              ? 'You will receive a confirmation email with all your appointment dates.'
+              : 'You will receive a confirmation email with your appointment details.'}
           </p>
-          <button
-            onClick={() => {
-              console.log("[BookingWidget] Done button clicked");
-              closeAndReset();
-            }}
-            style={{ 
-              width: '100%', 
-              padding: '12px', 
-              backgroundColor: '#000', 
-              color: 'white', 
-              border: 'none', 
-              borderRadius: '6px', 
-              fontSize: '16px', 
-              cursor: 'pointer' 
-            }}
-          >
-            Done
-          </button>
+          <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
+            <button
+              onClick={() => {
+                closeAndReset();
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                backgroundColor: '#000', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: '6px', 
+                fontSize: '16px', 
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+            >
+              Book Another Appointment
+            </button>
+            <button
+              onClick={() => {
+                // Reset everything and close completely
+                form.reset();
+                setCurrentStep(0);
+                setSearchQuery("");
+                setSelectedCategoryId(null);
+                setIsProcessingBooking(false);
+                setBookingData(null);
+                setSavedCardInfo(null);
+                setCreatedClientId(null);
+                setCreatedAppointmentId(null);
+                setBookingConfirmed(false);
+                setExistingClient(null);
+                setClientAppointmentHistory([]);
+                setShowConfirmation(false);
+                setConfirmationData(null);
+                onOpenChange(false);
+              }}
+              style={{ 
+                width: '100%', 
+                padding: '12px', 
+                backgroundColor: 'transparent', 
+                color: '#000', 
+                border: '1px solid #ccc', 
+                borderRadius: '6px', 
+                fontSize: '16px', 
+                cursor: 'pointer' 
+              }}
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     ) : null}

@@ -211,13 +211,6 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const context = getLogContext(req);
     const appointmentData = req.body;
 
-    console.log("🎯 APPOINTMENT CREATION STARTED:", {
-      clientId: appointmentData.clientId,
-      serviceId: appointmentData.serviceId,
-      staffId: appointmentData.staffId,
-      startTime: appointmentData.startTime,
-      endTime: appointmentData.endTime
-    });
 
     LoggerService.info("Creating new appointment", { ...context, appointmentData });
 
@@ -355,11 +348,12 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     // Persist any add-ons passed for this appointment (optional field addOnServiceIds[])
     try {
-      const raw = (req as any)._rawBody || req.body;
-      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
-        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
-        : [];
-      if (addOnServiceIds.length > 0) {
+      // Now that addOnServiceIds is in the schema, we can get it directly from appointmentData
+      if ('addOnServiceIds' in appointmentData) {
+        const addOnServiceIds = Array.isArray(appointmentData.addOnServiceIds)
+          ? appointmentData.addOnServiceIds.map((n: any) => parseInt(n))
+          : [];
+        // Always set add-ons when the field is present, even if empty
         await storage.setAddOnsForAppointment(newAppointment.id, addOnServiceIds);
       }
     } catch (e) {
@@ -730,9 +724,262 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         ? Number((newAppointment as any).totalAmount)
         : basePrice + addOnTotal;
       res.status(201).json({ ...newAppointment, addOns, computedTotalAmount });
-    } catch {
+    } catch (e) {
       res.status(201).json(newAppointment);
     }
+  }));
+
+  // Create recurring appointments
+  app.post("/api/appointments/recurring", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const {
+      clientId,
+      serviceId,
+      staffId,
+      locationId,
+      status,
+      paymentStatus,
+      notes,
+      totalAmount,
+      addOnServiceIds,
+      recurringAppointments,
+      recurringFrequency,
+      recurringCount
+    } = req.body;
+
+    console.log("🔄 RECURRING APPOINTMENTS CREATION STARTED:", {
+      clientId,
+      serviceId,
+      staffId,
+      recurringFrequency,
+      recurringCount,
+      numberOfDates: recurringAppointments?.length
+    });
+
+    LoggerService.info("Creating recurring appointments", { 
+      ...context, 
+      recurringCount,
+      recurringFrequency 
+    });
+
+    if (!recurringAppointments || !Array.isArray(recurringAppointments)) {
+      throw new ValidationError("recurringAppointments array is required");
+    }
+
+    const createdAppointments = [];
+    const failedAppointments = [];
+
+    // Fetch all necessary data upfront for validation
+    const allAppointments = await storage.getAllAppointments();
+    const allServices = await storage.getAllServices();
+    const allRooms = await (storage as any).getAllRooms?.();
+    const serviceIdToRoomId = new Map<number, number | null>(
+      allServices.map((svc: any) => [svc.id, (svc as any).roomId ?? null])
+    );
+    const appointmentRoomId = serviceIdToRoomId.get(serviceId) ?? null;
+
+    // Create each appointment in the series
+    for (let i = 0; i < recurringAppointments.length; i++) {
+      const appointmentDate = recurringAppointments[i];
+      
+      try {
+        // Create appointment data for this occurrence
+        const appointmentData = {
+          clientId,
+          serviceId,
+          staffId,
+          locationId,
+          startTime: new Date(appointmentDate.startTime),
+          endTime: new Date(appointmentDate.endTime),
+          status: status || "confirmed",
+          paymentStatus: paymentStatus || "unpaid",
+          notes: notes ? `${notes} (Recurring ${i + 1}/${recurringCount})` : `Recurring appointment ${i + 1}/${recurringCount}`,
+          totalAmount
+        };
+
+        // Validate appointment time conflicts (staff and rooms)
+        const conflictingAppointments = allAppointments.filter((apt: any) => {
+          if (apt.status === 'cancelled' || apt.status === 'completed') return false;
+          if (apt.staffId !== staffId) return false;
+          
+          const existingStart = new Date(apt.startTime);
+          const existingEnd = new Date(apt.endTime);
+          const newStart = new Date(appointmentData.startTime);
+          const newEnd = new Date(appointmentData.endTime);
+          
+          return existingStart < newEnd && existingEnd > newStart;
+        });
+
+        if (conflictingAppointments.length > 0) {
+          LoggerService.warn("Recurring appointment time conflict detected", {
+            ...context,
+            appointmentIndex: i,
+            startTime: appointmentData.startTime,
+            endTime: appointmentData.endTime
+          });
+          
+          failedAppointments.push({
+            index: i,
+            date: appointmentDate.startTime,
+            reason: "Time conflict with existing appointment"
+          });
+          continue;
+        }
+
+        // Enforce room capacity if applicable
+        if (appointmentRoomId != null) {
+          const roomInfo = Array.isArray(allRooms) ? 
+            (allRooms as any[]).find((r: any) => r.id === appointmentRoomId) : 
+            undefined;
+          const capacity = Number(roomInfo?.capacity ?? 1) || 1;
+
+          const newStart = new Date(appointmentData.startTime);
+          const newEnd = new Date(appointmentData.endTime);
+          const overlappingInRoom = allAppointments.filter((apt: any) => {
+            const existingRoomId = serviceIdToRoomId.get(apt.serviceId) ?? null;
+            if (!(existingRoomId != null && existingRoomId === appointmentRoomId)) return false;
+            if (apt.status === 'cancelled' || apt.status === 'completed') return false;
+            const aptStart = new Date(apt.startTime);
+            const aptEnd = new Date(apt.endTime);
+            return aptStart < newEnd && aptEnd > newStart;
+          }).length;
+
+          if (overlappingInRoom >= capacity) {
+            LoggerService.warn("Room capacity reached for recurring booking", {
+              ...context,
+              appointmentIndex: i,
+              roomId: appointmentRoomId,
+              capacity,
+              overlappingInRoom
+            });
+            
+            failedAppointments.push({
+              index: i,
+              date: appointmentDate.startTime,
+              reason: "Room at capacity"
+            });
+            continue;
+          }
+        }
+
+        // Create the appointment
+        const newAppointment = await storage.createAppointment(appointmentData);
+        
+        // Add to the list of appointments for future conflict checking
+        allAppointments.push(newAppointment);
+
+        // Persist any add-ons if provided
+        if (addOnServiceIds && Array.isArray(addOnServiceIds) && addOnServiceIds.length > 0) {
+          try {
+            await storage.setAddOnsForAppointment(
+              newAppointment.id, 
+              addOnServiceIds.map((id: any) => parseInt(id))
+            );
+          } catch (e) {
+            // Non-fatal - log but continue
+            console.error("Failed to set add-ons for recurring appointment:", e);
+          }
+        }
+
+        LoggerService.logAppointment("created", newAppointment.id, context);
+        createdAppointments.push(newAppointment);
+
+        // Send confirmation for the first appointment only
+        if (i === 0) {
+          try {
+            // Get client details
+            const client = await storage.getUser(clientId);
+            if (!client) {
+              console.error("Client not found for recurring appointment confirmation");
+            } else {
+              // Get service details
+              const service = await storage.getService(serviceId);
+              
+              // Format message for recurring appointments
+              const firstDate = new Date(appointmentDate.startTime);
+              const recurringText = `This is the first of ${recurringCount} ${recurringFrequency} appointments.`;
+              
+              // Send SMS confirmation if client has phone
+              if (client.phone) {
+                const smsMessage = `Hi ${client.firstName}, your recurring appointment series for ${service?.name || 'Service'} has been confirmed! First appointment: ${firstDate.toLocaleDateString()} at ${firstDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}. ${recurringText} We look forward to seeing you!`;
+                
+                try {
+                  await sendSMS(client.phone, smsMessage);
+                  console.log("SMS confirmation sent for recurring appointments to:", client.phone);
+                } catch (smsError) {
+                  console.error("Failed to send SMS for recurring appointments:", smsError);
+                }
+              }
+
+              // Send email confirmation if client has email
+              if (client.email) {
+                try {
+                  const allDates = createdAppointments.map(apt => 
+                    new Date(apt.startTime).toLocaleDateString('en-US', { 
+                      timeZone: 'America/Chicago',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })
+                  ).join(', ');
+                  
+                  await sendEmail({
+                    to: client.email,
+                    from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
+                    subject: `Recurring Appointment Series Confirmation`,
+                    html: `
+                      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #333;">Recurring Appointment Series Confirmed</h2>
+                        <p>Hello ${client.firstName || client.username},</p>
+                        <p>Your recurring appointment series has been confirmed!</p>
+                        <ul>
+                          <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
+                          <li><strong>Frequency:</strong> ${recurringFrequency === 'weekly' ? 'Weekly' : recurringFrequency === 'biweekly' ? 'Bi-weekly' : 'Monthly'}</li>
+                          <li><strong>Number of appointments:</strong> ${recurringCount}</li>
+                          <li><strong>First appointment:</strong> ${firstDate.toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${firstDate.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })}</li>
+                        </ul>
+                        <p><strong>All appointment dates:</strong></p>
+                        <p>${allDates}</p>
+                        <p>We look forward to seeing you!</p>
+                      </div>
+                    `
+                  });
+                  console.log("Email confirmation sent for recurring appointments to:", client.email);
+                } catch (emailError) {
+                  console.error("Failed to send email for recurring appointments:", emailError);
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error sending recurring appointment confirmations:", error);
+          }
+        }
+
+      } catch (error: any) {
+        console.error(`Failed to create recurring appointment ${i + 1}:`, error);
+        failedAppointments.push({
+          index: i,
+          date: appointmentDate.startTime,
+          reason: error.message || "Unknown error"
+        });
+      }
+    }
+
+    console.log(`✅ Created ${createdAppointments.length} of ${recurringAppointments.length} recurring appointments`);
+    
+    if (failedAppointments.length > 0) {
+      console.warn(`⚠️ Failed to create ${failedAppointments.length} appointments:`, failedAppointments);
+    }
+
+    // Return summary of created appointments
+    res.status(201).json({
+      success: true,
+      message: `Created ${createdAppointments.length} of ${recurringAppointments.length} appointments`,
+      created: createdAppointments.length,
+      failed: failedAppointments.length,
+      appointments: createdAppointments,
+      failures: failedAppointments
+    });
   }));
 
   // Get appointment by ID
@@ -877,14 +1124,16 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     // Optionally update add-ons if provided in request
     try {
-      const raw = (req as any)._rawBody || req.body;
-      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
-        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
-        : [];
-      if (addOnServiceIds.length > 0) {
+      // Now that addOnServiceIds is in the schema, we can get it directly from updateData
+      if ('addOnServiceIds' in updateData) {
+        const addOnServiceIds = Array.isArray(updateData.addOnServiceIds)
+          ? updateData.addOnServiceIds.map((n: any) => parseInt(n))
+          : [];
+        // Always update add-ons when the field is present, even if empty (to clear add-ons)
         await storage.setAddOnsForAppointment(appointmentId, addOnServiceIds);
       }
-    } catch {}
+    } catch (e) {
+    }
 
     LoggerService.logAppointment("updated", appointmentId, context);
 

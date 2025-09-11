@@ -120,9 +120,16 @@ export class HelcimTerminalService {
           webhookUrl = `http://localhost:${port}/api/terminal/webhook`;
           console.log('📝 Using localhost webhook URL for development:', webhookUrl);
         } else {
-          console.warn('⚠️ No webhook URL configured. Set TERMINAL_WEBHOOK_URL, HELCIM_WEBHOOK_URL, or PUBLIC_BASE_URL environment variable.');
+          console.warn('⚠️ No webhook URL configured. Set TERMINAL_WEBHOOK_URL, HELCIM_WEBHOOK_URL, or PUBLIC_BASE_URL environment variable for terminal payment callbacks.');
           console.warn('⚠️ Without webhook, payment status will only update via polling, which may timeout.');
+          console.warn('Current environment variables:', {
+            TERMINAL_WEBHOOK_URL: process.env.TERMINAL_WEBHOOK_URL || 'not set',
+            HELCIM_WEBHOOK_URL: process.env.HELCIM_WEBHOOK_URL || 'not set',
+            PUBLIC_BASE_URL: process.env.PUBLIC_BASE_URL || 'not set'
+          });
         }
+      } else {
+        console.log('📡 Using webhook URL:', webhookUrl);
       }
       
       console.log('🔗 Webhook URL for terminal payment:', webhookUrl);
@@ -231,6 +238,15 @@ export class HelcimTerminalService {
         } catch (err: any) {
           const errorMsg = String(err?.message || err?.response?.data || err).toLowerCase();
           console.error(`❌ ${endpoint.name} failed:`, errorMsg);
+          
+          // Log the full error details for debugging
+          console.error('Full error details:', {
+            message: err?.message,
+            response: err?.response?.data,
+            status: err?.response?.status,
+            statusText: err?.response?.statusText,
+            headers: err?.response?.headers
+          });
           
           // If this is the last endpoint, throw the error
           if (endpoint === endpoints[endpoints.length - 1]) {
@@ -842,7 +858,9 @@ export class HelcimTerminalService {
         console.log('⚠️ No invoice number in webhook, attempting to match to recent sessions...');
         try {
           const now = Date.now();
-          let bestMatch: { key: string; session: any; age: number } | null = null;
+          let bestMatchKey: string | null = null;
+          let bestMatchSession: any = null;
+          let bestMatchAge: number = 0;
           
           sessionStore.forEach((value, key) => {
             // Only consider POS-* invoice numbers from recent sessions (last 5 minutes)
@@ -850,19 +868,21 @@ export class HelcimTerminalService {
               const age = now - value.startedAt;
               if (age <= 5 * 60 * 1000) {
                 // Prefer the most recent session
-                if (!bestMatch || age < bestMatch.age) {
-                  bestMatch = { key, session: value, age };
+                if (!bestMatchKey || age < bestMatchAge) {
+                  bestMatchKey = key;
+                  bestMatchSession = value;
+                  bestMatchAge = age;
                 }
               }
             }
           });
           
-          if (bestMatch) {
-            invoiceNumber = bestMatch.key;
-            console.log(`✅ Matched webhook to session: ${invoiceNumber} (${Math.round(bestMatch.age / 1000)}s old)`);
+          if (bestMatchKey && bestMatchSession) {
+            invoiceNumber = bestMatchKey;
+            console.log(`✅ Matched webhook to session: ${invoiceNumber} (${Math.round(bestMatchAge / 1000)}s old)`);
             
             // Also update the session to include the transaction ID
-            sessionStore.set(String(transactionId), bestMatch.session);
+            sessionStore.set(String(transactionId), bestMatchSession);
           } else {
             console.log('❌ No matching POS-* session found in last 5 minutes');
           }

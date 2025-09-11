@@ -85,7 +85,7 @@ const PersistentMobileMenu = () => {
       href: "#",
       children: [
         { icon: DollarSign, label: "POS", href: "/pos" },
-        { icon: Gift, label: "Gift Certificates", href: "/gift-certificates" },
+        { icon: Gift, label: "Gift Certificates & Cards", href: "/gift-certificates" },
         { icon: Package, label: "Products", href: "/products" },
       ],
     },
