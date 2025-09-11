@@ -975,5 +975,115 @@ router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
   }
 });
 
+  // Webhook endpoint (without "helcim" in the path)
+  // This handles webhooks sent by Helcim when payments complete
+  router.post('/webhook', async (req: any, res: any) => {
+    try {
+      log('🌐 POST /api/terminal/webhook');
+      console.log('📥 Terminal webhook received:', {
+        headers: req.headers,
+        body: req.body,
+        path: req.path,
+      });
+      
+      // Get the shared terminal service instance that has the webhook handler
+      const sharedTerminalService = (storage as any).__terminalService;
+      if (!sharedTerminalService) {
+        console.error('❌ Terminal service not initialized');
+        return res.status(200).json({ received: true }); // Still return 200 to not trigger retries
+      }
+      
+      // Parse the webhook payload
+      let payload: any = req.body || {};
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+      
+      // Helcim sends minimal webhook: {"id":"TRANSACTION_ID", "type":"cardTransaction"}
+      const txId = payload?.id;
+      const type = payload?.type;
+      
+      console.log('🎯 Processing webhook:', { id: txId, type });
+      
+      // Process webhook based on type
+      if (type === 'cardTransaction' && txId) {
+        // Default to completed for cardTransaction webhooks
+        let paymentStatus = 'completed';
+        
+        // Check for failure indicators
+        const statusFields = [
+          payload?.status,
+          payload?.approved,
+          payload?.transactionStatus,
+          payload?.response,
+          payload?.responseMessage,
+          payload?.error
+        ];
+        
+        const statusStr = statusFields.filter(s => s != null).map(s => String(s).toLowerCase()).join(' ');
+        if (statusStr.includes('declined') || 
+            statusStr.includes('failed') || 
+            statusStr.includes('cancelled') || 
+            statusStr.includes('error') ||
+            payload?.approved === false ||
+            payload?.approved === 'false' ||
+            payload?.approved === 0) {
+          paymentStatus = 'failed';
+          console.log('❌ Payment declined/failed detected in webhook');
+        } else {
+          console.log('✅ Processing cardTransaction webhook as successful');
+        }
+        
+        // Handle the webhook asynchronously
+        setImmediate(async () => {
+          try {
+            await sharedTerminalService.handleWebhook({
+              id: txId,
+              transactionId: txId,
+              type: 'cardTransaction',
+              status: paymentStatus,
+              approved: payload?.approved,
+              response: payload?.response,
+              rawPayload: payload
+            });
+            console.log(`✅ Webhook processed for transaction ${txId} with status: ${paymentStatus}`);
+          } catch (err) {
+            console.error('❌ Webhook processing failed:', err);
+            // Try to cache directly as fallback
+            try {
+              const webhookStore = sharedTerminalService.webhookStore || new Map();
+              webhookStore.set(String(txId), {
+                status: paymentStatus,
+                transactionId: txId,
+                updatedAt: Date.now(),
+              });
+            } catch {}
+          }
+        });
+      } else if (type === 'terminalCancel' || type === 'terminalDecline' || type === 'declined') {
+        const cancelStatus = type === 'declined' || type === 'terminalDecline' ? 'failed' : 'cancelled';
+        setImmediate(async () => {
+          try {
+            await sharedTerminalService.handleWebhook({
+              id: txId,
+              transactionId: txId,
+              type: type,
+              status: cancelStatus,
+              rawPayload: payload
+            });
+          } catch (err) {
+            console.error(`❌ ${type} webhook processing failed:`, err);
+          }
+        });
+      }
+      
+      // Always return 200 OK to acknowledge receipt
+      return res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('❌ Error in terminal webhook:', error);
+      return res.status(200).json({ received: true });
+    }
+  });
+
   return router;
 }

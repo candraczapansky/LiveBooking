@@ -506,7 +506,6 @@ export default function HelcimPayJsModal({
         <div className="fixed inset-0 z-[99999]">
           <div 
             className="absolute inset-0 bg-black/60" 
-            onClick={handleClose}
           />
           <Button
             variant="ghost"
@@ -527,7 +526,6 @@ export default function HelcimPayJsModal({
         <div className="fixed inset-0 z-[9999]">
           <div 
             className="absolute inset-0 bg-black/80 z-[0]" 
-            onClick={handleClose}
           />
           <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
             <div
@@ -569,7 +567,6 @@ export default function HelcimPayJsModal({
         <div className="fixed inset-0 z-[9999]">
           <div 
             className="absolute inset-0 bg-black/80 z-[0]" 
-            onClick={handleClose}
           />
           <div className="absolute inset-0 grid place-items-center z-[1] pointer-events-none">
             <div

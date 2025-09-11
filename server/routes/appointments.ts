@@ -355,8 +355,9 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     // Persist any add-ons passed for this appointment (optional field addOnServiceIds[])
     try {
-      const addOnServiceIds = Array.isArray((req.body as any).addOnServiceIds)
-        ? (req.body as any).addOnServiceIds.map((n: any) => parseInt(n))
+      const raw = (req as any)._rawBody || req.body;
+      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
+        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
         : [];
       if (addOnServiceIds.length > 0) {
         await storage.setAddOnsForAppointment(newAppointment.id, addOnServiceIds);
@@ -719,7 +720,19 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       // Don't fail the appointment creation if notifications fail
     }
 
-    res.status(201).json(newAppointment);
+    // Enrich response with add-ons and computed total
+    try {
+      const addOns = await storage.getAddOnServiceObjectsForAppointment(newAppointment.id);
+      const svc = await storage.getService(newAppointment.serviceId);
+      const basePrice = Number((svc as any)?.price ?? 0) || 0;
+      const addOnTotal = Array.isArray(addOns) ? addOns.reduce((sum: number, s: any) => sum + (Number(s?.price ?? 0) || 0), 0) : 0;
+      const computedTotalAmount = (newAppointment as any).totalAmount && Number((newAppointment as any).totalAmount) > 0
+        ? Number((newAppointment as any).totalAmount)
+        : basePrice + addOnTotal;
+      res.status(201).json({ ...newAppointment, addOns, computedTotalAmount });
+    } catch {
+      res.status(201).json(newAppointment);
+    }
   }));
 
   // Get appointment by ID
@@ -734,7 +747,30 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Appointment");
     }
 
-    res.json(appointment);
+    // Enrich with add-ons and a computed total for checkout convenience
+    let addOns: any[] = [];
+    try {
+      addOns = await storage.getAddOnServiceObjectsForAppointment(appointmentId);
+    } catch {}
+
+    let computedTotalAmount = Number((appointment as any).totalAmount ?? 0) || 0;
+    if (!(computedTotalAmount > 0)) {
+      let baseServicePrice = 0;
+      try {
+        const svc = await storage.getService(appointment.serviceId);
+        baseServicePrice = Number((svc as any)?.price ?? 0) || 0;
+      } catch {}
+      const addOnTotal = Array.isArray(addOns)
+        ? addOns.reduce((sum: number, svc: any) => sum + (Number(svc?.price ?? 0) || 0), 0)
+        : 0;
+      computedTotalAmount = baseServicePrice + addOnTotal;
+    }
+
+    res.json({
+      ...appointment,
+      addOns,
+      computedTotalAmount,
+    });
   }));
 
   // Cancel appointment (move to cancelled store and remove from active list)
@@ -839,6 +875,17 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
 
     const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);
 
+    // Optionally update add-ons if provided in request
+    try {
+      const raw = (req as any)._rawBody || req.body;
+      const addOnServiceIds = Array.isArray((raw as any).addOnServiceIds)
+        ? (raw as any).addOnServiceIds.map((n: any) => parseInt(n))
+        : [];
+      if (addOnServiceIds.length > 0) {
+        await storage.setAddOnsForAppointment(appointmentId, addOnServiceIds);
+      }
+    } catch {}
+
     LoggerService.logAppointment("updated", appointmentId, context);
 
     // If status changed to cancelled, trigger cancellation automation
@@ -908,6 +955,41 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     res.json(updatedAppointment);
+  }));
+
+  // Set or update add-ons for an appointment (minimal targeted endpoint)
+  app.post("/api/appointments/:id/add-ons", asyncHandler(async (req: Request, res: Response) => {
+    const appointmentId = parseInt(req.params.id);
+    const context = getLogContext(req);
+
+    try {
+      const appointment = await storage.getAppointment(appointmentId);
+      if (!appointment) {
+        throw new NotFoundError("Appointment");
+      }
+
+      const body: any = req.body || {};
+      let addOnServiceIds: number[] = [];
+      if (Array.isArray(body.addOnServiceIds)) {
+        addOnServiceIds = body.addOnServiceIds.map((n: any) => parseInt(n)).filter((n: any) => Number.isFinite(n));
+      } else if (body.addOnServiceId != null) {
+        const n = parseInt(body.addOnServiceId);
+        if (Number.isFinite(n)) addOnServiceIds = [n];
+      }
+
+      await storage.setAddOnsForAppointment(appointmentId, addOnServiceIds);
+      const addOns = await storage.getAddOnServiceObjectsForAppointment(appointmentId);
+      const baseService = await storage.getService(appointment.serviceId);
+      const basePrice = Number((baseService as any)?.price ?? 0) || 0;
+      const addOnTotal = Array.isArray(addOns) ? addOns.reduce((sum: number, svc: any) => sum + (Number(svc?.price ?? 0) || 0), 0) : 0;
+      const computedTotalAmount = basePrice + addOnTotal;
+
+      LoggerService.info("Appointment add-ons updated", { ...context, appointmentId, addOnCount: addOns?.length ?? 0 });
+      return res.json({ success: true, appointmentId, addOns, computedTotalAmount });
+    } catch (error) {
+      LoggerService.error("Failed to set appointment add-ons", { ...context, appointmentId }, error as Error);
+      throw error;
+    }
   }));
 
   // Delete appointment

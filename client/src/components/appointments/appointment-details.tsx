@@ -297,14 +297,19 @@ const AppointmentDetails = ({
 
   // Staff update removed per request
 
-  // Compute the amount to charge for this appointment
+  // Compute the amount to charge for this appointment (include add-ons when present)
   const getAppointmentChargeAmount = () => {
     const total = Number((appointment as any)?.totalAmount ?? 0);
     if (!Number.isNaN(total) && total > 0) return total;
-    const fromAppointmentService = Number((appointment as any)?.service?.price ?? 0);
-    if (!Number.isNaN(fromAppointmentService) && fromAppointmentService > 0) return fromAppointmentService;
-    const fallback = Number((service as any)?.price ?? 0);
-    if (!Number.isNaN(fallback) && fallback > 0) return fallback;
+    const computed = Number((appointment as any)?.computedTotalAmount ?? 0);
+    if (!Number.isNaN(computed) && computed > 0) return computed;
+    const addOnTotal = Array.isArray((appointment as any)?.addOns)
+      ? (appointment as any).addOns.reduce((sum: number, a: any) => sum + (Number(a?.price ?? 0) || 0), 0)
+      : 0;
+    const baseFromAppointment = Number((appointment as any)?.service?.price ?? 0) || 0;
+    const baseFromQuery = Number((service as any)?.price ?? 0) || 0;
+    const combined = (baseFromAppointment || baseFromQuery) + addOnTotal;
+    if (combined > 0) return combined;
     const fromAmount = Number((appointment as any)?.amount ?? 0);
     return Number.isNaN(fromAmount) ? 0 : fromAmount;
   };
@@ -1087,6 +1092,27 @@ const AppointmentDetails = ({
               )}
             </CardContent>
           </Card>
+
+          {/* Add-Ons (if any) */}
+          {Array.isArray((appointment as any)?.addOns) && (appointment as any).addOns.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-3 mb-2">
+                  <Scissors className="h-5 w-5 text-gray-500" />
+                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Add-Ons</h3>
+                </div>
+                <div className="space-y-1">
+                  {(appointment as any).addOns.map((ao: any) => (
+                    <div key={ao.id} className="text-sm text-gray-700 dark:text-gray-300">
+                      {ao.name}
+                      {ao.duration ? ` (+${ao.duration} min)` : ''}
+                      {` — ${formatPrice(Number(ao.price) || 0)}`}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Staff Information section removed per request */}
 

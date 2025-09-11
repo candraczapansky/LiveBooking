@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, addDays } from "date-fns";
+import { toCentralWallTime } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { formatDuration, formatPrice } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -115,6 +116,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   const [confirmationData, setConfirmationData] = useState<any>(null);
   // Detect narrow screens in the widget itself as a fallback to ensure mobile view
   const [isNarrow, setIsNarrow] = useState(false);
+  const [mobileTopOffset, setMobileTopOffset] = useState<number>(200);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   
   
   useEffect(() => {
@@ -129,6 +132,36 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     } catch {}
   }, []);
   const isMobileView = variant === 'mobile' || isNarrow;
+
+  useEffect(() => {
+    if (!isMobileView) return;
+    try {
+      const headerEl = document.querySelector('header') as HTMLElement | null;
+      const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0;
+      // Add extra spacing below header to avoid covering any menu/tabs
+      const extraSpacing = 120; // px
+      const computed = Math.max(200, Math.round(headerHeight + extraSpacing));
+      setMobileTopOffset(computed);
+    } catch {}
+  }, [isMobileView]);
+
+  // Ensure the dialog overlay does not cover the mobile header/menu
+  useEffect(() => {
+    if (!isMobileView || !open) return;
+    try {
+      const overlayEl = (contentRef.current?.previousElementSibling || null) as HTMLElement | null;
+      if (overlayEl) {
+        overlayEl.style.top = `${mobileTopOffset}px`;
+        overlayEl.style.height = `calc(100vh - ${mobileTopOffset}px)`;
+      }
+      return () => {
+        if (overlayEl) {
+          overlayEl.style.top = '';
+          overlayEl.style.height = '';
+        }
+      };
+    } catch {}
+  }, [isMobileView, open, mobileTopOffset]);
 
   const form = useForm<BookingFormValues>({
     resolver: zodResolver(bookingSchema),
@@ -207,15 +240,18 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   // Fetch appointments for the selected location to prevent double-booking
   const { data: appointments = [], refetch: refetchAppointments } = useQuery({
-    queryKey: ['/api/appointments', selectedLocationId],
+    queryKey: ['/api/appointments'],
     queryFn: async () => {
-      const endpoint = selectedLocationId ? `/api/appointments?locationId=${selectedLocationId}` : '/api/appointments';
+      // IMPORTANT: We fetch ALL appointments, not filtered by location
+      // This prevents double-booking staff across different locations
+      const endpoint = '/api/appointments';
       const res = await apiRequest('GET', endpoint);
       return res.json();
     },
-    enabled: open,
+    enabled: true,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    refetchInterval: 15000,
     staleTime: 0,
     retry: 2,
     retryDelay: 1000
@@ -445,23 +481,52 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
 
   const timeSlots = generateTimeSlots();
 
-  // Restrict appointments to the selected location to avoid cross-location blocking
+  // Get all appointments for availability checking (NOT filtered by location)
+  // Staff can't be in two places at once, so we check ALL their appointments
   const appointmentsForAvailability = useMemo(() => {
     try {
       const list: any[] = Array.isArray(appointments) ? (appointments as any[]) : [];
-      if (!selectedLocationId) return list;
-      return list.filter((apt: any) => String(apt.locationId) === String(selectedLocationId));
+      // IMPORTANT: Return ALL appointments, not filtered by location
+      // This ensures staff can't be double-booked across locations
+      return list;
     } catch {
       return [] as any[];
     }
-  }, [appointments, selectedLocationId]);
+  }, [appointments]);
 
   // Helpers for schedule filtering
   const getDayName = (date: Date) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    return days[date.getDay()];
+    const centralDate = toCentralWallTime(date);
+    return days[centralDate.getDay()];
   };
-  const formatDateForComparison = (date: Date) => format(date, 'yyyy-MM-dd');
+  const formatDateForComparison = (date: Date) => {
+    const centralDate = toCentralWallTime(date);
+    return format(centralDate, 'yyyy-MM-dd');
+  };
+  const toCentralMinutesOfDay = (input: Date | string) => {
+    const d = toCentralWallTime(input);
+    return d.getHours() * 60 + d.getMinutes();
+  };
+
+  // Resolve a service duration (including buffers) by serviceId, with a conservative fallback
+  const getServiceDurationWithBuffers = (serviceId: number): number => {
+    const sources: any[] = [];
+    if (Array.isArray(allowedServicesAtLocation)) sources.push(...(allowedServicesAtLocation as any[]));
+    if (Array.isArray(allowedServices)) sources.push(...(allowedServices as any[]));
+    if (Array.isArray(servicesAtLocation)) sources.push(...(servicesAtLocation as any[]));
+    const svc = sources.find((s: any) => Number(s?.id) === Number(serviceId));
+    if (svc) {
+      const base = Number(svc.duration || 0);
+      const before = Number(svc.bufferTimeBefore || 0);
+      const after = Number(svc.bufferTimeAfter || 0);
+      const total = base + before + after;
+      // Default to at least 60 minutes to be safe if duration is zero/invalid
+      return total > 0 ? total : 60;
+    }
+    // Conservative default if service not found
+    return 60;
+  };
   const isTimeInRange = (timeSlot: string, startTime: string, endTime: string) => {
     const toMinutes = (t: string) => {
       const parts = String(t).trim().split(':');
@@ -474,15 +539,43 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     const end = toMinutes(endTime);
     return slot >= start && slot < end;
   };
+  // Ensure a slot range fits entirely within a schedule window
+  const isRangeWithinSchedule = (slotStartMin: number, slotEndMin: number, schedule: any) => {
+    const toMinutes = (t: string) => {
+      const parts = String(t).trim().split(':');
+      const hours = Number(parts[0] || 0);
+      const minutes = Number(parts[1] || 0);
+      return hours * 60 + minutes;
+    };
+    const schedStart = toMinutes(schedule.startTime);
+    const schedEnd = toMinutes(schedule.endTime);
+    return slotStartMin >= schedStart && slotEndMin <= schedEnd;
+  };
 
   // Compute available time slots based on staff schedule and existing appointments
   const getAvailableTimeSlots = () => {
     if (!selectedFormDate) return timeSlots;
 
     const dayName = getDayName(selectedFormDate);
-    const svc: any = selectedService;
+    // Resolve service robustly to ensure duration/buffers are applied when filtering
+    const svc: any = selectedServiceId
+      ? (
+          selectedService ||
+          (Array.isArray(allowedServicesAtLocation) ? (allowedServicesAtLocation as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null) ||
+          (Array.isArray(allowedServices) ? (allowedServices as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null) ||
+          (Array.isArray(servicesAtLocation) ? (servicesAtLocation as any[]).find((s: any) => String(s.id) === String(selectedServiceId)) : null)
+        )
+      : null;
 
     const isStaffAvailableForSlot = (staffIdNum: number, slotValue: string) => {
+      // Debug logging for specific case
+      const dateStr = selectedFormDate.toISOString().substring(0, 10);
+      const isDebugCase = (staffIdNum === 3 && dateStr === '2025-09-10' && slotValue === '11:00');
+      
+      if (isDebugCase) {
+        console.log('🔍 DEBUG: Checking Hailey (ID 3) availability for 11:00 AM on Sep 10, 2025');
+      }
+
       const staffSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
         const currentDateString = formatDateForComparison(selectedFormDate);
         const startDateString = typeof schedule.startDate === 'string'
@@ -505,30 +598,91 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           !schedule.isBlocked;
       });
 
-      if (staffSchedules.length === 0) return false;
-      const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slotValue, schedule.startTime, schedule.endTime));
-      if (!withinSchedule) return false;
+      if (isDebugCase) {
+        console.log('  - Staff schedules found:', staffSchedules.length);
+      }
 
-      if (!svc) return true;
+      if (staffSchedules.length === 0) return false;
 
       const [hours, minutes] = String(slotValue).split(':').map(Number);
-      const appointmentStart = new Date(selectedFormDate);
-      appointmentStart.setHours(hours, minutes, 0, 0);
+      // If a service is selected but cannot be resolved, be conservative and block the slot
+      if (!svc) return !selectedServiceId;
+      // Compute slot start/end as Central minutes-of-day (robust against timezone/epoch issues)
+      const slotStartMin = hours * 60 + minutes;
       const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
-      const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
+      const slotEndMin = slotStartMin + totalDuration;
+      // Require full containment within at least one schedule window
+      const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(slotStartMin, slotEndMin, schedule));
+      if (!withinSchedule) return false;
 
-      const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
-        .filter((apt: any) => apt.staffId === staffIdNum)
-        .filter((apt: any) => new Date(apt.startTime).toDateString() === selectedFormDate.toDateString())
+      // Get all appointments for this staff member
+      const allStaffAppts = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
+        .filter((apt: any) => Number(apt.staffId) === Number(staffIdNum));
+      
+      if (isDebugCase) {
+        console.log('  - Total appointments for staff:', allStaffAppts.length);
+      }
+
+      // Filter for same date
+      const sameDateAppts = allStaffAppts.filter((apt: any) => {
+        const aptCentral = toCentralWallTime(apt.startTime);
+        const selectedCentral = toCentralWallTime(selectedFormDate);
+        return aptCentral.toDateString() === selectedCentral.toDateString();
+      });
+
+      if (isDebugCase) {
+        console.log('  - Same date appointments:', sameDateAppts.length);
+        sameDateAppts.forEach(apt => {
+          const t = new Date(apt.startTime);
+          console.log('    • ID:', apt.id, '| Time:', t.toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'}), '| Status:', apt.status);
+        });
+      }
+
+      const staffAppointments = sameDateAppts
+        .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
         .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
+      if (isDebugCase) {
+        console.log('  - Active appointments:', staffAppointments.length);
+      }
+
       for (const apt of staffAppointments) {
-        const existingStart = new Date(apt.startTime);
-        const existingEnd = new Date(apt.endTime);
-        if (appointmentStart < existingEnd && appointmentEnd > existingStart) {
+        // Compare using Central minutes-of-day
+        const aptStartMin = toCentralMinutesOfDay(apt.startTime);
+        let aptEndMin = apt.endTime ? toCentralMinutesOfDay(apt.endTime) : aptStartMin;
+
+        // Guard: if the appointment has no proper end or zero duration, infer from service or default to 60m
+        if (!apt.endTime || aptEndMin <= aptStartMin) {
+          const inferredDuration = getServiceDurationWithBuffers(Number(apt.serviceId));
+          aptEndMin = aptStartMin + inferredDuration;
+        }
+
+        // Hard guard: exact start match should always block
+        if (slotStartMin === aptStartMin) {
+          if (isDebugCase) {
+            console.log('  ❌ BLOCKED: Exact start-time match with appointment', apt.id);
+          }
+          return false;
+        }
+
+        if (isDebugCase) {
+          console.log('  - Checking overlap with appointment', apt.id);
+          console.log('    Existing (min):', aptStartMin, '-', aptEndMin);
+          console.log('    New slot (min):', slotStartMin, '-', slotEndMin);
+        }
+
+        if (slotStartMin < aptEndMin && slotEndMin > aptStartMin) {
+          if (isDebugCase) {
+            console.log('  ❌ BLOCKED: Time slot conflicts with appointment', apt.id);
+          }
           return false;
         }
       }
+      
+      if (isDebugCase) {
+        console.log('  ✅ AVAILABLE: No conflicts found');
+      }
+      
       return true;
     };
 
@@ -546,7 +700,21 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     return timeSlots;
   };
 
-  const availableTimeSlots = useMemo(getAvailableTimeSlots, [selectedStaffId, selectedFormDate, selectedServiceId, schedules, appointmentsForAvailability, timeSlots]);
+  const availableTimeSlots = useMemo(
+    getAvailableTimeSlots,
+    [
+      selectedStaffId,
+      selectedFormDate,
+      selectedServiceId,
+      selectedService,
+      allowedServicesAtLocation,
+      allowedServices,
+      servicesAtLocation,
+      schedules,
+      appointmentsForAvailability,
+      timeSlots,
+    ]
+  );
 
   // Compute available days (next 30 days) based on staff schedules, service duration and existing appointments
   const availableDatesSet = useMemo(() => {
@@ -586,17 +754,20 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         if (staffSchedules.length === 0) return false;
 
         const appointmentsForDay = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
-          .filter((apt: any) => apt.staffId === staffIdNum)
-          .filter((apt: any) => new Date(apt.startTime).toDateString() === day.toDateString())
+          .filter((apt: any) => Number(apt.staffId) === Number(staffIdNum))
+          .filter((apt: any) => toCentralWallTime(apt.startTime).toDateString() === toCentralWallTime(day).toDateString())
+          .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
           .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
 
         for (const slot of timeSlots) {
-          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(slot.value, schedule.startTime, schedule.endTime));
-          if (!withinSchedule) continue;
           const [hours, minutes] = String(slot.value).split(':').map(Number);
+          const slotStartMin = hours * 60 + minutes;
+          const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
+          const slotEndMin = slotStartMin + totalDuration;
+          const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(slotStartMin, slotEndMin, schedule));
+          if (!withinSchedule) continue;
           const appointmentStart = new Date(day);
           appointmentStart.setHours(hours, minutes, 0, 0);
-          const totalDuration = (svc?.duration || 0) + (svc?.bufferTimeBefore || 0) + (svc?.bufferTimeAfter || 0);
           const appointmentEnd = new Date(appointmentStart.getTime() + totalDuration * 60000);
           let overlaps = false;
           for (const apt of appointmentsForDay) {
@@ -772,13 +943,19 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               !schedule.isBlocked;
           });
           if (staffSchedules.length === 0) continue;
-          const withinSchedule = staffSchedules.some((schedule: any) => isTimeInRange(values.time, schedule.startTime, schedule.endTime));
+          // Ensure selected time + duration fits entirely within schedule
+          const [hh, mm] = String(values.time).split(':').map(Number);
+          const startMin = hh * 60 + mm;
+          const serviceDurationMin = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
+          const endMin = startMin + serviceDurationMin;
+          const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(startMin, endMin, schedule));
           if (!withinSchedule) continue;
           const totalDuration = (svc.duration || 0) + (svc.bufferTimeBefore || 0) + (svc.bufferTimeAfter || 0);
           const appointmentEnd = new Date(date.getTime() + totalDuration * 60000);
           const staffAppointments = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])
             .filter((apt: any) => apt.staffId === staffIdNum)
             .filter((apt: any) => new Date(apt.startTime).toDateString() === date.toDateString())
+            .filter((apt: any) => apt.status !== 'cancelled' && apt.status !== 'completed')
             .sort((a: any, b: any) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
           let overlaps = false;
           for (const apt of staffAppointments) {
@@ -1115,11 +1292,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   return (
     <>
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
-      <DialogContent onInteractOutside={(e) => e.preventDefault()} className={
+      <DialogContent ref={contentRef} onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
-          ? "booking-mobile-overlay fixed left-2 right-2 top-24 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
+          ? "booking-mobile-overlay fixed left-2 right-2 top-32 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
           : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
-      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
+      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)', top: mobileTopOffset } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
         <DialogHeader className={isMobileView ? "p-0" : ""}>
           <DialogTitle className={isMobileView ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>
@@ -1250,8 +1427,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </div>
                 )}
                 
-                {/* Service Categories */}
-                <div className={isMobileView ? 'flex flex-wrap gap-2 py-2' : 'flex overflow-x-auto space-x-2 py-2'}>
+                {/* Service Categories (two rows; first row up to 8) */}
+                <div className={isMobileView ? 'space-y-2 py-2 -mx-2 px-2' : 'space-y-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1260,23 +1437,49 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <Skeleton className="h-8 w-28 rounded-full" />
                     </>
                   ) : (
-                    categories?.filter((category: Category) => {
-                      if (!selectedLocationId) return true;
-                      // Show category only if at least one allowed service at this location belongs to it
-                      if (!allowedServicesAtLocation || allowedServicesAtLocation.length === 0) return false;
-                      return allowedServicesAtLocation.some((svc: any) => svc.categoryId === category.id);
-                    }).map((category: Category) => (
-                      <Button
-                        key={category.id}
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10"
-                        onClick={() => handleCategoryChange(category.id.toString())}
-                      >
-                        {category.name}
-                      </Button>
-                    ))
+                    (() => {
+                      const filtered = (categories || []).filter((category: Category) => {
+                        if (!selectedLocationId) return true;
+                        if (!allowedServicesAtLocation || allowedServicesAtLocation.length === 0) return false;
+                        return (allowedServicesAtLocation as any[]).some((svc: any) => svc.categoryId === category.id);
+                      });
+                      const row1 = filtered.slice(0, 6);
+                      const row2 = filtered.slice(6, 12);
+                      return (
+                        <>
+                          <div className="flex flex-wrap gap-2 w-full">
+                            {row1.map((category: Category) => (
+                              <Button
+                                key={`row1-${category.id}`}
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10 max-w-[220px] truncate px-3"
+                                onClick={() => handleCategoryChange(category.id.toString())}
+                              >
+                                {category.name}
+                              </Button>
+                            ))}
+                          </div>
+                          {row2.length > 0 && (
+                            <div className="flex flex-wrap gap-2 w-full">
+                              {row2.map((category: Category) => (
+                                <Button
+                                  key={`row2-${category.id}`}
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="rounded-full whitespace-nowrap bg-transparent border-none text-foreground hover:bg-foreground/10 max-w-[220px] truncate px-3"
+                                  onClick={() => handleCategoryChange(category.id.toString())}
+                                >
+                                  {category.name}
+                                </Button>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()
                   )}
                 </div>
                 
@@ -1307,7 +1510,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     key={service.id}
                                     className={`cursor-pointer transition-all hover:shadow-md ${
                                       field.value === service.id.toString()
-                                        ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                        ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                                     }`}
                                     onClick={() => field.onChange(service.id.toString())}
@@ -1315,13 +1518,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     <CardContent className="p-4">
                                       <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                         <div>
-                                          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 break-words">{service.name}</h4>
-                                          <p className={`text-sm text-gray-500 dark:text-gray-400 mt-1 ${isMobileView ? 'break-words' : ''}`}>{service.description}</p>
-                                          <div className="mt-2 flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                          <h4 className={`text-base font-medium ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'} break-words`}>{service.name}</h4>
+                                          <p className={`text-sm mt-1 ${isMobileView ? 'break-words' : ''} ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{service.description}</p>
+                                          <div className={`mt-2 flex items-center text-sm ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
                                         </div>
-                                        <div className="text-lg font-semibold text-gray-900 dark:text-gray-100 sm:text-right">
+                                        <div className={`text-lg font-semibold sm:text-right ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                                           {formatPrice(service.price)}
                                         </div>
                                       </div>
@@ -1357,7 +1560,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               key="any-staff"
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === ANY_STAFF_ID
-                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(ANY_STAFF_ID)}
@@ -1368,8 +1571,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     *
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">Any available staff</h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">We'll assign a qualified staff member for this service.</p>
+                                    <h4 className={`text-base font-medium ${field.value === ANY_STAFF_ID ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>Any available staff</h4>
+                                    <p className={`text-sm ${field.value === ANY_STAFF_ID ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>We'll assign a qualified staff member for this service.</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1380,7 +1583,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               key={staffMember.id}
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === staffMember.id.toString()
-                                  ? "border-primary ring-2 ring-primary ring-opacity-50"
+                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(staffMember.id.toString())}
@@ -1391,7 +1594,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     {`${staffMember.user?.firstName?.[0] || ""}${staffMember.user?.lastName?.[0] || ""}`}
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                    <h4 className={`text-base font-medium ${field.value === staffMember.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
                                       {(() => {
                                         const u = (staffMember as any)?.user || {};
                                         const first = (u.firstName || '').trim();
@@ -1400,7 +1603,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                         return full || u.username || 'Unknown Staff';
                                       })()}
                                     </h4>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">{staffMember.title}</p>
+                                    <p className={`text-sm ${field.value === staffMember.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{staffMember.title}</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1437,7 +1640,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className={`w-full pl-3 text-left font-normal justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'min-h-[40px] h-10 text-base' : 'min-h-[44px]'}`}
+                                className={`w-full px-4 text-left font-normal leading-none justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'h-10 min-h-[40px] text-base' : 'h-12 min-h-[48px] text-base'} py-0 flex items-center`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1482,11 +1685,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     control={form.control}
                     name="time"
                     render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="flex flex-col">
                         <FormLabel>Time</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={availableTimeSlots.length === 0 || !selectedStaffId || !selectedServiceId}>
                           <FormControl>
-                            <SelectTrigger className={isMobileView ? 'min-h-[36px] h-9 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-300 dark:border-gray-600' : 'min-h-[44px] bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100'}>
+                            <SelectTrigger className={isMobileView ? 'h-10 min-h-[40px] leading-none text-base bg-transparent text-foreground border-foreground py-0 px-4' : 'h-12 min-h-[48px] leading-none text-base bg-transparent text-foreground border-foreground py-0 px-4'}>
                               <SelectValue placeholder={(!selectedStaffId || !selectedServiceId) ? "Select service and staff first" : (availableTimeSlots.length === 0 ? "No available times" : "Select a time")} />
                             </SelectTrigger>
                           </FormControl>

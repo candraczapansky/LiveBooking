@@ -32,6 +32,9 @@ interface AppointmentDetails {
     description?: string;
     duration: number;
   };
+  // Optional enrichments from backend for add-ons checkout
+  addOns?: { id: number; name: string; price: number; duration?: number }[];
+  computedTotalAmount?: number;
 }
 
 interface AppointmentCheckoutProps {
@@ -55,6 +58,16 @@ export default function AppointmentCheckout({
   const [showSaveCardModal, setShowSaveCardModal] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch latest appointment details (to include add-ons and computed total)
+  const { data: apptDetails } = useQuery({
+    queryKey: ['/api/appointments', appointment.id],
+    queryFn: async () => {
+      const res = await apiRequest('GET', `/api/appointments/${appointment.id}`);
+      return res.json();
+    },
+    enabled: isOpen && !!appointment.id,
+  });
 
   // Fetch saved payment methods for the client
   const { data: savedPaymentMethods, isLoading: isLoadingCards } = useQuery({
@@ -80,8 +93,19 @@ export default function AppointmentCheckout({
     enabled: isOpen && !!appointment.clientId
   });
 
-  // Calculate base amount
-  const baseAmount = appointment.totalAmount || (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
+  // Calculate base amount including add-ons so they are checked out as one
+  const effectiveAddOns = Array.isArray(apptDetails?.addOns)
+    ? apptDetails?.addOns
+    : (Array.isArray(appointment.addOns) ? appointment.addOns : []);
+  const addOnTotal = Array.isArray(effectiveAddOns)
+    ? effectiveAddOns.reduce((sum: number, a: any) => sum + (Number(a?.price ?? 0) || 0), 0)
+    : 0;
+  const serviceOnlyAmount = (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
+  const baseAmount = (Number(appointment.totalAmount) && Number(appointment.totalAmount) > 0)
+    ? Number(appointment.totalAmount)
+    : (Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount) && Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount) > 0)
+      ? Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount)
+      : (serviceOnlyAmount + addOnTotal);
 
   // Discount state and helpers
   const [discountCode, setDiscountCode] = useState("");
@@ -271,6 +295,16 @@ export default function AppointmentCheckout({
                     Service: {appointment.serviceName}
                   </span>
                 </div>
+                {Array.isArray(effectiveAddOns) && effectiveAddOns.length > 0 && (
+                  <div className="space-y-1 pl-6">
+                    {effectiveAddOns.map((ao: any) => (
+                      <div key={ao.id} className="flex items-center space-x-2">
+                        <DollarSign className="h-4 w-4 text-gray-400" />
+                        <span className="text-xs text-gray-600">Add-On: {ao.name}{ao.duration ? ` (+${ao.duration} min)` : ''} — {formatPrice(Number(ao.price) || 0)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="flex items-center space-x-2">
                   <DollarSign className="h-4 w-4 text-gray-500" />

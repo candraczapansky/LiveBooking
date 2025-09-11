@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 // Helcim payment processing
 
@@ -47,7 +47,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import HelcimPay from "@/components/payment/helcim-pay";
+import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 
 
@@ -118,6 +118,7 @@ export default function PointOfSale() {
   const [manualPhone, setManualPhone] = useState("");
   const [tipAmount, setTipAmount] = useState(0);
   const [showHelcimModal, setShowHelcimModal] = useState(false);
+  const [showTerminalDialog, setShowTerminalDialog] = useState(false);
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
@@ -134,6 +135,14 @@ export default function PointOfSale() {
   const { toast } = useToast();
 
   useDocumentTitle("Point of Sale");
+  // Open terminal dialog when terminal is selected; close when not selected
+  useEffect(() => {
+    if (paymentMethod === "terminal") {
+      setShowTerminalDialog(true);
+    } else {
+      setShowTerminalDialog(false);
+    }
+  }, [paymentMethod]);
 
   const queryClient = useQueryClient();
 
@@ -1540,6 +1549,29 @@ export default function PointOfSale() {
 
             <div>
               <label className="text-sm font-medium mb-2 block">Payment Method</label>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  type="button"
+                  variant={paymentMethod === "cash" ? "default" : "outline"}
+                  onClick={() => setPaymentMethod("cash")}
+                >
+                  Cash
+                </Button>
+                <Button
+                  type="button"
+                  variant={paymentMethod === "card" ? "default" : "outline"}
+                  onClick={() => setPaymentMethod("card")}
+                >
+                  Card
+                </Button>
+                <Button
+                  type="button"
+                  variant={paymentMethod === "terminal" ? "default" : "outline"}
+                  onClick={() => setPaymentMethod("terminal")}
+                >
+                  Terminal
+                </Button>
+              </div>
               <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                 <SelectTrigger>
                   <SelectValue />
@@ -1593,8 +1625,14 @@ export default function PointOfSale() {
               <div>
                 <label className="text-sm font-medium mb-2 block">Smart Terminal Payment</label>
                 <SmartTerminalPayment
-                  open={true}
-                  onOpenChange={() => {}}
+                  open={showTerminalDialog}
+                  onOpenChange={(open) => {
+                    setShowTerminalDialog(open);
+                    if (!open) {
+                      // If user closes the terminal dialog, keep checkout dialog usable
+                      setPaymentMethod("card");
+                    }
+                  }}
                   amount={getGrandTotal()}
                   description={`POS Sale - ${cart.length} item${cart.length > 1 ? 's' : ''}`}
                   onSuccess={handleTerminalSuccess}
@@ -1641,7 +1679,7 @@ export default function PointOfSale() {
             <Button variant="outline" onClick={() => setIsCheckoutOpen(false)}>
               Cancel
             </Button>
-            {paymentMethod !== "card" && (
+            {(paymentMethod === "cash" || paymentMethod === "gift_card") && (
               <Button 
                 onClick={processTransaction}
                 disabled={processTransactionMutation.isPending}
@@ -1819,7 +1857,7 @@ export default function PointOfSale() {
       </Dialog>
 
       {/* Helcim Pay.js Modal */}
-      <HelcimPay
+      <HelcimPayJsModal
         open={showHelcimModal}
         onOpenChange={setShowHelcimModal}
         amount={getGrandTotal()}
