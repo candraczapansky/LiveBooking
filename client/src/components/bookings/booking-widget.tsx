@@ -2139,7 +2139,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               defaultValue={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger className="text-foreground">
+                                <SelectTrigger className="text-black">
                                   <SelectValue placeholder="Select frequency" />
                                 </SelectTrigger>
                               </FormControl>
@@ -2165,7 +2165,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               defaultValue={field.value?.toString()}
                             >
                               <FormControl>
-                                <SelectTrigger className="text-foreground">
+                                <SelectTrigger className="text-black">
                                   <SelectValue placeholder="Select number of appointments" />
                                 </SelectTrigger>
                               </FormControl>
@@ -2187,7 +2187,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       
                       {form.watch('recurringFrequency') && form.watch('recurringCount') && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                          <p className="text-sm text-white">
                             <strong>Preview:</strong> This will create {form.watch('recurringCount')} appointments, 
                             scheduled {form.watch('recurringFrequency') === 'weekly' ? 'every week' : 
                                      form.watch('recurringFrequency') === 'biweekly' ? 'every 2 weeks' : 

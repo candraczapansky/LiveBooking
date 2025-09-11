@@ -145,12 +145,16 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   // Get all payments
   app.get("/api/payments", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { clientId, staffId, startDate, endDate, status } = req.query;
+    const { clientId, staffId, startDate, endDate, status, appointmentId } = req.query;
 
-    LoggerService.debug("Fetching payments", { ...context, filters: { clientId, staffId, startDate, endDate, status } });
+    LoggerService.debug("Fetching payments", { ...context, filters: { clientId, staffId, startDate, endDate, status, appointmentId } });
 
     let payments;
-    if (clientId) {
+    if (appointmentId) {
+      // Get payments for a specific appointment
+      const allPayments = await storage.getAllPayments();
+      payments = allPayments.filter((p: any) => p.appointmentId === parseInt(appointmentId as string));
+    } else if (clientId) {
       payments = await storage.getPaymentsByClient(parseInt(clientId as string));
     } else if (staffId) {
       // Note: payments don't have staffId field, get all payments for now
@@ -424,10 +428,24 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       currentBalance: giftCard.currentBalance - amount,
     });
 
+    // Get all payments for this appointment to calculate total paid
+    const allPayments = await storage.getAllPayments();
+    const appointmentPayments = allPayments.filter((p: any) => p.appointmentId === appointmentId);
+    const totalPaid = appointmentPayments.reduce((sum: number, p: any) => {
+      if (p.status === 'completed') {
+        return sum + (p.amount || 0);
+      }
+      return sum;
+    }, 0);
+
+    // Determine payment status based on total paid vs appointment total
+    const appointmentTotal = appointment.totalAmount || 0;
+    const paymentStatus = totalPaid >= appointmentTotal ? 'paid' : 'partial';
+
     // Update appointment payment status
     await storage.updateAppointment(appointmentId, {
-      paymentStatus: 'paid',
-      totalAmount: amount,
+      paymentStatus: paymentStatus,
+      // Note: paidAmount field doesn't exist in appointments table, but we're tracking via payments
     });
 
     // Create sales history for reports
@@ -556,17 +574,27 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     LoggerService.logPayment("gift_card_payment_confirmed", amount, { ...context, paymentId: payment.id });
 
-    // Fire automation for after payment
-    try {
-      const appt = await storage.getAppointment(appointmentId);
-      if (appt) {
-        await triggerAfterPayment(appt, storage);
+    // Fire automation for after payment (only if fully paid)
+    if (paymentStatus === 'paid') {
+      try {
+        const appt = await storage.getAppointment(appointmentId);
+        if (appt) {
+          await triggerAfterPayment(appt, storage);
+        }
+      } catch (e) {
+        try { LoggerService.error("Failed to trigger after_payment automation (gift card)", { ...context, paymentId: payment.id, error: e instanceof Error ? e.message : String(e) }); } catch {}
       }
-    } catch (e) {
-      try { LoggerService.error("Failed to trigger after_payment automation (gift card)", { ...context, paymentId: payment.id, error: e instanceof Error ? e.message : String(e) }); } catch {}
     }
 
-    res.json({ success: true, payment, remainingBalance: giftCard.currentBalance - amount });
+    res.json({ 
+      success: true, 
+      payment,
+      giftCardRemainingBalance: giftCard.currentBalance - amount,
+      appointmentRemainingBalance: Math.max(0, appointmentTotal - totalPaid),
+      totalPaid,
+      appointmentTotal,
+      paymentStatus
+    });
   }));
 
   // Add gift card (physical card sale)
@@ -586,7 +614,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     // Check if gift card already exists
     const existingGiftCard = await storage.getGiftCardByCode(code);
     if (existingGiftCard) {
-      throw new ConflictError("Gift card with this code already exists");
+      throw new ConflictError("Gift card with this code already exists. To add funds to an existing gift card, please use the 'Reload Gift Card' form instead.");
     }
 
     const giftCard = await storage.createGiftCard({
@@ -744,6 +772,105 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       initialAmount: giftCard.initialAmount,
       status: giftCard.status,
       expiryDate: giftCard.expiryDate
+    });
+  }));
+
+  // Reload gift card (add funds to existing card)
+  app.post("/api/reload-gift-card", asyncHandler(async (req: Request, res: Response) => {
+    const context = getLogContext(req);
+    const { 
+      code, 
+      amount, 
+      paymentMethod,
+      paymentReference,
+      notes 
+    } = req.body;
+
+    LoggerService.info("Reloading gift card", { ...context, code, amount });
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+      throw new ValidationError("Amount must be greater than 0");
+    }
+
+    // Find existing gift card
+    const giftCard = await storage.getGiftCardByCode(code);
+    if (!giftCard) {
+      throw new NotFoundError("Gift card not found");
+    }
+
+    // Check if gift card is active
+    if (giftCard.status !== 'active') {
+      throw new ValidationError(`Cannot reload gift card with status: ${giftCard.status}`);
+    }
+
+    // Calculate new balance
+    const newBalance = giftCard.currentBalance + amount;
+
+    // Update gift card balance
+    await storage.updateGiftCard(giftCard.id, {
+      currentBalance: newBalance,
+      // Update initial amount if new balance exceeds it (for tracking purposes)
+      initialAmount: Math.max(giftCard.initialAmount, newBalance),
+    });
+
+    // Create transaction record
+    await storage.createGiftCardTransaction({
+      giftCardId: giftCard.id,
+      transactionType: 'reload',
+      amount: amount,
+      balanceAfter: newBalance,
+      notes: notes || `Gift card reload - Added $${amount.toFixed(2)}`,
+    });
+
+    // Create payment record if payment method provided
+    if (paymentMethod) {
+      const payment = await storage.createPayment({
+        amount: amount,
+        totalAmount: amount,
+        clientId: giftCard.purchasedByUserId || 1, // Use original purchaser if available
+        method: paymentMethod,
+        status: 'completed',
+        notes: `Gift card reload - Code: ${code}`,
+        processedAt: new Date(),
+        helcimPaymentId: paymentReference || null,
+      });
+
+      // Create sales history record for reports
+      await createSalesHistoryRecord(storage, payment, 'gift_card_reload', {
+        giftCardId: giftCard.id,
+        giftCardCode: code,
+        reloadAmount: amount,
+        newBalance: newBalance,
+      });
+
+      LoggerService.logPayment("gift_card_reloaded", amount, { 
+        ...context, 
+        giftCardId: giftCard.id,
+        paymentMethod,
+        paymentReference,
+        newBalance
+      });
+    }
+
+    LoggerService.info("Gift card reloaded successfully", { 
+      ...context, 
+      giftCardId: giftCard.id,
+      previousBalance: giftCard.currentBalance,
+      newBalance,
+      amountAdded: amount
+    });
+
+    res.json({ 
+      success: true,
+      giftCard: {
+        ...giftCard,
+        currentBalance: newBalance,
+        initialAmount: Math.max(giftCard.initialAmount, newBalance),
+      },
+      previousBalance: giftCard.currentBalance,
+      amountAdded: amount,
+      newBalance
     });
   }));
 

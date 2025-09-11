@@ -64,6 +64,13 @@ const giftCardSchema = z.object({
 });
 type GiftCardForm = z.infer<typeof giftCardSchema>;
 
+// Gift Card Reload schema
+const giftCardReloadSchema = z.object({
+  code: z.string().min(8, "Gift card number must be at least 8 characters"),
+  amount: z.number().min(10, "Minimum reload amount is $10").max(1000, "Maximum reload amount is $1000"),
+});
+type GiftCardReloadForm = z.infer<typeof giftCardReloadSchema>;
+
 const PRESET_AMOUNTS = [25, 50, 75, 100, 150, 200];
 
 // Payment form component for Helcim
@@ -246,6 +253,16 @@ export default function GiftCertificatesPage() {
   const [showGiftCardTerminal, setShowGiftCardTerminal] = useState(false);
   const [giftCardCashReceived, setGiftCardCashReceived] = useState<string>("");
 
+  // Gift card reload states
+  const [showReloadPaymentDialog, setShowReloadPaymentDialog] = useState(false);
+  const [reloadPaymentMethod, setReloadPaymentMethod] = useState<"cash" | "card" | "terminal">("cash");
+  const [pendingReloadData, setPendingReloadData] = useState<GiftCardReloadForm | null>(null);
+  const [showReloadCashDialog, setShowReloadCashDialog] = useState(false);
+  const [showReloadHelcimPay, setShowReloadHelcimPay] = useState(false);
+  const [showReloadTerminal, setShowReloadTerminal] = useState(false);
+  const [reloadCashReceived, setReloadCashReceived] = useState<string>("");
+  const [selectedReloadAmount, setSelectedReloadAmount] = useState<number | null>(null);
+
   const form = useForm<GiftCertificateForm>({
     resolver: zodResolver(giftCertificateSchema),
     defaultValues: {
@@ -263,6 +280,14 @@ export default function GiftCertificatesPage() {
     defaultValues: {
       amount: 0,
       code: "",
+    },
+  });
+
+  const giftCardReloadForm = useForm<GiftCardReloadForm>({
+    resolver: zodResolver(giftCardReloadSchema),
+    defaultValues: {
+      code: "",
+      amount: 0,
     },
   });
 
@@ -482,6 +507,116 @@ export default function GiftCertificatesPage() {
   const onSubmitGiftCard = async (data: GiftCardForm) => {
     setPendingGiftCardData(data);
     setShowGiftCardPaymentDialog(true);
+  };
+
+  // Reload gift card mutation
+  const reloadGiftCardMutation = useMutation({
+    mutationFn: async ({ data, paymentInfo }: { data: GiftCardReloadForm; paymentInfo?: any }) => {
+      const response = await apiRequest("POST", "/api/reload-gift-card", {
+        code: data.code.toUpperCase(),
+        amount: data.amount,
+        paymentMethod: paymentInfo?.method,
+        paymentReference: paymentInfo?.reference,
+      });
+      return await response.json();
+    },
+    onSuccess: (result: any) => {
+      toast({
+        title: "Gift Card Reloaded",
+        description: `Gift card ${result.giftCard.code} reloaded with $${result.amountAdded.toFixed(2)}. New balance: $${result.newBalance.toFixed(2)}.`,
+      });
+      giftCardReloadForm.reset();
+      setSelectedReloadAmount(null);
+      setPendingReloadData(null);
+      setReloadCashReceived("");
+      setShowReloadPaymentDialog(false);
+      setShowReloadCashDialog(false);
+      setShowReloadHelcimPay(false);
+      setShowReloadTerminal(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-gift-cards'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reload Failed",
+        description: error?.message || "Failed to reload gift card",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmitReload = async (data: GiftCardReloadForm) => {
+    setPendingReloadData(data);
+    setShowReloadPaymentDialog(true);
+  };
+
+  // Process reload payment based on selected method
+  const processReloadPayment = () => {
+    if (!pendingReloadData) return;
+
+    setShowReloadPaymentDialog(false);
+
+    switch (reloadPaymentMethod) {
+      case "cash":
+        setShowReloadCashDialog(true);
+        break;
+      case "card":
+        setShowReloadHelcimPay(true);
+        break;
+      case "terminal":
+        setShowReloadTerminal(true);
+        break;
+    }
+  };
+
+  // Handle reload cash payment
+  const handleReloadCashPayment = () => {
+    if (!pendingReloadData) return;
+
+    const cashAmount = parseFloat(reloadCashReceived);
+    if (cashAmount >= pendingReloadData.amount) {
+      reloadGiftCardMutation.mutate({ 
+        data: pendingReloadData,
+        paymentInfo: {
+          method: 'cash',
+          reference: `Cash reload - Change: $${(cashAmount - pendingReloadData.amount).toFixed(2)}`
+        }
+      });
+      setShowReloadCashDialog(false);
+    } else {
+      toast({
+        title: "Insufficient Cash",
+        description: `Cash received ($${cashAmount.toFixed(2)}) is less than the reload amount ($${pendingReloadData.amount.toFixed(2)}).`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Handle reload Helcim success
+  const handleReloadHelcimSuccess = (paymentData: any) => {
+    if (!pendingReloadData) return;
+    
+    reloadGiftCardMutation.mutate({ 
+      data: pendingReloadData,
+      paymentInfo: {
+        method: 'card',
+        reference: paymentData.paymentId
+      }
+    });
+    setShowReloadHelcimPay(false);
+  };
+
+  // Handle reload terminal success
+  const handleReloadTerminalSuccess = (paymentData: any) => {
+    if (!pendingReloadData) return;
+    
+    reloadGiftCardMutation.mutate({ 
+      data: pendingReloadData,
+      paymentInfo: {
+        method: 'terminal',
+        reference: paymentData.transactionId
+      }
+    });
+    setShowReloadTerminal(false);
   };
 
   // Process gift card payment based on selected method
@@ -926,14 +1061,14 @@ export default function GiftCertificatesPage() {
                 </Card>
 
                 {/* Sell Physical Gift Card */}
-                <Card className="w-full">
+                <Card className="w-full border-blue-200 dark:border-blue-800">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Sell Gift Card
+                      <CreditCard className="h-5 w-5 text-blue-600" />
+                      Sell NEW Gift Card
                     </CardTitle>
                     <CardDescription>
-                      Create a physical gift card with a gift card number. No email will be sent.
+                      Create a NEW physical gift card with a unique number. For existing cards, use "Reload Gift Card" below.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -981,12 +1116,12 @@ export default function GiftCertificatesPage() {
                           name="code"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Gift Card Number</FormLabel>
+                              <FormLabel>Gift Card Number (Must be unique)</FormLabel>
                               <FormControl>
                                 <div className="relative">
                                   <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                                   <Input
-                                    placeholder="Enter gift card number"
+                                    placeholder="Enter NEW gift card number"
                                     className="pl-10 uppercase"
                                     value={field.value}
                                     onChange={(e) => field.onChange(e.target.value.toUpperCase())}
@@ -1003,7 +1138,107 @@ export default function GiftCertificatesPage() {
                           className="w-full"
                           disabled={isProcessing || !selectedCardAmount || selectedCardAmount < 10 || !giftCardForm.getValues("code")}
                         >
-                          {isProcessing ? "Processing..." : `Sell Gift Card ${selectedCardAmount ? `($${selectedCardAmount})` : ""}`}
+                          {isProcessing ? "Processing..." : `Sell NEW Gift Card ${selectedCardAmount ? `($${selectedCardAmount})` : ""}`}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+
+                {/* Visual separator between new and reload */}
+                <div className="w-full flex items-center gap-4 my-6">
+                  <div className="flex-1 h-px bg-gray-300 dark:bg-gray-700"></div>
+                  <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">OR</span>
+                  <div className="flex-1 h-px bg-gray-300 dark:bg-gray-700"></div>
+                </div>
+
+                {/* Reload Gift Card */}
+                <Card className="w-full border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/10">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-green-600" />
+                      Reload EXISTING Gift Card
+                    </CardTitle>
+                    <CardDescription>
+                      Add funds to an EXISTING gift card (including cards with $0 balance). Use this to reload previously sold or used cards.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...giftCardReloadForm}>
+                      <form onSubmit={giftCardReloadForm.handleSubmit(onSubmitReload)} className="space-y-4">
+                        <FormField
+                          control={giftCardReloadForm.control}
+                          name="code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Existing Gift Card Number</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                  <Input
+                                    placeholder="Enter EXISTING gift card number"
+                                    className="pl-10 uppercase"
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium leading-none">
+                            Select Reload Amount
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {PRESET_AMOUNTS.map((amount) => (
+                              <Button
+                                key={amount}
+                                type="button"
+                                variant={selectedReloadAmount === amount ? "default" : "outline"}
+                                className="h-12"
+                                onClick={() => {
+                                  setSelectedReloadAmount(amount);
+                                  giftCardReloadForm.setValue("amount", amount);
+                                }}
+                              >
+                                ${amount}
+                              </Button>
+                            ))}
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium leading-none">
+                              Or Enter Custom Amount
+                            </label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                              <Input
+                                type="number"
+                                placeholder="Enter custom amount"
+                                className="pl-10"
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value);
+                                  if (!isNaN(amount)) {
+                                    setSelectedReloadAmount(amount);
+                                    giftCardReloadForm.setValue("amount", amount);
+                                  }
+                                }}
+                                min="10"
+                                max="1000"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={isProcessing || !selectedReloadAmount || selectedReloadAmount < 10 || !giftCardReloadForm.getValues("code")}
+                        >
+                          {isProcessing ? "Processing..." : `Reload Gift Card ${selectedReloadAmount ? `($${selectedReloadAmount})` : ""}`}
                         </Button>
                       </form>
                     </Form>
@@ -1408,6 +1643,128 @@ export default function GiftCertificatesPage() {
           amount={pendingGiftCardData.amount}
           description={`Gift Card Purchase - ${pendingGiftCardData.code}`}
           onSuccess={handleGiftCardTerminalSuccess}
+          onError={handlePaymentError}
+        />
+      )}
+
+      {/* Reload Payment Dialog */}
+      <Dialog open={showReloadPaymentDialog} onOpenChange={setShowReloadPaymentDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select Payment Method</DialogTitle>
+            <DialogDescription>
+              {pendingReloadData && (
+                <>
+                  Choose how to pay for the reload amount of ${pendingReloadData.amount.toFixed(2)}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Payment Method</label>
+              <Select value={reloadPaymentMethod} onValueChange={(value: "cash" | "card" | "terminal") => setReloadPaymentMethod(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select payment method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4" />
+                      Cash
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="card">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Credit/Debit Card
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="terminal">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="h-4 w-4" />
+                      Smart Terminal
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setShowReloadPaymentDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={processReloadPayment}>
+              Continue to Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reload Cash Payment Dialog */}
+      <Dialog open={showReloadCashDialog} onOpenChange={setShowReloadCashDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cash Payment</DialogTitle>
+            <DialogDescription>
+              Reload amount: ${pendingReloadData?.amount?.toFixed(2) || '0.00'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Cash Received</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <Input
+                  type="number"
+                  placeholder="Enter cash amount received"
+                  value={reloadCashReceived}
+                  onChange={(e) => setReloadCashReceived(e.target.value)}
+                  className="pl-10"
+                  min={pendingReloadData?.amount || 0}
+                  step="0.01"
+                />
+              </div>
+            </div>
+            {reloadCashReceived && parseFloat(reloadCashReceived) >= (pendingReloadData?.amount || 0) && (
+              <div className="bg-muted p-3 rounded-md">
+                <p className="text-sm">
+                  Change: <span className="font-semibold">${(parseFloat(reloadCashReceived) - (pendingReloadData?.amount || 0)).toFixed(2)}</span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="mt-6">
+            <Button variant="outline" onClick={() => setShowReloadCashDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleReloadCashPayment} disabled={!reloadCashReceived || parseFloat(reloadCashReceived) < (pendingReloadData?.amount || 0)}>
+              Complete Reload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reload Helcim Payment */}
+      {showReloadHelcimPay && pendingReloadData && (
+        <HelcimPayJsModal
+          open={showReloadHelcimPay}
+          onOpenChange={setShowReloadHelcimPay}
+          amount={pendingReloadData.amount}
+          description={`Gift Card Reload - ${pendingReloadData.code}`}
+          onSuccess={handleReloadHelcimSuccess}
+          onError={handlePaymentError}
+        />
+      )}
+
+      {/* Reload Smart Terminal Payment */}
+      {showReloadTerminal && pendingReloadData && (
+        <SmartTerminalPayment
+          open={showReloadTerminal}
+          onOpenChange={setShowReloadTerminal}
+          amount={pendingReloadData.amount}
+          description={`Gift Card Reload - ${pendingReloadData.code}`}
+          onSuccess={handleReloadTerminalSuccess}
           onError={handlePaymentError}
         />
       )}
