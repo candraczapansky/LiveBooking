@@ -98,6 +98,8 @@ const AppointmentDetails = ({
   const [showTerminalPayment, setShowTerminalPayment] = useState(false);
   // Removed terminal device selection UI; keep minimal state if needed in future
   const [giftCardCode, setGiftCardCode] = useState("");
+  const [giftCardBalance, setGiftCardBalance] = useState<number | null>(null);
+  const [isCheckingGiftCardBalance, setIsCheckingGiftCardBalance] = useState(false);
   const [showHelcimModal, setShowHelcimModal] = useState(false);
   const [tipAmount, setTipAmount] = useState<number>(0);
   const [discountCode, setDiscountCode] = useState<string>("");
@@ -171,6 +173,23 @@ const AppointmentDetails = ({
       } catch {}
 
       return null;
+    },
+    enabled: open && !!appointmentId
+  });
+
+  // Fetch payments for this appointment to calculate amount paid
+  const { data: appointmentPayments } = useQuery({
+    queryKey: ['/api/payments', 'appointment', appointmentId],
+    queryFn: async () => {
+      if (!appointmentId) return [];
+      try {
+        const res = await apiRequest("GET", `/api/payments?appointmentId=${appointmentId}`);
+        if (res.ok) {
+          const data = await res.json();
+          return Array.isArray(data) ? data : [];
+        }
+      } catch {}
+      return [];
     },
     enabled: open && !!appointmentId
   });
@@ -297,8 +316,16 @@ const AppointmentDetails = ({
 
   // Staff update removed per request
 
-  // Compute the amount to charge for this appointment (include add-ons when present)
-  const getAppointmentChargeAmount = () => {
+  // Calculate the total amount already paid for this appointment
+  const calculateAmountPaid = () => {
+    if (!appointmentPayments || !Array.isArray(appointmentPayments)) return 0;
+    return appointmentPayments
+      .filter((p: any) => p.status === 'completed')
+      .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+  };
+
+  // Compute the original total amount for this appointment (include add-ons when present)
+  const getAppointmentTotalAmount = () => {
     const total = Number((appointment as any)?.totalAmount ?? 0);
     if (!Number.isNaN(total) && total > 0) return total;
     const computed = Number((appointment as any)?.computedTotalAmount ?? 0);
@@ -314,6 +341,18 @@ const AppointmentDetails = ({
     return Number.isNaN(fromAmount) ? 0 : fromAmount;
   };
 
+  // Get the remaining amount to charge (original amount - payments already made)
+  const getAppointmentChargeAmount = () => {
+    const totalAmount = getAppointmentTotalAmount();
+    const amountPaid = calculateAmountPaid();
+    const remaining = Math.max(0, totalAmount - amountPaid);
+    // If using chargeAmount state override (set after gift card payment), use that
+    if (chargeAmount > 0 && chargeAmount < totalAmount) {
+      return chargeAmount;
+    }
+    return remaining;
+  };
+
   // Freeze amount when card payment UI is shown (must be after queries exist)
   useEffect(() => {
     if (showCardPayment) {
@@ -321,10 +360,11 @@ const AppointmentDetails = ({
       if (amt && amt > 0) {
         setChargeAmount(amt);
       }
-    } else {
+    } else if (!showPaymentOptions) {
+      // Only reset if we're not in payment options at all
       setChargeAmount(0);
     }
-  }, [showCardPayment, (appointment as any)?.totalAmount, (service as any)?.price]);
+  }, [showCardPayment, (appointment as any)?.totalAmount, (service as any)?.price, appointmentPayments]);
 
   const calculateFinalAmount = () => {
     const base = getAppointmentChargeAmount() || 0;
@@ -589,6 +629,7 @@ const AppointmentDetails = ({
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
       // Refresh payroll/reporting immediately
       queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments', 'appointment', appointmentId] });
       queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
       queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
@@ -843,47 +884,133 @@ const AppointmentDetails = ({
     }, 5000); // Check every 5 seconds
   };
 
+  const handleCheckGiftCardBalance = async () => {
+    if (!giftCardCode.trim()) return;
+    
+    setIsCheckingGiftCardBalance(true);
+    try {
+      const response = await apiRequest("GET", `/api/gift-card-balance/${giftCardCode.trim()}`);
+      const data = await response.json();
+      
+      if (data && data.isActive) {
+        setGiftCardBalance(data.balance || 0);
+      } else {
+        setGiftCardBalance(0);
+        toast({
+          title: "Invalid Gift Card",
+          description: "This gift card is not active or doesn't exist.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to check gift card balance.",
+        variant: "destructive",
+      });
+      setGiftCardBalance(null);
+    } finally {
+      setIsCheckingGiftCardBalance(false);
+    }
+  };
+
   const handleGiftCardPayment = async () => {
     if (!appointmentId || !appointment || !giftCardCode.trim()) return;
     
     setIsProcessingGiftCardPayment(true);
     try {
-      const finalAmount = calculateFinalAmount();
-      // Create a payment record for gift card payment
-      await apiRequest("POST", "/api/payments", {
-        clientId: appointment.clientId,
+      // First, check the gift card balance
+      const balanceResponse = await apiRequest("GET", `/api/gift-card-balance/${giftCardCode.trim()}`);
+      const giftCardData = await balanceResponse.json();
+      
+      if (!giftCardData || !giftCardData.isActive) {
+        toast({
+          title: "Invalid Gift Card",
+          description: "This gift card is not active or doesn't exist.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const giftCardBalance = giftCardData.balance || 0;
+      const appointmentTotal = calculateFinalAmount();
+      
+      // Calculate how much can be applied from the gift card
+      const amountToApply = Math.min(giftCardBalance, appointmentTotal);
+      
+      if (amountToApply <= 0) {
+        toast({
+          title: "Gift Card Empty",
+          description: "This gift card has no remaining balance.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Use the proper gift card payment endpoint
+      const paymentResponse = await apiRequest("POST", "/api/confirm-gift-card-payment", {
         appointmentId: appointmentId,
-        amount: finalAmount,
-        totalAmount: finalAmount,
-        discountAmount: appliedDiscountCode ? discountAmount : 0,
-        discountCode: appliedDiscountCode || null,
-        method: "gift_card",
-        status: "completed",
-        notes: `Gift card payment with code: ${giftCardCode}`
+        giftCardCode: giftCardCode.trim(),
+        amount: amountToApply,
+        notes: `Gift card payment - Applied $${amountToApply.toFixed(2)} of $${giftCardBalance.toFixed(2)} available`
       });
-
-      // Update appointment payment status
+      
+      const paymentResult = await paymentResponse.json();
+      
+      // Use the actual remaining balance from the backend
+      const remainingBalance = paymentResult.appointmentRemainingBalance || (appointmentTotal - amountToApply);
+      
+      // Update appointment payment status based on whether it's fully paid
+      const paymentStatus = remainingBalance <= 0 ? "paid" : "partial";
+      
       await apiRequest("PUT", `/api/appointments/${appointmentId}`, {
         ...appointment,
-        paymentStatus: "paid",
+        paymentStatus: paymentStatus,
         tipAmount: tipAmount || 0,
-        totalAmount: finalAmount
+        totalAmount: appointmentTotal,
+        paidAmount: amountToApply  // Track how much has been paid
       });
-
+      
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments', 'appointment', appointmentId] });
+      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
       
-      toast({
-        title: "Gift Card Payment Recorded",
-        description: "Appointment marked as paid with gift card.",
-      });
-      
-      // Reset gift card code
-      setGiftCardCode("");
+      // Show appropriate message based on payment result
+      if (remainingBalance <= 0) {
+        toast({
+          title: "Payment Complete",
+          description: `Gift card applied successfully. Appointment fully paid with gift card.`,
+        });
+        setGiftCardCode("");
+        setGiftCardBalance(null);
+        setShowPaymentOptions(false);
+      } else {
+        toast({
+          title: "Partial Payment Applied",
+          description: `Applied $${amountToApply.toFixed(2)} from gift card. Remaining balance: $${remainingBalance.toFixed(2)}. Please select another payment method for the remaining amount.`,
+        });
+        // Clear the gift card code and balance since it's been used
+        setGiftCardCode("");
+        setGiftCardBalance(null);
+        // Update the charge amount to reflect remaining balance
+        setChargeAmount(remainingBalance);
+        // Reset tip amount since we're starting a new payment
+        setTipAmount(0);
+        
+        // Update the gift card remaining balance if provided
+        if (paymentResult.giftCardRemainingBalance !== undefined && paymentResult.giftCardRemainingBalance > 0) {
+          toast({
+            title: "Gift Card Balance Updated",
+            description: `Gift card has $${paymentResult.giftCardRemainingBalance.toFixed(2)} remaining.`,
+          });
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error",
-        description: error.message || "Failed to record gift card payment.",
+        description: error.message || "Failed to process gift card payment.",
         variant: "destructive",
       });
     } finally {
@@ -1125,8 +1252,18 @@ const AppointmentDetails = ({
               </div>
               <div className="space-y-2">
                 <p className="text-sm">
-                  <span className="font-medium">Amount:</span> {formatPrice(getAppointmentChargeAmount())}
+                  <span className="font-medium">Total Amount:</span> {formatPrice(getAppointmentTotalAmount())}
                 </p>
+                {calculateAmountPaid() > 0 && (
+                  <>
+                    <p className="text-sm text-green-600">
+                      <span className="font-medium">Amount Paid:</span> {formatPrice(calculateAmountPaid())}
+                    </p>
+                    <p className="text-sm font-semibold">
+                      <span className="font-medium">Remaining Balance:</span> {formatPrice(getAppointmentChargeAmount())}
+                    </p>
+                  </>
+                )}
                 <p className="text-sm">
                   <span className="font-medium">Status:</span> {appointment.paymentStatus || 'unpaid'}
                 </p>
@@ -1290,9 +1427,24 @@ const AppointmentDetails = ({
                             <Input
                               placeholder="Enter gift card code"
                               value={giftCardCode}
-                              onChange={(e) => setGiftCardCode(e.target.value)}
+                              onChange={(e) => {
+                                setGiftCardCode(e.target.value);
+                                setGiftCardBalance(null); // Reset balance when code changes
+                              }}
                               className="flex-1"
                             />
+                            <Button
+                              onClick={handleCheckGiftCardBalance}
+                              disabled={isCheckingGiftCardBalance || !giftCardCode.trim()}
+                              variant="outline"
+                              size="sm"
+                            >
+                              {isCheckingGiftCardBalance ? (
+                                <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
+                              ) : (
+                                "Check"
+                              )}
+                            </Button>
                             <Button
                               onClick={handleGiftCardPayment}
                               disabled={isProcessingGiftCardPayment || !giftCardCode.trim()}
@@ -1307,11 +1459,21 @@ const AppointmentDetails = ({
                               ) : (
                                 <div className="flex items-center gap-1">
                                   <Gift className="h-3 w-3" />
-                                  Use Gift Card
+                                  Apply
                                 </div>
                               )}
                             </Button>
                           </div>
+                          {giftCardBalance !== null && (
+                            <div className="text-sm p-2 bg-muted rounded-md">
+                              Gift Card Balance: ${giftCardBalance.toFixed(2)}
+                              {giftCardBalance > 0 && calculateFinalAmount() > 0 && (
+                                <span className="ml-2 text-muted-foreground">
+                                  (Will apply: ${Math.min(giftCardBalance, calculateFinalAmount()).toFixed(2)})
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Back Button */}
@@ -1382,6 +1544,7 @@ const AppointmentDetails = ({
                             queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
                             // Also refresh payroll-related data immediately
                             queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+                            queryClient.invalidateQueries({ queryKey: ['/api/payments', 'appointment', appointmentId] });
                             queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
                             queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
                             queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });

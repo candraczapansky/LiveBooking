@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { SidebarController } from "@/components/layout/sidebar";
+// Sidebar is handled globally by MainLayout
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -105,23 +105,12 @@ const LocationsPage = () => {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [locationToEdit, setLocationToEdit] = useState<Location | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [inlineEdits, setInlineEdits] = useState<Record<number, { phone?: string; email?: string }>>({});
   const [terminalDialogOpen, setTerminalDialogOpen] = useState(false);
   const [selectedLocationForTerminal, setSelectedLocationForTerminal] = useState<Location | null>(null);
 
-  useEffect(() => {
-    const checkSidebarState = () => {
-      const globalSidebarState = (window as any).sidebarIsOpen;
-      if (globalSidebarState !== undefined) {
-        setSidebarOpen(globalSidebarState);
-      }
-    };
-
-    const interval = setInterval(checkSidebarState, 100);
-    return () => clearInterval(interval);
-  }, []);
+  
 
   // Ensure authentication on component mount
   useEffect(() => {
@@ -386,15 +375,10 @@ const LocationsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <SidebarController />
-      
-      <div className={`flex flex-col transition-all duration-300 ${
-        sidebarOpen ? 'lg:ml-64' : 'lg:ml-16'
-      }`}>
-        
-        <main className="flex-1 overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="w-full">
+      <div className="w-full">
+        <div className="w-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+          <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
             {/* Page Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
               <div>
@@ -601,7 +585,6 @@ const LocationsPage = () => {
             )
           )}
         </div>
-        </main>
       </div>
       
       {/* Location Form Dialog */}
