@@ -278,6 +278,7 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
 }).extend({
   startTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
+  addOnServiceIds: z.array(z.number()).optional(),
 });
 
 // Classes schema

@@ -569,10 +569,17 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     res.json({ success: true, payment, remainingBalance: giftCard.currentBalance - amount });
   }));
 
-  // Add gift card
+  // Add gift card (physical card sale)
   app.post("/api/add-gift-card", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { code, balance, clientId, notes } = req.body;
+    const { 
+      code, 
+      balance, 
+      clientId, 
+      notes,
+      paymentMethod,
+      paymentReference 
+    } = req.body;
 
     LoggerService.info("Adding gift card", { ...context, code, balance, clientId });
 
@@ -587,11 +594,37 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       initialAmount: balance,
       currentBalance: balance,
       // clientId,
-      // notes,
+      // notes field doesn't exist on gift cards
       status: 'active',
     });
 
-    LoggerService.info("Gift card added", { ...context, giftCardId: giftCard.id });
+    // Create payment record if payment method provided (for physical card sales)
+    if (paymentMethod) {
+      const payment = await storage.createPayment({
+        amount: balance,
+        totalAmount: balance,
+        clientId: clientId || 1, // Default client for gift card purchases
+        method: paymentMethod, // cash, card, or terminal
+        status: 'completed',
+        notes: `Gift card sale - Code: ${code}`,
+        processedAt: new Date(),
+        helcimPaymentId: paymentReference || null,
+      });
+
+      // Create sales history record for reports
+      await createSalesHistoryRecord(storage, payment, 'gift_card', {
+        giftCardId: giftCard.id,
+        giftCardCode: code,
+        initialAmount: balance,
+      });
+    }
+
+    LoggerService.info("Gift card added", { 
+      ...context, 
+      giftCardId: giftCard.id,
+      paymentMethod,
+      paymentReference 
+    });
 
     res.status(201).json(giftCard);
   }));
@@ -630,7 +663,17 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   // Purchase gift certificate
   app.post("/api/gift-certificates/purchase", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { recipientName, recipientEmail, amount, message, purchaserName, purchaserEmail } = req.body;
+    const { 
+      recipientName, 
+      recipientEmail, 
+      amount, 
+      message, 
+      purchaserName, 
+      purchaserEmail,
+      paymentMethod,
+      paymentReference,
+      paymentAmount 
+    } = req.body;
 
     LoggerService.logPayment("gift_certificate_purchase", amount, context);
 
@@ -647,20 +690,38 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       purchasedByUserId: 1, // Default user for gift certificate purchases
       status: 'active',
       expiryDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+      // notes field doesn't exist on gift cards - store message in payment notes
     });
 
-    // Create payment record
+    // Create payment record with actual payment method
     const payment = await storage.createPayment({
       amount,
       totalAmount: amount,
       clientId: 1, // Default client for gift certificate purchases
-      method: 'gift_certificate',
+      method: paymentMethod || 'cash', // Use actual payment method (cash, card, terminal)
       status: 'completed',
-      notes: `Gift certificate purchase - Code: ${code}`,
+      notes: `Gift certificate purchase - Code: ${code} - Recipient: ${recipientName}${message ? ` - Message: ${message}` : ''}`,
       processedAt: new Date(),
+      helcimPaymentId: paymentReference || null, // Store payment reference
     });
 
-    LoggerService.logPayment("gift_certificate_created", amount, { ...context, giftCardId: giftCard.id });
+    // Create sales history record for reports
+    await createSalesHistoryRecord(storage, payment, 'gift_certificate', {
+      giftCardId: giftCard.id,
+      giftCardCode: code,
+      recipientName,
+      recipientEmail,
+      purchaserName,
+      purchaserEmail,
+      message,
+    });
+
+    LoggerService.logPayment("gift_certificate_created", amount, { 
+      ...context, 
+      giftCardId: giftCard.id,
+      paymentMethod,
+      paymentReference 
+    });
 
     res.status(201).json({ success: true, giftCard, payment });
   }));

@@ -44,6 +44,7 @@ import { NoteInput } from "@/components/ui/note-input";
 import { formatPrice } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Define the form schema
 const appointmentFormSchema = z.object({
@@ -56,6 +57,11 @@ const appointmentFormSchema = z.object({
   time: z.string().min(1, "Time is required"),
   notes: z.string().optional(),
   addOnServiceId: z.string().optional(),
+  // Recurring appointment fields (optional)
+  isRecurring: z.boolean().optional(),
+  recurringFrequency: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+  recurringCount: z.number().min(2).max(52).optional(),
+  recurringIndefinite: z.boolean().optional(),
 });
 
 type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
@@ -178,6 +184,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       date: selectedDate || new Date(),
       time: "10:00",
       notes: "",
+      // Recurring defaults
+      isRecurring: false,
+      recurringFrequency: undefined,
+      recurringCount: undefined,
+      recurringIndefinite: false,
     },
   });
   
@@ -461,6 +472,12 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         start,
       });
 
+      // Extract the first add-on ID if there are any add-ons
+      let addOnServiceId = "";
+      if (appointment.addOns && appointment.addOns.length > 0) {
+        addOnServiceId = appointment.addOns[0].id?.toString() || "";
+      }
+
       form.reset({
         staffId: appointment.staffId?.toString() || "",
         serviceId: appointment.serviceId?.toString() || "",
@@ -468,6 +485,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         date: appointmentDate,
         time: appointmentTime,
         notes: appointment.notes || "",
+        addOnServiceId: addOnServiceId,
       });
 
       // Set client search value to the selected client's name for editing
@@ -609,6 +627,56 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         locationId: selectedLocation?.id
       });
 
+      // Handle recurring appointments (optional)
+      if (values.isRecurring && values.recurringFrequency && (values.recurringIndefinite || (values.recurringCount && values.recurringCount > 1))) {
+        // Decide occurrence count
+        let occurrenceCount = values.recurringCount || 0;
+        if (values.recurringIndefinite) {
+          // Create approximately 12 months worth of appointments
+          if (values.recurringFrequency === 'weekly') occurrenceCount = 52;
+          else if (values.recurringFrequency === 'biweekly') occurrenceCount = 26;
+          else if (values.recurringFrequency === 'monthly') occurrenceCount = 12;
+        }
+        if (!occurrenceCount || occurrenceCount < 2) occurrenceCount = 2;
+        const occurrences: { startTime: string; endTime: string }[] = [];
+        const totalMinutes = totalDuration;
+        const baseStart = new Date(localDate);
+        for (let i = 0; i < occurrenceCount; i++) {
+          let occurrenceStart = new Date(baseStart);
+          if (i > 0) {
+            if (values.recurringFrequency === 'weekly') {
+              occurrenceStart.setDate(baseStart.getDate() + 7 * i);
+            } else if (values.recurringFrequency === 'biweekly') {
+              occurrenceStart.setDate(baseStart.getDate() + 14 * i);
+            } else if (values.recurringFrequency === 'monthly') {
+              const d = new Date(baseStart);
+              d.setMonth(baseStart.getMonth() + i);
+              occurrenceStart = d;
+            }
+          }
+          const occurrenceEnd = addMinutes(new Date(occurrenceStart), totalMinutes);
+          occurrences.push({
+            startTime: occurrenceStart.toISOString(),
+            endTime: occurrenceEnd.toISOString(),
+          });
+        }
+
+        const recurringPayload = {
+          serviceId: parseInt(values.serviceId),
+          staffId: parseInt(values.staffId),
+          clientId: parseInt(values.clientId),
+          locationId: selectedLocation?.id || null,
+          status: "confirmed",
+          notes: values.notes || null,
+          addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
+          recurringAppointments: occurrences,
+          recurringFrequency: values.recurringFrequency,
+          recurringCount: occurrenceCount,
+        } as any;
+
+        return apiRequest("POST", "/api/appointments/recurring", recurringPayload);
+      }
+
       const appointmentData = {
         serviceId: parseInt(values.serviceId),
         staffId: parseInt(values.staffId),
@@ -676,6 +744,84 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     },
   });
 
+  // Convert existing appointment into recurring series (creates future occurrences via API)
+  const convertToRecurringMutation = useMutation({
+    mutationFn: async (values: AppointmentFormValues) => {
+      // Validate time
+      if (!values.time || values.time.trim() === '') {
+        throw new Error('Please select a time for the appointment');
+      }
+
+      const [hours, minutes] = values.time.split(':').map(Number);
+      const year = values.date.getFullYear();
+      const month = values.date.getMonth();
+      const day = values.date.getDate();
+      const localDate = new Date(year, month, day, hours, minutes, 0, 0);
+
+      const selectedServiceData = services?.find((s: any) => s.id.toString() === values.serviceId);
+      const totalDuration = (selectedServiceData?.duration || 60) +
+                           (selectedServiceData?.bufferTimeBefore || 0) +
+                           (selectedServiceData?.bufferTimeAfter || 0);
+
+      // Determine number of occurrences
+      let occurrenceCount = values.recurringCount || 0;
+      if (values.recurringIndefinite) {
+        if (values.recurringFrequency === 'weekly') occurrenceCount = 52;
+        else if (values.recurringFrequency === 'biweekly') occurrenceCount = 26;
+        else if (values.recurringFrequency === 'monthly') occurrenceCount = 12;
+      }
+      if (!occurrenceCount || occurrenceCount < 2) occurrenceCount = 2;
+
+      const occurrences: { startTime: string; endTime: string }[] = [];
+      const baseStart = new Date(localDate);
+      for (let i = 0; i < occurrenceCount; i++) {
+        let occurrenceStart = new Date(baseStart);
+        if (i > 0) {
+          if (values.recurringFrequency === 'weekly') {
+            occurrenceStart.setDate(baseStart.getDate() + 7 * i);
+          } else if (values.recurringFrequency === 'biweekly') {
+            occurrenceStart.setDate(baseStart.getDate() + 14 * i);
+          } else if (values.recurringFrequency === 'monthly') {
+            const d = new Date(baseStart);
+            d.setMonth(baseStart.getMonth() + i);
+            occurrenceStart = d;
+          }
+        }
+        const occurrenceEnd = addMinutes(new Date(occurrenceStart), totalDuration);
+        occurrences.push({ startTime: occurrenceStart.toISOString(), endTime: occurrenceEnd.toISOString() });
+      }
+
+      const payload = {
+        serviceId: parseInt(values.serviceId),
+        staffId: parseInt(values.staffId),
+        clientId: parseInt(values.clientId),
+        locationId: selectedLocation?.id || null,
+        status: "confirmed",
+        notes: values.notes || null,
+        addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
+        recurringAppointments: occurrences,
+        recurringFrequency: values.recurringFrequency,
+        recurringCount: occurrenceCount,
+      } as any;
+
+      return apiRequest("POST", "/api/appointments/recurring", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      if (selectedLocation?.id) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments', selectedLocation.id] });
+      }
+      queryClient.refetchQueries({ queryKey: ['/api/appointments'] });
+      onOpenChange(false);
+      toast({ title: "Success", description: "Recurring appointments created. Existing appointment kept as-is." });
+    },
+    onError: (error: any) => {
+      const errorData = error.response?.data;
+      const errorMessage = errorData?.message || errorData?.error || error.message || "Failed to create recurring appointments.";
+      toast({ title: "Error", description: errorMessage, variant: "destructive" });
+    },
+  });
+
   const updateMutation = useMutation({
     mutationFn: async (values: AppointmentFormValues) => {
       console.log('Update mutation function called with:', values);
@@ -735,6 +881,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         endTime: endTime.toISOString(),
         status: "confirmed",
         notes: values.notes || null,
+        addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
       };
 
       return apiRequest("PUT", `/api/appointments/${appointmentId}`, appointmentData);
@@ -829,9 +976,15 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     console.log('Corrected values for submission:', correctedValues);
     console.log('ClientId in corrected values:', correctedValues.clientId);
     
+    const wantsRecurring = !!correctedValues.isRecurring && !!correctedValues.recurringFrequency && (!!correctedValues.recurringIndefinite || (correctedValues.recurringCount && correctedValues.recurringCount > 1));
     if (appointmentId && appointmentId > 0) {
-      console.log('Calling updateMutation.mutate');
-      updateMutation.mutate(correctedValues);
+      if (wantsRecurring) {
+        console.log('Calling convertToRecurringMutation.mutate');
+        convertToRecurringMutation.mutate(correctedValues);
+      } else {
+        console.log('Calling updateMutation.mutate');
+        updateMutation.mutate(correctedValues);
+      }
     } else {
       console.log('Calling createMutation.mutate');
       createMutation.mutate(correctedValues);
@@ -1274,6 +1427,99 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                     )}
                     <p><strong>End Time:</strong> {endTime}</p>
                   </div>
+                </div>
+              )}
+
+              {/* Recurring Options */}
+              <FormField
+                control={form.control}
+                name="isRecurring"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Recurring</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={!!field.value}
+                          onCheckedChange={(checked) => field.onChange(!!checked)}
+                          id="isRecurring"
+                        />
+                        <label htmlFor="isRecurring" className="text-sm">Make this a recurring appointment</label>
+                      </div>
+                    </FormControl>
+                    <FormDescription>Optional: create a series of appointments</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {form.watch('isRecurring') && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="recurringFrequency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Frequency</FormLabel>
+                        <FormControl>
+                          <Select onValueChange={field.onChange} value={field.value || ''}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select frequency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="recurringCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of appointments</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={2}
+                            max={52}
+                            value={field.value as any || ''}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            disabled={!!form.watch('recurringIndefinite')}
+                            placeholder="e.g. 4"
+                          />
+                        </FormControl>
+                        <FormDescription>Between 2 and 52</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="recurringIndefinite"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>No end date</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={!!field.value}
+                              onCheckedChange={(checked) => field.onChange(!!checked)}
+                              id="recurringIndefinite"
+                            />
+                            <label htmlFor="recurringIndefinite" className="text-sm">Create ongoing series (next 12 months)</label>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
               )}
 

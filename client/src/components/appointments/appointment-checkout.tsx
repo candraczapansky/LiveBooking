@@ -64,7 +64,8 @@ export default function AppointmentCheckout({
     queryKey: ['/api/appointments', appointment.id],
     queryFn: async () => {
       const res = await apiRequest('GET', `/api/appointments/${appointment.id}`);
-      return res.json();
+      const data = await res.json();
+      return data;
     },
     enabled: isOpen && !!appointment.id,
   });
@@ -97,6 +98,7 @@ export default function AppointmentCheckout({
   const effectiveAddOns = Array.isArray(apptDetails?.addOns)
     ? apptDetails?.addOns
     : (Array.isArray(appointment.addOns) ? appointment.addOns : []);
+  
   const addOnTotal = Array.isArray(effectiveAddOns)
     ? effectiveAddOns.reduce((sum: number, a: any) => sum + (Number(a?.price ?? 0) || 0), 0)
     : 0;

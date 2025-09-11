@@ -5,7 +5,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useSidebar } from "@/contexts/SidebarContext";
 
 import {
   Card,
@@ -33,10 +32,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Gift, CreditCard, DollarSign, Mail, User, Search, CheckCircle, XCircle, Clock, Receipt, MessageSquare } from "lucide-react";
+import { Gift, CreditCard, DollarSign, Mail, User, Search, CheckCircle, XCircle, Clock, Receipt, MessageSquare, Banknote, Terminal } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
+import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const giftCertificateSchema = z.object({
   amount: z.number().min(10, "Minimum amount is $10").max(1000, "Maximum amount is $1000"),
@@ -48,6 +56,13 @@ const giftCertificateSchema = z.object({
 });
 
 type GiftCertificateForm = z.infer<typeof giftCertificateSchema>;
+
+// Gift Card (physical card) schema
+const giftCardSchema = z.object({
+  amount: z.number().min(10, "Minimum amount is $10").max(1000, "Maximum amount is $1000"),
+  code: z.string().min(8, "Gift card number must be at least 8 characters"),
+});
+type GiftCardForm = z.infer<typeof giftCardSchema>;
 
 const PRESET_AMOUNTS = [25, 50, 75, 100, 150, 200];
 
@@ -201,11 +216,10 @@ const PaymentForm = ({ total, onSuccess, onError }: {
 };
 
 export default function GiftCertificatesPage() {
-  useDocumentTitle("Gift Certificates | Glo Head Spa");
+  useDocumentTitle("Gift Certificates & Cards | Glo Head Spa");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { isOpen } = useSidebar();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [balanceCheckCode, setBalanceCheckCode] = useState("");
@@ -213,6 +227,24 @@ export default function GiftCertificatesPage() {
   const [giftCertificateData, setGiftCertificateData] = useState<GiftCertificateForm | null>(null);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [purchaseData, setPurchaseData] = useState<any>(null);
+  const [selectedCardAmount, setSelectedCardAmount] = useState<number | null>(null);
+  
+  // Payment method states
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "terminal">("card");
+  const [showHelcimPayModal, setShowHelcimPayModal] = useState(false);
+  const [showTerminalPayment, setShowTerminalPayment] = useState(false);
+  const [pendingPurchaseData, setPendingPurchaseData] = useState<GiftCertificateForm | null>(null);
+  const [cashReceived, setCashReceived] = useState<string>("");
+  const [showCashDialog, setShowCashDialog] = useState(false);
+  
+  // Gift card payment states
+  const [showGiftCardPaymentDialog, setShowGiftCardPaymentDialog] = useState(false);
+  const [giftCardPaymentMethod, setGiftCardPaymentMethod] = useState<"cash" | "card" | "terminal">("cash");
+  const [pendingGiftCardData, setPendingGiftCardData] = useState<GiftCardForm | null>(null);
+  const [showGiftCardCashDialog, setShowGiftCardCashDialog] = useState(false);
+  const [showGiftCardHelcimPay, setShowGiftCardHelcimPay] = useState(false);
+  const [showGiftCardTerminal, setShowGiftCardTerminal] = useState(false);
+  const [giftCardCashReceived, setGiftCardCashReceived] = useState<string>("");
 
   const form = useForm<GiftCertificateForm>({
     resolver: zodResolver(giftCertificateSchema),
@@ -226,16 +258,36 @@ export default function GiftCertificatesPage() {
     },
   });
 
+  const giftCardForm = useForm<GiftCardForm>({
+    resolver: zodResolver(giftCardSchema),
+    defaultValues: {
+      amount: 0,
+      code: "",
+    },
+  });
+
   const purchaseGiftCertificateMutation = useMutation({
-    mutationFn: async (data: GiftCertificateForm) => {
-      const response = await apiRequest("POST", "/api/gift-certificates/purchase", data);
+    mutationFn: async ({ data, paymentInfo }: { data: GiftCertificateForm; paymentInfo: any }) => {
+      const response = await apiRequest("POST", "/api/gift-certificates/purchase", {
+        ...data,
+        paymentMethod: paymentInfo.method,
+        paymentReference: paymentInfo.reference,
+        paymentAmount: paymentInfo.amount,
+      });
       return await response.json();
     },
     onSuccess: (data) => {
       setPurchaseData(data);
       setShowPaymentDialog(false);
+      setShowCashDialog(false);
+      setShowHelcimPayModal(false);
+      setShowTerminalPayment(false);
       setShowReceiptDialog(true);
       queryClient.invalidateQueries({ queryKey: ['/api/gift-cards'] });
+      form.reset();
+      setSelectedAmount(null);
+      setCashReceived("");
+      setPendingPurchaseData(null);
     },
     onError: (error: any) => {
       toast({
@@ -265,9 +317,101 @@ export default function GiftCertificatesPage() {
     }
   };
 
+  const handleCardAmountSelect = (amount: number) => {
+    setSelectedCardAmount(amount);
+    giftCardForm.setValue("amount", amount);
+  };
+
+  const handleCardCustomAmount = (value: string) => {
+    const amount = parseFloat(value);
+    if (!isNaN(amount)) {
+      setSelectedCardAmount(amount);
+      giftCardForm.setValue("amount", amount);
+    }
+  };
+
   const onSubmit = async (data: GiftCertificateForm) => {
     setGiftCertificateData(data);
+    setPendingPurchaseData(data);
     setShowPaymentDialog(true);
+  };
+
+  // Handle payment based on selected method
+  const processPayment = () => {
+    if (!pendingPurchaseData) {
+      toast({
+        title: "Error",
+        description: "No purchase data available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setShowPaymentDialog(false);
+
+    switch (paymentMethod) {
+      case "cash":
+        setShowCashDialog(true);
+        break;
+      case "card":
+        setShowHelcimPayModal(true);
+        break;
+      case "terminal":
+        setShowTerminalPayment(true);
+        break;
+    }
+  };
+
+  // Handle cash payment
+  const handleCashPayment = () => {
+    if (!pendingPurchaseData) return;
+
+    const cashAmount = parseFloat(cashReceived);
+    if (isNaN(cashAmount) || cashAmount < pendingPurchaseData.amount) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid cash amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    purchaseGiftCertificateMutation.mutate({
+      data: pendingPurchaseData,
+      paymentInfo: {
+        method: "cash",
+        reference: `CASH-${Date.now()}`,
+        amount: pendingPurchaseData.amount,
+      },
+    });
+  };
+
+  // Handle Helcim Pay.js success
+  const handleHelcimSuccess = (paymentData: any) => {
+    if (!pendingPurchaseData) return;
+
+    purchaseGiftCertificateMutation.mutate({
+      data: pendingPurchaseData,
+      paymentInfo: {
+        method: "card",
+        reference: paymentData.transactionId || paymentData.invoiceNumber || `CARD-${Date.now()}`,
+        amount: pendingPurchaseData.amount,
+      },
+    });
+  };
+
+  // Handle terminal payment success
+  const handleTerminalSuccess = (paymentData: any) => {
+    if (!pendingPurchaseData) return;
+
+    purchaseGiftCertificateMutation.mutate({
+      data: pendingPurchaseData,
+      paymentInfo: {
+        method: "terminal",
+        reference: paymentData.transactionId || paymentData.invoiceNumber || `TERMINAL-${Date.now()}`,
+        amount: pendingPurchaseData.amount,
+      },
+    });
   };
 
   const handlePaymentSuccess = async (paymentId: string) => {
@@ -275,10 +419,14 @@ export default function GiftCertificatesPage() {
 
     setIsProcessing(true);
     try {
-      // Pass the payment ID to verify the payment was successful
+      // Legacy payment handler - kept for backwards compatibility
       await purchaseGiftCertificateMutation.mutateAsync({
-        ...giftCertificateData,
-        paymentId: paymentId
+        data: giftCertificateData,
+        paymentInfo: {
+          method: "card",
+          reference: paymentId,
+          amount: giftCertificateData.amount,
+        },
       });
     } finally {
       setIsProcessing(false);
@@ -295,6 +443,113 @@ export default function GiftCertificatesPage() {
 
   const handleBalanceCheck = (code: string) => {
     setBalanceCheckCode(code.toUpperCase());
+  };
+
+  const addGiftCardMutation = useMutation({
+    mutationFn: async ({ data, paymentInfo }: { data: GiftCardForm; paymentInfo?: any }) => {
+      const response = await apiRequest("POST", "/api/add-gift-card", {
+        code: data.code.toUpperCase(),
+        balance: data.amount,
+        paymentMethod: paymentInfo?.method,
+        paymentReference: paymentInfo?.reference,
+      });
+      return await response.json();
+    },
+    onSuccess: (giftCard: any) => {
+      toast({
+        title: "Gift Card Sold",
+        description: `Gift card ${giftCard.code} created with $${Number(giftCard.initialAmount || giftCard.currentBalance || 0).toFixed(2)}.`,
+      });
+      giftCardForm.reset();
+      setSelectedCardAmount(null);
+      setPendingGiftCardData(null);
+      setGiftCardCashReceived("");
+      setShowGiftCardPaymentDialog(false);
+      setShowGiftCardCashDialog(false);
+      setShowGiftCardHelcimPay(false);
+      setShowGiftCardTerminal(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/saved-gift-cards'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Sale Failed",
+        description: error?.message || "Failed to sell gift card",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmitGiftCard = async (data: GiftCardForm) => {
+    setPendingGiftCardData(data);
+    setShowGiftCardPaymentDialog(true);
+  };
+
+  // Process gift card payment based on selected method
+  const processGiftCardPayment = () => {
+    if (!pendingGiftCardData) return;
+
+    setShowGiftCardPaymentDialog(false);
+
+    switch (giftCardPaymentMethod) {
+      case "cash":
+        setShowGiftCardCashDialog(true);
+        break;
+      case "card":
+        setShowGiftCardHelcimPay(true);
+        break;
+      case "terminal":
+        setShowGiftCardTerminal(true);
+        break;
+    }
+  };
+
+  // Handle gift card cash payment
+  const handleGiftCardCashPayment = () => {
+    if (!pendingGiftCardData) return;
+
+    const cashAmount = parseFloat(giftCardCashReceived);
+    if (isNaN(cashAmount) || cashAmount < pendingGiftCardData.amount) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid cash amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addGiftCardMutation.mutate({
+      data: pendingGiftCardData,
+      paymentInfo: {
+        method: "cash",
+        reference: `CASH-GC-${Date.now()}`,
+      },
+    });
+  };
+
+  // Handle gift card Helcim success
+  const handleGiftCardHelcimSuccess = (paymentData: any) => {
+    if (!pendingGiftCardData) return;
+
+    addGiftCardMutation.mutate({
+      data: pendingGiftCardData,
+      paymentInfo: {
+        method: "card",
+        reference: paymentData.transactionId || paymentData.invoiceNumber || `CARD-GC-${Date.now()}`,
+      },
+    });
+  };
+
+  // Handle gift card terminal success
+  const handleGiftCardTerminalSuccess = (paymentData: any) => {
+    if (!pendingGiftCardData) return;
+
+    addGiftCardMutation.mutate({
+      data: pendingGiftCardData,
+      paymentInfo: {
+        method: "terminal",
+        reference: paymentData.transactionId || paymentData.invoiceNumber || `TERMINAL-GC-${Date.now()}`,
+      },
+    });
   };
 
   const handleReceiptEmailSend = async (email: string) => {
@@ -404,38 +659,35 @@ export default function GiftCertificatesPage() {
   return (
     <>
       <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="hidden lg:block">
-          <SidebarController />
-        </div>
+        <SidebarController />
         
-        <div className={`flex-1 flex flex-col transition-all duration-300 ${isOpen ? 'lg:ml-64' : 'lg:ml-16'}`}>
-          
-          <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-6">
-            <div className="w-full max-w-6xl mx-auto">
+        <div className="flex-1 flex flex-col">
+          <main className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 sm:p-6">
+            <div className="w-full">
               <div className="mb-6">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Gift Certificates</h1>
-                <p className="text-gray-600 dark:text-gray-400">Purchase and manage gift certificates</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Gift Certificates & Cards</h1>
+                <p className="text-gray-600 dark:text-gray-400">Purchase and manage gift certificates and physical gift cards</p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <Card className="w-full">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Search className="h-5 w-5" />
-                      Check Gift Certificate Balance
+                      Check Gift Balance
                     </CardTitle>
                     <CardDescription>
-                      Enter your gift certificate code to check the current balance
+                      Enter your gift card or certificate code to check the current balance
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Gift Certificate Code
+                        Gift Code
                       </label>
                       <div className="relative">
                         <Input
-                          placeholder="Enter your gift certificate code"
+                          placeholder="Enter gift code"
                           value={balanceCheckCode}
                           onChange={(e) => handleBalanceCheck(e.target.value)}
                           className="uppercase"
@@ -495,7 +747,7 @@ export default function GiftCertificatesPage() {
                         <div className="flex items-center gap-2">
                           <XCircle className="h-5 w-5 text-red-600" />
                           <span className="text-sm text-red-700 dark:text-red-300">
-                            Gift certificate not found or invalid code
+                            Gift card/certificate not found or invalid code
                           </span>
                         </div>
                       </div>
@@ -503,7 +755,7 @@ export default function GiftCertificatesPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="w-full">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Gift className="h-5 w-5" />
@@ -672,6 +924,91 @@ export default function GiftCertificatesPage() {
                     </Form>
                   </CardContent>
                 </Card>
+
+                {/* Sell Physical Gift Card */}
+                <Card className="w-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CreditCard className="h-5 w-5" />
+                      Sell Gift Card
+                    </CardTitle>
+                    <CardDescription>
+                      Create a physical gift card with a gift card number. No email will be sent.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Form {...giftCardForm}>
+                      <form onSubmit={giftCardForm.handleSubmit(onSubmitGiftCard)} className="space-y-4">
+                        <div className="space-y-3">
+                          <label className="text-sm font-medium leading-none">
+                            Select Amount
+                          </label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {PRESET_AMOUNTS.map((amount) => (
+                              <Button
+                                key={amount}
+                                type="button"
+                                variant={selectedCardAmount === amount ? "default" : "outline"}
+                                className="h-12"
+                                onClick={() => handleCardAmountSelect(amount)}
+                              >
+                                ${amount}
+                              </Button>
+                            ))}
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium leading-none">
+                              Or enter custom amount
+                            </label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                              <Input
+                                type="number"
+                                placeholder="0.00"
+                                className="pl-10"
+                                min="10"
+                                max="1000"
+                                step="0.01"
+                                onChange={(e) => handleCardCustomAmount(e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <FormField
+                          control={giftCardForm.control}
+                          name="code"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Gift Card Number</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <CreditCard className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                                  <Input
+                                    placeholder="Enter gift card number"
+                                    className="pl-10 uppercase"
+                                    value={field.value}
+                                    onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                  />
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={isProcessing || !selectedCardAmount || selectedCardAmount < 10 || !giftCardForm.getValues("code")}
+                        >
+                          {isProcessing ? "Processing..." : `Sell Gift Card ${selectedCardAmount ? `($${selectedCardAmount})` : ""}`}
+                        </Button>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </main>
@@ -681,31 +1018,142 @@ export default function GiftCertificatesPage() {
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Complete Your Gift Certificate Purchase</DialogTitle>
+            <DialogTitle>Select Payment Method</DialogTitle>
             <DialogDescription>
-              {giftCertificateData && (
+              {pendingPurchaseData && (
                 <>
-                  Complete payment for a ${giftCertificateData.amount} gift certificate for {giftCertificateData.recipientName}.
+                  Choose how to pay for the ${pendingPurchaseData.amount} gift certificate for {pendingPurchaseData.recipientName}.
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           
-          {giftCertificateData && (
-            <PaymentForm 
-              total={giftCertificateData.amount} 
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
-            />
-          )}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Payment Method</label>
+              <Select value={paymentMethod} onValueChange={(value: "cash" | "card" | "terminal") => setPaymentMethod(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4" />
+                      Cash
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="card">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Credit/Debit Card
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="terminal">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="h-4 w-4" />
+                      Helcim Terminal
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {pendingPurchaseData && (
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span>Amount:</span>
+                    <span className="font-medium">${pendingPurchaseData.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Recipient:</span>
+                    <span className="font-medium">{pendingPurchaseData.recipientName}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
               Cancel
             </Button>
+            <Button onClick={processPayment}>
+              Continue to Payment
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cash Payment Dialog */}
+      <Dialog open={showCashDialog} onOpenChange={setShowCashDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cash Payment</DialogTitle>
+            <DialogDescription>
+              Enter the cash amount received from the customer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Amount Due</label>
+              <div className="text-2xl font-bold">${pendingPurchaseData?.amount.toFixed(2)}</div>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Cash Received</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={cashReceived}
+                onChange={(e) => setCashReceived(e.target.value)}
+              />
+              {cashReceived && parseFloat(cashReceived) >= (pendingPurchaseData?.amount || 0) && (
+                <p className="text-sm text-green-600 mt-1">
+                  Change: ${(parseFloat(cashReceived) - (pendingPurchaseData?.amount || 0)).toFixed(2)}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCashDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCashPayment} disabled={!cashReceived || parseFloat(cashReceived) < (pendingPurchaseData?.amount || 0)}>
+              Complete Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Helcim Pay.js Modal */}
+      {showHelcimPayModal && pendingPurchaseData && (
+        <HelcimPayJsModal
+          open={showHelcimPayModal}
+          onOpenChange={setShowHelcimPayModal}
+          amount={pendingPurchaseData.amount}
+          description={`Gift Certificate for ${pendingPurchaseData.recipientName}`}
+          customerEmail={pendingPurchaseData.purchaserEmail}
+          customerName={pendingPurchaseData.purchaserName}
+          onSuccess={handleHelcimSuccess}
+          onError={handlePaymentError}
+        />
+      )}
+
+      {/* Smart Terminal Payment */}
+      {showTerminalPayment && pendingPurchaseData && (
+        <SmartTerminalPayment
+          open={showTerminalPayment}
+          onOpenChange={setShowTerminalPayment}
+          amount={pendingPurchaseData.amount}
+          description={`Gift Certificate for ${pendingPurchaseData.recipientName}`}
+          onSuccess={handleTerminalSuccess}
+          onError={handlePaymentError}
+        />
+      )}
 
       {/* Receipt Confirmation Dialog */}
       <Dialog open={showReceiptDialog} onOpenChange={setShowReceiptDialog}>
@@ -824,6 +1272,145 @@ export default function GiftCertificatesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Gift Card Payment Dialog */}
+      <Dialog open={showGiftCardPaymentDialog} onOpenChange={setShowGiftCardPaymentDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select Payment Method</DialogTitle>
+            <DialogDescription>
+              {pendingGiftCardData && (
+                <>
+                  Choose how to pay for the ${pendingGiftCardData.amount} gift card.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Payment Method</label>
+              <Select value={giftCardPaymentMethod} onValueChange={(value: "cash" | "card" | "terminal") => setGiftCardPaymentMethod(value)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">
+                    <div className="flex items-center gap-2">
+                      <Banknote className="h-4 w-4" />
+                      Cash
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="card">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Credit/Debit Card
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="terminal">
+                    <div className="flex items-center gap-2">
+                      <Terminal className="h-4 w-4" />
+                      Helcim Terminal
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {pendingGiftCardData && (
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span>Amount:</span>
+                    <span className="font-medium">${pendingGiftCardData.amount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Card Number:</span>
+                    <span className="font-medium">{pendingGiftCardData.code}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGiftCardPaymentDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={processGiftCardPayment}>
+              Continue to Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gift Card Cash Payment Dialog */}
+      <Dialog open={showGiftCardCashDialog} onOpenChange={setShowGiftCardCashDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Cash Payment</DialogTitle>
+            <DialogDescription>
+              Enter the cash amount received from the customer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Amount Due</label>
+              <div className="text-2xl font-bold">${pendingGiftCardData?.amount.toFixed(2)}</div>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Cash Received</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={giftCardCashReceived}
+                onChange={(e) => setGiftCardCashReceived(e.target.value)}
+              />
+              {giftCardCashReceived && parseFloat(giftCardCashReceived) >= (pendingGiftCardData?.amount || 0) && (
+                <p className="text-sm text-green-600 mt-1">
+                  Change: ${(parseFloat(giftCardCashReceived) - (pendingGiftCardData?.amount || 0)).toFixed(2)}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGiftCardCashDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleGiftCardCashPayment} disabled={!giftCardCashReceived || parseFloat(giftCardCashReceived) < (pendingGiftCardData?.amount || 0)}>
+              Complete Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Gift Card Helcim Pay.js Modal */}
+      {showGiftCardHelcimPay && pendingGiftCardData && (
+        <HelcimPayJsModal
+          open={showGiftCardHelcimPay}
+          onOpenChange={setShowGiftCardHelcimPay}
+          amount={pendingGiftCardData.amount}
+          description={`Gift Card Purchase - ${pendingGiftCardData.code}`}
+          onSuccess={handleGiftCardHelcimSuccess}
+          onError={handlePaymentError}
+        />
+      )}
+
+      {/* Gift Card Smart Terminal Payment */}
+      {showGiftCardTerminal && pendingGiftCardData && (
+        <SmartTerminalPayment
+          open={showGiftCardTerminal}
+          onOpenChange={setShowGiftCardTerminal}
+          amount={pendingGiftCardData.amount}
+          description={`Gift Card Purchase - ${pendingGiftCardData.code}`}
+          onSuccess={handleGiftCardTerminalSuccess}
+          onError={handlePaymentError}
+        />
+      )}
     </>
   );
 }

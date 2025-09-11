@@ -40,8 +40,8 @@ async function ensureLocationsSchema() {
   try { await db.execute(sql`ALTER TABLE locations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()`); } catch {}
 }
 
-// Get all locations
-router.get('/', requireAuth, async (req, res) => {
+// Get all locations (public access for booking widget)
+router.get('/', async (req, res) => {
   try {
     // Ensure schema compatibility in case of older databases
     await ensureLocationsSchema();
@@ -80,8 +80,8 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// Get active locations only
-router.get('/active', requireAuth, async (req, res) => {
+// Get active locations only (public access for booking widget)
+router.get('/active', async (req, res) => {
   try {
     const activeLocations = await db
       .select()
@@ -95,8 +95,8 @@ router.get('/active', requireAuth, async (req, res) => {
   }
 });
 
-// Get location by ID
-router.get('/:id', requireAuth, async (req, res) => {
+// Get location by ID (public access for booking widget)
+router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const location = await db

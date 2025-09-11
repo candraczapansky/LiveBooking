@@ -559,7 +559,7 @@ export function Sidebar({ isOpen, isMobile: _isMobile }: SidebarProps) {
                         <div className="mt-1">
                           <SidebarItem
                             icon={<Gift className="w-5 h-5" strokeWidth={1.75} />}
-                            label="Gift Certificates"
+                            label="Gift Certificates & Cards"
                             href="/gift-certificates"
                             isActive={location === "/gift-certificates"}
                             isOpen={isOpen}

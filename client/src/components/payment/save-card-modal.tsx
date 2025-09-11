@@ -52,6 +52,66 @@ export function SaveCardModal({
     console.log("[SaveCardModal] 🔄 Modal state changed - open:", open);
   }, [open]);
 
+  // Inject global CSS to ensure Helcim iframe is always clickable
+  useEffect(() => {
+    const styleId = 'helcim-iframe-z-index-fix';
+    
+    // Check if styles already exist
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.innerHTML = `
+        /* Ensure Helcim iframe is always on top and clickable */
+        iframe#helcimPayIframe,
+        .helcim-pay-iframe,
+        [id*="helcim"] iframe {
+          z-index: 2147483647 !important;
+          position: fixed !important;
+          pointer-events: auto !important;
+        }
+        
+        /* Ensure iframe container is also on top and clickable */
+        .helcim-pay-container,
+        .helcim-overlay,
+        [class*="helcim-pay"],
+        div:has(> iframe#helcimPayIframe) {
+          z-index: 2147483646 !important;
+          pointer-events: auto !important;
+        }
+        
+        /* Hide our dialog overlay when Helcim is open to prevent blocking */
+        .helcim-modal-open [data-radix-dialog-overlay],
+        .helcim-modal-open [role="dialog"] {
+          z-index: 1 !important;
+          pointer-events: none !important;
+        }
+        
+        /* But keep dialog content interactive for our buttons */
+        .helcim-modal-open [role="dialog"] > div {
+          pointer-events: auto !important;
+        }
+        
+        /* Ensure all overlays are below Helcim */
+        .helcim-modal-open .fixed.inset-0 {
+          z-index: 1 !important;
+        }
+      `;
+      document.head.appendChild(style);
+      console.log("[SaveCardModal] Injected global CSS for Helcim iframe z-index fix");
+    }
+    
+    // Add class to body when Helcim modal is open
+    if (helcimIframeOpen) {
+      document.body.classList.add('helcim-modal-open');
+    } else {
+      document.body.classList.remove('helcim-modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('helcim-modal-open');
+    };
+  }, [helcimIframeOpen]);
+
   // Persistent message listener - never gets removed
   useEffect(() => {
     console.log("[SaveCardModal] 🔒 Setting up PERSISTENT message listener");
@@ -301,70 +361,14 @@ export function SaveCardModal({
     
     console.log("[SaveCardModal] Modal opened, checking for Helcim functions...");
     
-    // Check for appendHelcimPayIframe availability
-    let attempts = 0;
-    const maxAttempts = 10; // 1.5 seconds total
-    
-    const checkInterval = setInterval(() => {
-      attempts++;
-      
-      // @ts-ignore
-      const hasAppendFunction = typeof window.appendHelcimPayIframe === 'function';
-      // @ts-ignore
-      const hasRemoveFunction = typeof window.removeHelcimPayIframe === 'function';
-      
-      console.log(`[SaveCardModal] Checking Helcim functions (attempt ${attempts}):`, { 
-        hasAppendFunction,
-        hasRemoveFunction
-      });
-      
-      if (hasAppendFunction && hasRemoveFunction) {
-        console.log("[SaveCardModal] Helcim iframe functions available!");
-        clearInterval(checkInterval);
-        if (!isInitialized && mounted) {
-          initializeForm();
-        }
-      } else if (attempts >= maxAttempts) {
-        console.error("[SaveCardModal] Helcim functions not available after timeout");
-        clearInterval(checkInterval);
-        
-        // Try to load the script manually one more time
-        const existingScript = document.querySelector('script[src*="helcim-pay/services/start.js"]');
-        if (!existingScript) {
-          console.log("[SaveCardModal] Adding Helcim script manually...");
-          const script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.src = 'https://secure.helcim.app/helcim-pay/services/start.js';
-          script.async = true;
-          script.onload = () => {
-            console.log("[SaveCardModal] Script loaded, checking again...");
-            // @ts-ignore
-            if (typeof window.appendHelcimPayIframe === 'function' && mounted) {
-              initializeForm();
-            }
-          };
-          script.onerror = () => {
-            console.error("[SaveCardModal] Failed to load Helcim script");
-            toast({ 
-              title: "Payment form unavailable", 
-              description: "Unable to load payment form. Please refresh and try again.", 
-              variant: "destructive" 
-            });
-          };
-          document.head.appendChild(script);
-        } else {
-          toast({ 
-            title: "Payment form unavailable", 
-            description: "Unable to load payment form. Please refresh and try again.", 
-            variant: "destructive" 
-          });
-        }
-      }
-    }, 150);
+    // Initialize immediately since we're using redirect method
+    console.log("[SaveCardModal] Initializing payment form...");
+    if (!isInitialized && mounted) {
+      initializeForm();
+    }
     
     return () => {
       mounted = false;
-      clearInterval(checkInterval);
     };
   }, [open, isInitialized, initializeForm, toast]);
 
@@ -723,36 +727,61 @@ export function SaveCardModal({
       
       // Small delay before opening Helcim
       setTimeout(() => {
-        // Open the Helcim iframe modal
-        // @ts-ignore
-        if (typeof window.appendHelcimPayIframe === 'function') {
-          try {
+        // Try different methods to open Helcim payment form
+        try {
+          // Method 1: Try appendHelcimPayIframe (if available)
+          // @ts-ignore
+          if (typeof window.appendHelcimPayIframe === 'function') {
             // @ts-ignore
             const result = window.appendHelcimPayIframe(checkoutToken);
             console.log("[SaveCardModal] appendHelcimPayIframe result:", result);
+          } 
+          // Method 2: Try using Helcim Pay.js v2 redirect
+          else if (checkoutToken) {
+            console.log("[SaveCardModal] Using redirect method for Helcim checkout");
             
-            // Check if the iframe was actually added
-            setTimeout(() => {
-              const iframe = document.querySelector('iframe#helcimPayIframe') as HTMLIFrameElement;
-              if (iframe) {
-                console.log("[SaveCardModal] Helcim iframe confirmed in DOM");
-              } else {
-                console.error("[SaveCardModal] Helcim iframe not found in DOM after append");
-              }
-            }, 500);
+            // Create a hosted checkout URL
+            const checkoutUrl = `https://secure.helcim.app/helcim-pay/checkout?token=${checkoutToken}`;
             
-          } catch (appendErr) {
-            console.error("[SaveCardModal] Error calling appendHelcimPayIframe:", appendErr);
+            // Open in a new window/tab
+            const paymentWindow = window.open(
+              checkoutUrl,
+              'helcim-payment',
+              'width=500,height=700,top=100,left=100,resizable=yes,scrollbars=yes'
+            );
+            
+            if (paymentWindow) {
+              console.log("[SaveCardModal] Opened Helcim checkout in new window");
+              
+              // Monitor the window for closure
+              const checkWindowClosed = setInterval(() => {
+                if (paymentWindow.closed) {
+                  clearInterval(checkWindowClosed);
+                  console.log("[SaveCardModal] Payment window closed");
+                  setHelcimIframeOpen(false);
+                  
+                  // The persistent message listener should catch any success messages
+                  toast({
+                    title: "Payment window closed",
+                    description: "If you completed your payment, your appointment will be confirmed shortly."
+                  });
+                }
+              }, 500);
+            } else {
+              throw new Error("Unable to open payment window - popup may be blocked");
+            }
+          } else {
+            throw new Error("No checkout token available");
+          }
+        } catch (appendErr: any) {
+            console.error("[SaveCardModal] Error opening Helcim payment:", appendErr);
             setHelcimIframeOpen(false);
             toast({ 
               title: "Error", 
-              description: "Failed to open payment window. Please try again.", 
+              description: appendErr?.message || "Failed to open payment window. Please try again.", 
               variant: "destructive" 
             });
           }
-        } else {
-          throw new Error("Helcim payment function not available");
-        }
       }, 100);
       
     } catch (err: any) {
@@ -785,9 +814,21 @@ export function SaveCardModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[480px] w-auto sm:w-auto" style={{ zIndex: helcimIframeOpen ? 1 : undefined, width: "auto", maxWidth: "min(480px, calc(100vw - 2rem))", padding: "16px" }}>
+      <DialogContent 
+        className="sm:max-w-[480px] w-auto sm:w-auto" 
+        style={{ 
+          width: "auto", 
+          maxWidth: "min(480px, calc(100vw - 2rem))", 
+          padding: "16px",
+          zIndex: helcimIframeOpen ? 1 : undefined
+        }}
+        onInteractOutside={(e) => {
+          if (helcimIframeOpen) {
+            e.preventDefault();
+          }
+        }}>
         <DialogHeader>
-          <DialogTitle>Add a Card (DEBUG v3)</DialogTitle>
+          <DialogTitle>Add a Card</DialogTitle>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
@@ -799,12 +840,12 @@ export function SaveCardModal({
           ) : helcimIframeOpen ? (
             <div className="space-y-4">
               <div className="text-center space-y-2">
-                <p className="font-medium">Payment window is open</p>
+                <p className="font-medium">Opening payment window...</p>
                 <p className="text-sm text-muted-foreground">
-                  Please complete your card details in the Helcim secure payment window.
+                  A secure payment window should open in a moment. Please complete your card details there.
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  If you don't see the payment window, it may be blocked by your browser.
+                  If the payment window doesn't open, please check if popups are blocked in your browser.
                 </p>
                 <div className="flex gap-2 justify-center">
                   <Button 
@@ -827,78 +868,13 @@ export function SaveCardModal({
                     size="sm"
                     onClick={() => {
                       console.log("[SaveCardModal] Manual completion triggered");
-                      // Remove iframe
-                      if (typeof window.removeHelcimPayIframe === 'function') {
-                        // @ts-ignore
-                        window.removeHelcimPayIframe();
-                      }
                       setHelcimIframeOpen(false);
                       
-                      // Trigger the callback
-                      if (onSaved) {
-                        console.log("[SaveCardModal] Calling onSaved directly from manual complete");
-                        onSaved({
-                          last4: '****',
-                          brand: 'Card',
-                          saved: true
-                        });
-                      } else {
-                        // @ts-ignore
-                        if (window.helcimSaveCardCallback && window.helcimSaveCardCallback.onSaved) {
-                          console.log("[SaveCardModal] Calling onSaved from window from manual complete");
-                          // @ts-ignore
-                          window.helcimSaveCardCallback.onSaved({
-                            last4: '****',
-                            brand: 'Card',
-                            saved: true
-                          });
-                        }
-                      }
-                      
-                      toast({ 
-                        title: "Continuing with booking", 
-                        description: "Processing your appointment..." 
-                      });
+                      // Try to reopen the payment window
+                      handleOpenHelcimModal();
                     }}
                   >
-                    ✓ I've Completed Entering My Card
-                  </Button>
-                  
-                  {/* DEBUG: Direct callback test */}
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => {
-                      console.log("[SaveCardModal] DEBUG: Direct onSaved test - BUTTON CLICKED!");
-                      console.log("[SaveCardModal] DEBUG: onSaved exists?", !!onSaved);
-                      console.log("[SaveCardModal] DEBUG: onSaved type:", typeof onSaved);
-                      console.log("[SaveCardModal] DEBUG: onSaved function:", onSaved);
-                      
-                      if (onSaved) {
-                        console.log("[SaveCardModal] DEBUG: About to call onSaved directly...");
-                        try {
-                          onSaved({
-                            last4: 'TEST',
-                            brand: 'TEST',
-                            saved: true,
-                            debug: true
-                          });
-                          console.log("[SaveCardModal] DEBUG: onSaved called successfully!");
-                        } catch (err) {
-                          console.error("[SaveCardModal] DEBUG: Error calling onSaved:", err);
-                        }
-                      } else {
-                        console.log("[SaveCardModal] DEBUG: onSaved is null/undefined!");
-                      }
-                      
-                      // Close modal after a delay to see console output
-                      setTimeout(() => {
-                        setHelcimIframeOpen(false);
-                        onOpenChange(false);
-                      }, 1000);
-                    }}
-                  >
-                    DEBUG: Test Callback
+                    Retry Opening Payment Window
                   </Button>
                 </div>
               </div>

@@ -1941,8 +1941,13 @@ Glo Head Spa`,
     try {
       const cfg = await this.getSystemConfig('appointment_add_on_mapping');
       const raw = cfg?.value || '{}';
-      try { return JSON.parse(raw) as Record<string, number[]>; } catch { return {}; }
-    } catch {
+      try { 
+        const parsed = JSON.parse(raw) as Record<string, number[]>;
+        return parsed;
+      } catch { 
+        return {}; 
+      }
+    } catch (e) {
       return {};
     }
   }
@@ -1954,7 +1959,8 @@ Glo Head Spa`,
 
   async getAddOnsForAppointment(appointmentId: number): Promise<number[]> {
     const map = await this.getAppointmentAddOnMapping();
-    return map[String(appointmentId)] || [];
+    const result = map[String(appointmentId)] || [];
+    return result;
   }
 
   async setAddOnsForAppointment(appointmentId: number, addOnServiceIds: number[]): Promise<void> {
@@ -1981,7 +1987,8 @@ Glo Head Spa`,
     const ids = await this.getAddOnsForAppointment(appointmentId);
     const all = await this.getAllServices();
     const idSet = new Set(ids.map(Number));
-    return all.filter((s) => idSet.has(Number(s.id)));
+    const result = all.filter((s) => idSet.has(Number(s.id)));
+    return result;
   }
 
   // Staff operations
@@ -4457,21 +4464,41 @@ Glo Head Spa`,
 
   async updateSystemConfig(key: string, value: string, description?: string): Promise<SystemConfig> {
     try {
-      const updateData: any = { 
-        value, 
-        updatedAt: new Date() 
-      };
-      if (description) {
-        updateData.description = description;
+      // First check if the config exists
+      const existing = await this.getSystemConfig(key);
+      
+      if (existing) {
+        // Update existing config
+        const updateData: any = { 
+          value, 
+          updatedAt: new Date() 
+        };
+        if (description) {
+          updateData.description = description;
+        }
+        
+        const [result] = await db
+          .update(systemConfig)
+          .set(updateData)
+          .where(eq(systemConfig.key, key))
+          .returning();
+        
+        return result;
+      } else {
+        // Create new config
+        const [result] = await db
+          .insert(systemConfig)
+          .values({
+            key,
+            value,
+            description: description || null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          })
+          .returning();
+        
+        return result;
       }
-      
-      const [result] = await db
-        .update(systemConfig)
-        .set(updateData)
-        .where(eq(systemConfig.key, key))
-        .returning();
-      
-      return result;
     } catch (error) {
       console.error('Error updating system config:', error);
       throw error;
