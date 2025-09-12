@@ -1500,7 +1500,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       <DialogContent ref={contentRef} onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
           ? "booking-mobile-overlay fixed left-2 right-2 top-20 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[75vh] border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
-          : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
+          : "booking-desktop-overlay w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
       } style={isMobileView ? { 
         backgroundColor: overlayColor || 'rgba(255,255,255,0.95)', 
         top: mobileTopOffset,
@@ -2373,7 +2373,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           </form>
         </Form>
         
-        <DialogFooter className={isMobileView ? "mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 flex justify-between gap-2" : "flex justify-between mt-4"}>
+        <DialogFooter className={isMobileView ? "booking-actions mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 flex justify-between gap-2" : "booking-actions flex justify-between mt-4"}>
           {/* Show Back button on save card step, but hide Next since the step has its own submit button */}
           {currentStep === saveCardStepIndex ? (
             <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base' : ''} border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent`} onClick={prevStep}>

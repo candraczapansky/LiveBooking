@@ -74,9 +74,9 @@ export class LoggerService {
     logger.error(message, {
       ...context,
       error: error ? {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
+        name: error?.name || 'UnknownError',
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
       } : undefined,
     });
   }

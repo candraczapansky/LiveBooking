@@ -82,6 +82,17 @@ export function handleError(error: any, req?: any): ErrorResponse {
   const path = req?.path;
   const method = req?.method;
 
+  // Handle null or undefined errors
+  if (!error) {
+    return {
+      error: 'InternalServerError',
+      message: 'An unexpected error occurred',
+      timestamp,
+      path,
+      method,
+    };
+  }
+
   // Handle known application errors
   if (error instanceof AppError) {
     return {
@@ -95,7 +106,7 @@ export function handleError(error: any, req?: any): ErrorResponse {
   }
 
   // Handle Zod validation errors
-  if (error.name === 'ZodError') {
+  if (error?.name === 'ZodError') {
     const details = error.errors.map((err: any) => ({
       field: err.path.join('.'),
       message: err.message,
@@ -133,7 +144,7 @@ export function handleError(error: any, req?: any): ErrorResponse {
   }
 
   // Handle JWT errors
-  if (error.name === 'JsonWebTokenError') {
+  if (error?.name === 'JsonWebTokenError') {
     return {
       error: 'AuthenticationError',
       message: 'Invalid token',
@@ -143,7 +154,7 @@ export function handleError(error: any, req?: any): ErrorResponse {
     };
   }
 
-  if (error.name === 'TokenExpiredError') {
+  if (error?.name === 'TokenExpiredError') {
     return {
       error: 'AuthenticationError',
       message: 'Token expired',
@@ -160,8 +171,8 @@ export function handleError(error: any, req?: any): ErrorResponse {
     error: 'InternalServerError',
     message: process.env.NODE_ENV === 'production' 
       ? 'An unexpected error occurred' 
-      : error.message,
-    details: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      : error?.message || 'Unknown error',
+    details: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
     timestamp,
     path,
     method,
@@ -178,9 +189,9 @@ export function asyncHandler(fn: Function) {
 // Error logging utility
 export function logError(error: any, context?: any) {
   const errorInfo = {
-    name: error.name || 'UnknownError',
-    message: error.message,
-    stack: error.stack,
+    name: error?.name || 'UnknownError',
+    message: error?.message || 'Unknown error',
+    stack: error?.stack,
     timestamp: new Date().toISOString(),
     context,
   };

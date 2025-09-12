@@ -1120,19 +1120,22 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       }
     }
 
-    const updatedAppointment = await storage.updateAppointment(appointmentId, updateData);
+    // Extract addOnServiceIds from updateData before passing to storage
+    const { addOnServiceIds, ...appointmentUpdateData } = updateData;
+    
+    const updatedAppointment = await storage.updateAppointment(appointmentId, appointmentUpdateData);
 
     // Optionally update add-ons if provided in request
     try {
-      // Now that addOnServiceIds is in the schema, we can get it directly from updateData
-      if ('addOnServiceIds' in updateData) {
-        const addOnServiceIds = Array.isArray(updateData.addOnServiceIds)
-          ? updateData.addOnServiceIds.map((n: any) => parseInt(n))
+      if (addOnServiceIds !== undefined) {
+        const addOnIds = Array.isArray(addOnServiceIds)
+          ? addOnServiceIds.map((n: any) => parseInt(n))
           : [];
         // Always update add-ons when the field is present, even if empty (to clear add-ons)
-        await storage.setAddOnsForAppointment(appointmentId, addOnServiceIds);
+        await storage.setAddOnsForAppointment(appointmentId, addOnIds);
       }
     } catch (e) {
+      LoggerService.warn("Failed to update add-ons for appointment", { appointmentId, error: e });
     }
 
     LoggerService.logAppointment("updated", appointmentId, context);
@@ -1154,7 +1157,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         || (updateData.endTime && new Date(updateData.endTime).toISOString() !== new Date(existingAppointment.endTime).toISOString());
       if (timeChanged) {
         const client = await storage.getUser(updatedAppointment.clientId);
-        const staffUser = await storage.getUser(updatedAppointment.staffId);
+        const staffRecord = await storage.getStaff(updatedAppointment.staffId);
+        const staffUser = staffRecord ? await storage.getUser(staffRecord.userId) : null;
         const service = await storage.getService(updatedAppointment.serviceId);
         
         // Check if service exists before proceeding
@@ -1339,7 +1343,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     const client = await storage.getUser(appointment.clientId);
-    const staff = await storage.getUser(appointment.staffId);
+    const staffRecord = await storage.getStaff(appointment.staffId);
+    const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
     const service = await storage.getService(appointment.serviceId);
     // Resolve appointment location for resend
     let appointmentLocation: any = null;
@@ -1535,7 +1540,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     const client = await storage.getUser(appointment.clientId);
-    const staff = await storage.getUser(appointment.staffId);
+    const staffRecord = await storage.getStaff(appointment.staffId);
+    const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
     const service = await storage.getService(appointment.serviceId);
 
     // Resolve appointment location for messaging
@@ -1647,7 +1653,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     }
 
     const client = await storage.getUser(appointment.clientId);
-    const staff = await storage.getUser(appointment.staffId);
+    const staffRecord = await storage.getStaff(appointment.staffId);
+    const staff = staffRecord ? await storage.getUser(staffRecord.userId) : null;
     const service = await storage.getService(appointment.serviceId);
 
     // Resolve appointment location for messaging

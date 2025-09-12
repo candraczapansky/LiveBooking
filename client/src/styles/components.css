@@ -9,6 +9,13 @@ button svg:not([data-hamburger]) {
   fill: hsl(var(--primary)) !important;
 }
 
+/* Booking dialog desktop: ensure Cancel/Next action buttons are white for contrast */
+.booking-desktop-overlay .booking-actions button,
+.booking-desktop-overlay .booking-actions .btn,
+.booking-desktop-overlay .booking-actions [role="button"] {
+  color: #fff !important;
+}
+
 /* Profile Picture */
 .profile-circle {
   @apply w-[120px] h-[120px] min-w-[120px] min-h-[120px] max-w-[120px] max-h-[120px] rounded-[60px] bg-cover bg-center bg-no-repeat border-[3px] border-gray-200 flex-shrink-0 box-border aspect-square overflow-hidden block relative;

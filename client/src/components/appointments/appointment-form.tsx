@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -166,6 +166,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [clientSearchValue, setClientSearchValue] = useState("");
+  const lastManualClientSearch = useRef<string>("");
   const [showClientCreationDialog, setShowClientCreationDialog] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -176,7 +177,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   useEffect(() => {
     const handle = setTimeout(() => {
-      setDebouncedClientSearch(clientSearchValue.trim());
+      // Only update debounced search when it was a manual keystroke
+      if (lastManualClientSearch.current === clientSearchValue) {
+        setDebouncedClientSearch(clientSearchValue.trim());
+      }
     }, 300);
     return () => clearTimeout(handle);
   }, [clientSearchValue]);
@@ -266,12 +270,16 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   
   // Get clients
   const { data: clients, refetch: refetchClients } = useQuery({
-    queryKey: ['/api/users?role=client', debouncedClientSearch],
+    queryKey: ['/api/users?role=client', debouncedClientSearch, appointmentId],
     queryFn: async () => {
+      // If we're editing and have no search term, load all clients to ensure we have the appointment's client
       const searchTerm = debouncedClientSearch.trim();
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      
+      // If editing and no search, get a broader set of clients
+      const limitParam = appointmentId && !searchTerm ? '&limit=1000' : '';
 
-      const response = await apiRequest("GET", `/api/users?role=client${searchParam}`);
+      const response = await apiRequest("GET", `/api/users?role=client${searchParam}${limitParam}`);
       const data = await response.json();
 
       // If nothing found but we have a search term, fall back to a broader search without role filter
@@ -301,7 +309,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       });
       return data;
     },
-    enabled: open && (debouncedClientSearch.length >= 2 || !!appointmentId),
+    enabled: open,
     staleTime: 0, // Always fetch fresh data
     refetchOnWindowFocus: true // Refetch when window gains focus
   });
@@ -310,11 +318,29 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const { data: appointment, isLoading: isLoadingAppointment } = useQuery({
     queryKey: ['/api/appointments', appointmentId],
     queryFn: async () => {
+      console.log('🔍 Fetching appointment for editing:', appointmentId);
       if (!appointmentId || appointmentId < 0) return null;
       const response = await apiRequest("GET", `/api/appointments/${appointmentId}`);
-      return response.json();
+      const appointmentData = await response.json();
+      console.log('🔍 Fetched appointment data:', appointmentData);
+      
+      // Also fetch the client details if we have a clientId
+      if (appointmentData?.clientId) {
+        try {
+          const clientResponse = await apiRequest("GET", `/api/users/${appointmentData.clientId}`);
+          const clientData = await clientResponse.json();
+          appointmentData.client = clientData;
+          console.log('🔍 Fetched client data for appointment:', clientData);
+        } catch (error) {
+          console.log('Could not fetch client details for appointment:', error);
+        }
+      }
+      
+      return appointmentData;
     },
-    enabled: open && !!appointmentId && appointmentId > 0
+    enabled: !!appointmentId && appointmentId > 0,
+    staleTime: 0,
+    refetchOnMount: true
   });
 
   // Computed values
@@ -439,7 +465,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   
   // Load appointment data when editing
   useEffect(() => {
-    if (appointment && appointmentId && appointmentId > 0) {
+    console.log('🔍 Load appointment data effect triggered:', {
+      hasAppointment: !!appointment,
+      appointmentId,
+      appointment,
+      isLoadingAppointment
+    });
+    
+    if (appointment && appointmentId && appointmentId > 0 && !isLoadingAppointment) {
       // Normalize startTime to a Date
       let start: Date | null = null;
       try {
@@ -485,7 +518,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         addOnServiceId = appointment.addOns[0].id?.toString() || "";
       }
 
-      form.reset({
+      const formValues = {
         staffId: appointment.staffId?.toString() || "",
         serviceId: appointment.serviceId?.toString() || "",
         clientId: appointment.clientId?.toString() || "",
@@ -493,13 +526,44 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         time: appointmentTime,
         notes: appointment.notes || "",
         addOnServiceId: addOnServiceId,
-      });
+      };
+      
+      console.log('🔍 Setting form values:', formValues);
+      form.reset(formValues);
 
       // Set client search value to the selected client's name for editing
-      const selectedClient = clients?.find((client: any) => client.id.toString() === appointment.clientId?.toString());
-      setClientSearchValue(selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : "");
+      // First try to use the client data from the appointment itself
+      if (appointment.client) {
+        const displayName = `${appointment.client.firstName} ${appointment.client.lastName}`.trim();
+        console.log('🔍 Setting client name from appointment.client:', displayName);
+        lastManualClientSearch.current = displayName; // prevent debounce from clearing it
+        setClientSearchValue(displayName);
+      } else if (appointment.clientId) {
+        // Try to find in existing clients list
+        const selectedClient = clients?.find((client: any) => client.id.toString() === appointment.clientId?.toString());
+        if (selectedClient) {
+          const fallbackName = `${selectedClient.firstName} ${selectedClient.lastName}`.trim();
+          console.log('🔍 Setting client name from clients list:', fallbackName);
+          lastManualClientSearch.current = fallbackName;
+          setClientSearchValue(fallbackName);
+        } else {
+          // If client not in list, fetch it separately
+          console.log('🔍 Client not in list, will fetch separately');
+          apiRequest("GET", `/api/users/${appointment.clientId}`)
+            .then(response => response.json())
+            .then(clientData => {
+              const clientName = `${clientData.firstName} ${clientData.lastName}`.trim();
+              console.log('🔍 Fetched client separately:', clientName);
+              lastManualClientSearch.current = clientName;
+              setClientSearchValue(clientName);
+            })
+            .catch(error => {
+              console.error('Failed to fetch client:', error);
+            });
+        }
+      }
     }
-  }, [appointment, appointmentId]);
+  }, [appointment, appointmentId, isLoadingAppointment, clients]);
 
   // Force refresh client data when dialog opens
   useEffect(() => {
@@ -529,6 +593,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       });
       // Reset client search value when closing
       setClientSearchValue("");
+      lastManualClientSearch.current = "";
     } else if (!appointmentId) {
       // Only reset with defaults for new appointments, not when editing existing ones
       const resetDate = selectedDate || new Date();
@@ -543,6 +608,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       });
       // Reset client search value for new appointments
       setClientSearchValue("");
+      lastManualClientSearch.current = "";
       // Force the date field to update and clear any validation errors
       form.setValue('date', resetDate);
       form.clearErrors('date');
@@ -1240,6 +1306,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                                 newValue: e.target.value,
                                 length: e.target.value.length
                               });
+                              lastManualClientSearch.current = e.target.value;
                               setClientSearchValue(e.target.value);
                               // Clear selected client when typing
                               if (field.value) {
@@ -1295,7 +1362,9 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                                     console.log('Client selected:', client);
                                     console.log('Setting clientId to:', client.id.toString());
                                     field.onChange(client.id.toString());
-                                    setClientSearchValue(`${client.firstName} ${client.lastName}`);
+                                    const pickedName = `${client.firstName} ${client.lastName}`.trim();
+                                    lastManualClientSearch.current = pickedName;
+                                    setClientSearchValue(pickedName);
                                     console.log('Form clientId after selection:', form.getValues('clientId'));
                                   }}
                                 >
@@ -1325,10 +1394,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                             <div className="flex items-center justify-between">
                               <div>
                                 <div className="font-medium text-gray-900 dark:text-gray-100">
-                                  {clients?.find((client: any) => client.id.toString() === field.value)?.firstName} {clients?.find((client: any) => client.id.toString() === field.value)?.lastName}
+                                  {(appointment?.client && String(appointment.client.id) === String(field.value))
+                                    ? `${appointment.client.firstName} ${appointment.client.lastName}`
+                                    : `${clients?.find((client: any) => client.id.toString() === field.value)?.firstName || ''} ${clients?.find((client: any) => client.id.toString() === field.value)?.lastName || ''}`}
                                 </div>
                                 <div className="text-sm text-gray-600 dark:text-gray-300">
-                                  {clients?.find((client: any) => client.id.toString() === field.value)?.email}
+                                  {(appointment?.client && String(appointment.client.id) === String(field.value))
+                                    ? appointment.client.email
+                                    : clients?.find((client: any) => client.id.toString() === field.value)?.email}
                                 </div>
                               </div>
                               <Button
@@ -1337,6 +1410,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                                 size="sm"
                                 onClick={() => {
                                   field.onChange("");
+                                  lastManualClientSearch.current = "";
                                   setClientSearchValue("");
                                 }}
                               >
@@ -1400,12 +1474,44 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                   const staffSelected = !!selectedStaffId;
                   const serviceSelected = !!selectedServiceId;
                   const dateSelected = !!selectedFormDate;
-                  const canSelectTime = staffSelected && serviceSelected && dateSelected && availableTimeSlots.length > 0;
+                  const isEditing = !!appointmentId && appointmentId > 0;
+                  // Allow selection while editing even if slots haven't loaded yet
+                  const baseCanSelect = staffSelected && serviceSelected && dateSelected;
+                  const canSelectTime = (isEditing && !!field.value) || (baseCanSelect && availableTimeSlots.length > 0);
+
+                  // Ensure the current time value is present in the options so the SelectValue can render it
+                  let displayedSlots = [...availableTimeSlots];
+                  if (field.value && !availableTimeSlots.some((s: any) => s.value === field.value)) {
+                    displayedSlots = [{ value: field.value, label: field.value }, ...availableTimeSlots];
+                  }
+
+                  // If editing and no slots loaded yet, provide a permissive fallback list for the selected day
+                  if (isEditing && baseCanSelect && displayedSlots.length === 0) {
+                    const fallback: { value: string; label: string }[] = [];
+                    for (let hour = 8; hour <= 20; hour++) {
+                      for (const minute of [0, 15, 30, 45]) {
+                        const hh = String(hour).padStart(2, '0');
+                        const mm = String(minute).padStart(2, '0');
+                        const value = `${hh}:${mm}`;
+                        const label = (() => {
+                          const h12 = ((hour + 11) % 12) + 1;
+                          const ampm = hour < 12 ? 'AM' : 'PM';
+                          return `${h12}:${mm} ${ampm}`;
+                        })();
+                        fallback.push({ value, label });
+                      }
+                    }
+                    displayedSlots = field.value && !fallback.some(s => s.value === field.value)
+                      ? [{ value: field.value, label: field.value }, ...fallback]
+                      : fallback;
+                  }
+
                   let placeholder = "Select a time";
                   if (!staffSelected) placeholder = "Select a staff member first";
                   else if (!serviceSelected) placeholder = "Select a service first";
                   else if (!dateSelected) placeholder = "Select a date first";
-                  else if (availableTimeSlots.length === 0) placeholder = "No available times";
+                  else if (!displayedSlots.length) placeholder = "No available times";
+
                   return (
                     <FormItem>
                       <FormLabel>Time</FormLabel>
@@ -1420,10 +1526,10 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                             <div className="p-2 text-gray-500 text-sm">Please select a service first.</div>
                           ) : !dateSelected ? (
                             <div className="p-2 text-gray-500 text-sm">Please select a date first.</div>
-                          ) : availableTimeSlots.length === 0 ? (
+                          ) : !displayedSlots.length ? (
                             <div className="p-2 text-gray-500 text-sm">No available times for this staff member on this day. Please choose another date or staff member.</div>
                           ) : (
-                            availableTimeSlots.map((slot, index) => (
+                            displayedSlots.map((slot: any, index: number) => (
                               <SelectItem key={`${slot.value}-${index}`} value={slot.value}>
                                 {slot.label}
                               </SelectItem>
