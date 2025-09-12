@@ -92,6 +92,58 @@ button svg:not([data-hamburger]) {
     padding-right: max(env(safe-area-inset-right), 8px) !important;
     box-sizing: border-box !important;
   }
+  
+  /* Booking mobile overlay specific scrolling fix */
+  .booking-mobile-overlay {
+    -webkit-overflow-scrolling: touch !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  
+  .booking-mobile-overlay form {
+    min-height: 100%;
+  }
+
+  /* Mobile booking overlay: force white text/icons for better contrast on colored backgrounds */
+  .booking-mobile-overlay,
+  .booking-mobile-overlay .text-gray-900,
+  .booking-mobile-overlay .text-foreground,
+  .booking-mobile-overlay h1,
+  .booking-mobile-overlay h2,
+  .booking-mobile-overlay h3,
+  .booking-mobile-overlay h4,
+  .booking-mobile-overlay h5,
+  .booking-mobile-overlay h6 {
+    color: #fff !important;
+  }
+
+  .booking-mobile-overlay .text-gray-500,
+  .booking-mobile-overlay .dark\:text-gray-400,
+  .booking-mobile-overlay .text-muted-foreground {
+    color: rgba(255, 255, 255, 0.85) !important;
+  }
+
+  .booking-mobile-overlay button,
+  .booking-mobile-overlay .btn,
+  .booking-mobile-overlay [role="button"] {
+    color: #fff !important;
+  }
+
+  .booking-mobile-overlay svg {
+    color: #fff !important;
+    fill: currentColor !important;
+  }
+
+  .booking-mobile-overlay ::placeholder {
+    color: rgba(255, 255, 255, 0.7) !important;
+  }
+
+  /* Light borders become white on colored overlays */
+  .booking-mobile-overlay .border-gray-700,
+  .booking-mobile-overlay .dark\:border-gray-300,
+  .booking-mobile-overlay .border-foreground {
+    border-color: rgba(255, 255, 255, 0.75) !important;
+  }
 }
 
 /* Email Editor */

@@ -343,7 +343,7 @@ export function SaveCardModal({
       setHelcimIframeOpen(false);
       setPolicyAgreed(false);
       
-      // Clean up Helcim iframe if it exists when modal closes
+      // Clean up Helcim iframe and container if they exist when modal closes
       // @ts-ignore
       if (typeof window.removeHelcimPayIframe === 'function') {
         try {
@@ -353,6 +353,26 @@ export function SaveCardModal({
         } catch (err) {
           console.error("[SaveCardModal] Error removing iframe:", err);
         }
+      }
+      
+      // Also clean up our custom iframe wrapper
+      const iframeWrapper = document.getElementById('helcim-iframe-wrapper');
+      if (iframeWrapper) {
+        iframeWrapper.remove();
+        console.log("[SaveCardModal] Removed iframe wrapper on close");
+      }
+      
+      // Clean up any remaining Helcim iframes
+      const remainingFrames = document.querySelectorAll('#helcimPayIframe, iframe[src*="helcim"]');
+      remainingFrames.forEach(frame => {
+        frame.remove();
+        console.log("[SaveCardModal] Removed remaining iframe");
+      });
+      
+      // Restore viewport if it was modified for mobile
+      const viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport) {
+        viewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
       }
       return;
     }
@@ -732,9 +752,93 @@ export function SaveCardModal({
           // Method 1: Try appendHelcimPayIframe (if available)
           // @ts-ignore
           if (typeof window.appendHelcimPayIframe === 'function') {
+            console.log('[SaveCardModal] Mounting Helcim iframe with mobile-friendly container');
+            
+            // Clear any existing iframes and wrappers first (like appointments page does)
+            const existingWrappers = document.querySelectorAll('#helcim-iframe-wrapper');
+            existingWrappers.forEach(wrapper => {
+              console.log('[SaveCardModal] Removing existing wrapper');
+              wrapper.remove();
+            });
+            
+            const existingFrames = document.querySelectorAll('#helcimPayIframe, iframe[src*="helcim"]');
+            existingFrames.forEach(frame => {
+              console.log('[SaveCardModal] Removing existing iframe');
+              frame.remove();
+            });
+            
+            // Create a container div for the iframe with proper z-index (matching appointments page)
+            const iframeContainer = document.createElement('div');
+            iframeContainer.id = 'helcim-iframe-wrapper';
+            iframeContainer.style.cssText = `
+              position: fixed;
+              top: 0;
+              left: 0;
+              right: 0;
+              bottom: 0;
+              z-index: 100000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              pointer-events: none;
+              background-color: rgba(0, 0, 0, 0.8);
+            `;
+            document.body.appendChild(iframeContainer);
+            
             // @ts-ignore
-            const result = window.appendHelcimPayIframe(checkoutToken);
+            const result = window.appendHelcimPayIframe(checkoutToken, {
+              allowExit: true,
+            });
             console.log("[SaveCardModal] appendHelcimPayIframe result:", result);
+            
+            // Move and style the iframe properly (matching appointments page)
+            setTimeout(() => {
+              const iframe = document.getElementById('helcimPayIframe') as HTMLIFrameElement;
+              if (iframe && iframeContainer) {
+                console.log('[SaveCardModal] Found Helcim iframe, applying mobile-friendly styling');
+                iframeContainer.appendChild(iframe);
+                
+                // Apply mobile-friendly styling with responsive adjustments
+                const isMobile = window.innerWidth <= 768;
+                iframe.style.cssText = `
+                  width: ${isMobile ? '95vw' : '100%'};
+                  max-width: ${isMobile ? '100%' : '600px'};
+                  height: ${isMobile ? '85vh' : '80vh'};
+                  max-height: ${isMobile ? '100%' : '700px'};
+                  border: none;
+                  border-radius: ${isMobile ? '0' : '8px'};
+                  background-color: white;
+                  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+                  pointer-events: auto;
+                  position: relative;
+                  z-index: 100001;
+                  margin: ${isMobile ? '0' : 'auto'};
+                `;
+                
+                // Make the container interactive for the iframe area
+                iframeContainer.style.pointerEvents = 'auto';
+                
+                // Add touch event handling for mobile devices
+                if (isMobile) {
+                  iframe.style.touchAction = 'auto';
+                  iframe.style.webkitOverflowScrolling = 'touch';
+                  iframe.style.overflowY = 'auto';
+                  
+                  // Ensure iframe content is scrollable on mobile
+                  iframe.setAttribute('scrolling', 'yes');
+                  
+                  // Add viewport meta tag adjustments for mobile
+                  const viewport = document.querySelector('meta[name="viewport"]');
+                  if (viewport) {
+                    viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+                  }
+                }
+                
+                console.log('[SaveCardModal] Iframe styled and positioned for mobile compatibility with touch support');
+              } else {
+                console.log('[SaveCardModal] Warning: Could not find iframe to style');
+              }
+            }, 100);
           } 
           // Method 2: Try using Helcim Pay.js v2 redirect
           else if (checkoutToken) {
@@ -812,46 +916,64 @@ export function SaveCardModal({
     onOpenChange(newOpen);
   };
 
+  // Check if we're on mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 768;
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent 
-        className="sm:max-w-[480px] w-auto sm:w-auto" 
-        style={{ 
+        className={isMobile 
+          ? "fixed left-2 right-2 top-[15%] translate-x-0 translate-y-0 w-auto mx-auto max-h-[70vh] overflow-y-auto bg-white dark:bg-gray-900"
+          : "sm:max-w-[480px] w-auto sm:w-auto"
+        }
+        style={isMobile ? {
+          maxWidth: "calc(100vw - 1rem)",
+          padding: "20px",
+          borderRadius: "12px",
+          boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+          zIndex: helcimIframeOpen ? 90 : 95,  // Above booking widget (z-90) but below Helcim iframe (z-100000)
+          border: "1px solid rgba(200, 200, 200, 0.2)"
+        } : { 
           width: "auto", 
           maxWidth: "min(480px, calc(100vw - 2rem))", 
           padding: "16px",
-          zIndex: helcimIframeOpen ? 1 : undefined
+          zIndex: helcimIframeOpen ? 90 : 95  // Above booking widget but below Helcim iframe
         }}
         onInteractOutside={(e) => {
           if (helcimIframeOpen) {
             e.preventDefault();
           }
         }}>
-        <DialogHeader>
-          <DialogTitle>Add a Card</DialogTitle>
+        <DialogHeader className={isMobile ? "mb-3" : ""}>
+          <DialogTitle className={isMobile ? "text-lg" : ""}>Add a Card</DialogTitle>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
+        <div className={isMobile ? "grid gap-3 py-3" : "grid gap-4 py-4"}>
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Initializing secure payment...</p>
+              <Loader2 className={isMobile ? "h-6 w-6 animate-spin text-primary" : "h-8 w-8 animate-spin text-primary"} />
+              <p className={isMobile ? "text-sm text-muted-foreground text-center px-2" : "text-sm text-muted-foreground"}>
+                Initializing secure payment...
+              </p>
             </div>
           ) : helcimIframeOpen ? (
             <div className="space-y-4">
               <div className="text-center space-y-2">
-                <p className="font-medium">Opening payment window...</p>
-                <p className="text-sm text-muted-foreground">
+                <p className={isMobile ? "font-medium text-base" : "font-medium"}>Opening payment window...</p>
+                <p className={isMobile ? "text-sm text-muted-foreground px-2" : "text-sm text-muted-foreground"}>
                   A secure payment window should open in a moment. Please complete your card details there.
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className={isMobile ? "text-xs text-muted-foreground px-2" : "text-xs text-muted-foreground"}>
                   If the payment window doesn't open, please check if popups are blocked in your browser.
                 </p>
-                <div className="flex gap-2 justify-center">
+                <div className={isMobile ? "flex flex-col gap-2 px-2" : "flex gap-2 justify-center"}>
                   <Button 
                     variant="outline" 
-                    size="sm"
-                    className="text-black dark:text-black hover:text-black"
+                    size={isMobile ? "default" : "sm"}
+                    className={isMobile 
+                      ? "text-black dark:text-black hover:text-black w-full h-10 text-base"
+                      : "text-black dark:text-black hover:text-black"
+                    }
                     onClick={() => {
                       // Close Helcim iframe and reset
                       if (typeof window.removeHelcimPayIframe === 'function') {
@@ -865,7 +987,8 @@ export function SaveCardModal({
                   </Button>
                   <Button 
                     variant="default" 
-                    size="sm"
+                    size={isMobile ? "default" : "sm"}
+                    className={isMobile ? "w-full h-10 text-base" : ""}
                     onClick={() => {
                       console.log("[SaveCardModal] Manual completion triggered");
                       setHelcimIframeOpen(false);
@@ -881,30 +1004,51 @@ export function SaveCardModal({
             </div>
           ) : isInitialized ? (
             <div className="space-y-2">
-              <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-left space-y-2 border border-gray-200 dark:border-gray-700">
-                <p className="text-sm text-black">
+              <div className={isMobile 
+                ? "bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-left space-y-3 border border-gray-200 dark:border-gray-700"
+                : "bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-left space-y-2 border border-gray-200 dark:border-gray-700"
+              }>
+                <p className={isMobile ? "text-base text-black leading-relaxed" : "text-sm text-black"}>
                   <strong>Cancellation policy:</strong> $30 fee if you cancel within 24 hours of the appointment, and the full service charge for no‑shows.
                 </p>
-                <div className="flex items-start gap-2 pt-1">
-                  <Checkbox id="policyAgree" checked={policyAgreed} onCheckedChange={(v) => setPolicyAgreed(!!v)} />
-                  <Label htmlFor="policyAgree" className="text-sm leading-snug cursor-pointer text-black">I have read and agree to the cancellation policy.</Label>
+                <div className={isMobile ? "flex items-start gap-3 pt-2" : "flex items-start gap-2 pt-1"}>
+                  <Checkbox 
+                    id="policyAgree" 
+                    checked={policyAgreed} 
+                    onCheckedChange={(v) => setPolicyAgreed(!!v)}
+                    className={isMobile ? "mt-0.5 h-5 w-5" : ""}
+                  />
+                  <Label 
+                    htmlFor="policyAgree" 
+                    className={isMobile 
+                      ? "text-base leading-relaxed cursor-pointer text-black"
+                      : "text-sm leading-snug cursor-pointer text-black"
+                    }
+                  >
+                    I have read and agree to the cancellation policy.
+                  </Label>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Preparing payment form...</p>
+            <div className={isMobile ? "flex flex-col items-center justify-center py-6 gap-2" : "flex flex-col items-center justify-center py-8 gap-2"}>
+              <Loader2 className={isMobile ? "h-5 w-5 animate-spin text-muted-foreground" : "h-6 w-6 animate-spin text-muted-foreground"} />
+              <p className={isMobile ? "text-sm text-muted-foreground text-center px-2" : "text-sm text-muted-foreground"}>
+                Preparing payment form...
+              </p>
             </div>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className={isMobile ? "flex-row justify-between gap-2" : ""}>
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
             disabled={isLoading}
-            className="text-black dark:text-black hover:text-black"
+            className={isMobile 
+              ? "text-black dark:text-black hover:text-black h-10 px-4 text-base flex-1"
+              : "text-black dark:text-black hover:text-black"
+            }
           >
             {helcimIframeOpen ? "Close" : "Cancel"}
           </Button>
@@ -912,10 +1056,11 @@ export function SaveCardModal({
             <Button 
               onClick={handleOpenHelcimModal} 
               disabled={isLoading || !isInitialized || !policyAgreed}
+              className={isMobile ? "h-10 px-4 text-base flex-1" : ""}
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className={isMobile ? "mr-2 h-5 w-5 animate-spin" : "mr-2 h-4 w-4 animate-spin"} />
                   Loading...
                 </>
               ) : (

@@ -321,6 +321,25 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     } catch {}
   }, [currentStep, open, selectedLocationId]);
 
+  // Listen for schedule updates from other components
+  useEffect(() => {
+    const handleScheduleUpdate = () => {
+      console.log('🔄 Booking widget: Received schedule update event, refreshing data');
+      queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
+      queryClient.refetchQueries({ queryKey: ['/api/schedules'] });
+      // Also refresh staff and appointments to ensure consistency
+      refetchStaff();
+      refetchSchedules();
+      refetchAppointments();
+    };
+
+    window.addEventListener('schedule-updated', handleScheduleUpdate);
+    
+    return () => {
+      window.removeEventListener('schedule-updated', handleScheduleUpdate);
+    };
+  }, [queryClient, refetchStaff, refetchSchedules, refetchAppointments]);
+
   // Compute allowed services based on staff assignments at the selected location
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [allowedServices, setAllowedServices] = useState<any[]>([]);
@@ -1274,6 +1293,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
   }, [bookingData, createAppointmentAfterPayment, selectedService, timeSlots, onOpenChange, toast]);
 
   const handleSubmit = async () => {
+    console.log("[BookingWidget] handleSubmit called on step:", currentStep);
+    
     // Get the latest form values
     const latestValues = form.getValues();
     
@@ -1284,6 +1305,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     
     // Handle Save Card step submission
     if (currentStep === saveCardStepIndex && latestValues) {
+      console.log("[BookingWidget] Processing save card step with values:", latestValues);
       if (!savedCardInfo) {
         // Need to create client first if not logged in
         if (!userId && !createdClientId) {
@@ -1329,6 +1351,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             setCreatedClientId(clientId);
             
             // Show save card modal FIRST (appointment will be created after card is saved)
+            console.log("[BookingWidget] Setting showSaveCardModal to true");
             setShowSaveCardModal(true);
             setIsProcessingBooking(false);
           } catch (error: any) {
@@ -1341,6 +1364,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           }
         } else {
           // Client exists, show save card modal FIRST (appointment will be created after card is saved)
+          console.log("[BookingWidget] Client exists, setting showSaveCardModal to true");
+          console.log("[BookingWidget] Current bookingData:", latestValues);
           setShowSaveCardModal(true);
           setIsProcessingBooking(false);
         }
@@ -1474,22 +1499,24 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
     <Dialog modal={false} open={open} onOpenChange={onOpenChange}>
       <DialogContent ref={contentRef} onInteractOutside={(e) => e.preventDefault()} className={
         isMobileView
-          ? "booking-mobile-overlay fixed left-2 right-2 top-32 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[85vh] overflow-y-auto overflow-x-hidden border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
+          ? "booking-mobile-overlay fixed left-2 right-2 top-20 z-[90] translate-x-0 translate-y-0 w-auto max-w-[440px] mx-auto max-h-[75vh] border border-white/20 dark:border-white/10 rounded-lg p-4 box-border"
           : "w-[95vw] sm:w-auto sm:max-w-[800px] lg:max-w-[1000px] max-h-[90vh] overflow-y-auto overflow-x-hidden backdrop-blur-sm border border-white/20 dark:border-white/10"
-      } style={isMobileView ? { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)', top: mobileTopOffset } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
-        <DialogHeader className={isMobileView ? "p-0" : ""}>
+      } style={isMobileView ? { 
+        backgroundColor: overlayColor || 'rgba(255,255,255,0.95)', 
+        top: mobileTopOffset,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch'
+      } : { backgroundColor: overlayColor || 'rgba(255,255,255,0.90)' }}>
+        <DialogHeader className={isMobileView ? "p-0 mb-4" : ""}>
           <DialogTitle className={isMobileView ? "text-lg" : "text-xl"}>Book an Appointment</DialogTitle>
         </DialogHeader>
-        {/* Mobile width constraint wrapper start */}
-        <div className={isMobileView ? "w-full mx-auto" : ""} style={isMobileView ? {
-            maxWidth: 'min(420px, calc(100vw - 1rem - env(safe-area-inset-left) - env(safe-area-inset-right)))'
-          } : undefined}>
 
         {/* Progress Steps */}
         {isMobileView ? (
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="rounded-full h-8 w-8 flex items-center justify-center bg-primary text-white">
+              <div className="rounded-full h-8 w-8 flex items-center justify-center bg-primary text-white text-sm">
                 {currentStep + 1}
               </div>
               <div className="text-sm font-medium text-foreground">{steps[currentStep]}</div>
@@ -1527,11 +1554,11 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
         )}
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate>
+          <form onSubmit={form.handleSubmit(handleSubmit)} noValidate className={isMobileView ? "pb-32" : ""}>
             {/* Step 1: Location Selection */}
             {currentStep === 0 && (
               <div className="space-y-4">
-                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Location</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Select a Location</h3>
                 {isLoadingLocations ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
@@ -1584,15 +1611,15 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {currentStep === 1 && (
               <div className="space-y-4">
                 <div className={`flex items-center ${isMobileView ? 'gap-2 justify-start flex-wrap' : 'justify-between'}`}>
-                  <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select a Service</h3>
+                  <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Select a Service</h3>
                   {selectedCategoryId && (
-                    <div className="relative w-full sm:w-auto sm:max-w-none">
+                    <div className="relative w-full sm:w-auto sm:max-w-none mt-2 sm:mt-0">
                       <Input 
                         type="text" 
                         placeholder="Search services..." 
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className={`${isMobileView ? 'pl-8 pr-4 h-10 text-base w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
+                        className={`${isMobileView ? 'pl-8 pr-4 h-10 text-sm w-full' : 'pl-8 pr-4 py-2 text-sm'}`}
                       />
                       <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
@@ -1607,8 +1634,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </div>
                 )}
                 
-                {/* Service Categories (two rows; first row up to 8) */}
-                <div className={isMobileView ? 'space-y-2 py-2 -mx-2 px-2' : 'space-y-2 py-2'}>
+                {/* Service Categories */}
+                <div className={isMobileView ? 'space-y-3 py-3' : 'space-y-2 py-2'}>
                   {isLoadingCategories ? (
                     <>
                       <Skeleton className="h-8 w-20 rounded-full" />
@@ -1671,7 +1698,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     render={({ field }) => (
                       <FormItem className="space-y-0">
                         <FormControl>
-                          <div className="grid grid-cols-1 gap-4">
+                          <div className={`grid grid-cols-1 ${isMobileView ? 'gap-3' : 'gap-4'}`}>
                             {isPreparingServices ? (
                               <>
                                 <Skeleton className="h-24 w-full" />
@@ -1690,21 +1717,21 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     key={service.id}
                                     className={`cursor-pointer transition-all hover:shadow-md ${
                                       field.value === service.id.toString()
-                                        ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
+                                        ? "border-primary ring-2 ring-primary ring-opacity-50 bg-[hsla(var(--primary),0.10)]"
                                         : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                                     }`}
                                     onClick={() => field.onChange(service.id.toString())}
                                   >
                                     <CardContent className="p-4">
                                       <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                                        <div>
-                                          <h4 className={`text-base font-medium ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'} break-words`}>{service.name}</h4>
-                                          <p className={`text-sm mt-1 ${isMobileView ? 'break-words' : ''} ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{service.description}</p>
-                                          <div className={`mt-2 flex items-center text-sm ${field.value === service.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>
+                                        <div className="flex-1">
+                                          <h4 className={`text-base font-medium ${field.value === service.id.toString() ? 'text-primary-foreground' : 'text-gray-900 dark:text-gray-100'} break-words`}>{service.name}</h4>
+                                          <p className={`text-sm mt-1 ${isMobileView ? 'break-words' : ''} ${field.value === service.id.toString() ? 'text-primary-foreground/90' : 'text-gray-500 dark:text-gray-400'}`}>{service.description}</p>
+                                          <div className={`mt-2 flex items-center text-sm ${field.value === service.id.toString() ? 'text-primary-foreground/90' : 'text-gray-500 dark:text-gray-400'}`}>
                                             <Clock className="h-4 w-4 mr-1" /> {formatDuration(service.duration)}
                                           </div>
                                         </div>
-                                        <div className={`text-lg font-semibold sm:text-right ${field.value === service.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+                                        <div className={`text-lg font-semibold sm:text-right ${field.value === service.id.toString() ? 'text-primary-foreground' : 'text-gray-900 dark:text-gray-100'}`}>
                                           {formatPrice(service.price)}
                                         </div>
                                       </div>
@@ -1775,7 +1802,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 3: Staff Selection */}
             {currentStep === 2 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">Select Staff Member</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Select Staff Member</h3>
                 
                 <FormField
                   control={form.control}
@@ -1783,13 +1810,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   render={({ field }) => (
                     <FormItem className="space-y-1">
                       <FormControl>
-                        <div className="grid grid-cols-1 gap-4">
+                        <div className={`grid grid-cols-1 ${isMobileView ? 'gap-3' : 'gap-4'}`}>
                           {selectedServiceId && (availableStaff as any[]).length > 0 && (
                             <Card
                               key="any-staff"
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === ANY_STAFF_ID
-                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
+                                  ? "border-primary ring-2 ring-primary ring-opacity-50 bg-[hsla(var(--primary),0.10)]"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(ANY_STAFF_ID)}
@@ -1800,8 +1827,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     *
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className={`text-base font-medium ${field.value === ANY_STAFF_ID ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>Any available staff</h4>
-                                    <p className={`text-sm ${field.value === ANY_STAFF_ID ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>We'll assign a qualified staff member for this service.</p>
+                                    <h4 className={`text-base font-medium ${field.value === ANY_STAFF_ID ? 'text-primary-foreground' : 'text-gray-900 dark:text-gray-100'}`}>Any available staff</h4>
+                                    <p className={`text-sm ${field.value === ANY_STAFF_ID ? 'text-primary-foreground/90' : 'text-gray-500 dark:text-gray-400'}`}>We'll assign a qualified staff member for this service.</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1812,7 +1839,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               key={staffMember.id}
                               className={`cursor-pointer transition-all hover:shadow-md ${
                                 field.value === staffMember.id.toString()
-                                  ? "border-primary ring-4 ring-primary ring-opacity-70 bg-[hsla(var(--primary),0.10)] text-white"
+                                  ? "border-primary ring-2 ring-primary ring-opacity-50 bg-[hsla(var(--primary),0.10)]"
                                   : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
                               }`}
                               onClick={() => field.onChange(staffMember.id.toString())}
@@ -1823,7 +1850,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                     {`${staffMember.user?.firstName?.[0] || ""}${staffMember.user?.lastName?.[0] || ""}`}
                                   </div>
                                   <div className="ml-4">
-                                    <h4 className={`text-base font-medium ${field.value === staffMember.id.toString() ? '!text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+                                    <h4 className={`text-base font-medium ${field.value === staffMember.id.toString() ? 'text-primary-foreground' : 'text-gray-900 dark:text-gray-100'}`}>
                                       {(() => {
                                         const u = (staffMember as any)?.user || {};
                                         const first = (u.firstName || '').trim();
@@ -1832,7 +1859,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                                         return full || u.username || 'Unknown Staff';
                                       })()}
                                     </h4>
-                                    <p className={`text-sm ${field.value === staffMember.id.toString() ? '!text-white/90' : 'text-gray-500 dark:text-gray-400'}`}>{staffMember.title}</p>
+                                    <p className={`text-sm ${field.value === staffMember.id.toString() ? 'text-primary-foreground/90' : 'text-gray-500 dark:text-gray-400'}`}>{staffMember.title}</p>
                                   </div>
                                 </div>
                               </CardContent>
@@ -1855,7 +1882,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 4: Date and Time Selection */}
             {currentStep === 3 && (
               <div className="space-y-4">
-                <h3 className={isMobileView ? "text-base font-medium text-foreground" : "text-lg font-medium text-foreground"}>Select Date & Time</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Select Date & Time</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -1869,7 +1896,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             <FormControl>
                               <Button
                                 variant="outline"
-                                className={`w-full px-4 text-left font-normal leading-none justify-start border-foreground text-foreground bg-transparent hover:bg-transparent ${isMobileView ? 'h-10 min-h-[40px] text-base' : 'h-12 min-h-[48px] text-base'} py-0 flex items-center`}
+                                className={`w-full px-4 text-left font-normal leading-none justify-start border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent ${isMobileView ? 'h-10 min-h-[40px] text-base' : 'h-12 min-h-[48px] text-base'} py-0 flex items-center`}
                               >
                                 {field.value ? (
                                   format(field.value, "PPP")
@@ -1980,7 +2007,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 5: Customer Details */}
             {currentStep === 4 && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">Your Details</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Your Details</h3>
                 
                 {/* Show appointment history if existing client found */}
                 {existingClient && clientAppointmentHistory.length > 0 && (
@@ -2017,9 +2044,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     name="firstName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>First Name</FormLabel>
+                        <FormLabel className="text-gray-900 dark:text-gray-100">First Name</FormLabel>
                         <FormControl>
-                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="John" {...field} />
+                          <Input className="text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 bg-white dark:bg-gray-800" placeholder="John" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2031,9 +2058,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     name="lastName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Last Name</FormLabel>
+                        <FormLabel className="text-gray-900 dark:text-gray-100">Last Name</FormLabel>
                         <FormControl>
-                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="Doe" {...field} />
+                          <Input className="text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 bg-white dark:bg-gray-800" placeholder="Doe" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2047,10 +2074,10 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel className="text-gray-900 dark:text-gray-100">Email</FormLabel>
                         <FormControl>
                           <Input 
-                            className="text-foreground placeholder:text-muted-foreground"
+                            className="text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 bg-white dark:bg-gray-800"
                             type="text" 
                             placeholder="Enter email address" 
                             autoComplete="off"
@@ -2072,9 +2099,9 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     name="phone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Phone</FormLabel>
+                        <FormLabel className="text-gray-900 dark:text-gray-100">Phone</FormLabel>
                         <FormControl>
-                          <Input className="text-foreground placeholder:text-muted-foreground" placeholder="(123) 456-7890" {...field} />
+                          <Input className="text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 bg-white dark:bg-gray-800" placeholder="(123) 456-7890" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2087,10 +2114,10 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Notes (Optional)</FormLabel>
+                      <FormLabel className="text-gray-900 dark:text-gray-100">Notes (Optional)</FormLabel>
                       <FormControl>
                         <Textarea 
-                          className="text-foreground placeholder:text-muted-foreground"
+                          className="text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 bg-white dark:bg-gray-800"
                           placeholder="Any special requests or information for your appointment..."
                           {...field}
                           value={field.value || ""}
@@ -2133,13 +2160,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                         name="recurringFrequency"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Frequency</FormLabel>
+                            <FormLabel className="text-gray-900 dark:text-gray-100">Frequency</FormLabel>
                             <Select
                               onValueChange={field.onChange}
                               defaultValue={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger className="text-black">
+                                <SelectTrigger className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">
                                   <SelectValue placeholder="Select frequency" />
                                 </SelectTrigger>
                               </FormControl>
@@ -2159,13 +2186,13 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                         name="recurringCount"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Number of Appointments</FormLabel>
+                            <FormLabel className="text-gray-900 dark:text-gray-100">Number of Appointments</FormLabel>
                             <Select
                               onValueChange={(value) => field.onChange(Number(value))}
                               defaultValue={field.value?.toString()}
                             >
                               <FormControl>
-                                <SelectTrigger className="text-black">
+                                <SelectTrigger className="text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-800">
                                   <SelectValue placeholder="Select number of appointments" />
                                 </SelectTrigger>
                               </FormControl>
@@ -2187,7 +2214,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       
                       {form.watch('recurringFrequency') && form.watch('recurringCount') && (
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
-                          <p className="text-sm text-white">
+                          <p className="text-sm text-blue-900 dark:text-blue-100">
                             <strong>Preview:</strong> This will create {form.watch('recurringCount')} appointments, 
                             scheduled {form.watch('recurringFrequency') === 'weekly' ? 'every week' : 
                                      form.watch('recurringFrequency') === 'biweekly' ? 'every 2 weeks' : 
@@ -2231,7 +2258,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             {/* Step 6: Save Card */}
             {currentStep === saveCardStepIndex && (
               <div className="space-y-4">
-                <h3 className="text-lg font-medium text-foreground">Save Payment Method</h3>
+                <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Save Payment Method</h3>
                 
                 {/* Booking summary */}
                 {selectedService && (
@@ -2286,7 +2313,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                       <div className="text-center space-y-4">
                         <CreditCard className="h-16 w-16 text-primary mx-auto" />
                         <div className="space-y-2">
-                          <p className="text-lg font-medium text-foreground">
+                          <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
                             Final Step: Add Your Payment Method
                           </p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -2294,11 +2321,16 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                           </p>
                         </div>
                         <Button
-                          onClick={handleSubmit}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            console.log("[BookingWidget] Save card button clicked");
+                            handleSubmit();
+                          }}
                           disabled={isProcessingBooking}
                           size="lg"
                           variant="outline"
-                          className="w-full h-12 text-base font-semibold border-foreground !text-black hover:!text-black focus:!text-black disabled:!text-black bg-transparent hover:bg-transparent"
+                          className="w-full h-12 text-base font-semibold border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                         >
                           {isProcessingBooking ? (
                             <>
@@ -2338,42 +2370,50 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           </form>
         </Form>
         
-        <DialogFooter className={`flex justify-between mt-4 ${isMobileView ? 'flex-wrap gap-2' : ''}`}>
-          {/* Hide buttons on step 6 (Save Card step) */}
-          {currentStep !== saveCardStepIndex && (
+        <DialogFooter className={isMobileView ? "mt-4 pt-2 border-t border-gray-200 dark:border-gray-700 flex justify-between gap-2" : "flex justify-between mt-4"}>
+          {/* Show Back button on save card step, but hide Next since the step has its own submit button */}
+          {currentStep === saveCardStepIndex ? (
+            <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base' : ''} border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent`} onClick={prevStep}>
+              Back
+            </Button>
+          ) : (
             <>
               {currentStep > 0 ? (
-                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={prevStep}>
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base' : ''} border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent`} onClick={prevStep}>
                   Back
                 </Button>
               ) : (
-                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={closeAndReset}>
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base' : ''} border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent`} onClick={closeAndReset}>
                   Cancel
                 </Button>
               )}
               
               {currentStep < saveCardStepIndex && (
-                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base w-auto' : ''} border-foreground text-foreground bg-transparent hover:bg-transparent`} onClick={nextStep}>
+                <Button type="button" variant="outline" className={`${isMobileView ? 'h-10 px-4 text-base' : ''} border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 bg-transparent hover:bg-transparent`} onClick={nextStep}>
                   Next
                 </Button>
               )}
             </>
           )}
         </DialogFooter>
-        {/* Mobile width constraint wrapper end */}
-        </div>
       </DialogContent>
+    </Dialog>
       
-      {/* Save Card Modal */}
-      {showSaveCardModal && (
-        <SaveCardModal
-          open={showSaveCardModal}
-          onOpenChange={setShowSaveCardModal}
-          clientId={userId || createdClientId || 0}
-          appointmentId={null}  // Don't pass appointment ID since we haven't created it yet
-          customerEmail={bookingData?.email}
-          customerName={bookingData ? `${bookingData.firstName} ${bookingData.lastName}` : ''}
-          onSaved={async (paymentMethod) => {
+    {/* Save Card Modal - Rendered outside the main dialog */}
+    {console.log("[BookingWidget] Checking SaveCardModal render conditions:", {
+      showSaveCardModal,
+      bookingData: !!bookingData,
+      clientId: userId || createdClientId || 0,
+      shouldRender: showSaveCardModal
+    })}
+    {showSaveCardModal && (
+      <SaveCardModal
+        open={showSaveCardModal}
+        onOpenChange={setShowSaveCardModal}
+        clientId={userId || createdClientId || 0}
+        customerEmail={bookingData?.email || ''}
+        customerName={bookingData ? `${bookingData.firstName} ${bookingData.lastName}` : ''}
+        onSaved={async (paymentMethod) => {
             setSavedCardInfo(paymentMethod);
             setShowSaveCardModal(false);
             
@@ -2419,87 +2459,172 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             }
           }}
         />
-      )}
-    </Dialog>
+    )}
     
     {/* Appointment Confirmed Popup - Outside main dialog */}
     {showConfirmation ? (
       <div 
         style={{ 
           position: 'fixed', 
-          top: '0px', 
-          left: '0px', 
-          right: '0px', 
-          bottom: '0px', 
+          top: '0', 
+          left: '0', 
+          right: '0', 
+          bottom: '0', 
           zIndex: 999999, 
           backgroundColor: 'rgba(0, 0, 0, 0.8)', 
           display: 'flex', 
           alignItems: 'center', 
           justifyContent: 'center',
-          pointerEvents: 'auto'
+          pointerEvents: 'auto',
+          padding: isMobileView ? '0' : '20px'
         }}
       >
         <div 
           style={{ 
+            position: isMobileView ? 'absolute' : 'relative',
+            left: isMobileView ? '4px' : 'auto',
+            right: isMobileView ? '4px' : 'auto',
+            top: isMobileView ? '60px' : 'auto',
             backgroundColor: 'white', 
-            padding: '40px', 
-            borderRadius: '12px', 
-            maxWidth: '500px', 
-            width: '90%', 
+            padding: isMobileView ? '14px' : '40px', 
+            borderRadius: isMobileView ? '8px' : '12px', 
+            width: isMobileView ? 'calc(100% - 8px)' : '90%',
+            maxWidth: isMobileView ? 'none' : '500px', 
+            margin: '0 auto',
             color: 'black',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
+            boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
+            maxHeight: isMobileView ? 'calc(100vh - 120px)' : '90vh',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            WebkitOverflowScrolling: 'touch',
+            boxSizing: 'border-box',
+            transform: isMobileView ? 'none' : 'translateY(0)'
           }}
         >
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', textAlign: 'center' }}>
+          <h2 style={{ 
+            fontSize: isMobileView ? '18px' : '24px', 
+            fontWeight: 'bold', 
+            marginBottom: isMobileView ? '12px' : '20px', 
+            marginTop: '0',
+            textAlign: 'center',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            lineHeight: '1.3'
+          }}>
             {form.watch('isRecurring') ? 'Recurring Appointments Confirmed! 🎉' : 'Appointment Confirmed! 🎉'}
           </h2>
-          <p style={{ marginBottom: '20px', textAlign: 'center' }}>
+          <p style={{ 
+            marginBottom: isMobileView ? '12px' : '20px', 
+            textAlign: 'center',
+            fontSize: isMobileView ? '13px' : '16px',
+            wordWrap: 'break-word',
+            overflowWrap: 'break-word',
+            lineHeight: '1.4',
+            margin: isMobileView ? '0 0 12px 0' : '0 0 20px 0'
+          }}>
             {form.watch('isRecurring') 
               ? `Your ${form.watch('recurringCount')} recurring appointments have been successfully booked!`
               : 'Your appointment has been successfully booked!'}
           </p>
           {confirmationData && confirmationData.service && (
-            <div style={{ backgroundColor: '#f5f5f5', padding: '20px', borderRadius: '8px', marginBottom: '20px' }}>
-              <div style={{ marginBottom: '10px' }}><strong>Service:</strong> {confirmationData.service.name}</div>
-              <div style={{ marginBottom: '10px' }}><strong>Date:</strong> {confirmationData.date ? format(confirmationData.date, "PPP") : ""}</div>
-              <div style={{ marginBottom: '10px' }}><strong>Time:</strong> {confirmationData.timeLabel}</div>
-              <div style={{ marginBottom: '10px' }}><strong>Duration:</strong> {formatDuration(confirmationData.service.duration)}</div>
+            <div style={{ 
+              backgroundColor: '#f5f5f5', 
+              padding: isMobileView ? '12px' : '20px', 
+              borderRadius: '6px', 
+              marginBottom: isMobileView ? '12px' : '20px',
+              wordWrap: 'break-word',
+              overflowWrap: 'break-word',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ 
+                marginBottom: isMobileView ? '6px' : '10px', 
+                fontSize: isMobileView ? '12px' : '16px',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
+                lineHeight: '1.4'
+              }}>
+                <strong style={{ display: 'block', marginBottom: '2px' }}>Service:</strong>
+                <div style={{ paddingLeft: isMobileView ? '0' : '0' }}>{confirmationData.service.name}</div>
+              </div>
+              <div style={{ 
+                marginBottom: isMobileView ? '6px' : '10px', 
+                fontSize: isMobileView ? '12px' : '16px',
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere'
+              }}>
+                <strong style={{ display: 'block', marginBottom: '2px' }}>Date:</strong>
+                <div style={{ paddingLeft: isMobileView ? '0' : '0' }}>{confirmationData.date ? format(confirmationData.date, isMobileView ? "PP" : "PPP") : ""}</div>
+              </div>
+              <div style={{ 
+                marginBottom: isMobileView ? '6px' : '10px', 
+                fontSize: isMobileView ? '12px' : '16px',
+                wordBreak: 'break-word'
+              }}>
+                <strong>Time:</strong> {confirmationData.timeLabel}
+              </div>
+              <div style={{ 
+                marginBottom: isMobileView ? '6px' : '10px', 
+                fontSize: isMobileView ? '12px' : '16px' 
+              }}>
+                <strong>Duration:</strong> {formatDuration(confirmationData.service.duration)}
+              </div>
               {form.watch('isRecurring') && (
                 <>
-                  <div style={{ marginBottom: '10px' }}><strong>Frequency:</strong> {
-                    form.watch('recurringFrequency') === 'weekly' ? 'Weekly' :
-                    form.watch('recurringFrequency') === 'biweekly' ? 'Bi-weekly' :
-                    'Monthly'
-                  }</div>
-                  <div style={{ marginBottom: '10px' }}><strong>Total Appointments:</strong> {form.watch('recurringCount')}</div>
-                  <div><strong>Total Price:</strong> {formatPrice((confirmationData.service.price || 0) * (form.watch('recurringCount') || 1))}</div>
+                  <div style={{ marginBottom: isMobileView ? '6px' : '10px', fontSize: isMobileView ? '12px' : '16px' }}>
+                    <strong>Frequency:</strong> {
+                      form.watch('recurringFrequency') === 'weekly' ? 'Weekly' :
+                      form.watch('recurringFrequency') === 'biweekly' ? 'Bi-weekly' :
+                      'Monthly'
+                    }
+                  </div>
+                  <div style={{ marginBottom: isMobileView ? '6px' : '10px', fontSize: isMobileView ? '12px' : '16px' }}>
+                    <strong>Total Appointments:</strong> {form.watch('recurringCount')}
+                  </div>
+                  <div style={{ fontSize: isMobileView ? '12px' : '16px' }}>
+                    <strong>Total Price:</strong> {formatPrice((confirmationData.service.price || 0) * (form.watch('recurringCount') || 1))}
+                  </div>
                 </>
               )}
               {!form.watch('isRecurring') && (
-                <div><strong>Price:</strong> {formatPrice(confirmationData.service.price)}</div>
+                <div style={{ fontSize: isMobileView ? '12px' : '16px' }}>
+                  <strong>Price:</strong> {formatPrice(confirmationData.service.price)}
+                </div>
               )}
             </div>
           )}
-          <p style={{ marginBottom: '20px', textAlign: 'center', fontSize: '14px', color: '#666' }}>
+          <p style={{ 
+            marginBottom: isMobileView ? '12px' : '20px', 
+            textAlign: 'center', 
+            fontSize: isMobileView ? '11px' : '14px', 
+            color: '#666',
+            lineHeight: '1.4'
+          }}>
             {form.watch('isRecurring')
               ? 'You will receive a confirmation email with all your appointment dates.'
               : 'You will receive a confirmation email with your appointment details.'}
           </p>
-          <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: isMobileView ? '6px' : '10px', 
+            flexDirection: 'column',
+            width: '100%'
+          }}>
             <button
               onClick={() => {
                 closeAndReset();
               }}
               style={{ 
                 width: '100%', 
-                padding: '12px', 
+                padding: isMobileView ? '8px' : '12px', 
                 backgroundColor: '#000', 
                 color: 'white', 
                 border: 'none', 
-                borderRadius: '6px', 
-                fontSize: '16px', 
+                borderRadius: '4px', 
+                fontSize: isMobileView ? '12px' : '16px', 
                 cursor: 'pointer',
-                fontWeight: '600'
+                fontWeight: '600',
+                boxSizing: 'border-box'
               }}
             >
               Book Another Appointment
@@ -2525,13 +2650,14 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               }}
               style={{ 
                 width: '100%', 
-                padding: '12px', 
+                padding: isMobileView ? '8px' : '12px', 
                 backgroundColor: 'transparent', 
                 color: '#000', 
                 border: '1px solid #ccc', 
-                borderRadius: '6px', 
-                fontSize: '16px', 
-                cursor: 'pointer' 
+                borderRadius: '4px', 
+                fontSize: isMobileView ? '12px' : '16px', 
+                cursor: 'pointer',
+                boxSizing: 'border-box'
               }}
             >
               Close

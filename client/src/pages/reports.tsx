@@ -2503,8 +2503,40 @@ const TimeClockReport = ({ }: {
     refetchOnMount: true,
     staleTime: 0,
   });
+
+  // Fetch staff data to display names instead of IDs
+  const { data: staff = [] } = useQuery({
+    queryKey: ["/api/staff"],
+  });
+
+  const { data: users = [] } = useQuery({
+    queryKey: ["/api/users"],
+  });
   
   const [syncing, setSyncing] = useState(false);
+
+  // Helper function to get staff name from staffId
+  const getStaffName = (staffId: number) => {
+    const staffMember = (staff as any[]).find((s: any) => s.id === staffId);
+    if (staffMember) {
+      // Try to get user's full name
+      const user = (users as any[]).find((u: any) => u.id === staffMember.userId || u.id === staffMember.user_id);
+      if (user) {
+        const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+        if (fullName) return fullName;
+        if (user.username) return user.username;
+      }
+      // Fallback to staff member data
+      if (staffMember.user) {
+        const fullName = `${staffMember.user.firstName || ''} ${staffMember.user.lastName || ''}`.trim();
+        if (fullName) return fullName;
+        if (staffMember.user.username) return staffMember.user.username;
+      }
+      // Fallback to title
+      if (staffMember.title) return staffMember.title;
+    }
+    return `Staff Member #${staffId}`;
+  };
   
   const handleSync = async () => {
     setSyncing(true);
@@ -2645,7 +2677,7 @@ const TimeClockReport = ({ }: {
                           return (
                             <tr key={entry.id}>
                               <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
-                                Staff #{entry.staffId}
+                                {getStaffName(entry.staffId)}
                               </td>
                               <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
                                 {clockIn.toLocaleDateString()}

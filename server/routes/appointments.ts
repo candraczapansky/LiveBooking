@@ -540,7 +540,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               messageType: 'confirmation',
               locationId: String((newAppointment as any).locationId ?? 'global'),
               channel: 'email',
-              to: { email: client.email, name: client.firstName || client.username },
+              to: { email: client.email, name: client?.firstName || client?.username || 'Customer' },
               overrides: {
                 subject: `Appointment Confirmation - ${appointmentLocation?.name || 'Glo Head Spa'}`,
                 body: `
@@ -549,10 +549,10 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                   <p>Hello ${client.firstName || client.username},</p>
                   <p>Your appointment has been confirmed:</p>
                   <ul>
-                    <li><strong>Service:</strong> ${service.name}</li>
+                    <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                     <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
                     <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
-                    <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
+                    <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
                     ${appointmentLocation ? `<li><strong>Location:</strong> ${appointmentLocation.name} — ${[appointmentLocation.address, appointmentLocation.city, appointmentLocation.state, appointmentLocation.zipCode].filter(Boolean).join(', ')}</li>` : ''}
                   </ul>
                   <p>We look forward to seeing you!</p>
@@ -581,9 +581,9 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                 messageType: 'confirmation',
                 locationId: String((newAppointment as any).locationId ?? 'global'),
                 channel: 'email',
-                to: { email: client.email, name: client.firstName || client.username },
+                to: { email: client.email, name: client?.firstName || client?.username || 'Customer' },
                 context: {
-                  serviceName: service.name,
+                  serviceName: service?.name || 'Service',
                   appointmentDate: new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime)),
                   appointmentTime: new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime)),
                   staffName: staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'
@@ -618,7 +618,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                     <p>Hello ${client.firstName || client.username},</p>
                     <p>Your appointment has been confirmed:</p>
                     <ul>
-                      <li><strong>Service:</strong> ${service.name}</li>
+                      <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                       <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(newAppointment.startTime))} (Central Time)</li>
                       <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(newAppointment.endTime))} (Central Time)</li>
                       <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
@@ -692,7 +692,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             messageType: 'confirmation',
             locationId: String((newAppointment as any).locationId ?? 'global'),
             channel: 'sms',
-            to: { phone: client.phone, name: client.firstName || client.username },
+            to: { phone: client.phone, name: client?.firstName || client?.username || 'Customer' },
             overrides: { body: smsMessage }
           });
           LoggerService.logCommunication("sms", "appointment_confirmation_sent", { ...context, userId: client.id });
@@ -1156,6 +1156,16 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         const client = await storage.getUser(updatedAppointment.clientId);
         const staffUser = await storage.getUser(updatedAppointment.staffId);
         const service = await storage.getService(updatedAppointment.serviceId);
+        
+        // Check if service exists before proceeding
+        if (!service) {
+          LoggerService.warn("Service not found for reschedule notification", { 
+            ...context, 
+            appointmentId, 
+            serviceId: updatedAppointment.serviceId 
+          });
+        }
+        
         // Resolve appointment location
         let appointmentLocation: any = null;
         try {
@@ -1169,12 +1179,14 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         const startDt = new Date(updatedAppointment.startTime);
         const dateStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'long', day: 'numeric', year: 'numeric' }).format(startDt);
         const timeStr = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(startDt);
+        
+        // Only send notifications if we have client info
         if (client?.emailAppointmentReminders && client.email) {
           await sendLocationMessage({
             messageType: 'reschedule',
             locationId: String((updatedAppointment as any).locationId ?? 'global'),
             channel: 'email',
-            to: { email: client.email, name: client.firstName || client.username },
+            to: { email: client.email, name: client?.firstName || client?.username || 'Customer' },
             context: {
               serviceName: service?.name || 'Service',
               appointmentDate: dateStr,
@@ -1189,7 +1201,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
             messageType: 'reschedule',
             locationId: String((updatedAppointment as any).locationId ?? 'global'),
             channel: 'sms',
-            to: { phone: client.phone, name: client.firstName || client.username },
+            to: { phone: client.phone, name: client?.firstName || client?.username || 'Customer' },
             context: {
               serviceName: service?.name || 'Service',
               appointmentDate: dateStr,
@@ -1367,10 +1379,10 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>Hello ${client.firstName || client.username},</p>
               <p>This is a reminder for your upcoming appointment:</p>
               <ul>
-                <li><strong>Service:</strong> ${service.name}</li>
+                <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                 <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
                 <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
-                <li><strong>Staff:</strong> ${staff.firstName} ${staff.lastName}</li>
+                <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
               </ul>
               <p>We look forward to seeing you!</p>
             </div>
@@ -1387,7 +1399,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     // Send SMS reminder
     if (client.smsAppointmentReminders && client.phone) {
       try {
-        const message = `Reminder: Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service.name} is tomorrow at ${appointment.startTime}.`;
+        const message = `Reminder: Your ${appointmentLocation?.name || 'Glo Head Spa'} appointment for ${service?.name || 'your service'} is tomorrow at ${appointment.startTime}.`;
         await sendLocationMessage({
           messageType: 'reminder',
           locationId: String((appointment as any).locationId ?? 'global'),
@@ -1447,7 +1459,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               messageType: 'reminder',
               locationId: String((appointment as any).locationId ?? 'global'),
               channel: 'email',
-              to: { email: client.email, name: client.firstName || client.username },
+              to: { email: client.email, name: client?.firstName || client?.username || 'Customer' },
               overrides: {
                 subject: `Appointment Reminder - ${apptLoc?.name || 'Glo Head Spa'}`,
                 body: `
@@ -1478,7 +1490,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               messageType: 'reminder',
               locationId: String((appointment as any).locationId ?? 'global'),
               channel: 'sms',
-              to: { phone: client.phone, name: client.firstName || client.username },
+              to: { phone: client.phone, name: client?.firstName || client?.username || 'Customer' },
               overrides: { body: message }
             });
             reminderSent = true;
@@ -1565,7 +1577,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>Hello ${client.firstName || client.username || ''},</p>
               <p>Your appointment has been confirmed:</p>
               <ul>
-                <li><strong>Service:</strong> ${service.name}</li>
+                <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                 <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
                 <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
                 <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>
@@ -1675,7 +1687,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               <p>Hello ${client.firstName || client.username || ''},</p>
               <p>Your appointment has been confirmed:</p>
               <ul>
-                <li><strong>Service:</strong> ${service.name}</li>
+                <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                 <li><strong>Date:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }).format(new Date(appointment.startTime))} (Central Time)</li>
                 <li><strong>Time:</strong> ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.startTime))} - ${new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(appointment.endTime))} (Central Time)</li>
                 <li><strong>Staff:</strong> ${staff ? `${staff.firstName} ${staff.lastName}` : 'Your stylist'}</li>

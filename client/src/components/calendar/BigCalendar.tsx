@@ -108,12 +108,12 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
     );
   };
 
-  // Ensure clicks on events (especially blocked) do not bubble into slot-selection
+  // Ensure clicks on events (especially blocked and available) do not bubble into slot-selection
   const EventWrapper: React.FC<any> = (props: any) => {
     const ev = props?.event;
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
       try {
-        if (ev && (ev as any).type === 'blocked') {
+        if (ev && ((ev as any).type === 'blocked' || (ev as any).type === 'available')) {
           e.preventDefault();
           e.stopPropagation();
           onSelectEvent?.(ev);
@@ -123,7 +123,7 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
     };
     const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
       try {
-        if (ev && (ev as any).type === 'blocked') {
+        if (ev && ((ev as any).type === 'blocked' || (ev as any).type === 'available')) {
           e.preventDefault();
           e.stopPropagation();
           onSelectEvent?.(ev);
@@ -214,10 +214,11 @@ const BigCalendar: React.FC<BigCalendarProps> = ({ events, resources, background
             return {
               style: {
                 backgroundColor: availableColor || '#dbeafe',
-                border: 'none',
-                opacity: 1,
-                zIndex: 1,
-                pointerEvents: 'none',
+                border: '1px solid #93c5fd',
+                opacity: 0.8,
+                zIndex: 2,
+                pointerEvents: 'auto',
+                cursor: 'pointer',
               },
             };
           }

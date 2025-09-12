@@ -811,6 +811,7 @@ const LocationsPage = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </div>
   );
 };
 

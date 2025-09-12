@@ -81,6 +81,8 @@ const HelpScheduleDetailed = lazy(() => import("@/pages/help/schedule-detailed")
 const HelpStaffScheduleDetailed = lazy(() => import("@/pages/help/staff-schedule-detailed"));
 const HelpMembershipsDetailed = lazy(() => import("@/pages/help/memberships-detailed"));
 const BookingDesign = lazy(() => import("@/pages/booking-design"));
+const AppointmentsMobile = lazy(() => import("@/pages/appointments-mobile"));
+const AppointmentsWrapper = lazy(() => import("@/pages/appointments-wrapper"));
 
 // Loading component for lazy-loaded routes
 const PageLoading = () => (
@@ -186,10 +188,22 @@ function Router() {
                 'edit_appointments',
                 'update_appointments',
               ]}>
-                <Appointments />
+                <AppointmentsWrapper />
               </ProtectedRoute>
             );
           }} />
+          <Route path="/appointments-mobile" component={() => (
+            <ProtectedRoute anyPermissions={[
+              'view_calendar',
+              'edit_calendar',
+              'view_appointments',
+              'create_appointments',
+              'edit_appointments',
+              'update_appointments',
+            ]}>
+              <AppointmentsMobile />
+            </ProtectedRoute>
+          )} />
           <Route path="/classes" component={Classes} />
           <Route path="/memberships" component={Memberships} />
           <Route path="/reports" component={Reports} />

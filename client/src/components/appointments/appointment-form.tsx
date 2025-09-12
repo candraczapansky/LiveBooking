@@ -9,6 +9,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation } from "@/contexts/LocationContext";
 import AppointmentCheckout from "./appointment-checkout";
 import { ClientCreationDialog } from "./client-creation-dialog";
+import { EditAvailabilityDialog } from "./edit-availability-dialog";
 
 import {
   Dialog,
@@ -35,7 +36,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { Clock, CreditCard, DollarSign, Loader2, User, ChevronsUpDown, Check } from "lucide-react";
+import { Clock, CreditCard, DollarSign, Loader2, User, ChevronsUpDown, Check, Calendar, MapPin } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 
 import { Button } from "@/components/ui/button";
 import CheckoutWithTerminal from "@/components/payment/checkout-with-terminal";
@@ -74,6 +77,9 @@ interface AppointmentFormProps {
   appointments: any[];
   selectedDate?: Date;
   selectedTime?: string;
+  preSelectedStaffId?: number | null;
+  selectedSchedule?: any;
+  onCloseCallback?: () => void;
 }
 
 const generateTimeSlots = () => {
@@ -156,7 +162,7 @@ const isStaffScheduledForDate = (
 
 
 
-const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated, appointments }: AppointmentFormProps) => {
+const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, selectedTime, onAppointmentCreated, appointments, preSelectedStaffId, selectedSchedule, onCloseCallback }: AppointmentFormProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [clientSearchValue, setClientSearchValue] = useState("");
@@ -166,6 +172,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const { selectedLocation } = useLocation();
   const [debouncedClientSearch, setDebouncedClientSearch] = useState("");
   const [serviceComboboxOpen, setServiceComboboxOpen] = useState(false);
+  const [showScheduleEdit, setShowScheduleEdit] = useState(false);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -178,11 +185,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const form = useForm<AppointmentFormValues>({
     resolver: zodResolver(appointmentFormSchema),
     defaultValues: {
-      staffId: "",
+      staffId: preSelectedStaffId?.toString() || "",
       serviceId: "",
       clientId: "",
       date: selectedDate || new Date(),
-      time: "10:00",
+      time: selectedTime || "10:00",
       notes: "",
       // Recurring defaults
       isRecurring: false,
@@ -513,11 +520,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   useEffect(() => {
     if (!open) {
       form.reset({
-        staffId: "",
+        staffId: preSelectedStaffId?.toString() || "",
         serviceId: "",
         clientId: "",
         date: selectedDate || new Date(),
-        time: "10:00",
+        time: selectedTime || "10:00",
         notes: "",
       });
       // Reset client search value when closing
@@ -527,11 +534,11 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       const resetDate = selectedDate || new Date();
       console.log('Resetting form with date:', resetDate);
       form.reset({
-        staffId: "",
+        staffId: preSelectedStaffId?.toString() || "",
         serviceId: "",
         clientId: "",
         date: resetDate,
-        time: "10:00",
+        time: selectedTime || "10:00",
         notes: "",
       });
       // Reset client search value for new appointments
@@ -1017,18 +1024,44 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <Dialog open={open} onOpenChange={(value) => {
+        onOpenChange(value);
+        if (!value && onCloseCallback) {
+          onCloseCallback();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {appointmentId && appointmentId > 0 ? "Edit Appointment" : "Create Appointment"}
-            </DialogTitle>
-            <DialogDescription>
-              {appointmentId && appointmentId > 0 
-                ? "Update the appointment details below." 
-                : "Fill in the details to create a new appointment."
-              }
-            </DialogDescription>
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <DialogTitle>
+                  {preSelectedStaffId && selectedSchedule 
+                    ? "Appointment & Schedule Management" 
+                    : appointmentId && appointmentId > 0 
+                      ? "Edit Appointment" 
+                      : "Create Appointment"}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {preSelectedStaffId && selectedSchedule
+                    ? "Create an appointment or adjust the schedule for this time slot."
+                    : appointmentId && appointmentId > 0 
+                      ? "Update the appointment details below." 
+                      : "Fill in the details to create a new appointment."}
+                </DialogDescription>
+              </div>
+              {preSelectedStaffId && selectedSchedule && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowScheduleEdit(true)}
+                  className="ml-4"
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Adjust Schedule
+                </Button>
+              )}
+            </div>
           </DialogHeader>
           
           <Form {...form}>
@@ -1714,6 +1747,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           });
         }}
       />
+      
+      {/* Schedule Edit Dialog */}
+      {preSelectedStaffId && selectedSchedule && (
+        <EditAvailabilityDialog
+          open={showScheduleEdit}
+          onOpenChange={setShowScheduleEdit}
+          staffId={preSelectedStaffId}
+          date={selectedDate || new Date()}
+          locationId={selectedLocation?.id}
+          existingSchedule={selectedSchedule}
+        />
+      )}
     </>
   );
 };
