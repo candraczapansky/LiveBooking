@@ -2257,37 +2257,37 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
             
             {/* Step 6: Save Card */}
             {currentStep === saveCardStepIndex && (
-              <div className="space-y-4">
+              <div className={isMobileView ? "space-y-3 overflow-x-hidden w-full" : "space-y-4"}>
                 <h3 className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>Save Payment Method</h3>
                 
                 {/* Booking summary */}
                 {selectedService && (
-                  <Card>
-                    <CardContent className="pt-6">
-                      <h4 className="font-medium mb-3">Booking Summary</h4>
+                  <Card className={isMobileView ? "overflow-hidden" : ""}>
+                    <CardContent className={isMobileView ? "p-3 overflow-hidden" : "pt-6 overflow-hidden"}>
+                      <h4 className={isMobileView ? "font-medium mb-2 text-sm" : "font-medium mb-3"}>Booking Summary</h4>
                       <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Service:</span>
-                          <span className="font-medium">{selectedService.name}</span>
+                        <div className={isMobileView ? "flex flex-col text-sm gap-1" : "flex items-start justify-between text-sm gap-2"}>
+                          <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Service:</span>
+                          <span className={isMobileView ? "font-medium break-words" : "font-medium text-right break-words whitespace-normal min-w-0"}>{selectedService.name}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Date:</span>
-                          <span className="font-medium">{format(form.watch('date'), "PPP")}</span>
+                        <div className={isMobileView ? "flex flex-col text-sm gap-1" : "flex items-start justify-between text-sm gap-2"}>
+                          <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Date:</span>
+                          <span className={isMobileView ? "font-medium break-words" : "font-medium text-right break-words whitespace-normal min-w-0"}>{format(form.watch('date'), isMobileView ? "PP" : "PPP")}</span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Time:</span>
-                          <span className="font-medium">
+                        <div className={isMobileView ? "flex flex-col text-sm gap-1" : "flex items-start justify-between text-sm gap-2"}>
+                          <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Time:</span>
+                          <span className={isMobileView ? "font-medium break-words" : "font-medium text-right break-words whitespace-normal min-w-0"}>
                             {timeSlots.find(slot => slot.value === form.watch('time'))?.label || form.watch('time')}
                           </span>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Duration:</span>
-                          <span className="font-medium">{formatDuration(selectedService.duration)}</span>
+                        <div className={isMobileView ? "flex flex-col text-sm gap-1" : "flex items-start justify-between text-sm gap-2"}>
+                          <span className="text-gray-600 dark:text-gray-400 flex-shrink-0">Duration:</span>
+                          <span className={isMobileView ? "font-medium break-words" : "font-medium text-right break-words whitespace-normal min-w-0"}>{formatDuration(selectedService.duration)}</span>
                         </div>
                         <div className="border-t pt-2 mt-2">
-                          <div className="flex justify-between">
-                            <span className="font-medium">Service Price:</span>
-                            <span className="font-bold text-lg">{formatPrice(selectedService.price)}</span>
+                          <div className={isMobileView ? "flex flex-col gap-1" : "flex items-start justify-between gap-2"}>
+                            <span className={isMobileView ? "text-sm font-medium" : "font-medium"}>Service Price:</span>
+                            <span className={isMobileView ? "font-bold text-base" : "font-bold text-lg text-right min-w-0"}>{formatPrice(selectedService.price)}</span>
                           </div>
                         </div>
                       </div>
@@ -2295,28 +2295,28 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                   </Card>
                 )}
                 
-                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
-                  <p className="text-sm text-green-800 dark:text-green-200">
+                <div className={isMobileView ? "bg-green-50 dark:bg-green-900/20 p-3 rounded-lg" : "bg-green-50 dark:bg-green-900/20 p-4 rounded-lg"}>
+                  <p className={isMobileView ? "text-xs text-green-800 dark:text-green-200" : "text-sm text-green-800 dark:text-green-200"}>
                     <strong>No payment required now!</strong> We'll securely save your card on file for easy checkout after your appointment. You will only be charged after your service is completed.
                   </p>
                 </div>
                 
                 {savedCardInfo ? (
-                  <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                  <div className={isMobileView ? "bg-gray-50 dark:bg-gray-800 p-2 rounded-lg" : "bg-gray-50 dark:bg-gray-800 p-3 rounded-lg"}>
+                    <p className={isMobileView ? "text-xs text-gray-600 dark:text-gray-400" : "text-sm text-gray-600 dark:text-gray-400"}>
                       Card saved: {savedCardInfo.brand || savedCardInfo.cardBrand || 'Card'} ending in {savedCardInfo.last4 || savedCardInfo.cardLast4 || '****'}
                     </p>
                   </div>
                 ) : (
-                  <Card className="border-2 border-primary/50 shadow-lg">
-                    <CardContent className="pt-6">
-                      <div className="text-center space-y-4">
-                        <CreditCard className="h-16 w-16 text-primary mx-auto" />
+                  <Card className={isMobileView ? "border-2 border-primary/50 shadow-lg overflow-hidden" : "border-2 border-primary/50 shadow-lg"}>
+                    <CardContent className={isMobileView ? "p-4" : "pt-6"}>
+                      <div className="text-center space-y-3">
+                        <CreditCard className={isMobileView ? "h-12 w-12 text-primary mx-auto" : "h-16 w-16 text-primary mx-auto"} />
                         <div className="space-y-2">
-                          <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                          <p className={isMobileView ? "text-base font-medium text-gray-900 dark:text-gray-100" : "text-lg font-medium text-gray-900 dark:text-gray-100"}>
                             Final Step: Add Your Payment Method
                           </p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                          <p className={isMobileView ? "text-xs text-gray-600 dark:text-gray-400 px-2" : "text-sm text-gray-600 dark:text-gray-400"}>
                             Your card will be saved securely and charged after your service
                           </p>
                         </div>
@@ -2328,19 +2328,22 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                             handleSubmit();
                           }}
                           disabled={isProcessingBooking}
-                          size="lg"
+                          size={isMobileView ? "default" : "lg"}
                           variant="outline"
-                          className="w-full h-12 text-base font-semibold border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          className={isMobileView 
+                            ? "w-full h-10 text-sm font-semibold border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                            : "w-full h-12 text-base font-semibold border-gray-700 dark:border-gray-300 text-gray-900 dark:text-gray-100 hover:text-gray-900 dark:hover:text-gray-100 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          }
                         >
                           {isProcessingBooking ? (
                             <>
-                              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                              <Loader2 className={isMobileView ? "mr-2 h-4 w-4 animate-spin" : "mr-2 h-5 w-5 animate-spin"} />
                               Processing...
                             </>
                           ) : (
                             <>
-                              <CreditCard className="mr-2 h-5 w-5" />
-                              Add Payment Method & Complete Booking
+                              <CreditCard className={isMobileView ? "mr-2 h-4 w-4" : "mr-2 h-5 w-5"} />
+                              {isMobileView ? "Add Payment & Book" : "Add Payment Method & Complete Booking"}
                             </>
                           )}
                         </Button>
