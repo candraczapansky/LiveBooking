@@ -43,6 +43,61 @@ export default function StaffScheduleDetailPage() {
     }
   });
 
+  // Fetch locations for display - MOVED BEFORE CONDITIONAL RETURNS
+  const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useQuery<any[]>({
+    queryKey: ['/api/locations'],
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching locations:', error);
+    }
+  });
+
+  // Fetch schedules for this staff member - MOVED BEFORE CONDITIONAL RETURNS
+  const { data: allSchedules = [], isLoading: schedulesLoading, error: schedulesError } = useQuery<any[]>({
+    queryKey: ['/api/schedules'],
+    staleTime: 0, // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    retry: 1,
+    onError: (error) => {
+      console.error('Error fetching schedules:', error);
+    }
+  });
+
+  // Delete schedule mutation - MOVED BEFORE CONDITIONAL RETURNS
+  const deleteScheduleMutation = useMutation({
+    mutationFn: async (scheduleId: number) => {
+      const response = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
+      if (!response.ok) {
+        throw new Error("Failed to delete schedule");
+      }
+    },
+    onSuccess: () => {
+      // Invalidate all schedules queries (including location-scoped keys)
+      try {
+        queryClient.invalidateQueries({ 
+          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
+        });
+        queryClient.refetchQueries({ 
+          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
+        });
+      } catch {}
+      // Dispatch custom event to notify calendar
+      try { window.dispatchEvent(new CustomEvent('schedule-updated')); } catch {}
+      toast({
+        title: "Success",
+        description: "Schedule deleted successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error("Failed to delete schedule:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete schedule. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Determine the staff member for this page
   const staffMember = staff.find((s: any) => s.id === staffId);
 
@@ -55,6 +110,33 @@ export default function StaffScheduleDetailPage() {
   // Check if user can access this schedule (safe after staffMember is defined)
   const canAccessSchedule = canViewAllSchedules || (canViewOwnSchedule && user?.id && staffMember?.userId === user.id);
   const canEditSchedule = canEditAllSchedules || (canEditOwnSchedule && user?.id && staffMember?.userId === user.id);
+
+  // Filter schedules for this staff member
+  const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
+
+  // Group schedules by location for better organization
+  const schedulesByLocation = staffSchedules.reduce((acc: any, schedule: any) => {
+    const location = locations.find((loc: any) => loc.id === schedule.locationId);
+    const locationName = location?.name || 'Unknown Location';
+    
+    if (!acc[locationName]) {
+      acc[locationName] = [];
+    }
+    acc[locationName].push({ ...schedule, locationName });
+    return acc;
+  }, {});
+
+  // Group schedules by day for weekly view
+  const schedulesByDay = staffSchedules.reduce((acc: any, schedule: any) => {
+    const dayName = schedule.dayOfWeek;
+    if (!acc[dayName]) {
+      acc[dayName] = [];
+    }
+    acc[dayName].push(schedule);
+    return acc;
+  }, {});
+
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
   // While loading staff, avoid premature access checks
   if (staffLoading) {
@@ -90,15 +172,6 @@ export default function StaffScheduleDetailPage() {
     );
   }
 
-  // Fetch locations for display
-  const { data: locations = [], isLoading: locationsLoading, error: locationsError } = useQuery<any[]>({
-    queryKey: ['/api/locations'],
-    retry: 1,
-    onError: (error) => {
-      console.error('Error fetching locations:', error);
-    }
-  });
-
   // Add error handling for missing staff member
   if (!staffMember && staff.length > 0) {
     console.error('Staff member not found:', { staffId, availableStaff: staff.map(s => ({ id: s.id, userId: s.userId, title: s.title })) });
@@ -120,79 +193,6 @@ export default function StaffScheduleDetailPage() {
       </div>
     );
   }
-
-  // Fetch schedules for this staff member
-  const { data: allSchedules = [], isLoading: schedulesLoading, error: schedulesError } = useQuery<any[]>({
-    queryKey: ['/api/schedules'],
-    staleTime: 0, // Always refetch when component mounts
-    refetchOnWindowFocus: true, // Refetch when window gains focus
-    retry: 1,
-    onError: (error) => {
-      console.error('Error fetching schedules:', error);
-    }
-  });
-
-  const staffSchedules = allSchedules.filter((schedule: any) => schedule.staffId === staffId);
-
-  // Group schedules by location for better organization
-  const schedulesByLocation = staffSchedules.reduce((acc: any, schedule: any) => {
-    const location = locations.find((loc: any) => loc.id === schedule.locationId);
-    const locationName = location?.name || 'Unknown Location';
-    
-    if (!acc[locationName]) {
-      acc[locationName] = [];
-    }
-    acc[locationName].push({ ...schedule, locationName });
-    return acc;
-  }, {});
-
-  // Group schedules by day for weekly view
-  const schedulesByDay = staffSchedules.reduce((acc: any, schedule: any) => {
-    const dayName = schedule.dayOfWeek;
-    if (!acc[dayName]) {
-      acc[dayName] = [];
-    }
-    acc[dayName].push(schedule);
-    return acc;
-  }, {});
-
-  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-
-  // Delete schedule mutation
-  const deleteScheduleMutation = useMutation({
-    mutationFn: async (scheduleId: number) => {
-      const response = await apiRequest("DELETE", `/api/schedules/${scheduleId}`);
-      if (!response.ok) {
-        throw new Error("Failed to delete schedule");
-      }
-    },
-    onSuccess: () => {
-      // Invalidate all schedules queries (including location-scoped keys)
-      try {
-        queryClient.invalidateQueries({ 
-          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
-        });
-        queryClient.refetchQueries({ 
-          predicate: (q) => Array.isArray((q as any).queryKey) && (q as any).queryKey[0] === '/api/schedules'
-        });
-      } catch {}
-      // Dispatch custom event to notify calendar
-      try { window.dispatchEvent(new CustomEvent('schedule-updated')); } catch {}
-      toast({
-        title: "Success",
-        description: "Schedule deleted successfully.",
-      });
-    },
-    onError: (error) => {
-      console.error("Failed to delete schedule:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete schedule. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleEdit = (schedule: any) => {
     setEditingSchedule(schedule);
     setIsDialogOpen(true);

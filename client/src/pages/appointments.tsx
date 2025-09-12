@@ -86,6 +86,11 @@ const AppointmentsPage = () => {
   const [quickSchedule, setQuickSchedule] = useState<any | null>(null);
   const [quickStartTime, setQuickStartTime] = useState<string>("");
   const [quickEndTime, setQuickEndTime] = useState<string>("");
+  
+  // Store availability info when clicking on availability blocks
+  const [editAvailabilityStaffId, setEditAvailabilityStaffId] = useState<number | null>(null);
+  const [editAvailabilityDate, setEditAvailabilityDate] = useState<Date>(new Date());
+  const [editAvailabilitySchedule, setEditAvailabilitySchedule] = useState<any | null>(null);
   const [quickDate, setQuickDate] = useState<string | null>(null);
   const [repeatWeekly, setRepeatWeekly] = useState<boolean>(false);
   const [repeatEndDate, setRepeatEndDate] = useState<string>("");
@@ -1063,6 +1068,7 @@ const AppointmentsPage = () => {
                     type: 'available',
                     style: { backgroundColor: availableColorLocal, opacity: 1 },
                     isBackground: true,
+                    resource: avail, // Include the full schedule data for editing
                   });
                 });
               } catch {}
@@ -1946,6 +1952,24 @@ const AppointmentsPage = () => {
                           return false;
                         }}
                         onSelectEvent={(event) => {
+                          // Handle availability block clicks - open appointment form
+                          if ((event as any).type === 'available') {
+                            const eventData = event as any;
+                            const start: Date = eventData.start;
+                            const resourceId = eventData.resourceId;
+                            const schedule = eventData.resource;
+                            
+                            // Open appointment form with pre-selected staff and time
+                            setSelectedAppointmentId(null);
+                            // Store the schedule info for the appointment form
+                            setEditAvailabilityStaffId(resourceId);
+                            setEditAvailabilityDate(start);
+                            setEditAvailabilitySchedule(schedule);
+                            setIsFormOpen(true);
+                            return;
+                          }
+                          
+                          // Handle blocked schedule clicks (existing code)
                           if ((event as any).type === 'blocked') {
                             const sch = (event as any).resource;
                             if (sch) {
@@ -2103,7 +2127,14 @@ const AppointmentsPage = () => {
             refetch();
           }}
           appointments={appointments}
-          selectedDate={selectedDate}
+          selectedDate={editAvailabilityDate || selectedDate}
+          selectedStaffId={editAvailabilityStaffId}
+          selectedSchedule={editAvailabilitySchedule}
+          onCloseCallback={() => {
+            setEditAvailabilityStaffId(null);
+            setEditAvailabilityDate(new Date());
+            setEditAvailabilitySchedule(null);
+          }}
         />
       </Suspense>
 
@@ -2143,6 +2174,7 @@ const AppointmentsPage = () => {
           }}
         />
       </Suspense>
+
 
       {/* Simple Add Block Dialog */}
       <Dialog open={isSimpleBlockOpen} onOpenChange={(open) => {
