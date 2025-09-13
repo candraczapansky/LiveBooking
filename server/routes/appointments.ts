@@ -901,7 +901,21 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
               
               // Send SMS confirmation if client has phone
               if (client.phone) {
-                const smsMessage = `Hi ${client.firstName}, your recurring appointment series for ${service?.name || 'Service'} has been confirmed! First appointment: ${firstDate.toLocaleDateString()} at ${firstDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}. ${recurringText} We look forward to seeing you!`;
+                // Use Intl.DateTimeFormat for consistent timezone handling
+                const dateStr = new Intl.DateTimeFormat('en-US', { 
+                  timeZone: 'America/Chicago', 
+                  month: 'long', 
+                  day: 'numeric', 
+                  year: 'numeric' 
+                }).format(firstDate);
+                const timeStr = new Intl.DateTimeFormat('en-US', { 
+                  timeZone: 'America/Chicago', 
+                  hour: 'numeric', 
+                  minute: '2-digit', 
+                  hour12: true 
+                }).format(firstDate);
+                
+                const smsMessage = `Hi ${client.firstName}, your recurring appointment series for ${service?.name || 'Service'} has been confirmed! First appointment: ${dateStr} at ${timeStr}. ${recurringText} We look forward to seeing you!`;
                 
                 try {
                   await sendSMS(client.phone, smsMessage);
@@ -923,6 +937,21 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                     })
                   ).join(', ');
                   
+                  // Use Intl.DateTimeFormat for consistent timezone handling
+                  const firstDateStr = new Intl.DateTimeFormat('en-US', { 
+                    timeZone: 'America/Chicago', 
+                    weekday: 'long', 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  }).format(firstDate);
+                  const firstTimeStr = new Intl.DateTimeFormat('en-US', { 
+                    timeZone: 'America/Chicago', 
+                    hour: 'numeric', 
+                    minute: '2-digit', 
+                    hour12: true 
+                  }).format(firstDate);
+                  
                   await sendEmail({
                     to: client.email,
                     from: process.env.SENDGRID_FROM_EMAIL || 'hello@headspaglo.com',
@@ -936,7 +965,7 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
                           <li><strong>Service:</strong> ${service?.name || 'Service'}</li>
                           <li><strong>Frequency:</strong> ${recurringFrequency === 'weekly' ? 'Weekly' : recurringFrequency === 'biweekly' ? 'Bi-weekly' : 'Monthly'}</li>
                           <li><strong>Number of appointments:</strong> ${recurringCount}</li>
-                          <li><strong>First appointment:</strong> ${firstDate.toLocaleDateString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${firstDate.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })}</li>
+                          <li><strong>First appointment:</strong> ${firstDateStr} at ${firstTimeStr} (Central Time)</li>
                         </ul>
                         <p><strong>All appointment dates:</strong></p>
                         <p>${allDates}</p>
