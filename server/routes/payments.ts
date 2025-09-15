@@ -269,12 +269,11 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     // Update appointment payment status and record checkout time
     await storage.updateAppointment(appointmentId, {
       paymentStatus: 'paid',
-      totalAmount: amount,
-      paymentDate: checkoutTime, // Record when the client was checked out
+      totalAmount: amount
     });
 
-    // Create sales history for reports with checkout time
-    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime });
+    // Create sales history for reports
+    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime: new Date() });
 
     // Create staff earnings record for payroll
     try {
@@ -472,8 +471,8 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       // Note: paidAmount field doesn't exist in appointments table, but we're tracking via payments
     });
 
-    // Create sales history for reports with checkout time
-    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime });
+    // Create sales history for reports
+    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime: new Date() });
 
     // Create staff earnings record for payroll
     try {
@@ -1060,12 +1059,11 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       processedAt: checkoutTime, // Also record processing time if not set
     });
 
-    // Update appointment payment status if appointmentId provided
+      // Update appointment payment status if appointmentId provided
     if (appointmentId) {
       await storage.updateAppointment(appointmentId, {
         paymentStatus: 'paid',
-        totalAmount: payment.amount,
-        paymentDate: checkoutTime, // Record the exact checkout time
+        totalAmount: payment.amount
       });
 
       // Create staff earnings record for payroll
