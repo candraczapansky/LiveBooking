@@ -103,7 +103,7 @@ function buildModel(locationId: string, to: Recipient, context?: Record<string, 
     locationName: loc.name,
     locationFromEmail: loc.fromEmail,
     locationFromNumber: loc.fromNumber,
-    name: to.name,
+    name: to?.name,
     ...context
   };
 }
@@ -118,7 +118,7 @@ export async function sendLocationMessage(input: SendLocationMessageInput): Prom
   const { messageType, locationId, channel, to, context, overrides, photoUrl } = input;
 
   if (channel === 'sms') {
-    if (!to.phone) {
+    if (!to || !to.phone) {
       return { success: false, error: 'Missing recipient phone for SMS' };
     }
     const tpl = getTemplate(locationId, messageType, 'sms') as SmsTemplate | null;
@@ -139,7 +139,7 @@ export async function sendLocationMessage(input: SendLocationMessageInput): Prom
   }
 
   // email
-  if (!to.email) {
+  if (!to || !to.email) {
     return { success: false, error: 'Missing recipient email for Email' };
   }
   const tpl = getTemplate(locationId, messageType, 'email') as EmailTemplate | null;

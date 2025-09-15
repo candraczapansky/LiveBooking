@@ -54,6 +54,7 @@ import { registerMembershipRoutes } from "./routes/memberships.js";
 import { registerNoteTemplateRoutes } from "./routes/note-templates.js";
 import { registerNoteHistoryRoutes } from "./routes/note-history.js";
 import { registerReportRoutes } from "./routes/reports.js";
+import { registerPayrollSalesHistoryRoutes } from "./routes/payroll-sales-history.js";
 import { registerTimeClockRoutes } from "./routes/time-clock.js";
 import { registerClassRoutes } from "./routes/classes.js";
 import { registerBookingDesignRoutes } from "./routes/booking-design.js";
@@ -113,6 +114,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerNoteTemplateRoutes(app, storage);
   registerNoteHistoryRoutes(app, storage);
   registerReportRoutes(app, storage);
+  // Payroll routes using sales history
+  registerPayrollSalesHistoryRoutes(app, storage);
   // Time clock routes
   registerTimeClockRoutes(app, storage);
   // Classes routes
@@ -823,6 +826,42 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error("Error getting sales history:", error);
       return res.status(500).json({
         error: error instanceof Error ? error.message : "Failed to get sales history",
+      });
+    }
+  });
+
+  // New endpoint to update staff assignment for sales history
+  app.put("/api/sales-history/:id/assign-staff", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (Number.isNaN(id)) {
+        return res.status(400).json({ error: "Invalid sales history id" });
+      }
+
+      const { staffId, staffName } = req.body;
+      
+      // Need at least staffName for the update
+      if (!staffName) {
+        return res.status(400).json({ error: "Staff name is required" });
+      }
+
+      // Update the sales history record with new staff assignment
+      const updatedSale = await storage.updateSalesHistory(id, { 
+        staffId: staffId || null,
+        staffName,
+        // Add a note indicating this was manually assigned
+        notes: `${req.body.notes || ''} [Manually assigned to ${staffName}]`.trim()
+      });
+      
+      if (!updatedSale) {
+        return res.status(404).json({ error: "Sales history record not found" });
+      }
+      
+      res.json(updatedSale);
+    } catch (error) {
+      console.error("Error updating sales history staff assignment:", error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to update staff assignment",
       });
     }
   });

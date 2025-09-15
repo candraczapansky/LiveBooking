@@ -345,7 +345,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
           : undefined;
         const requestOrigin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
-        const defaultDomain = 'https://gloheadspa.app';
+        const defaultDomain = 'https://www.glofloapp.com';
         const baseUrl = (process.env.FRONTEND_URL
           || process.env.CUSTOM_DOMAIN
           || replitDomain
@@ -476,7 +476,7 @@ export function registerAuthRoutes(app: Express, storage: IStorage) {
           ? `https://${process.env.REPLIT_DOMAINS.split(',')[0]}`
           : undefined;
         const requestOrigin = req.get('origin') || `${req.protocol}://${req.get('host')}`;
-        const defaultDomain = 'https://gloheadspa.app';
+        const defaultDomain = 'https://www.glofloapp.com';
         const baseUrl = (process.env.FRONTEND_URL
           || process.env.CUSTOM_DOMAIN
           || replitDomain

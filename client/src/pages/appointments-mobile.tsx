@@ -60,6 +60,18 @@ export default function AppointmentsMobilePage() {
   const { data: services = [] } = useQuery<any[]>({ queryKey: ["/api/services"] });
   const { data: users = [] } = useQuery<any[]>({ queryKey: ["/api/users"] });
   const { data: staffRecords = [] } = useQuery<any[]>({ queryKey: ["/api/staff"] });
+  
+  // Fetch schedules to filter staff by location
+  const { data: schedules = [] } = useQuery({
+    queryKey: ["/api/schedules", selectedLocation?.id],
+    queryFn: async () => {
+      const url = selectedLocation?.id 
+        ? `/api/schedules?locationId=${selectedLocation.id}`
+        : "/api/schedules";
+      const res = await apiRequest("GET", url);
+      return res.json();
+    },
+  });
 
   // Helper maps
   const serviceIdToService = useMemo(() => {
@@ -91,6 +103,38 @@ export default function AppointmentsMobilePage() {
     }
     return map;
   }, [staffRecords, users]);
+
+  // Filter staff to only show those with schedules at the selected location
+  const locationStaffOptions = useMemo(() => {
+    try {
+      if (!Array.isArray(staffRecords) || !Array.isArray(schedules)) return [];
+      // Only show staff when a location is selected
+      if (!selectedLocation?.id) return [];
+      const locId = selectedLocation.id;
+      const staffIdsWithSchedules = new Set<number>(
+        schedules
+          .filter((sch: any) => sch && sch.locationId === locId)
+          .map((sch: any) => Number(sch.staffId))
+          .filter((id: number) => Number.isFinite(id))
+      );
+      return staffRecords.filter((s: any) => staffIdsWithSchedules.has(Number(s.id)));
+    } catch {
+      // Return empty array on error instead of all staff
+      return [];
+    }
+  }, [staffRecords, schedules, selectedLocation?.id]);
+
+  // Reset staff filter when location changes or if selected staff is not available
+  useEffect(() => {
+    if (selectedStaffId !== "all") {
+      const selectedId = parseInt(selectedStaffId);
+      const isStaffAvailable = locationStaffOptions.some((s: any) => s.id === selectedId);
+      if (!isStaffAvailable) {
+        console.log('📍 Selected staff not available at this location, resetting filter');
+        setSelectedStaffId("all");
+      }
+    }
+  }, [locationStaffOptions, selectedStaffId]);
 
   // Get week days
   const weekDays = useMemo(() => {
@@ -247,7 +291,7 @@ export default function AppointmentsMobilePage() {
               className="w-full px-3 py-1 text-sm border rounded-md"
             >
               <option value="all">All Staff</option>
-              {Array.isArray(staffRecords) && staffRecords
+              {locationStaffOptions
                 .map((staff: any) => {
                   const user = staffIdToUser.get(staff.id);
                   if (!user) return null;

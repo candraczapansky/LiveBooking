@@ -9,6 +9,7 @@ import { log } from "./log.js";
 import { DatabaseStorage } from "./storage.js";
 import { EmailAutomationService } from "./email-automation.js";
 import { MarketingCampaignService } from "./marketing-campaigns.js";
+import { createMembershipRenewalService } from "./services/membership-renewal-service.js";
 import { createServer } from "http";
 
 // Load environment variables
@@ -145,6 +146,10 @@ async function findAvailablePort(startPort: number): Promise<number> {
     // Initialize marketing campaign service
     const marketingCampaignService = new MarketingCampaignService(storage);
     marketingCampaignService.startService();
+    
+    // Initialize membership renewal service
+    const membershipRenewalService = createMembershipRenewalService(storage);
+    membershipRenewalService.start();
     
     // Load routes module with resilient resolution
     const routesModule = await import("./routes.js").catch(async () => {

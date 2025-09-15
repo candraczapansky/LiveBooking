@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatPrice } from "@/lib/utils";
 import MembershipForm from "@/components/memberships/membership-form";
-import MembershipSubscriptionDialog from "@/components/memberships/membership-subscription-dialog-new";
+import MembershipSubscriptionDialog from "@/components/memberships/membership-subscription-dialog";
 import SubscriberDialog from "@/components/memberships/subscriber-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 
@@ -97,11 +97,13 @@ const MembershipsPage = () => {
   const { data: clientMemberships, isLoading: isClientMembershipsLoading } = useQuery({
     queryKey: ['/api/client-memberships'],
     queryFn: async () => {
-      // In a real app, we would have a better way to get all client memberships
-      // For this demo, we'll just fake it with what we have
-      const response = await fetch('/api/client-memberships?clientId=1');
+      console.log("[MEMBERSHIPS PAGE] Fetching all client memberships...");
+      // Fetch ALL client memberships, not just for one client
+      const response = await fetch('/api/client-memberships');
       if (!response.ok) throw new Error('Failed to fetch client memberships');
-      return response.json();
+      const data = await response.json();
+      console.log("[MEMBERSHIPS PAGE] Client memberships fetched:", data.length, "subscriptions");
+      return data;
     },
     enabled: activeTab === "subscribers"
   });
@@ -154,8 +156,10 @@ const MembershipsPage = () => {
   };
 
   const handleAddClient = (membership: Membership) => {
+    console.log("[MEMBERSHIPS PAGE] handleAddClient called with membership:", membership);
     setSelectedMembershipForAddClient(membership);
     setIsAddClientDialogOpen(true);
+    console.log("[MEMBERSHIPS PAGE] Dialog should be opening now...");
   };
 
   return (

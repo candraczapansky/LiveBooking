@@ -1068,7 +1068,7 @@ const ServiceForm = ({ open, onOpenChange, serviceId, onServiceCreated, defaultI
                           </Label>
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          When enabled, this service is hidden from clients at the online booking page (`https://gloheadspa.app/booking`). Staff can still book it internally.
+                          When enabled, this service is hidden from clients at the online booking page (`http://glofloapp.com/booking`). Staff can still book it internally.
                         </div>
                         <FormMessage />
                       </FormItem>

@@ -231,6 +231,7 @@ export interface IStorage {
   getClientMembershipsByMembership(membershipId: number): Promise<ClientMembership[]>;
   updateClientMembership(id: number, data: Partial<InsertClientMembership>): Promise<ClientMembership>;
   deleteClientMembership(id: number): Promise<boolean>;
+  getExpiringMemberships(): Promise<ClientMembership[]>;
 
   // Payment operations
   createPayment(payment: InsertPayment): Promise<Payment>;
@@ -2777,6 +2778,24 @@ Glo Head Spa`,
   async deleteClientMembership(id: number): Promise<boolean> {
     const result = await db.delete(clientMemberships).where(eq(clientMemberships.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  async getExpiringMemberships(): Promise<ClientMembership[]> {
+    const today = new Date();
+    const sevenDaysFromNow = new Date();
+    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
+    
+    // Get memberships that are active, have auto-renewal enabled, and are expiring within 7 days
+    const result = await db.select()
+      .from(clientMemberships)
+      .where(
+        and(
+          eq(clientMemberships.active, true),
+          eq(clientMemberships.autoRenew, true),
+          lte(clientMemberships.endDate, sevenDaysFromNow)
+        )
+      );
+    return result;
   }
 
   // Payment operations

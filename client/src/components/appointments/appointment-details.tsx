@@ -1062,7 +1062,7 @@ const AppointmentDetails = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-4xl md:max-w-5xl max-h-[80vh] overflow-y-auto overflow-x-hidden">
+      <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getStatusIcon(appointment.status || 'pending')}
@@ -1075,7 +1075,7 @@ const AppointmentDetails = ({
 
         <div className="space-y-6">
           {/* Status and Payment Status */}
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-2">
             <Badge className={getStatusColor(appointment.status || 'pending')}>
               {(appointment.status || 'pending').charAt(0).toUpperCase() + (appointment.status || 'pending').slice(1)}
             </Badge>
@@ -1087,7 +1087,7 @@ const AppointmentDetails = ({
           {/* Time and Date */}
           <Card>
             <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="flex items-center gap-3">
                   <Calendar className="h-5 w-5 text-gray-500" />
                   <div>
@@ -1134,7 +1134,7 @@ const AppointmentDetails = ({
           {/* Client Information */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <User className="h-5 w-5 text-gray-500" />
                   <h3 className="font-medium text-gray-900 dark:text-gray-100">Client</h3>
@@ -1144,10 +1144,10 @@ const AppointmentDetails = ({
                     variant="outline"
                     size="sm"
                     onClick={() => setIsEditClientOpen(true)}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 w-full sm:w-auto"
                   >
                     <UserCog className="h-4 w-4" />
-                    Edit Client
+                    <span className="sm:inline">Edit Client</span>
                   </Button>
                 )}
               </div>
@@ -1180,7 +1180,7 @@ const AppointmentDetails = ({
           {/* Service Information */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div className="flex items-center gap-3">
                   <Scissors className="h-5 w-5 text-gray-500" />
                   <h3 className="font-medium text-gray-900 dark:text-gray-100">Service</h3>
@@ -1190,10 +1190,10 @@ const AppointmentDetails = ({
                     variant="outline"
                     size="sm"
                     onClick={() => setIsEditServiceOpen(true)}
-                    className="flex items-center gap-2"
+                    className="flex items-center gap-2 w-full sm:w-auto"
                   >
                     <Settings className="h-4 w-4" />
-                    Edit Service
+                    <span className="sm:inline">Edit Service</span>
                   </Button>
                 )}
               </div>
@@ -1275,7 +1275,7 @@ const AppointmentDetails = ({
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Discount Code</div>
                       {!appliedDiscountCode ? (
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                           <Input
                             placeholder="Enter discount code"
                             value={discountCode}
@@ -1288,6 +1288,7 @@ const AppointmentDetails = ({
                             disabled={!discountCode.trim() || isValidatingDiscount}
                             variant="outline"
                             size="sm"
+                            className="w-full sm:w-auto"
                           >
                             {isValidatingDiscount ? "Validating" : "Apply"}
                           </Button>
@@ -1306,17 +1307,19 @@ const AppointmentDetails = ({
                     <div className="space-y-2">
                       <div className="text-sm font-medium">Tip</div>
                       <div className="space-y-2">
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {[0, 0.15, 0.18, 0.2].map((p) => (
                             <Button key={p} variant={tipAmount / (getAppointmentChargeAmount() || 1) === p ? 'default' : 'outline'} size="sm" onClick={() => setTipAmount(Math.round((getAppointmentChargeAmount() * p) * 100) / 100)}>
                               {p === 0 ? 'No Tip' : `${Math.round(p * 100)}%`}
                             </Button>
                           ))}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm">Custom:</span>
-                          <Input type="number" className="h-8 w-28" value={Number.isNaN(tipAmount) ? '' : tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} min="0" step="0.01" />
-                          <span className="ml-auto text-sm">Total: {formatPrice(calculateFinalAmount())}</span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">Custom:</span>
+                            <Input type="number" className="h-8 w-28" value={Number.isNaN(tipAmount) ? '' : tipAmount} onChange={(e) => setTipAmount(parseFloat(e.target.value) || 0)} min="0" step="0.01" />
+                          </div>
+                          <span className="sm:ml-auto text-sm font-medium">Total: {formatPrice(calculateFinalAmount())}</span>
                         </div>
                       </div>
                     </div>
@@ -1383,15 +1386,15 @@ const AppointmentDetails = ({
                                 key={paymentMethod.id}
                                 onClick={() => handleSavedPaymentMethod(paymentMethod)}
                                 variant="outline"
-                                className="w-full justify-start"
+                                className="w-full justify-start text-xs sm:text-sm"
                               >
-                                <div className="flex items-center gap-2">
-                                  <CreditCard className="h-4 w-4" />
-                                  <span>
-                                    {paymentMethod.cardBrand} ending in {paymentMethod.cardLast4}
+                                <div className="flex items-center gap-2 w-full">
+                                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                  <span className="truncate">
+                                    {paymentMethod.cardBrand} ···{paymentMethod.cardLast4}
                                   </span>
                                   {paymentMethod.isDefault && (
-                                    <Badge variant="secondary" className="ml-auto text-xs">
+                                    <Badge variant="secondary" className="ml-auto text-xs flex-shrink-0">
                                       Default
                                     </Badge>
                                   )}
@@ -1423,7 +1426,7 @@ const AppointmentDetails = ({
 
                         {/* Gift Card Payment */}
                         <div className="space-y-2">
-                          <div className="flex gap-2">
+                          <div className="flex flex-col sm:flex-row gap-2">
                             <Input
                               placeholder="Enter gift card code"
                               value={giftCardCode}
@@ -1433,36 +1436,40 @@ const AppointmentDetails = ({
                               }}
                               className="flex-1"
                             />
-                            <Button
-                              onClick={handleCheckGiftCardBalance}
-                              disabled={isCheckingGiftCardBalance || !giftCardCode.trim()}
-                              variant="outline"
-                              size="sm"
-                            >
-                              {isCheckingGiftCardBalance ? (
-                                <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
-                              ) : (
-                                "Check"
-                              )}
-                            </Button>
-                            <Button
-                              onClick={handleGiftCardPayment}
-                              disabled={isProcessingGiftCardPayment || !giftCardCode.trim()}
-                              variant="outline"
-                              size="sm"
-                            >
-                              {isProcessingGiftCardPayment ? (
-                                <div className="flex items-center gap-1">
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={handleCheckGiftCardBalance}
+                                disabled={isCheckingGiftCardBalance || !giftCardCode.trim()}
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 sm:flex-none"
+                              >
+                                {isCheckingGiftCardBalance ? (
                                   <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
-                                  Processing
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1">
-                                  <Gift className="h-3 w-3" />
-                                  Apply
-                                </div>
-                              )}
-                            </Button>
+                                ) : (
+                                  "Check"
+                                )}
+                              </Button>
+                              <Button
+                                onClick={handleGiftCardPayment}
+                                disabled={isProcessingGiftCardPayment || !giftCardCode.trim()}
+                                variant="outline"
+                                size="sm"
+                                className="flex-1 sm:flex-none"
+                              >
+                                {isProcessingGiftCardPayment ? (
+                                  <div className="flex items-center gap-1">
+                                    <div className="animate-spin w-3 h-3 border-2 border-primary border-t-transparent rounded-full" />
+                                    <span className="hidden sm:inline">Processing</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1">
+                                    <Gift className="h-3 w-3" />
+                                    Apply
+                                  </div>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                           {giftCardBalance !== null && (
                             <div className="text-sm p-2 bg-muted rounded-md">
@@ -1496,11 +1503,11 @@ const AppointmentDetails = ({
                             <span>{formatPrice(calculateFinalAmount())}</span>
                           </div>
                         </div>
-                        <div className="flex gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                           <Button
                             variant="outline"
                             onClick={() => setShowCardPayment(false)}
-                            className="flex-1"
+                            className="w-full"
                           >
                             Back
                           </Button>
@@ -1509,7 +1516,7 @@ const AppointmentDetails = ({
                               console.log('[CardPayment] Pay Now button clicked, opening modal...');
                               setShowHelcimModal(true);
                             }}
-                            className="flex-1"
+                            className="w-full"
                           >
                             Pay Now
                           </Button>
@@ -1641,26 +1648,26 @@ const AppointmentDetails = ({
           {/* Notes (read-only) */}
           <Card>
             <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">Notes</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsNotesOpen(true)}
-                    className="flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <MessageSquare className="h-4 w-4" />
-                    View Note History
+                    <span className="whitespace-nowrap">Note History</span>
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setIsFormsOpen(true)}
-                    className="flex items-center gap-2"
+                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <FileText className="h-4 w-4" />
-                    View Client Forms
+                    <span className="whitespace-nowrap">Client Forms</span>
                   </Button>
                 </div>
               </div>
@@ -1697,72 +1704,79 @@ const AppointmentDetails = ({
                   rows={3}
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleSavePhotoSectionNote} disabled={isSavingPhotoNote || !photoSectionNote.trim()} className="flex items-center gap-2">
+                  <Button size="sm" onClick={handleSavePhotoSectionNote} disabled={isSavingPhotoNote || !photoSectionNote.trim()} className="flex items-center gap-2 flex-1 sm:flex-none">
                     <Save className="h-4 w-4" />
                     {isSavingPhotoNote ? 'Saving...' : 'Save Note'}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setPhotoSectionNote("")}>Clear</Button>
+                  <Button size="sm" variant="outline" onClick={() => setPhotoSectionNote("")} className="flex-1 sm:flex-none">Clear</Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => resendSmsMutation.mutate()}
-            disabled={resendSmsMutation.isPending}
-            className="flex items-center gap-2"
-          >
-            <MessageSquare className="h-4 w-4" />
-            {resendSmsMutation.isPending ? "Sending SMS..." : "Resend SMS"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => resendEmailMutation.mutate()}
-            disabled={resendEmailMutation.isPending}
-            className="flex items-center gap-2"
-          >
-            <Mail className="h-4 w-4" />
-            {resendEmailMutation.isPending ? "Sending Email..." : "Resend Email"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
-            Close
-          </Button>
-          {onEdit && (
-            <Button
-              onClick={() => {
-                onOpenChange(false);
-                onEdit(appointmentId!);
-              }}
-              className="flex items-center gap-2"
-            >
-              <Edit className="h-4 w-4" />
-              Edit
-            </Button>
-          )}
-          
-          {appointment?.status !== 'cancelled' && appointment?.paymentStatus !== 'paid' && (
+        <DialogFooter className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <div className="grid grid-cols-2 sm:flex gap-2">
             <Button
               variant="outline"
-              onClick={handleCancel}
-              disabled={isCancelling}
-              className="flex items-center gap-2"
+              onClick={() => resendSmsMutation.mutate()}
+              disabled={resendSmsMutation.isPending}
+              className="flex items-center justify-center gap-1 text-xs sm:text-sm"
             >
-              <X className="h-4 w-4" />
-              {isCancelling ? 'Cancelling...' : 'Cancel Appointment'}
+              <MessageSquare className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{resendSmsMutation.isPending ? "Sending SMS..." : "Resend SMS"}</span>
+              <span className="sm:hidden">SMS</span>
             </Button>
-          )}
+            <Button
+              variant="outline"
+              onClick={() => resendEmailMutation.mutate()}
+              disabled={resendEmailMutation.isPending}
+              className="flex items-center justify-center gap-1 text-xs sm:text-sm"
+            >
+              <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">{resendEmailMutation.isPending ? "Sending Email..." : "Resend Email"}</span>
+              <span className="sm:hidden">Email</span>
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 sm:flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              className="order-1 sm:order-none"
+            >
+              Close
+            </Button>
+            {onEdit && (
+              <Button
+                onClick={() => {
+                  onOpenChange(false);
+                  onEdit(appointmentId!);
+                }}
+                className="flex items-center justify-center gap-1 order-2 sm:order-none"
+              >
+                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                Edit
+              </Button>
+            )}
+            {appointment?.status !== 'cancelled' && appointment?.paymentStatus !== 'paid' && (
+              <Button
+                variant="outline"
+                onClick={handleCancel}
+                disabled={isCancelling}
+                className="flex items-center justify-center gap-1 col-span-2 sm:col-span-1 order-3 sm:order-none text-xs sm:text-sm"
+              >
+                <X className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">{isCancelling ? 'Cancelling...' : 'Cancel Appointment'}</span>
+                <span className="sm:hidden">Cancel</span>
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
     {client && (
       <Dialog open={isFormsOpen} onOpenChange={setIsFormsOpen}>
-        <DialogContent className="w-[95vw] sm:max-w-5xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-3xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
@@ -1778,7 +1792,7 @@ const AppointmentDetails = ({
     )}
     {client && (
       <Dialog open={isNotesOpen} onOpenChange={setIsNotesOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -1795,7 +1809,7 @@ const AppointmentDetails = ({
     )}
     {client && (
       <Dialog open={isEditClientOpen} onOpenChange={setIsEditClientOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <UserCog className="h-4 w-4" />
@@ -1807,7 +1821,7 @@ const AppointmentDetails = ({
           </DialogHeader>
           <Form {...editClientForm}>
             <form onSubmit={editClientForm.handleSubmit(handleEditClient)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editClientForm.control}
                   name="firstName"
@@ -1874,7 +1888,7 @@ const AppointmentDetails = ({
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <FormField
                   control={editClientForm.control}
                   name="city"
@@ -1930,7 +1944,7 @@ const AppointmentDetails = ({
     )}
     {service && (
       <Dialog open={isEditServiceOpen} onOpenChange={setIsEditServiceOpen}>
-        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -1968,7 +1982,7 @@ const AppointmentDetails = ({
                   </FormItem>
                 )}
               />
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                   control={editServiceForm.control}
                   name="duration"
