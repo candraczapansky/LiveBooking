@@ -8,7 +8,7 @@
  * 1. CUSTOM_DOMAIN environment variable
  * 2. VITE_API_BASE_URL environment variable  
  * 3. Replit domain (REPLIT_DOMAINS) - always use HTTPS
- * 4. Localhost for development
+ * 4. Default: https://www.glofloapp.com
  */
 export function getPublicBaseUrl(): string {
   // Check for custom domain first
@@ -29,14 +29,9 @@ export function getPublicBaseUrl(): string {
     return replitDomain.startsWith('https://') ? replitDomain : `https://${replitDomain}`;
   }
 
-  // Fallback to localhost for development - try common ports
-  const commonPorts = [5000, 5001, 5002, 3000, 3001];
-  for (const port of commonPorts) {
-    // For now, default to 5002 since that's what the server is using
-    return `http://localhost:5002`;
-  }
-
-  return 'http://localhost:5002';
+  // Default to www.glofloapp.com with HTTPS in production
+  // If no environment variables are set, use the production domain
+  return 'https://www.glofloapp.com';
 }
 
 /**

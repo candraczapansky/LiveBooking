@@ -45,18 +45,25 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
   app.get("/api/clients", async (req, res) => {
     try {
       const { email } = req.query as { email?: string };
-      const results: any[] = [];
-
+      
       if (email && typeof email === "string" && email.trim()) {
+        const results: any[] = [];
         const user = await storage.getUserByEmail(email.trim());
         if (user) {
           const { password, ...safeUser } = user as any;
           results.push(safeUser);
         }
+        return res.json(results);
       }
-
-      // Always return an array for compatibility with callers
-      return res.json(results);
+      
+      // When no email is specified, return all clients
+      const allClients = await storage.getUsersByRole("client");
+      const safeClients = allClients.map((client: any) => {
+        const { password, ...safeClient } = client;
+        return safeClient;
+      });
+      
+      return res.json(safeClients);
     } catch (error: any) {
       console.error("Error looking up clients by email:", error);
       return res.status(500).json({ error: "Failed to lookup clients" });

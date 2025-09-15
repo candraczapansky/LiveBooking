@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Membership Creation</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { padding: 10px 20px; margin: 10px; font-size: 16px; }
+        #result { margin-top: 20px; padding: 20px; background: #f0f0f0; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Test Membership Subscription Creation</h1>
+    <p>This will create a test subscription for Client #7 (Londyn Triplett)</p>
+    
+    <button onclick="createSubscription()">Create Test Subscription</button>
+    <button onclick="checkSubscriptions()">Check All Subscriptions</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        const log = (msg) => {
+            document.getElementById('result').innerHTML += msg + '\n';
+            console.log(msg);
+        };
+        
+        async function createSubscription() {
+            log('Creating subscription...');
+            
+            const startDate = new Date();
+            const endDate = new Date();
+            endDate.setDate(endDate.getDate() + 30);
+            
+            const data = {
+                clientId: 7,  // Londyn Triplett
+                membershipId: 6,
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+                active: true,
+                autoRenew: false
+            };
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/client-memberships', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    log('✓ SUCCESS! Created subscription ID: ' + result.id);
+                    log(JSON.stringify(result, null, 2));
+                } else {
+                    log('✗ FAILED: ' + JSON.stringify(result));
+                }
+            } catch (error) {
+                log('✗ ERROR: ' + error.message);
+            }
+        }
+        
+        async function checkSubscriptions() {
+            log('Checking all subscriptions...');
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/client-memberships');
+                const data = await response.json();
+                
+                log('Total subscriptions: ' + data.length);
+                data.forEach(sub => {
+                    const client = sub.client || {};
+                    log(`  - ID ${sub.id}: ${client.firstName} ${client.lastName}`);
+                });
+            } catch (error) {
+                log('✗ ERROR: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

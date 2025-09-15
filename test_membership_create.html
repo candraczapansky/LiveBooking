@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Membership Creation</title>
+</head>
+<body>
+    <h1>Test Membership Subscription Creation</h1>
+    <button onclick="testCashSubscription()">Test Cash Subscription</button>
+    <div id="result"></div>
+    
+    <script>
+        async function testCashSubscription() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                // Create subscription
+                const startDate = new Date();
+                const endDate = new Date();
+                endDate.setDate(endDate.getDate() + 30);
+                
+                const response = await fetch('http://localhost:5000/api/client-memberships', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        clientId: 7, // Using a different client ID
+                        membershipId: 6,
+                        startDate: startDate.toISOString(),
+                        endDate: endDate.toISOString(),
+                        active: true,
+                        autoRenew: false
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                
+                if (response.ok) {
+                    // Create payment record
+                    const paymentResponse = await fetch('http://localhost:5000/api/payments', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            clientId: 7,
+                            clientMembershipId: data.id,
+                            amount: 89,
+                            totalAmount: 89,
+                            method: 'cash',
+                            status: 'completed',
+                            type: 'membership',
+                            description: 'Test membership payment',
+                            paymentDate: new Date()
+                        })
+                    });
+                    
+                    const paymentData = await paymentResponse.json();
+                    resultDiv.innerHTML += '<br>Payment:<pre>' + JSON.stringify(paymentData, null, 2) + '</pre>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = 'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

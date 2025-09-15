@@ -1,4 +1,5 @@
 import { sendEmail } from './email.js';
+import { getPublicUrl } from './utils/url.js';
 // Load templates dynamically at runtime to avoid hard dependency on compiled file path
 let appointmentConfirmationTemplate: any, appointmentReminderTemplate: any, followUpTemplate: any, birthdayTemplate: any, generateEmailHTML: any, generateEmailText: any, generateRawMarketingEmailHTML: any, htmlToText: any;
 async function loadTemplates() {
@@ -365,9 +366,9 @@ export class EmailAutomationService {
       totalAmount: appointment.totalAmount,
       salonAddress: '123 Main St, New York, NY 10001',
       salonPhone: '(555) 123-4567',
-      rescheduleUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/appointments/${appointment.id}/reschedule`,
-      cancelUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/appointments/${appointment.id}/cancel`,
-      unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${client.id}`
+      rescheduleUrl: getPublicUrl(`appointments/${appointment.id}/reschedule`),
+      cancelUrl: getPublicUrl(`appointments/${appointment.id}/cancel`),
+      unsubscribeUrl: getPublicUrl(`unsubscribe/${client.id}`)
     };
 
     const html = generateEmailHTML(appointmentReminderTemplate, templateData, 'Appointment Reminder - Tomorrow');
@@ -399,10 +400,10 @@ export class EmailAutomationService {
       serviceName: service.name,
       appointmentDate: appointmentDate,
       staffName: staff.user ? `${staff.user.firstName || ''} ${staff.user.lastName || ''}`.trim() : 'Our Staff',
-      reviewUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/review/${appointment.id}`,
-      bookAgainUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/book`,
+      reviewUrl: getPublicUrl(`review/${appointment.id}`),
+      bookAgainUrl: getPublicUrl('book'),
       careTips: this.getCareTipsForService(service.name),
-      unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${client.id}`
+      unsubscribeUrl: getPublicUrl(`unsubscribe/${client.id}`)
     };
 
     const html = generateEmailHTML(followUpTemplate, templateData, 'Thank You for Your Visit!');
@@ -431,8 +432,8 @@ export class EmailAutomationService {
       birthdayYear: birthdayYear,
       discountPercent: 20,
       expiryDate: expiryDate,
-      bookUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/book`,
-      unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${client.id}`
+      bookUrl: getPublicUrl('book'),
+      unsubscribeUrl: getPublicUrl(`unsubscribe/${client.id}`)
     };
 
     const html = generateEmailHTML(birthdayTemplate, templateData, 'Happy Birthday from Glo Head Spa!');
@@ -463,7 +464,7 @@ export class EmailAutomationService {
       }
 
       try {
-        const baseUrl = process.env.CUSTOM_DOMAIN || 'http://localhost:5000';
+        const baseUrl = getPublicUrl('');
         const editorHtml = (campaign.htmlContent || campaign.content || '').toString();
         const templateData = {
           clientName: `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Valued Client',
@@ -582,9 +583,9 @@ export class EmailAutomationService {
       duration: service.duration || 60,
       staffName: staff.user ? `${staff.user.firstName || ''} ${staff.user.lastName || ''}`.trim() : 'Our Staff',
       totalAmount: appointment.totalAmount,
-      rescheduleUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/appointments/${appointment.id}/reschedule`,
-      cancelUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/appointments/${appointment.id}/cancel`,
-      unsubscribeUrl: `${process.env.CUSTOM_DOMAIN || 'http://localhost:5000'}/unsubscribe/${client.id}`
+      rescheduleUrl: getPublicUrl(`appointments/${appointment.id}/reschedule`),
+      cancelUrl: getPublicUrl(`appointments/${appointment.id}/cancel`),
+      unsubscribeUrl: getPublicUrl(`unsubscribe/${client.id}`)
     };
 
     const html = generateEmailHTML(appointmentConfirmationTemplate, templateData, 'Appointment Confirmed');

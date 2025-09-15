@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
+import StaffAssignmentDropdown from "@/components/reports/StaffAssignmentDropdown";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -27,8 +29,8 @@ import {
   BarChart2,
   Clock,
   ArrowLeft,
-  ChevronRight,
-  RefreshCw
+  RefreshCw,
+  Search
 } from "lucide-react";
 import PayrollReport from "./payroll-report";
 import { formatPrice } from "@/lib/utils";
@@ -678,6 +680,10 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
   customEndDate?: string; 
   selectedLocation?: string; 
 }) => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const itemsPerPage = 50; // Show 50 transactions per page
+  
   const { data: salesHistory = [], isLoading, refetch } = useQuery({ 
     queryKey: ["/api/sales-history"],
     refetchInterval: 30000, // Refetch every 30 seconds
@@ -825,7 +831,79 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
     }
   })();
 
-  const combinedSales = [...filteredSales, ...paymentFallbackRecords];
+  const combinedSales = [...(filteredSales || []), ...(paymentFallbackRecords || [])];
+
+  // Apply search filter
+  const searchFilteredSales = searchTerm.trim() === "" 
+    ? combinedSales 
+    : combinedSales.filter((sale: any) => {
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Search in multiple fields
+        const clientName = (sale.clientName || sale.client_name || '').toLowerCase();
+        const staffName = (sale.staffName || sale.staff_name || '').toLowerCase();
+        const helcimId = (sale.helcimPaymentId || sale.helcim_payment_id || '').toLowerCase();
+        const notes = (sale.notes || '').toLowerCase();
+        const amount = (sale.totalAmount || sale.total_amount || 0).toString();
+        const paymentMethod = (sale.paymentMethod || sale.payment_method || '').toLowerCase();
+        const transactionType = (sale.transactionType || sale.transaction_type || '').toLowerCase();
+        const serviceNames = (sale.serviceNames || sale.service_names || '').toLowerCase();
+        const productNames = (sale.productNames || sale.product_names || '').toLowerCase();
+        
+        // Format date and time for searching
+        const dateObj = new Date(sale.transactionDate || sale.transaction_date);
+        const dateStr = dateObj.toLocaleDateString().toLowerCase();
+        
+        // Check if this transaction has actual time data
+        const hours = dateObj.getUTCHours();
+        const minutes = dateObj.getUTCMinutes();
+        const seconds = dateObj.getUTCSeconds();
+        const hasTimeData = !(
+          (hours === 0 && minutes === 0 && seconds === 0) ||
+          (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('POS-')) ||
+          (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('INV')) ||
+          (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('APT-'))
+        );
+        
+        let timeStr = '';
+        let dateTimeStr = dateStr;
+        
+        if (hasTimeData) {
+          timeStr = dateObj.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+          }).toLowerCase();
+          dateTimeStr = `${dateStr} ${timeStr}`;
+        }
+        
+        return clientName.includes(searchLower) ||
+               staffName.includes(searchLower) ||
+               helcimId.includes(searchLower) ||
+               notes.includes(searchLower) ||
+               amount.includes(searchLower) ||
+               paymentMethod.includes(searchLower) ||
+               transactionType.includes(searchLower) ||
+               serviceNames.includes(searchLower) ||
+               productNames.includes(searchLower) ||
+               dateStr.includes(searchLower) ||
+               (hasTimeData && timeStr.includes(searchLower)) ||
+               (hasTimeData && dateTimeStr.includes(searchLower));
+      });
+
+  // Calculate pagination
+  const totalItems = searchFilteredSales?.length || 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedSales = searchFilteredSales?.slice(startIndex, endIndex) || [];
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [timePeriod, customStartDate, customEndDate, selectedLocation, searchTerm]);
 
   const totalRevenue = combinedSales.reduce((sum: number, sale: any) => sum + (sale.totalAmount || sale.total_amount || 0), 0);
   const totalTransactions = combinedSales.length;
@@ -1170,12 +1248,42 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
           <CardDescription>Detailed view of all transactions in the selected period</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Search bar */}
+          <div className="mb-4">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                type="text"
+                placeholder="Search transactions (customer, amount, ID, date, time, notes...)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm("")}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {searchTerm && (
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                Found {totalItems} result{totalItems !== 1 ? 's' : ''} 
+                {searchTerm && ` for "${searchTerm}"`}
+              </p>
+            )}
+          </div>
+          
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
+                    Date & Time
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Type
@@ -1198,13 +1306,52 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Method
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Helcim ID
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {combinedSales.slice(0, 20).map((sale: any, index: number) => (
+                {(paginatedSales || []).map((sale: any, index: number) => (
                   <tr key={sale.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {new Date(sale.transactionDate || sale.transaction_date).toLocaleDateString()}
+                      <div>
+                        <div className="font-medium">
+                          {new Date(sale.transactionDate || sale.transaction_date).toLocaleDateString('en-US', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {(() => {
+                            const date = new Date(sale.transactionDate || sale.transaction_date);
+                            const hours = date.getUTCHours();
+                            const minutes = date.getUTCMinutes();
+                            const seconds = date.getUTCSeconds();
+                            
+                            // Check if time is midnight UTC (imported data without time)
+                            // or if it's a Helcim imported transaction
+                            if ((hours === 0 && minutes === 0 && seconds === 0) || 
+                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('POS-')) ||
+                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('INV')) ||
+                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('APT-'))) {
+                              return <span className="italic">Time not recorded</span>;
+                            }
+                            
+                            return (
+                              <span className="font-mono">
+                                {date.toLocaleTimeString('en-US', {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                  second: '2-digit',
+                                  hour12: true
+                                })}
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
@@ -1222,7 +1369,14 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                       {sale.clientName || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {sale.staffName || 'N/A'}
+                      {sale.staffName === 'NEEDS ASSIGNMENT' ? (
+                        <StaffAssignmentDropdown 
+                          saleId={sale.id}
+                          onAssign={() => refetch()}
+                        />
+                      ) : (
+                        sale.staffName || 'N/A'
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {formatPrice(sale.totalAmount || sale.total_amount || 0)}
@@ -1236,13 +1390,103 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       {sale.paymentMethod || 'N/A'}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      {sale.helcimPaymentId || sale.helcim_payment_id ? (
+                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                          {sale.helcimPaymentId || sale.helcim_payment_id}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {filteredSales.length > 20 && (
-              <div className="mt-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                Showing first 20 of {filteredSales.length} transactions
+            {totalPages > 1 && (
+              <div className="mt-4 px-6 py-3 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 flex justify-between sm:hidden">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, validCurrentPage - 1))}
+                      disabled={validCurrentPage === 1}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setCurrentPage(Math.min(totalPages, validCurrentPage + 1))}
+                      disabled={validCurrentPage === totalPages}
+                      className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
+                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">
+                        Showing{' '}
+                        <span className="font-medium">{startIndex + 1}</span>
+                        {' '}to{' '}
+                        <span className="font-medium">{Math.min(endIndex, totalItems)}</span>
+                        {' '}of{' '}
+                        <span className="font-medium">{totalItems}</span>
+                        {' '}results
+                      </p>
+                    </div>
+                    <div>
+                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                        <button
+                          onClick={() => setCurrentPage(Math.max(1, validCurrentPage - 1))}
+                          disabled={validCurrentPage === 1}
+                          className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="sr-only">Previous</span>
+                          <ChevronLeft className="h-5 w-5" />
+                        </button>
+                        
+                        {/* Page numbers */}
+                        {(() => {
+                          const pageNumbers = [];
+                          const maxVisiblePages = 5;
+                          let startPage = Math.max(1, validCurrentPage - Math.floor(maxVisiblePages / 2));
+                          let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                          
+                          if (endPage - startPage < maxVisiblePages - 1) {
+                            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                          }
+                          
+                          for (let i = startPage; i <= endPage; i++) {
+                            pageNumbers.push(
+                              <button
+                                key={i}
+                                onClick={() => setCurrentPage(i)}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                  i === validCurrentPage
+                                    ? 'z-10 bg-indigo-50 dark:bg-indigo-900 border-indigo-500 text-indigo-600 dark:text-indigo-300'
+                                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                }`}
+                              >
+                                {i}
+                              </button>
+                            );
+                          }
+                          
+                          return pageNumbers;
+                        })()}
+                        
+                        <button
+                          onClick={() => setCurrentPage(Math.min(totalPages, validCurrentPage + 1))}
+                          disabled={validCurrentPage === totalPages}
+                          className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="sr-only">Next</span>
+                          <ChevronRight className="h-5 w-5" />
+                        </button>
+                      </nav>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -2766,7 +3010,7 @@ const ReportsPage = () => {
   };
 
   // Auto-update the last update time every 30 seconds to show live status
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdateTime(new Date());
     }, 30000);
@@ -2774,7 +3018,7 @@ const ReportsPage = () => {
   }, []);
 
   // Real-time data refresh effect
-  React.useEffect(() => {
+  useEffect(() => {
     const refreshInterval = setInterval(() => {
       // Invalidate all report-related queries to trigger refetch
       queryClient.invalidateQueries({ queryKey: ["/api/sales-history"] });

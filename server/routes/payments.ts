@@ -19,7 +19,8 @@ import cache, { invalidateCache } from "../utils/cache.js";
 async function createSalesHistoryRecord(storage: IStorage, paymentData: any, transactionType: string, additionalData?: any) {
   console.log('createSalesHistoryRecord called with:', { paymentData: paymentData.id, transactionType });
   try {
-    const transactionDate = new Date();
+    // Use checkout time if provided, otherwise use current time
+    const transactionDate = additionalData?.checkoutTime || new Date();
     const businessDate = transactionDate.toISOString().split('T')[0];
     const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][transactionDate.getDay()];
     const monthYear = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
@@ -38,14 +39,33 @@ async function createSalesHistoryRecord(storage: IStorage, paymentData: any, tra
     // Get appointment and service information for appointment payments
     if (paymentData.appointmentId && transactionType === 'appointment') {
       appointmentInfo = await storage.getAppointment(paymentData.appointmentId);
+      
       if (appointmentInfo) {
         serviceInfo = await storage.getService(appointmentInfo.serviceId);
+        
+        // Always check for staff assignment in the appointment
         if (appointmentInfo.staffId) {
-          const staffData = await storage.getStaff(appointmentInfo.staffId);
-          if (staffData) {
-            const staffUser = await storage.getUser(staffData.userId);
-            staffInfo = { ...staffData, user: staffUser };
+          try {
+            const staffData = await storage.getStaff(appointmentInfo.staffId);
+            if (staffData) {
+              const staffUser = await storage.getUser(staffData.userId);
+              if (staffUser) {
+                staffInfo = { 
+                  id: staffData.id,
+                  user: staffUser 
+                };
+                console.log('Staff found for appointment:', staffData.id, staffUser.firstName, staffUser.lastName);
+              } else {
+                console.log('Staff user not found:', staffData.userId);
+              }
+            } else {
+              console.log('Staff record not found for appointmentId:', appointmentInfo.id, 'staffId:', appointmentInfo.staffId);
+            }
+          } catch (staffError) {
+            console.error('Error getting staff info:', staffError);
           }
+        } else {
+          console.log('No staffId set on appointment:', appointmentInfo.id);
         }
       }
     }
@@ -66,7 +86,8 @@ async function createSalesHistoryRecord(storage: IStorage, paymentData: any, tra
       
       // Staff information
       staffId: staffInfo?.id || null,
-      staffName: staffInfo?.user ? `${staffInfo.user.firstName || ''} ${staffInfo.user.lastName || ''}`.trim() : null,
+      staffName: staffInfo?.user ? `${staffInfo.user.firstName || ''} ${staffInfo.user.lastName || ''}`.trim() : 
+                appointmentInfo?.staffId ? 'NEEDS ASSIGNMENT' : null,
       
       // Appointment and service information
       appointmentId: appointmentInfo?.id || null,
@@ -231,6 +252,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
     }
 
     // Create payment record
+    const checkoutTime = new Date();
     const payment = await storage.createPayment({
       appointmentId,
       clientId: appointment.clientId,
@@ -240,17 +262,19 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       status: 'completed',
       type: 'appointment_payment',
       notes: notes || 'Cash payment',
-      processedAt: new Date(),
+      processedAt: checkoutTime,
+      paymentDate: checkoutTime, // Record the exact checkout time
     });
 
-    // Update appointment payment status
+    // Update appointment payment status and record checkout time
     await storage.updateAppointment(appointmentId, {
       paymentStatus: 'paid',
       totalAmount: amount,
+      paymentDate: checkoutTime, // Record when the client was checked out
     });
 
-    // Create sales history for reports
-    await createSalesHistoryRecord(storage, payment, 'appointment');
+    // Create sales history for reports with checkout time
+    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime });
 
     // Create staff earnings record for payroll
     try {
@@ -448,8 +472,8 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       // Note: paidAmount field doesn't exist in appointments table, but we're tracking via payments
     });
 
-    // Create sales history for reports
-    await createSalesHistoryRecord(storage, payment, 'appointment');
+    // Create sales history for reports with checkout time
+    await createSalesHistoryRecord(storage, payment, 'appointment', { checkoutTime });
 
     // Create staff earnings record for payroll
     try {
@@ -1028,9 +1052,12 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Payment");
     }
 
-    // Update payment status
+    // Update payment status and record checkout time
+    const checkoutTime = new Date();
     const updatedPayment = await storage.updatePayment(paymentId, {
       status: 'completed',
+      paymentDate: checkoutTime, // Record the exact checkout time
+      processedAt: checkoutTime, // Also record processing time if not set
     });
 
     // Update appointment payment status if appointmentId provided
@@ -1038,6 +1065,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       await storage.updateAppointment(appointmentId, {
         paymentStatus: 'paid',
         totalAmount: payment.amount,
+        paymentDate: checkoutTime, // Record the exact checkout time
       });
 
       // Create staff earnings record for payroll

@@ -78,7 +78,29 @@ const AppointmentsPage = () => {
   });
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [detailsAppointmentId, setDetailsAppointmentId] = useState<number | null>(null);
-  const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>("all");
+  
+  // Initialize selectedStaffFilter from localStorage (same approach as selectedDate and calendarView)
+  const [selectedStaffFilter, setSelectedStaffFilterState] = useState<string>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const stored = localStorage.getItem('appointments.selectedStaffFilter');
+        if (stored) return stored;
+      }
+    } catch {}
+    return "all";
+  });
+  
+  // Wrapper to update both state and localStorage
+  const setSelectedStaffFilter = (value: string) => {
+    setSelectedStaffFilterState(value);
+    // Save to localStorage
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('appointments.selectedStaffFilter', value);
+      }
+    } catch {}
+  };
+  
   const [isScheduleDialogOpen, setIsScheduleDialogOpen] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<any | null>(null);
   const [preSelectedResourceId, setPreSelectedResourceId] = useState<number | null>(null);
@@ -265,7 +287,8 @@ const AppointmentsPage = () => {
   const locationStaffOptions = useMemo(() => {
     try {
       if (!Array.isArray(staff) || !Array.isArray(schedules)) return [] as any[];
-      if (!selectedLocation?.id) return staff as any[];
+      // Only show staff when a location is selected
+      if (!selectedLocation?.id) return [] as any[];
       const locId = selectedLocation.id;
       const staffIdsWithSchedules = new Set<number>((schedules as any[])
         .filter((sch: any) => sch && sch.locationId === locId)
@@ -274,7 +297,8 @@ const AppointmentsPage = () => {
       );
       return (staff as any[]).filter((s: any) => staffIdsWithSchedules.has(Number(s.id)));
     } catch {
-      return staff as any[];
+      // Return empty array on error instead of all staff
+      return [] as any[];
     }
   }, [staff, schedules, selectedLocation?.id]);
 
@@ -313,6 +337,18 @@ const AppointmentsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
     }
   }, [selectedLocation?.id, queryClient]);
+
+  // Only reset staff filter if the selected staff is not available at the new location
+  useEffect(() => {
+    if (selectedStaffFilter !== "all" && locationStaffOptions.length > 0) {
+      const selectedStaffId = parseInt(selectedStaffFilter);
+      const isStaffAvailable = locationStaffOptions.some((s: any) => s.id === selectedStaffId);
+      if (!isStaffAvailable) {
+        console.log('📍 Selected staff not available at this location, resetting filter');
+        setSelectedStaffFilter("all");
+      }
+    }
+  }, [locationStaffOptions]);
 
   // Recalculate filtered resources when date changes (for day view staff filtering)
   useEffect(() => {
@@ -623,15 +659,7 @@ const AppointmentsPage = () => {
     }
   }, [selectedLocation, calendarView, staff, schedules]);
 
-  // Reset staff filter when switching to day view (show all staff)
-  useEffect(() => {
-    if (calendarView === 'day') {
-      // Only reset if user had a specific staff selected and we're switching to day view
-      if (selectedStaffFilter !== "all") {
-        setSelectedStaffFilter("all");
-      }
-    }
-  }, [calendarView]);
+  // Removed auto-reset of staff filter when switching views - preserve user's selection
 
   // Handlers
   // Helper: find a schedule for the clicked slot (returns the most specific match or null)

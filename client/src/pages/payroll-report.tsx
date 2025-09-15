@@ -149,9 +149,25 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
 
   const { data: staffServices = [] } = useQuery<any[]>({
     queryKey: ['/api/staff-services'],
+    queryFn: () => fetch('/api/staff-services').then((r) => r.json())
+  });
+  
+  // Fetch payroll data from sales history for accurate reporting
+  const { data: salesHistoryPayroll, isLoading: salesHistoryLoading } = useQuery({
+    queryKey: ['/api/payroll/sales-history', startDate?.toISOString(), endDate?.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate.toISOString());
+      if (endDate) params.append('endDate', endDate.toISOString());
+      
+      const response = await fetch(`/api/payroll/sales-history?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch payroll data');
+      return response.json();
+    },
+    enabled: !!startDate && !!endDate
   });
 
-  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading;
+  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading || salesHistoryLoading;
 
   // Refresh data function
   const refreshData = async () => {
@@ -161,7 +177,8 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
       queryClient.invalidateQueries({ queryKey: ['/api/services'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
       queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/payments'] })
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/payroll/sales-history'] })
     ]);
     toast({
       title: "Data Refreshed",
@@ -169,8 +186,29 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     });
   };
 
-  // Calculate payroll data
+  // Calculate payroll data - use sales history if available for accuracy
   const payrollData = useMemo((): PayrollData[] => {
+    // If we have sales history payroll data, use that instead of appointment-based calculation
+    if (salesHistoryPayroll && salesHistoryPayroll.length > 0) {
+      return salesHistoryPayroll.map((staffPayroll: any) => ({
+        staffId: staffPayroll.staffId,
+        staffName: staffPayroll.staffName,
+        totalRevenue: staffPayroll.totalRevenue || 0,
+        totalCommission: staffPayroll.totalCommission || 0,
+        totalTips: staffPayroll.totalTips || 0,
+        totalServices: staffPayroll.transactionCount || 0,
+        uniqueClients: staffPayroll.transactions?.length || 0,
+        totalHours: staffPayroll.totalHourlyPay ? (staffPayroll.totalHourlyPay / (staffPayroll.hourlyRate || 15)) : 0,
+        totalHourlyPay: staffPayroll.totalHourlyPay || 0,
+        totalEarnings: staffPayroll.totalEarnings || 0,
+        avgServiceValue: staffPayroll.transactionCount > 0 ? staffPayroll.totalRevenue / staffPayroll.transactionCount : 0,
+        commissionType: staffPayroll.commissionType,
+        commissionRate: staffPayroll.commissionRate,
+        hourlyRate: staffPayroll.hourlyRate
+      }));
+    }
+    
+    // Fallback to appointment-based calculation if sales history not available
     if (!staff || !users || !services || !appointments) return [];
 
     // Determine date range based on timePeriod and custom dates
@@ -1091,9 +1129,22 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
   console.log('DetailedPayrollView rendering for staffId:', staffId);
   
   const { data: detailData, isLoading } = useQuery({
-    queryKey: ["/api/payroll/detailed-local", String(staffId), month.toISOString()],
+    queryKey: ["/api/payroll/sales-history/detailed", String(staffId), month.toISOString()],
     queryFn: async () => {
-      // Compute locally from current APIs to ensure latest commission rate is used
+      // First try to get data from sales history for accuracy
+      try {
+        const salesHistoryRes = await fetch(`/api/payroll/sales-history/${staffId}/detailed?month=${month.toISOString()}`);
+        if (salesHistoryRes.ok) {
+          const salesData = await salesHistoryRes.json();
+          if (salesData.transactions && salesData.transactions.length > 0) {
+            return salesData;
+          }
+        }
+      } catch (error) {
+        console.log('Sales history not available, falling back to appointment-based calculation');
+      }
+      
+      // Fallback to computing locally from appointments
       const [staffRes, userRes, svcRes, apptRes, payRes, staffSvcRes] = await Promise.all([
         fetch('/api/staff'),
         fetch('/api/users'),
