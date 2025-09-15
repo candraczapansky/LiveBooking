@@ -189,7 +189,7 @@ export function SendDocumentSMSDialog({ open, onOpenChange, documentId, document
               <FormItem>
                 <FormLabel>Custom Message (Optional)</FormLabel>
                 <FormControl>
-                  <Textarea placeholder="Hi! Please review this document from Glo Head Spa..." className="min-h-[100px]" {...field} />
+                  <Textarea placeholder="Hi! Please review this document from Glo Flo App..." className="min-h-[100px]" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

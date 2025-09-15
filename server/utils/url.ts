@@ -29,9 +29,9 @@ export function getPublicBaseUrl(): string {
     return replitDomain.startsWith('https://') ? replitDomain : `https://${replitDomain}`;
   }
 
-  // Default to www.glofloapp.com with HTTPS in production
+  // Default to glofloapp.com with HTTPS in production
   // If no environment variables are set, use the production domain
-  return 'https://www.glofloapp.com';
+  return 'https://glofloapp.com';
 }
 
 /**

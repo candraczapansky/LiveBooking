@@ -293,7 +293,7 @@ export function SendFormSMSDialog({
                   <FormLabel>Custom Message (Optional)</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Hi! You have a new form from Glo Head Spa..."
+                      placeholder="Hi! You have a new form from Glo Flo App..."
                       className="min-h-[100px]"
                       {...field}
                     />

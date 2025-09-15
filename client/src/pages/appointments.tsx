@@ -2120,6 +2120,19 @@ const AppointmentsPage = () => {
                             onClick={async () => {
                               try {
                                 if (!ctxAppointment?.id) return;
+                                setCheckoutAppointment(ctxAppointment);
+                                setIsCheckoutOpen(true);
+                                setCtxMenuOpen(false);
+                              } catch {}
+                            }}
+                          >
+                            Complete & Checkout
+                          </button>
+                          <button
+                            className="w-full text-left px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground rounded-sm"
+                            onClick={async () => {
+                              try {
+                                if (!ctxAppointment?.id) return;
                                 const confirmCancel = window.confirm('Are you sure you want to cancel this appointment?');
                                 if (!confirmCancel) { return; }
                                 const res = await apiRequest("POST", `/api/appointments/${ctxAppointment.id}/cancel`, { reason: 'Cancelled from calendar menu' });

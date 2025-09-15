@@ -126,22 +126,22 @@ export default function ClientCommunication({
     switch (action) {
       case "welcome":
         messageForm.reset({
-          subject: "Welcome to Glo Head Spa!",
-          message: `Hi ${clientName},\n\nWelcome to Glo Head Spa! We're excited to have you as a client.\n\nIf you have any questions or need to book an appointment, please don't hesitate to reach out.\n\nBest regards,\nThe Glo Head Spa Team`,
+          subject: "Welcome to Glo Flo App!",
+          message: `Hi ${clientName},\n\nWelcome to Glo Flo App! We're excited to have you as a client.\n\nIf you have any questions or need to book an appointment, please don't hesitate to reach out.\n\nBest regards,\nThe Glo Flo App Team`,
           type: "email",
         });
         break;
       case "followup":
         messageForm.reset({
           subject: "How was your visit?",
-          message: `Hi ${clientName},\n\nThank you for visiting Glo Head Spa! We hope you enjoyed your experience.\n\nWe'd love to hear your feedback and would be happy to help you book your next appointment.\n\nBest regards,\nThe Glo Head Spa Team`,
+          message: `Hi ${clientName},\n\nThank you for visiting Glo Flo App! We hope you enjoyed your experience.\n\nWe'd love to hear your feedback and would be happy to help you book your next appointment.\n\nBest regards,\nThe Glo Flo App Team`,
           type: "email",
         });
         break;
       case "promotion":
         messageForm.reset({
           subject: "Special Offer Just for You!",
-          message: `Hi ${clientName},\n\nWe have a special offer just for our valued clients!\n\n[Add your promotion details here]\n\nBook your appointment today to take advantage of this offer.\n\nBest regards,\nThe Glo Head Spa Team`,
+          message: `Hi ${clientName},\n\nWe have a special offer just for our valued clients!\n\n[Add your promotion details here]\n\nBook your appointment today to take advantage of this offer.\n\nBest regards,\nThe Glo Flo App Team`,
           type: "email",
         });
         break;

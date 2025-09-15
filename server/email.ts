@@ -270,7 +270,7 @@ export function createMarketingCampaignEmail(
   trackingToken?: string,
   additionalData?: any
 ): EmailParams {
-  const baseUrl = process.env.CUSTOM_DOMAIN || 'https://gloupheadspa.app' || (process.env.REPLIT_DOMAINS ? 
+  const baseUrl = process.env.CUSTOM_DOMAIN || 'https://www.glofloapp.com' || (process.env.REPLIT_DOMAINS ? 
     `https://${process.env.REPLIT_DOMAINS.split(',')[0]}` : 
     'http://localhost:5000');
   
@@ -330,7 +330,7 @@ export function createAccountUpdateEmail(
           <p><strong>Details:</strong> {{details}}</p>
         </div>
         <p>If you have any questions, please contact us.</p>
-        <p>Best regards,<br>Glo Head Spa Team</p>
+        <p>Best regards,<br>Glo Flo App Team</p>
       </div>
     </div>
   `);

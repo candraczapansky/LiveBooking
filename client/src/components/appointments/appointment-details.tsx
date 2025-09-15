@@ -30,7 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera } from "lucide-react";
+import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera, ShoppingCart, Plus, Search, Loader2 } from "lucide-react";
+import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 import { formatPrice } from "@/lib/utils";
 import { PermissionGuard } from "@/components/permissions/PermissionGuard";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
@@ -106,6 +107,18 @@ const AppointmentDetails = ({
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [isValidatingDiscount, setIsValidatingDiscount] = useState(false);
   const [appliedDiscountCode, setAppliedDiscountCode] = useState<string>("");
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<{id: number; name: string; price: number; quantity: number; isTaxable?: boolean}[]>([]);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
+  const { businessSettings } = useBusinessSettings();
+  
+  // Debug log to verify component is loading with products feature
+  useEffect(() => {
+    if (open) {
+      console.log("[AppointmentDetails] Modal opened - Product button should be visible in payment options");
+      console.log("[AppointmentDetails] Version: 2024.2 - WITH PRODUCTS IN REGULAR CHECKOUT");
+    }
+  }, [open]);
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isEditClientOpen, setIsEditClientOpen] = useState(false);
@@ -249,6 +262,19 @@ const AppointmentDetails = ({
     enabled: !!appointment?.clientId
   });
 
+  // Fetch products for selection
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/products");
+      if (!res.ok) return [];
+      const products = await res.json();
+      // Filter active products only
+      return products.filter((p: any) => p.isActive && p.stockQuantity > 0);
+    },
+    enabled: open,
+  });
+
   // Ensure fresh client data when opening the edit dialog
   useEffect(() => {
     if (isEditClientOpen && appointment?.clientId) {
@@ -366,10 +392,27 @@ const AppointmentDetails = ({
     }
   }, [showCardPayment, (appointment as any)?.totalAmount, (service as any)?.price, appointmentPayments]);
 
+  const getProductSubtotal = () => {
+    return selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+  };
+  
+  const getProductTaxAmount = () => {
+    const taxRate = businessSettings?.taxRate || 0.08; // Default to 8% if settings not loaded
+    return selectedProducts
+      .filter(p => p.isTaxable !== false) // Default to taxable if not specified
+      .reduce((sum, p) => sum + (p.price * p.quantity * taxRate), 0);
+  };
+  
+  const getProductTotal = () => {
+    return getProductSubtotal() + getProductTaxAmount();
+  };
+
   const calculateFinalAmount = () => {
     const base = getAppointmentChargeAmount() || 0;
+    
+    // Apply discount to base amount, then add tip and product total
     const discounted = Math.max(0, base - (appliedDiscountCode ? discountAmount : 0));
-    return discounted + (tipAmount || 0);
+    return discounted + (tipAmount || 0) + getProductTotal();
   };
 
   const handleApplyDiscount = async () => {
@@ -613,7 +656,10 @@ const AppointmentDetails = ({
         type: "appointment_payment",
         processedAt: new Date(),
         paymentDate: new Date(),
-        tipAmount: tipAmount || 0
+        tipAmount: tipAmount || 0,
+        products: selectedProducts.length > 0 ? selectedProducts : undefined,
+        productTaxAmount: getProductTaxAmount(),
+        taxRate: businessSettings?.taxRate || 0.08,
       });
 
       // Update appointment payment status
@@ -695,7 +741,10 @@ const AppointmentDetails = ({
         description: `Card payment for ${service?.name || 'Appointment'}`,
         appointmentId: appointment?.id,
         clientId: appointment?.clientId,
-        tipAmount: tipAmount || 0
+        tipAmount: tipAmount || 0,
+        products: selectedProducts.length > 0 ? selectedProducts : undefined,
+        productTaxAmount: getProductTaxAmount(),
+        taxRate: businessSettings?.taxRate || 0.08,
       });
       
       if (!response.ok) {
@@ -1339,6 +1388,18 @@ const AppointmentDetails = ({
                       </Button>
                     ) : (
                       <div className="space-y-3">
+                        {/* Product Selection */}
+                        <Button
+                          onClick={() => setShowProductSelector(true)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          <div className="flex items-center gap-2">
+                            <ShoppingCart className="h-4 w-4" />
+                            Add Products
+                          </div>
+                        </Button>
+
                         {/* Cash Payment */}
                         <Button
                           onClick={handleCashPayment}
@@ -1371,42 +1432,49 @@ const AppointmentDetails = ({
                             Pay with Card
                           </div>
                         </Button>
-
-                        {/* Saved Payment Methods */}
-                        {savedPaymentMethods && savedPaymentMethods.length > 0 && (
-                          <div className="space-y-2">
-                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              Saved Payment Methods
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                              Click to use your saved card (you'll need to complete the payment form)
-                            </div>
-                            {savedPaymentMethods.map((paymentMethod: any) => (
-                              <Button
-                                key={paymentMethod.id}
-                                onClick={() => handleSavedPaymentMethod(paymentMethod)}
-                                variant="outline"
-                                className="w-full justify-start text-xs sm:text-sm"
-                              >
-                                <div className="flex items-center gap-2 w-full">
-                                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                                  <span className="truncate">
-                                    {paymentMethod.cardBrand} ···{paymentMethod.cardLast4}
-                                  </span>
-                                  {paymentMethod.isDefault && (
-                                    <Badge variant="secondary" className="ml-auto text-xs flex-shrink-0">
-                                      Default
-                                    </Badge>
-                                  )}
+                        
+                        {selectedProducts.length > 0 && (
+                          <div className="mt-2 space-y-2 bg-gray-50 dark:bg-gray-900 p-2 rounded-md">
+                            <div className="text-sm font-medium">Selected Products:</div>
+                            <div className="space-y-1">
+                              {selectedProducts.map((product) => (
+                                <div key={product.id} className="flex items-center justify-between">
+                                  <div className="flex items-center space-x-2">
+                                    <ShoppingCart className="h-4 w-4 text-gray-400" />
+                                    <span className="text-xs text-gray-600">
+                                      {product.name} (x{product.quantity}) — {formatPrice(product.price * product.quantity)}
+                                      {product.isTaxable !== false && <span className="text-xs text-gray-400 ml-1">(+tax)</span>}
+                                    </span>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                                    onClick={() => {
+                                      setSelectedProducts(prev => 
+                                        prev.filter(p => p.id !== product.id)
+                                      );
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
                                 </div>
-                              </Button>
-                            ))}
-                          </div>
-                        )}
-                        {/* Debug info - remove this later */}
-                        {savedPaymentMethods && savedPaymentMethods.length === 0 && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                            No saved payment methods found for this client. Cards are saved during the booking process.
+                              ))}
+                              <div className="flex items-center justify-between text-xs pt-1">
+                                <span>Subtotal:</span>
+                                <span>{formatPrice(getProductSubtotal())}</span>
+                              </div>
+                              {getProductTaxAmount() > 0 && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span>Tax ({(businessSettings?.taxRate || 0.08) * 100}%):</span>
+                                  <span>{formatPrice(getProductTaxAmount())}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between text-xs font-semibold">
+                                <span>Products Total:</span>
+                                <span>{formatPrice(getProductTotal())}</span>
+                              </div>
+                            </div>
                           </div>
                         )}
 
@@ -1482,6 +1550,44 @@ const AppointmentDetails = ({
                             </div>
                           )}
                         </div>
+
+                        {/* Saved Payment Methods */}
+                        {savedPaymentMethods && savedPaymentMethods.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Saved Payment Methods
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                              Click to use your saved card (you'll need to complete the payment form)
+                            </div>
+                            {savedPaymentMethods.map((paymentMethod: any) => (
+                              <Button
+                                key={paymentMethod.id}
+                                onClick={() => handleSavedPaymentMethod(paymentMethod)}
+                                variant="outline"
+                                className="w-full justify-start text-xs sm:text-sm"
+                              >
+                                <div className="flex items-center gap-2 w-full">
+                                  <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                                  <span className="truncate">
+                                    {paymentMethod.cardBrand} ···{paymentMethod.cardLast4}
+                                  </span>
+                                  {paymentMethod.isDefault && (
+                                    <Badge variant="secondary" className="ml-auto text-xs flex-shrink-0">
+                                      Default
+                                    </Badge>
+                                  )}
+                                </div>
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                        {/* Debug info - remove this later */}
+                        {savedPaymentMethods && savedPaymentMethods.length === 0 && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                            No saved payment methods found for this client. Cards are saved during the booking process.
+                          </div>
+                        )}
 
                         {/* Back Button */}
                         <Button
@@ -2046,7 +2152,164 @@ const AppointmentDetails = ({
       </Dialog>
     )}
     {/* Edit Staff dialog removed per request */}
-    </>
+    
+    {/* Product Selector Modal */}
+    <Dialog open={showProductSelector} onOpenChange={setShowProductSelector}>
+    <DialogContent className="w-[95vw] max-w-md">
+      <DialogHeader>
+        <DialogTitle>Add Products</DialogTitle>
+        <DialogDescription>
+          Select products to add to this checkout
+        </DialogDescription>
+      </DialogHeader>
+      
+      {/* Search Bar */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+        <Input
+          className="pl-9"
+          placeholder="Search products..."
+          value={productSearchQuery}
+          onChange={(e) => setProductSearchQuery(e.target.value)}
+        />
+      </div>
+      
+      <div className="max-h-[400px] overflow-y-auto">
+        {isLoadingProducts ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin mr-2" />
+            <span>Loading products...</span>
+          </div>
+        ) : products.length === 0 ? (
+          <div className="text-center py-6">
+            <p className="text-muted-foreground">No products available</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {products
+              .filter((product: any) => {
+                if (!productSearchQuery.trim()) return true;
+                const query = productSearchQuery.toLowerCase().trim();
+                return (
+                  product.name?.toLowerCase().includes(query) ||
+                  product.description?.toLowerCase().includes(query) ||
+                  product.sku?.toLowerCase().includes(query) ||
+                  product.barcode?.toLowerCase().includes(query) ||
+                  product.category?.toLowerCase().includes(query) ||
+                  product.brand?.toLowerCase().includes(query)
+                );
+              })
+              .map((product: any) => {
+                const isSelected = selectedProducts.some(p => p.id === product.id);
+                const selectedProduct = selectedProducts.find(p => p.id === product.id);
+                const quantity = selectedProduct ? selectedProduct.quantity : 0;
+                
+                return (
+                  <div key={product.id} className="p-3 border rounded-md">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatPrice(product.price)} 
+                          {product.isTaxable !== false && <span className="text-xs">(+{(businessSettings?.taxRate || 0.08) * 100}% tax)</span>} 
+                          - {product.stockQuantity} in stock
+                        </p>
+                        {product.brand && (
+                          <p className="text-xs text-muted-foreground">{product.brand}</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        {isSelected ? (
+                          <>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-7 w-7"
+                              onClick={() => {
+                                if (quantity > 1) {
+                                  setSelectedProducts(prev => 
+                                    prev.map(p => 
+                                      p.id === product.id 
+                                        ? {...p, quantity: p.quantity - 1} 
+                                        : p
+                                    )
+                                  );
+                                } else {
+                                  setSelectedProducts(prev => 
+                                    prev.filter(p => p.id !== product.id)
+                                  );
+                                }
+                              }}
+                            >
+                              <span>-</span>
+                            </Button>
+                            <span className="w-5 text-center">{quantity}</span>
+                            <Button 
+                              variant="outline" 
+                              size="icon" 
+                              className="h-7 w-7"
+                              onClick={() => {
+                                // Don't allow adding more than stock
+                                if (quantity < product.stockQuantity) {
+                                  setSelectedProducts(prev => 
+                                    prev.map(p => 
+                                      p.id === product.id 
+                                        ? {...p, quantity: p.quantity + 1} 
+                                        : p
+                                    )
+                                  );
+                                }
+                              }}
+                              disabled={quantity >= product.stockQuantity}
+                            >
+                              <span>+</span>
+                            </Button>
+                          </>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            className="text-xs h-7"
+                            onClick={() => {
+                              setSelectedProducts(prev => [
+                                ...prev, 
+                                {
+                                  id: product.id,
+                                  name: product.name,
+                                  price: product.price,
+                                  quantity: 1,
+                                  isTaxable: product.isTaxable !== false // Default to taxable if not specified
+                                }
+                              ]);
+                            }}
+                          >
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+      
+      <DialogFooter className="flex justify-between items-center">
+        <div className="text-sm">
+          {selectedProducts.length > 0 ? (
+            <span>Selected: {selectedProducts.reduce((sum, p) => sum + p.quantity, 0)} products</span>
+          ) : (
+            <span>No products selected</span>
+          )}
+        </div>
+        <Button onClick={() => setShowProductSelector(false)}>
+          Done
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+  </>
   );
 };
 

@@ -2,16 +2,25 @@ import { useState, useEffect } from "react";
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Calendar, User, Clock, DollarSign, CheckCircle, CreditCard, Loader2 } from "lucide-react";
+import { Calendar, User, Clock, DollarSign, CheckCircle, CreditCard, Loader2, ShoppingCart, Plus, X, Search } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/utils";
 import { format } from "date-fns";
 import { HelcimPayModal } from "../payment/helcim-pay-modal";
 import { SaveCardModal } from "../payment/save-card-modal";
+import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 
 interface AppointmentDetails {
   id: number;
@@ -34,6 +43,7 @@ interface AppointmentDetails {
   };
   // Optional enrichments from backend for add-ons checkout
   addOns?: { id: number; name: string; price: number; duration?: number }[];
+  products?: { id: number; name: string; price: number; quantity: number }[];
   computedTotalAmount?: number;
 }
 
@@ -56,8 +66,20 @@ export default function AppointmentCheckout({
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [showHelcimPayModal, setShowHelcimPayModal] = useState(false);
   const [showSaveCardModal, setShowSaveCardModal] = useState(false);
+  const [showProductSelector, setShowProductSelector] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<{id: number; name: string; price: number; quantity: number; isTaxable?: boolean}[]>([]);
+  const [productSearchQuery, setProductSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { businessSettings } = useBusinessSettings();
+  
+  // Debug log to verify component is loading with latest code
+  useEffect(() => {
+    if (isOpen) {
+      console.log("[AppointmentCheckout] Component opened - Product button should be visible between Service Amount and Discount Code");
+      console.log("[AppointmentCheckout] Version: 2024.1 - WITH PRODUCTS FEATURE");
+    }
+  }, [isOpen]);
 
   // Fetch latest appointment details (to include add-ons and computed total)
   const { data: apptDetails } = useQuery({
@@ -82,6 +104,19 @@ export default function AppointmentCheckout({
     enabled: isOpen && !!appointment.clientId
   });
 
+  // Fetch products for selection
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ["/api/products"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/products");
+      if (!res.ok) return [];
+      const products = await res.json();
+      // Filter active products only
+      return products.filter((p: any) => p.isActive && p.stockQuantity > 0);
+    },
+    enabled: isOpen,
+  });
+
   // Fetch client details for payment processing
   const { data: clientData } = useQuery({
     queryKey: ['/api/clients', appointment.clientId],
@@ -94,7 +129,7 @@ export default function AppointmentCheckout({
     enabled: isOpen && !!appointment.clientId
   });
 
-  // Calculate base amount including add-ons so they are checked out as one
+  // Calculate base amount including add-ons and products so they are checked out as one
   const effectiveAddOns = Array.isArray(apptDetails?.addOns)
     ? apptDetails?.addOns
     : (Array.isArray(appointment.addOns) ? appointment.addOns : []);
@@ -102,18 +137,32 @@ export default function AppointmentCheckout({
   const addOnTotal = Array.isArray(effectiveAddOns)
     ? effectiveAddOns.reduce((sum: number, a: any) => sum + (Number(a?.price ?? 0) || 0), 0)
     : 0;
+    
+  // Calculate product totals and tax
+  const productSubtotal = selectedProducts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+  const taxRate = businessSettings?.taxRate || 0.08; // Default to 8% if settings not loaded
+  
+  // Calculate tax on taxable products
+  const productTaxAmount = selectedProducts
+    .filter(p => p.isTaxable !== false) // Default to taxable if not specified
+    .reduce((sum, p) => sum + (p.price * p.quantity * taxRate), 0);
+  
+  const productTotal = productSubtotal + productTaxAmount;
+    
   const serviceOnlyAmount = (appointment.service?.price && appointment.service.price > 0 ? appointment.service.price : appointment.amount) || 0;
   const baseAmount = (Number(appointment.totalAmount) && Number(appointment.totalAmount) > 0)
     ? Number(appointment.totalAmount)
     : (Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount) && Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount) > 0)
       ? Number(apptDetails?.computedTotalAmount ?? appointment.computedTotalAmount)
       : (serviceOnlyAmount + addOnTotal);
+      
+  const totalAmountWithProducts = baseAmount + productTotal;
 
   // Discount state and helpers
   const [discountCode, setDiscountCode] = useState("");
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isApplyingDiscount, setIsApplyingDiscount] = useState(false);
-  const finalAmount = Math.max(baseAmount - discountAmount, 0);
+  const finalAmount = Math.max(totalAmountWithProducts - discountAmount, 0);
 
   const handleApplyDiscount = async () => {
     const code = discountCode.trim();
@@ -163,6 +212,9 @@ export default function AppointmentCheckout({
           amount: finalAmount,
           notes: `Completed via calendar checkout${discountAmount > 0 && discountCode ? ` | Discount ${discountCode.toUpperCase()} -$${discountAmount.toFixed(2)}` : ''}`,
           ...(discountAmount > 0 && discountCode ? { discountCode: discountCode.trim(), discountAmount } : {}),
+          products: selectedProducts.length > 0 ? selectedProducts : undefined,
+          productTaxAmount: productTaxAmount,
+          taxRate: taxRate,
         });
 
         // Ensure appointment is marked completed for calendar views
@@ -230,7 +282,10 @@ export default function AppointmentCheckout({
         type: 'appointment',
         description: `Card payment for ${appointment.serviceName} appointment`,
         helcimPaymentId: paymentData.paymentId,
-        paymentDate: new Date()
+        paymentDate: new Date(),
+        products: selectedProducts.length > 0 ? selectedProducts : undefined,
+        productTaxAmount: productTaxAmount,
+        taxRate: taxRate,
       });
 
       toast({
@@ -311,9 +366,68 @@ export default function AppointmentCheckout({
                 <div className="flex items-center space-x-2">
                   <DollarSign className="h-4 w-4 text-gray-500" />
                   <span className="text-sm text-gray-600">
-                    Amount: {formatPrice(baseAmount)}
+                    Service Amount: {formatPrice(baseAmount)}
                   </span>
                 </div>
+                
+                {/* Products Section */}
+                {selectedProducts.length > 0 && (
+                  <div className="space-y-1 pl-6">
+                    {selectedProducts.map((product) => (
+                      <div key={product.id} className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <ShoppingCart className="h-4 w-4 text-gray-400" />
+                          <span className="text-xs text-gray-600">
+                            {product.name} (x{product.quantity}) — {formatPrice(product.price * product.quantity)}
+                            {product.isTaxable !== false && <span className="text-xs text-gray-400 ml-1">(+tax)</span>}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                          onClick={() => {
+                            setSelectedProducts(prev => 
+                              prev.filter(p => p.id !== product.id)
+                            );
+                          }}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex items-center justify-between text-sm pt-1">
+                      <span className="font-medium">Products Subtotal:</span>
+                      <span>{formatPrice(productSubtotal)}</span>
+                    </div>
+                    {productTaxAmount > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">Sales Tax ({(taxRate * 100).toFixed(2)}%):</span>
+                        <span>{formatPrice(productTaxAmount)}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-sm font-semibold">
+                      <span>Products Total:</span>
+                      <span>{formatPrice(productTotal)}</span>
+                    </div>
+                  </div>
+                )}
+                
+                {/* PRODUCT BUTTON START - THIS SHOULD ALWAYS BE VISIBLE */}
+                <div className="mt-3 mb-3" style={{ marginTop: '12px', marginBottom: '12px' }}>
+                  <Button
+                    variant="default"
+                    className="flex items-center w-full justify-center bg-primary hover:bg-primary/90"
+                    onClick={() => {
+                      console.log("[AppointmentCheckout] Opening product selector");
+                      setShowProductSelector(true);
+                    }}
+                    style={{ width: '100%', padding: '8px 16px' }}
+                  >
+                    <ShoppingCart className="h-4 w-4 mr-2" /> Add Products to Checkout
+                  </Button>
+                </div>
+                {/* PRODUCT BUTTON END */}
 
                 <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
                   <div className="md:col-span-2">
@@ -527,6 +641,163 @@ export default function AppointmentCheckout({
           }}
         />
       )}
+
+      {/* Product Selector Modal */}
+      <Dialog open={showProductSelector} onOpenChange={setShowProductSelector}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Products</DialogTitle>
+            <DialogDescription>
+              Select products to add to this checkout
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+            <Input
+              className="pl-9"
+              placeholder="Search products..."
+              value={productSearchQuery}
+              onChange={(e) => setProductSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="max-h-[400px] overflow-y-auto">
+            {isLoadingProducts ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                <span>Loading products...</span>
+              </div>
+            ) : products.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground">No products available</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {products
+                  .filter((product: any) => {
+                    if (!productSearchQuery.trim()) return true;
+                    const query = productSearchQuery.toLowerCase().trim();
+                    return (
+                      product.name?.toLowerCase().includes(query) ||
+                      product.description?.toLowerCase().includes(query) ||
+                      product.sku?.toLowerCase().includes(query) ||
+                      product.barcode?.toLowerCase().includes(query) ||
+                      product.category?.toLowerCase().includes(query) ||
+                      product.brand?.toLowerCase().includes(query)
+                    );
+                  })
+                  .map((product: any) => {
+                  const isSelected = selectedProducts.some(p => p.id === product.id);
+                  const selectedProduct = selectedProducts.find(p => p.id === product.id);
+                  const quantity = selectedProduct ? selectedProduct.quantity : 0;
+                  
+                  return (
+                    <div key={product.id} className="p-3 border rounded-md">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">{product.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {formatPrice(product.price)} 
+                            {product.isTaxable !== false && <span className="text-xs">(+{(taxRate * 100).toFixed(2)}% tax)</span>} 
+                            - {product.stockQuantity} in stock
+                          </p>
+                          {product.brand && (
+                            <p className="text-xs text-muted-foreground">{product.brand}</p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          {isSelected ? (
+                            <>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  if (quantity > 1) {
+                                    setSelectedProducts(prev => 
+                                      prev.map(p => 
+                                        p.id === product.id 
+                                          ? {...p, quantity: p.quantity - 1} 
+                                          : p
+                                      )
+                                    );
+                                  } else {
+                                    setSelectedProducts(prev => 
+                                      prev.filter(p => p.id !== product.id)
+                                    );
+                                  }
+                                }}
+                              >
+                                <span>-</span>
+                              </Button>
+                              <span className="w-5 text-center">{quantity}</span>
+                              <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-7 w-7"
+                                onClick={() => {
+                                  // Don't allow adding more than stock
+                                  if (quantity < product.stockQuantity) {
+                                    setSelectedProducts(prev => 
+                                      prev.map(p => 
+                                        p.id === product.id 
+                                          ? {...p, quantity: p.quantity + 1} 
+                                          : p
+                                      )
+                                    );
+                                  }
+                                }}
+                                disabled={quantity >= product.stockQuantity}
+                              >
+                                <span>+</span>
+                              </Button>
+                            </>
+                          ) : (
+                            <Button 
+                              variant="outline" 
+                              className="text-xs h-7"
+                              onClick={() => {
+                                setSelectedProducts(prev => [
+                                  ...prev, 
+                                  {
+                                    id: product.id,
+                                    name: product.name,
+                                    price: product.price,
+                                    quantity: 1,
+                                    isTaxable: product.isTaxable !== false // Default to taxable if not specified
+                                  }
+                                ]);
+                              }}
+                            >
+                              Add
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className="flex justify-between items-center">
+            <div className="text-sm">
+              {selectedProducts.length > 0 ? (
+                <span>Selected: {selectedProducts.reduce((sum, p) => sum + p.quantity, 0)} products</span>
+              ) : (
+                <span>No products selected</span>
+              )}
+            </div>
+            <Button onClick={() => setShowProductSelector(false)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
