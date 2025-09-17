@@ -281,7 +281,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   // Confirm cash payment
   app.post("/api/confirm-cash-payment", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { appointmentId, amount, notes } = req.body;
+    const { appointmentId, amount, notes, tipAmount = 0 } = req.body;
 
     LoggerService.logPayment("cash_payment", amount, context);
 
@@ -291,12 +291,16 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Appointment");
     }
 
-    // Create payment record
+    // Calculate base amount (total minus tip)
+    const baseAmount = amount - tipAmount;
+
+    // Create payment record with tip tracking
     const checkoutTime = new Date();
     const payment = await storage.createPayment({
       appointmentId,
       clientId: appointment.clientId,
-      amount,
+      amount: baseAmount,
+      tipAmount: tipAmount,
       totalAmount: amount,
       method: 'cash',
       status: 'completed',
@@ -306,9 +310,10 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       paymentDate: checkoutTime, // Record the exact checkout time
     });
 
-    // Update appointment payment status and record checkout time
+    // Update appointment payment status and record checkout time with tip
     await storage.updateAppointment(appointmentId, {
       paymentStatus: 'paid',
+      tipAmount: tipAmount,
       totalAmount: amount
     });
 
@@ -454,7 +459,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   // Confirm gift card payment
   app.post("/api/confirm-gift-card-payment", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { appointmentId, giftCardCode, amount, notes } = req.body;
+    const { appointmentId, giftCardCode, amount, notes, tipAmount = 0 } = req.body;
 
     LoggerService.logPayment("gift_card_payment", amount, context);
 
@@ -474,11 +479,15 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Appointment");
     }
 
-    // Create payment record
+    // Calculate base amount (total minus tip)
+    const baseAmount = amount - tipAmount;
+
+    // Create payment record with tip tracking
     const payment = await storage.createPayment({
       appointmentId,
       clientId: appointment.clientId,
-      amount,
+      amount: baseAmount,
+      tipAmount: tipAmount,
       totalAmount: amount,
       method: 'gift_card',
       status: 'completed',
@@ -1081,7 +1090,7 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
   // Confirm payment
   app.post("/api/confirm-payment", asyncHandler(async (req: Request, res: Response) => {
     const context = getLogContext(req);
-    const { paymentId, appointmentId } = req.body;
+    const { paymentId, appointmentId, helcimTransactionId } = req.body;
 
     LoggerService.logPayment("payment_confirmation", undefined, context);
 
@@ -1091,12 +1100,17 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       throw new NotFoundError("Payment");
     }
 
-    // Update payment status and record checkout time
+    // CRITICAL: Only mark as completed if there's a valid Helcim transaction ID
+    // or if it's a cash/gift_card payment. Otherwise keep as pending.
+    const isCashPayment = payment.method === 'cash' || payment.method === 'gift_card';
+    const hasValidHelcimId = helcimTransactionId || payment.helcimPaymentId;
+    
     const checkoutTime = new Date();
     const updatedPayment = await storage.updatePayment(paymentId, {
-      status: 'completed',
+      status: isCashPayment || hasValidHelcimId ? 'completed' : 'pending',
       paymentDate: checkoutTime, // Record the exact checkout time
       processedAt: checkoutTime, // Also record processing time if not set
+      ...(helcimTransactionId ? { helcimPaymentId: helcimTransactionId } : {})
     });
 
       // Update appointment payment status if appointmentId provided
@@ -1236,13 +1250,18 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       await createSalesHistoryRecord(storage, updatedPayment, 'appointment');
     }
 
-    LoggerService.logPayment("payment_confirmed", payment.amount, { ...context, paymentId });
+    // Log the appropriate status based on actual payment state
+    if (isCashPayment || hasValidHelcimId) {
+      LoggerService.logPayment("payment_confirmed", payment.amount, { ...context, paymentId });
+    } else {
+      LoggerService.logPayment("payment_pending_helcim", payment.amount, { ...context, paymentId, reason: 'Missing Helcim transaction ID' });
+    }
 
-    // Fire automation if transitioning to completed
+    // Fire automation ONLY if actually transitioning to completed with valid payment
     try {
-      const transitionedToCompleted = String(payment.status) !== 'completed' && String((updatedPayment as any)?.status) === 'completed';
+      const actuallyCompleted = (isCashPayment || hasValidHelcimId) && String(payment.status) !== 'completed';
       const apptId = appointmentId || (payment as any)?.appointmentId;
-      if (transitionedToCompleted && apptId) {
+      if (actuallyCompleted && apptId) {
         const appt = await storage.getAppointment(apptId);
         if (appt) {
           await triggerAfterPayment(appt, storage);

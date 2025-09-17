@@ -147,7 +147,7 @@ const ClientsPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
   const [clientDetail, setClientDetail] = useState<Client | null>(null);
-  const [showAllClients, setShowAllClients] = useState(true);
+  const [showAllClients, setShowAllClients] = useState(false);  // Start with limited clients for performance
   const [showSaveCardEdit, setShowSaveCardEdit] = useState(false);
 
   const [location] = useLocation();
@@ -226,11 +226,14 @@ const ClientsPage = () => {
     refetchOnReconnect: true,
     gcTime: 0
   });
-  // Load all clients when not searching
+  // Load all clients when not searching - with limit for performance
   const { data: allClientsData, isLoading: isLoadingAll } = useQuery({
-    queryKey: ['/api/users?role=client', refreshTrigger],
+    queryKey: ['/api/users?role=client', refreshTrigger, showAllClients],
     queryFn: async () => {
-      const response = await apiRequest("GET", "/api/users?role=client");
+      const url = showAllClients 
+        ? "/api/users?role=client"  // Load all when explicitly requested
+        : "/api/users?role=client&limit=50";  // Load only 50 initially for performance
+      const response = await apiRequest("GET", url);
       const data = await response.json();
       return data;
     },
@@ -1236,7 +1239,10 @@ const ClientsPage = () => {
                   {/* Enhanced Search & Filters */}
                   <ClientSearchFilters
                     searchQuery={searchQuery}
-                    onSearchChange={(v: string) => { setShowAllClients(false); setSearchQuery(v); }}
+                    onSearchChange={(v: string) => { 
+                      setSearchQuery(v);
+                      // Don't reset showAllClients on search - let user control it
+                    }}
                     filters={filters}
                     onFiltersChange={setFilters}
                     onClearFilters={() => setFilters({
@@ -1246,8 +1252,6 @@ const ClientsPage = () => {
                       spendingRange: 'all',
                       lastVisit: 'all',
                     })}
-                    totalClients={clients?.length || 0}
-                    filteredClients={filteredClients?.length || 0}
                   />
                   
                   {/* Action Buttons - Mobile First Design */}
@@ -1525,6 +1529,23 @@ const ClientsPage = () => {
                         </TableBody>
                       </Table>
                     </div>
+                    
+                    {/* Show All Clients Button - only show when limited */}
+                    {!shouldSearch && !showAllClients && allClientsData?.length === 50 && (
+                      <div className="mt-6 text-center py-4 border-t border-gray-200 dark:border-gray-700">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                          Showing 50 clients for faster loading
+                        </p>
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setShowAllClients(true)}
+                          className="flex items-center gap-2 mx-auto"
+                        >
+                          <Users className="h-4 w-4" />
+                          Load All Clients
+                        </Button>
+                      </div>
+                    )}
                   </>
                 )}
               </CardContent>

@@ -1079,6 +1079,138 @@ router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
       } catch (e) {
         console.error('❌ Error creating sales history:', e);
       }
+      
+      // Create staff earnings record with tips for payroll
+      try {
+        if (staffInfo && serviceInfo) {
+          const staffMember = await storage.getStaff(staffInfo.id);
+          
+          if (staffMember) {
+            // Calculate staff earnings (include tips)
+            let earningsAmount = 0;
+            let rateType = 'commission';
+            let rateUsed = 0;
+            let calculationDetails = '';
+            
+            switch (staffMember.commissionType) {
+              case 'commission': {
+                const commissionRate = staffMember.commissionRate || 0;
+                const commissionOnService = serviceInfo.price * commissionRate;
+                // Add 100% of tips to earnings
+                earningsAmount = commissionOnService + (tipAmount || 0);
+                rateUsed = commissionRate;
+                calculationDetails = JSON.stringify({
+                  type: 'commission',
+                  servicePrice: serviceInfo.price,
+                  commissionRate: commissionRate,
+                  commissionEarnings: commissionOnService,
+                  tipAmount: tipAmount || 0,
+                  totalEarnings: earningsAmount
+                });
+                break;
+              }
+              case 'hourly': {
+                const hourlyRate = staffMember.hourlyRate || 0;
+                const serviceDuration = serviceInfo.duration || 60;
+                const hours = serviceDuration / 60;
+                const hourlyEarnings = hourlyRate * hours;
+                // Add 100% of tips to earnings
+                earningsAmount = hourlyEarnings + (tipAmount || 0);
+                rateType = 'hourly';
+                rateUsed = hourlyRate;
+                calculationDetails = JSON.stringify({
+                  type: 'hourly',
+                  servicePrice: serviceInfo.price,
+                  hourlyRate: hourlyRate,
+                  serviceDuration: serviceDuration,
+                  hours: hours,
+                  hourlyEarnings: hourlyEarnings,
+                  tipAmount: tipAmount || 0,
+                  totalEarnings: earningsAmount
+                });
+                break;
+              }
+              case 'fixed': {
+                const fixedRate = staffMember.fixedRate || 0;
+                // Add 100% of tips to earnings
+                earningsAmount = fixedRate + (tipAmount || 0);
+                rateType = 'fixed';
+                rateUsed = fixedRate;
+                calculationDetails = JSON.stringify({
+                  type: 'fixed',
+                  servicePrice: serviceInfo.price,
+                  fixedRate: fixedRate,
+                  fixedEarnings: fixedRate,
+                  tipAmount: tipAmount || 0,
+                  totalEarnings: earningsAmount
+                });
+                break;
+              }
+              case 'hourly_plus_commission': {
+                const hourlyRate = staffMember.hourlyRate || 0;
+                const commissionRate = staffMember.commissionRate || 0;
+                const serviceDuration = serviceInfo.duration || 60;
+                const hours = serviceDuration / 60;
+                const hourlyPortion = hourlyRate * hours;
+                const commissionPortion = serviceInfo.price * commissionRate;
+                const baseEarnings = hourlyPortion + commissionPortion;
+                // Add 100% of tips to earnings
+                earningsAmount = baseEarnings + (tipAmount || 0);
+                rateType = 'hourly_plus_commission';
+                rateUsed = hourlyRate;
+                calculationDetails = JSON.stringify({
+                  type: 'hourly_plus_commission',
+                  servicePrice: serviceInfo.price,
+                  hourlyRate: hourlyRate,
+                  commissionRate: commissionRate,
+                  serviceDuration: serviceDuration,
+                  hours: hours,
+                  hourlyPortion: hourlyPortion,
+                  commissionPortion: commissionPortion,
+                  baseEarnings: baseEarnings,
+                  tipAmount: tipAmount || 0,
+                  totalEarnings: earningsAmount
+                });
+                break;
+              }
+              default:
+                earningsAmount = tipAmount || 0; // At least include tips even if commission type unknown
+                calculationDetails = JSON.stringify({
+                  type: 'unknown',
+                  servicePrice: serviceInfo.price,
+                  tipAmount: tipAmount || 0,
+                  totalEarnings: earningsAmount
+                });
+            }
+            
+            // Create staff earnings record
+            if (earningsAmount > 0) {
+              await storage.createStaffEarnings({
+                staffId: staffInfo.id,
+                appointmentId: parseInt(appointmentId),
+                serviceId: appointment.serviceId,
+                paymentId: updatedPayment.id,
+                earningsAmount: earningsAmount,
+                rateType: rateType,
+                rateUsed: rateUsed,
+                isCustomRate: false,
+                servicePrice: serviceInfo.price,
+                calculationDetails: calculationDetails,
+                earningsDate: new Date()
+              });
+              
+              console.log('💰 Staff earnings created with tip:', { 
+                staffId: staffInfo.id,
+                earningsAmount,
+                tipAmount: tipAmount || 0
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.error('❌ Error creating staff earnings:', e);
+        // Don't fail the payment confirmation if earnings creation fails
+      }
     }
 
     return res.json({ 

@@ -361,7 +361,7 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
   app.get("/api/users", async (req, res) => {
     try {
       console.log("GET /api/users called - DEBUG VERSION");
-      const { search, role } = req.query;
+      const { search, role, limit } = req.query;
       let users;
       
       if (search && typeof search === 'string') {
@@ -498,13 +498,23 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         return userWithoutPassword;
       });
       
+      // Apply limit if specified
+      let limitedUsers = safeUsers;
+      if (limit && typeof limit === 'string') {
+        const limitNum = parseInt(limit, 10);
+        if (!isNaN(limitNum) && limitNum > 0) {
+          limitedUsers = safeUsers.slice(0, limitNum);
+          console.log(`Applied limit of ${limitNum}, returning ${limitedUsers.length} out of ${safeUsers.length} users`);
+        }
+      }
+      
       // Debug log: print the first user object and its keys
-      if (safeUsers.length > 0) {
-        console.log('API response - first user object:', safeUsers[0]);
-        console.log('API response - first user keys:', Object.keys(safeUsers[0]));
+      if (limitedUsers.length > 0) {
+        console.log('API response - first user object:', limitedUsers[0]);
+        console.log('API response - first user keys:', Object.keys(limitedUsers[0]));
         
         // Check if phone field exists in the response
-        const firstUser = safeUsers[0];
+        const firstUser = limitedUsers[0];
         console.log('Phone field check:', {
           hasPhone: 'phone' in firstUser,
           phoneValue: firstUser.phone,
@@ -513,11 +523,11 @@ export function registerUserRoutes(app: Express, storage: IStorage) {
         });
         
         // Check how many users have phone numbers
-        const usersWithPhones = safeUsers.filter((u: any) => u.phone && u.phone.trim() !== '');
-        console.log('Users with phones in API response:', usersWithPhones.length, 'out of', safeUsers.length);
+        const usersWithPhones = limitedUsers.filter((u: any) => u.phone && u.phone.trim() !== '');
+        console.log('Users with phones in API response:', usersWithPhones.length, 'out of', limitedUsers.length);
       }
 
-      res.json(safeUsers);
+      res.json(limitedUsers);
     } catch (error: any) {
       console.error("Error fetching users:", error);
       res.status(500).json({ error: "Failed to fetch users: " + error.message });

@@ -35,8 +35,6 @@ interface ClientSearchFiltersProps {
   };
   onFiltersChange: (filters: any) => void;
   onClearFilters: () => void;
-  totalClients: number;
-  filteredClients: number;
 }
 
 export default function ClientSearchFilters({
@@ -44,9 +42,7 @@ export default function ClientSearchFilters({
   onSearchChange,
   filters,
   onFiltersChange,
-  onClearFilters,
-  totalClients,
-  filteredClients
+  onClearFilters
 }: ClientSearchFiltersProps) {
   const [isFiltersExpanded, setIsFiltersExpanded] = useState(false);
 
@@ -125,16 +121,6 @@ export default function ClientSearchFilters({
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10"
           />
-        </div>
-        
-        {/* Results Summary */}
-        <div className="text-sm text-gray-600">
-          Showing {filteredClients} of {totalClients} clients
-          {searchQuery && (
-            <span className="ml-2">
-              for "{searchQuery}"
-            </span>
-          )}
         </div>
       </CardHeader>
 

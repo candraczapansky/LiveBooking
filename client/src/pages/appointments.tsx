@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense, lazy, useMemo, useContext } from "react";
+import { useState, useEffect, Suspense, lazy, useMemo, useContext, useCallback } from "react";
 import { SidebarController } from "@/components/layout/sidebar";
 // import Header from "@/components/layout/header"; // Provided by MainLayout
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
@@ -15,13 +15,15 @@ const AddEditScheduleDialog = lazy(() => import("@/components/staff/add-edit-sch
 import { Plus, Calendar, Filter, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Select components temporarily replaced with native HTML selects to fix infinite loop issue
+// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import BigCalendar from "@/components/calendar/BigCalendar";
 import { Calendar as MiniCalendar } from "@/components/ui/calendar";
 import { startOfDay, endOfDay, setHours, setMinutes } from 'date-fns';
 import { toCentralWallTime } from "@/lib/utils";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { AuthContext } from "@/contexts/AuthProvider";
 
 const AppointmentsPage = () => {
@@ -146,6 +148,11 @@ const AppointmentsPage = () => {
   const [sbStartTime, setSbStartTime] = useState<string>("09:00");
   const [sbEndTime, setSbEndTime] = useState<string>("10:00");
   const [sbError, setSbError] = useState<string>("");
+  const [sbIsRecurring, setSbIsRecurring] = useState(false);
+  const [sbRecurringFrequency, setSbRecurringFrequency] = useState<"weekly" | "biweekly" | "triweekly" | "monthly">("weekly");
+  const [sbRecurringCount, setSbRecurringCount] = useState<number>(4);
+  const [sbAvailableDates, setSbAvailableDates] = useState<Date[]>([]);
+  const [sbAvailableTimes, setSbAvailableTimes] = useState<string[]>([]);
   // Calendar color controls
   const [availableColor, setAvailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('availableColor')) || '#dbeafe');
   const [unavailableColor, setUnavailableColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('unavailableColor')) || '#e5e7eb');
@@ -154,6 +161,16 @@ const AppointmentsPage = () => {
   const [arrivedColor, setArrivedColor] = useState<string>((typeof window !== 'undefined' && localStorage.getItem('arrivedColor')) || '#a5b4fc');
   const [serviceIdMap, setServiceIdMap] = useState<Record<number, any>>({});
   const [calendarRefreshToken, setCalendarRefreshToken] = useState<number>(0);
+
+  // Helper functions for block dialog smart filtering
+  const getDayName = (date: Date) => {
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  const formatDateForComparison = (date: Date) => {
+    return date.toISOString().slice(0, 10);
+  };
+
 
   // Helpers to track locally which appointments have been marked "arrived"
   const addArrivedLocal = (id: number) => {
@@ -295,12 +312,207 @@ const AppointmentsPage = () => {
         .map((sch: any) => Number(sch.staffId))
         .filter((id: number) => Number.isFinite(id))
       );
-      return (staff as any[]).filter((s: any) => staffIdsWithSchedules.has(Number(s.id)));
+      const result = (staff as any[]).filter((s: any) => staffIdsWithSchedules.has(Number(s.id)));
+      // Ensure stable array reference
+      return result.length > 0 ? result : [];
     } catch {
       // Return empty array on error instead of all staff
-      return [] as any[];
+      return [];
     }
   }, [staff, schedules, selectedLocation?.id]);
+
+  // Helper: Check if a staff member is scheduled for a specific date and location
+  const isStaffScheduledForDate = (staffId: number, date: Date, locationId?: number) => {
+    if (!schedules || schedules.length === 0) return false;
+
+    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+
+    const toLocalYMD = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const da = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${da}`;
+    };
+
+    const dateString = toLocalYMD(date);
+
+    // Find schedules for this staff on this day
+    const staffSchedules = schedules.filter((schedule: any) => {
+      const matchesStaff = schedule.staffId === staffId;
+      const matchesDay = String(schedule.dayOfWeek || '').toLowerCase() === String(dayName || '').toLowerCase();
+
+      // Check if the schedule is at the selected location (if location filtering is enabled)
+      const matchesLocation = !locationId || schedule.locationId == null || schedule.locationId === locationId;
+
+      // Check if the schedule is active for this date (compare in local time)
+      const startDateString = typeof schedule.startDate === 'string'
+        ? schedule.startDate
+        : toLocalYMD(new Date(schedule.startDate));
+
+      const endDateString = schedule.endDate
+        ? (typeof schedule.endDate === 'string'
+          ? schedule.endDate
+          : toLocalYMD(new Date(schedule.endDate)))
+        : null;
+
+      const matchesStartDate = startDateString <= dateString;
+      const matchesEndDate = !endDateString || endDateString >= dateString;
+
+      return matchesStaff && matchesDay && matchesLocation && matchesStartDate && matchesEndDate;
+    });
+
+    return staffSchedules.length > 0;
+  };
+
+  // Helper functions for block dialog
+  const getStaffAvailableDates = useCallback((staffId: string) => {
+    if (!staffId) return [];
+    const availableDates: Date[] = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Check next 90 days
+    for (let i = 0; i < 90; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(today.getDate() + i);
+      
+      // Use the existing isStaffScheduledForDate function and also check that the schedule is not blocked
+      if (isStaffScheduledForDate(parseInt(staffId), checkDate, selectedLocation?.id)) {
+        // Additional check to ensure there's at least one non-blocked schedule for this day
+        const dayName = getDayName(checkDate);
+        const hasNonBlockedSchedule = schedules.some((schedule: any) => 
+          schedule.staffId === parseInt(staffId) &&
+          schedule.dayOfWeek === dayName &&
+          !schedule.isBlocked &&
+          (!selectedLocation?.id || schedule.locationId === selectedLocation.id)
+        );
+        
+        if (hasNonBlockedSchedule) {
+          availableDates.push(checkDate);
+        }
+      }
+    }
+    
+    return availableDates;
+  }, [schedules, selectedLocation]);
+
+  const getAvailableTimesForBlock = useCallback((staffId: string, date: string) => {
+    if (!staffId || !date) return [];
+    
+    const selectedDate = new Date(date + 'T00:00:00');
+    const dayName = getDayName(selectedDate);
+    const staffIdNum = parseInt(staffId);
+    
+    // Get staff schedules for this day
+    const staffSchedules = schedules.filter((schedule: any) => {
+      const currentDateString = formatDateForComparison(selectedDate);
+      const startDateString = typeof schedule.startDate === 'string' 
+        ? schedule.startDate 
+        : new Date(schedule.startDate).toISOString().slice(0, 10);
+      const endDateString = schedule.endDate 
+        ? (typeof schedule.endDate === 'string' 
+          ? schedule.endDate 
+          : new Date(schedule.endDate).toISOString().slice(0, 10))
+        : null;
+      
+      return schedule.staffId === staffIdNum && 
+        schedule.dayOfWeek === dayName &&
+        startDateString <= currentDateString &&
+        (!endDateString || endDateString >= currentDateString) &&
+        !schedule.isBlocked &&
+        (!selectedLocation?.id || schedule.locationId === selectedLocation.id);
+    });
+
+    if (staffSchedules.length === 0) return [];
+
+    // Get all time slots from staff schedules
+    const allSlots: string[] = [];
+    staffSchedules.forEach((schedule: any) => {
+      const startMin = parseInt(schedule.startTime.split(':')[0]) * 60 + parseInt(schedule.startTime.split(':')[1] || 0);
+      const endMin = parseInt(schedule.endTime.split(':')[0]) * 60 + parseInt(schedule.endTime.split(':')[1] || 0);
+      
+      for (let min = startMin; min < endMin; min += 30) {
+        const hours = Math.floor(min / 60);
+        const minutes = min % 60;
+        const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        if (!allSlots.includes(timeStr)) {
+          allSlots.push(timeStr);
+        }
+      }
+    });
+
+    // Filter out times that conflict with appointments
+    const staffAppointments = appointments.filter((apt: any) => {
+      if (apt.staffId !== staffIdNum) return false;
+      const aptDate = new Date(apt.startTime);
+      return aptDate.toDateString() === selectedDate.toDateString();
+    });
+
+    const availableSlots = allSlots.filter(slot => {
+      const [slotHour, slotMin] = slot.split(':').map(Number);
+      const slotTime = new Date(selectedDate);
+      slotTime.setHours(slotHour, slotMin, 0, 0);
+
+      // Check if this slot conflicts with any appointment
+      return !staffAppointments.some((apt: any) => {
+        const aptStart = new Date(apt.startTime);
+        const aptEnd = new Date(apt.endTime);
+        
+        // Add 30 minutes for the block duration
+        const blockEnd = new Date(slotTime);
+        blockEnd.setMinutes(blockEnd.getMinutes() + 30);
+        
+        // Check for overlap
+        return slotTime < aptEnd && blockEnd > aptStart;
+      });
+    });
+
+    return availableSlots.sort();
+  }, [appointments, schedules, selectedLocation]);
+
+  // Update available dates when staff is selected
+  useEffect(() => {
+    if (sbStaffId) {
+      const availableDates = getStaffAvailableDates(sbStaffId);
+      setSbAvailableDates(availableDates);
+      
+      // Reset date if current date is not available
+      if (sbDate && availableDates.length > 0) {
+        const dateObj = new Date(sbDate + 'T00:00:00');
+        const isAvailable = availableDates.some(d => 
+          d.toISOString().slice(0, 10) === sbDate
+        );
+        if (!isAvailable) {
+          setSbDate('');
+          setSbAvailableTimes([]);
+        }
+      }
+    } else {
+      setSbAvailableDates([]);
+      setSbAvailableTimes([]);
+    }
+  }, [sbStaffId, getStaffAvailableDates, sbDate]);
+
+  // Update available times when date is selected
+  useEffect(() => {
+    if (sbStaffId && sbDate) {
+      const times = getAvailableTimesForBlock(sbStaffId, sbDate);
+      setSbAvailableTimes(times);
+      
+      // Reset time if not available
+      if (sbStartTime && !times.includes(sbStartTime)) {
+        setSbStartTime(times[0] || '09:00');
+      }
+      if (sbEndTime) {
+        const startIdx = times.indexOf(sbStartTime);
+        if (startIdx >= 0 && startIdx < times.length - 1) {
+          setSbEndTime(times[startIdx + 1] || '10:00');
+        }
+      }
+    } else {
+      setSbAvailableTimes([]);
+    }
+  }, [sbStaffId, sbDate, getAvailableTimesForBlock, sbStartTime, sbEndTime]);
 
   // Debug: Log schedules when they change
   useEffect(() => {
@@ -326,7 +538,7 @@ const AppointmentsPage = () => {
     }
   }, [staff, selectedLocation?.id]);
 
-  // Force cache invalidation when location changes
+  // Force cache invalidation when location changes and reset staff filter
   useEffect(() => {
     if (selectedLocation?.id) {
       console.log('🔄 Location changed to:', selectedLocation.id);
@@ -335,20 +547,13 @@ const AppointmentsPage = () => {
       queryClient.invalidateQueries({ queryKey: ['/api/schedules'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/services'] });
+      
+      // Always reset staff filter to "all" when changing locations
+      // This is simpler and avoids complex dependency issues
+      console.log('📍 Location changed, resetting staff filter to all');
+      setSelectedStaffFilter("all");
     }
   }, [selectedLocation?.id, queryClient]);
-
-  // Only reset staff filter if the selected staff is not available at the new location
-  useEffect(() => {
-    if (selectedStaffFilter !== "all" && locationStaffOptions.length > 0) {
-      const selectedStaffId = parseInt(selectedStaffFilter);
-      const isStaffAvailable = locationStaffOptions.some((s: any) => s.id === selectedStaffId);
-      if (!isStaffAvailable) {
-        console.log('📍 Selected staff not available at this location, resetting filter');
-        setSelectedStaffFilter("all");
-      }
-    }
-  }, [locationStaffOptions]);
 
   // Recalculate filtered resources when date changes (for day view staff filtering)
   useEffect(() => {
@@ -407,49 +612,6 @@ const AppointmentsPage = () => {
       window.removeEventListener('schedule-updated', handleScheduleUpdate);
     };
   }, [queryClient]);
-
-  // Helper: Check if a staff member is scheduled for a specific date and location
-  const isStaffScheduledForDate = (staffId: number, date: Date, locationId?: number) => {
-    if (!schedules || schedules.length === 0) return false;
-
-    const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-
-    const toLocalYMD = (d: Date) => {
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const da = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${da}`;
-    };
-
-    const dateString = toLocalYMD(date);
-
-    // Find schedules for this staff on this day
-    const staffSchedules = schedules.filter((schedule: any) => {
-      const matchesStaff = schedule.staffId === staffId;
-      const matchesDay = String(schedule.dayOfWeek || '').toLowerCase() === String(dayName || '').toLowerCase();
-
-      // Check if the schedule is at the selected location (if location filtering is enabled)
-      const matchesLocation = !locationId || schedule.locationId == null || schedule.locationId === locationId;
-
-      // Check if the schedule is active for this date (compare in local time)
-      const startDateString = typeof schedule.startDate === 'string'
-        ? schedule.startDate
-        : toLocalYMD(new Date(schedule.startDate));
-
-      const endDateString = schedule.endDate
-        ? (typeof schedule.endDate === 'string'
-          ? schedule.endDate
-          : toLocalYMD(new Date(schedule.endDate)))
-        : null;
-
-      const matchesStartDate = startDateString <= dateString;
-      const matchesEndDate = !endDateString || endDateString >= dateString;
-
-      return matchesStaff && matchesDay && matchesLocation && matchesStartDate && matchesEndDate;
-    });
-
-    return staffSchedules.length > 0;
-  };
 
   const filteredAppointments = appointments.filter((apt: any) => {
     // Filter by selected location if set
@@ -778,23 +940,27 @@ const AppointmentsPage = () => {
 
   const handleAddBlock = () => {
     try {
-      const base = selectedDate || new Date();
-      const start = new Date(base);
-      start.setSeconds(0, 0);
-      const end = new Date(start.getTime() + 60 * 60 * 1000);
-      const pad = (n: number) => String(n).padStart(2, '0');
-      setSbStartTime(`${pad(start.getHours())}:${pad(start.getMinutes())}`);
-      setSbEndTime(`${pad(end.getHours())}:${pad(end.getMinutes())}`);
-      setSbDate(start.toISOString().slice(0, 10));
+      // Reset all fields
+      setSbStaffId("");
+      setSbDate("");
+      setSbStartTime("09:00");
+      setSbEndTime("10:00");
+      setSbAvailableDates([]);
+      setSbAvailableTimes([]);
+      setSbError("");
+      setSbIsRecurring(false);
+      setSbRecurringFrequency("weekly");
+      setSbRecurringCount(4);
+      
+      // Pre-select staff if filtered
       if (selectedStaffFilter !== 'all') {
-        // Only prefill if the selected staff is eligible for this location
         const n = Number(selectedStaffFilter);
         const eligible = locationStaffOptions.some((s: any) => Number(s.id) === n);
-        setSbStaffId(eligible ? String(n) : "");
-      } else {
-        setSbStaffId("");
+        if (eligible) {
+          setSbStaffId(String(n));
+        }
       }
-      setSbError("");
+      
       setIsSimpleBlockOpen(true);
     } catch (e) {
       console.warn('Error preparing Add Block dialog:', e);
@@ -803,12 +969,27 @@ const AppointmentsPage = () => {
 
   const createSimpleBlockMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const response = await apiRequest("POST", "/api/schedules", payload);
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || 'Failed to create block');
+      if (payload.recurring && payload.blocks) {
+        // Handle recurring blocks - create multiple blocks
+        const results = [];
+        for (const block of payload.blocks) {
+          const response = await apiRequest("POST", "/api/schedules", block);
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || 'Failed to create block');
+          }
+          results.push(await response.json());
+        }
+        return results;
+      } else {
+        // Handle single block
+        const response = await apiRequest("POST", "/api/schedules", payload);
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || 'Failed to create block');
+        }
+        return response.json();
       }
-      return response.json();
     },
     onSuccess: () => {
       try {
@@ -819,6 +1000,16 @@ const AppointmentsPage = () => {
         window.dispatchEvent(new CustomEvent('schedule-updated'));
       } catch {}
       setIsSimpleBlockOpen(false);
+      // Reset all fields after successful creation
+      setSbStaffId("");
+      setSbDate("");
+      setSbStartTime("09:00");
+      setSbEndTime("10:00");
+      setSbAvailableDates([]);
+      setSbAvailableTimes([]);
+      setSbIsRecurring(false);
+      setSbRecurringFrequency("weekly");
+      setSbRecurringCount(4);
     },
     onError: (error) => {
       try {
@@ -1703,27 +1894,26 @@ const AppointmentsPage = () => {
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center gap-2">
                         <Filter className="h-4 w-4 text-gray-500" />
-                        <Select value={selectedStaffFilter} onValueChange={setSelectedStaffFilter}>
-                          <SelectTrigger className="w-48 min-h-[44px]">
-                            <SelectValue placeholder="Filter by staff" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">
-                              {calendarView === 'day' ? 'All Staff (Daily View)' : 'All Staff'}
-                            </SelectItem>
-                            {locationStaffOptions?.map((s: any) => (
-                              <SelectItem key={s.id} value={s.id.toString()}>
-                                {(() => {
-                                  const u = s?.user || {};
-                                  const first = (u.firstName || '').trim();
-                                  const last = (u.lastName || '').trim();
-                                  const full = `${first} ${last}`.trim();
-                                  return full || u.username || 'Unknown Staff';
-                                })()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <select
+                          value={selectedStaffFilter}
+                          onChange={(e) => setSelectedStaffFilter(e.target.value)}
+                          className="w-48 min-h-[44px] px-3 py-2 text-sm rounded-md border border-input bg-background"
+                        >
+                          <option value="all">
+                            {calendarView === 'day' ? 'All Staff (Daily View)' : 'All Staff'}
+                          </option>
+                          {locationStaffOptions?.map((s: any) => (
+                            <option key={s.id} value={s.id.toString()}>
+                              {(() => {
+                                const u = s?.user || {};
+                                const first = (u.firstName || '').trim();
+                                const last = (u.lastName || '').trim();
+                                const full = `${first} ${last}`.trim();
+                                return full || u.username || 'Unknown Staff';
+                              })()}
+                            </option>
+                          ))}
+                        </select>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground">Colors:</span>
@@ -2242,7 +2432,17 @@ const AppointmentsPage = () => {
       <Dialog open={isSimpleBlockOpen} onOpenChange={(open) => {
         setIsSimpleBlockOpen(open);
         if (!open) {
+          // Reset all states when dialog closes
+          setSbStaffId("");
+          setSbDate("");
+          setSbStartTime("09:00");
+          setSbEndTime("10:00");
+          setSbAvailableDates([]);
+          setSbAvailableTimes([]);
           setSbError("");
+          setSbIsRecurring(false);
+          setSbRecurringFrequency("weekly");
+          setSbRecurringCount(4);
         }
       }}>
         <DialogContent>
@@ -2252,39 +2452,167 @@ const AppointmentsPage = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-sm font-medium">Staff</label>
-                <Select value={sbStaffId} onValueChange={setSbStaffId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select staff" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locationStaffOptions?.map((s: any) => (
-                      <SelectItem key={s.id} value={String(s.id)}>
-                        {(() => {
-                          const u = s?.user || {};
-                          const first = (u.firstName || '').trim();
-                          const last = (u.lastName || '').trim();
-                          const full = `${first} ${last}`.trim();
-                          return full || u.username || 'Unknown Staff';
-                        })()}
-                      </SelectItem>
+                <label className="text-sm font-medium">Staff <span className="text-red-500">*</span></label>
+                <select
+                  value={sbStaffId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSbStaffId(value);
+                    // Clear date and time when staff changes
+                    setSbDate("");
+                    setSbStartTime("09:00");
+                    setSbEndTime("10:00");
+                  }}
+                  className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background"
+                >
+                  <option value="">Select staff first</option>
+                  {locationStaffOptions?.map((s: any) => (
+                    <option key={s.id} value={String(s.id)}>
+                      {(() => {
+                        const u = s?.user || {};
+                        const first = (u.firstName || '').trim();
+                        const last = (u.lastName || '').trim();
+                        const full = `${first} ${last}`.trim();
+                        return full || u.username || 'Unknown Staff';
+                      })()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Date <span className="text-red-500">*</span></label>
+                {!sbStaffId ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    Select staff first
+                  </div>
+                ) : sbAvailableDates.length === 0 ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    No available dates for selected staff
+                  </div>
+                ) : (
+                  <Input 
+                    type="date" 
+                    value={sbDate} 
+                    onChange={(e) => {
+                      setSbDate(e.target.value);
+                      // Reset times when date changes
+                      setSbStartTime("09:00");
+                      setSbEndTime("10:00");
+                    }}
+                    min={sbAvailableDates[0]?.toISOString().slice(0, 10)}
+                    max={sbAvailableDates[sbAvailableDates.length - 1]?.toISOString().slice(0, 10)}
+                  />
+                )}
+                {sbStaffId && sbAvailableDates.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {sbAvailableDates.length} available dates
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium">Start Time <span className="text-red-500">*</span></label>
+                {!sbStaffId || !sbDate ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    {!sbStaffId ? "Select staff first" : "Select date first"}
+                  </div>
+                ) : sbAvailableTimes.length === 0 ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    No available times
+                  </div>
+                ) : (
+                  <select
+                    value={sbStartTime}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setSbStartTime(value);
+                      // Auto-set end time to 30 minutes later
+                      const idx = sbAvailableTimes.indexOf(value);
+                      if (idx >= 0 && idx < sbAvailableTimes.length - 1) {
+                        setSbEndTime(sbAvailableTimes[idx + 1]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background"
+                  >
+                    {sbAvailableTimes.slice(0, -1).map(time => (
+                      <option key={time} value={time}>
+                        {time}
+                      </option>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </select>
+                )}
               </div>
               <div>
-                <label className="text-sm font-medium">Date</label>
-                <Input type="date" value={sbDate} onChange={(e) => setSbDate(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Start Time</label>
-                <Input type="time" value={sbStartTime} onChange={(e) => setSbStartTime(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-sm font-medium">End Time</label>
-                <Input type="time" value={sbEndTime} onChange={(e) => setSbEndTime(e.target.value)} />
+                <label className="text-sm font-medium">End Time <span className="text-red-500">*</span></label>
+                {!sbStaffId || !sbDate || !sbStartTime ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    {!sbStaffId ? "Select staff first" : !sbDate ? "Select date first" : "Select start time first"}
+                  </div>
+                ) : sbAvailableTimes.length === 0 ? (
+                  <div className="px-3 py-2 border rounded-md bg-gray-50 text-sm text-gray-500">
+                    No available times
+                  </div>
+                ) : (
+                  <select
+                    value={sbEndTime}
+                    onChange={(e) => setSbEndTime(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background"
+                  >
+                    {sbAvailableTimes
+                      .slice(sbAvailableTimes.indexOf(sbStartTime) + 1)
+                      .map(time => (
+                        <option key={time} value={time}>
+                          {time}
+                        </option>
+                      ))}
+                  </select>
+                )}
               </div>
             </div>
+            
+            {/* Recurring block options - only show if we have valid times */}
+            {sbStaffId && sbDate && sbAvailableTimes.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="recurring-block"
+                    checked={sbIsRecurring}
+                    onCheckedChange={(checked) => setSbIsRecurring(checked as boolean)}
+                  />
+                  <label htmlFor="recurring-block" className="text-sm font-medium cursor-pointer">
+                    Create recurring blocks
+                  </label>
+                </div>
+              
+              {sbIsRecurring && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-6">
+                  <div>
+                    <label className="text-sm font-medium">Frequency</label>
+                    <select
+                      value={sbRecurringFrequency}
+                      onChange={(e) => setSbRecurringFrequency(e.target.value)}
+                      className="w-full px-3 py-2 text-sm rounded-md border border-input bg-background"
+                    >
+                      <option value="weekly">Weekly</option>
+                      <option value="biweekly">Every 2 Weeks</option>
+                      <option value="triweekly">Every 3 Weeks</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Number of occurrences</label>
+                    <Input 
+                      type="number" 
+                      min="2" 
+                      max="52" 
+                      value={sbRecurringCount} 
+                      onChange={(e) => setSbRecurringCount(parseInt(e.target.value) || 4)}
+                    />
+                  </div>
+                </div>
+              )}
+              </div>
+            )}
+            
             {sbError && (
               <div className="text-red-600 text-sm">{sbError}</div>
             )}
@@ -2301,23 +2629,70 @@ const AppointmentsPage = () => {
               if (!sbDate) { setSbError('Please select a date.'); return; }
               if (!sbStartTime || !sbEndTime) { setSbError('Please select start and end times.'); return; }
               if (toMinutes(sbEndTime) <= toMinutes(sbStartTime)) { setSbError('End time must be after start time.'); return; }
+              if (sbIsRecurring && (!sbRecurringCount || sbRecurringCount < 2 || sbRecurringCount > 52)) {
+                setSbError('Number of occurrences must be between 2 and 52.');
+                return;
+              }
 
               try {
-                const [yy, mm, dd] = sbDate.split('-').map((n) => parseInt(n, 10));
-                const d = new Date(yy, (mm || 1) - 1, dd || 1);
-                const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
-                const payload = {
-                  staffId: parseInt(sbStaffId, 10),
-                  dayOfWeek,
-                  startTime: sbStartTime,
-                  endTime: sbEndTime,
-                  locationId: selectedLocation?.id ?? null,
-                  startDate: sbDate,
-                  endDate: sbDate,
-                  isBlocked: true,
-                  serviceCategories: [],
-                };
-                createSimpleBlockMutation.mutate(payload);
+                if (sbIsRecurring) {
+                  // Create recurring blocks
+                  const baseDate = new Date(sbDate + 'T00:00:00');
+                  const blocks = [];
+                  
+                  for (let i = 0; i < sbRecurringCount; i++) {
+                    let blockDate = new Date(baseDate);
+                    
+                    // Calculate the date for each occurrence
+                    if (i > 0) {
+                      if (sbRecurringFrequency === 'weekly') {
+                        blockDate.setDate(baseDate.getDate() + (7 * i));
+                      } else if (sbRecurringFrequency === 'biweekly') {
+                        blockDate.setDate(baseDate.getDate() + (14 * i));
+                      } else if (sbRecurringFrequency === 'triweekly') {
+                        blockDate.setDate(baseDate.getDate() + (21 * i));
+                      } else if (sbRecurringFrequency === 'monthly') {
+                        blockDate = new Date(baseDate);
+                        blockDate.setMonth(baseDate.getMonth() + i);
+                      }
+                    }
+                    
+                    const dayOfWeek = blockDate.toLocaleDateString('en-US', { weekday: 'long' });
+                    const dateStr = blockDate.toISOString().slice(0, 10);
+                    
+                    blocks.push({
+                      staffId: parseInt(sbStaffId, 10),
+                      dayOfWeek,
+                      startTime: sbStartTime,
+                      endTime: sbEndTime,
+                      locationId: selectedLocation?.id ?? null,
+                      startDate: dateStr,
+                      endDate: dateStr,
+                      isBlocked: true,
+                      serviceCategories: [],
+                    });
+                  }
+                  
+                  // Create all blocks
+                  createSimpleBlockMutation.mutate({ recurring: true, blocks });
+                } else {
+                  // Create single block
+                  const [yy, mm, dd] = sbDate.split('-').map((n) => parseInt(n, 10));
+                  const d = new Date(yy, (mm || 1) - 1, dd || 1);
+                  const dayOfWeek = d.toLocaleDateString('en-US', { weekday: 'long' });
+                  const payload = {
+                    staffId: parseInt(sbStaffId, 10),
+                    dayOfWeek,
+                    startTime: sbStartTime,
+                    endTime: sbEndTime,
+                    locationId: selectedLocation?.id ?? null,
+                    startDate: sbDate,
+                    endDate: sbDate,
+                    isBlocked: true,
+                    serviceCategories: [],
+                  };
+                  createSimpleBlockMutation.mutate(payload);
+                }
               } catch (e) {
                 setSbError('Failed to create block.');
               }

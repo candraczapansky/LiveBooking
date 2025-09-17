@@ -50,7 +50,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectTo = '/dashboard',
   children 
 }) => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { 
     hasPermission, 
     hasAnyPermission, 
@@ -66,7 +66,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
   
   // While loading, show nothing to prevent flickering
-  if (loading) return null;
+  if (authLoading || loading) return null;
   
   // Check permissions based on props provided
   let hasAccess = false;

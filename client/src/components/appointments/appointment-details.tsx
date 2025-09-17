@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera, ShoppingCart, Plus, Search, Loader2 } from "lucide-react";
+import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera, ShoppingCart, Search, Loader2 } from "lucide-react";
 import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
 import { formatPrice } from "@/lib/utils";
 import { PermissionGuard } from "@/components/permissions/PermissionGuard";
@@ -39,6 +39,7 @@ import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientNoteHistory from "@/components/client/client-note-history";
 import AppointmentPhotos from "@/components/appointments/appointment-photos";
+import PaymentCompleteCard from "@/components/appointments/payment-complete-card";
 // Removed inline photo upload UI; keep only components in use
 
 interface AppointmentDetailsProps {
@@ -125,6 +126,8 @@ const AppointmentDetails = ({
   const [isEditServiceOpen, setIsEditServiceOpen] = useState(false);
   const [selectedSavedCard, setSelectedSavedCard] = useState<any>(null);
   // Staff edit dialog removed
+  const [showPaymentComplete, setShowPaymentComplete] = useState(false);
+  const [paymentCompleteDetails, setPaymentCompleteDetails] = useState<any>(null);
 
   // Inline photo upload removed; handled by standalone AppointmentPhotos
   const [photoSectionNote, setPhotoSectionNote] = useState("");
@@ -692,10 +695,27 @@ const AppointmentDetails = ({
       queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
       
+      // Show payment complete card
+      setPaymentCompleteDetails({
+        amount: finalAmount,
+        tipAmount: tipAmount || 0,
+        method: 'cash',
+        timestamp: new Date(),
+        description: `Cash payment for ${appointment.serviceName || service?.name || 'Appointment'}`
+      });
+      setShowPaymentComplete(true);
+      setShowPaymentOptions(false);
+      
       toast({
         title: "Cash Payment Recorded",
         description: "Appointment marked as paid with cash.",
       });
+      
+      // Close the appointment details dialog after a short delay
+      setTimeout(() => {
+        onOpenChange(false);
+        if (onEdit) onEdit(appointmentId);
+      }, 100);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -796,20 +816,38 @@ const AppointmentDetails = ({
       // Dismiss loading toast and show success
       loadingToast.dismiss();
       
+      // Show payment complete card
+      setPaymentCompleteDetails({
+        amount: amt,
+        tipAmount: tipAmount || 0,
+        transactionId: paymentData.transactionId,
+        cardLast4: paymentData.cardLast4 || paymentMethod.cardLast4,
+        method: 'card',
+        timestamp: new Date(),
+        description: `Card payment for ${service?.name || 'Appointment'}`
+      });
+      setShowPaymentComplete(true);
+      
       toast({
         title: "Payment Successful",
         description: `Payment of ${formatPrice(amt)} has been processed.`,
       });
       
       // Refresh data
-      queryClient.invalidateQueries(['/api/appointments']);
-      queryClient.invalidateQueries(['/api/payments']);
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
       
       // Reset UI states
       setShowPaymentOptions(false);
       setShowCardPayment(false);
-      setChargeAmount(null);
+      setChargeAmount(0);
       setTipAmount(0);
+      
+      // Close the appointment details dialog after a short delay
+      setTimeout(() => {
+        onOpenChange(false);
+        if (onEdit) onEdit(appointment?.id);
+      }, 100);
       
     } catch (error: any) {
       console.error('[SavedCardPayment] Payment error:', error);
@@ -868,13 +906,30 @@ const AppointmentDetails = ({
                 await queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
               } catch {}
               
+              // Show payment complete card
+              setPaymentCompleteDetails({
+                amount: result.amount || appointment.totalAmount,
+                tipAmount: result.tipAmount || 0,
+                transactionId: transactionId,
+                cardLast4: result.cardLast4 || result.last4,
+                method: 'terminal',
+                timestamp: new Date(),
+                description: `Terminal payment for ${appointment.serviceName || service?.name || 'Appointment'}`
+              });
+              setShowPaymentComplete(true);
+              setShowPaymentOptions(false);
+              setShowTerminalPayment(false);
+              
               toast({
                 title: "Payment Confirmed",
                 description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
               });
 
-              onOpenChange(false);
-              if (onEdit) onEdit(appointment.id);
+              // Close appointment details dialog after short delay
+              setTimeout(() => {
+                onOpenChange(false);
+                if (onEdit) onEdit(appointment.id);
+              }, 100);
             } else {
               throw new Error(completeResult.error || 'Failed to sync payment with calendar');
             }
@@ -900,13 +955,30 @@ const AppointmentDetails = ({
                 await queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
               } catch {}
 
+              // Show payment complete card
+              setPaymentCompleteDetails({
+                amount: result.amount || appointment.totalAmount,
+                tipAmount: result.tipAmount || 0,
+                transactionId: result.transactionId,
+                cardLast4: result.cardLast4 || result.last4,
+                method: 'terminal',
+                timestamp: new Date(),
+                description: `Terminal payment for ${appointment.serviceName || service?.name || 'Appointment'}`
+              });
+              setShowPaymentComplete(true);
+              setShowPaymentOptions(false);
+              setShowTerminalPayment(false);
+
               toast({
                 title: "Payment Confirmed",
                 description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
               });
 
-              onOpenChange(false);
-              if (onEdit) onEdit(appointment.id);
+              // Close appointment details dialog after short delay
+              setTimeout(() => {
+                onOpenChange(false);
+                if (onEdit) onEdit(appointment.id);
+              }, 100);
             } catch (fallbackError) {
               console.error('Fallback payment update failed:', fallbackError);
               toast({
@@ -1041,6 +1113,17 @@ const AppointmentDetails = ({
       
       // Show appropriate message based on payment result
       if (remainingBalance <= 0) {
+        // Show payment complete card for full payment
+        setPaymentCompleteDetails({
+          amount: amountToApply,
+          tipAmount: tipAmount || 0,
+          transactionId: paymentResult.transactionId,
+          method: 'gift_card',
+          timestamp: new Date(),
+          description: `Gift card payment for ${appointment.serviceName || service?.name || 'Appointment'}`
+        });
+        setShowPaymentComplete(true);
+        
         toast({
           title: "Payment Complete",
           description: `Gift card applied successfully. Appointment fully paid with gift card.`,
@@ -1048,6 +1131,12 @@ const AppointmentDetails = ({
         setGiftCardCode("");
         setGiftCardBalance(null);
         setShowPaymentOptions(false);
+        
+        // Close appointment details dialog after short delay
+        setTimeout(() => {
+          onOpenChange(false);
+          if (onEdit) onEdit(appointmentId);
+        }, 100);
       } else {
         toast({
           title: "Partial Payment Applied",
@@ -1125,6 +1214,22 @@ const AppointmentDetails = ({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        {showPaymentComplete && paymentCompleteDetails ? (
+          // Show payment complete card instead of appointment details
+          <PaymentCompleteCard
+            paymentDetails={paymentCompleteDetails}
+            clientName={client ? `${client.firstName} ${client.lastName}` : 'Customer'}
+            clientEmail={client?.email}
+            clientPhone={client?.phone}
+            onClose={() => {
+              setShowPaymentComplete(false);
+              setPaymentCompleteDetails(null);
+              onOpenChange(false);
+              if (onEdit && appointmentId) onEdit(appointmentId);
+            }}
+          />
+        ) : (
+          <>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getStatusIcon(appointment.status || 'pending')}
@@ -1691,7 +1796,7 @@ const AppointmentDetails = ({
                           clientId={appointment.clientId}
                           tipAmount={tipAmount}
                           savedCard={selectedSavedCard}
-                          onSuccess={async (_response: any) => {
+                          onSuccess={async (response: any) => {
                             try {
                               await apiRequest('PUT', `/api/appointments/${appointment.id}`, {
                                 status: 'completed',
@@ -1700,6 +1805,19 @@ const AppointmentDetails = ({
                                 totalAmount: calculateFinalAmount()
                               });
                             } catch {}
+                            
+                            // Show payment complete card
+                            setPaymentCompleteDetails({
+                              amount: calculateFinalAmount(),
+                              tipAmount: tipAmount || 0,
+                              transactionId: response?.transactionId,
+                              cardLast4: response?.cardLast4,
+                              method: 'card',
+                              timestamp: new Date(),
+                              description: `Card payment for ${service?.name || 'Appointment'}`
+                            });
+                            setShowPaymentComplete(true);
+                            
                             setShowHelcimModal(false);
                             setShowCardPayment(false);
                             setShowPaymentOptions(false);
@@ -1711,6 +1829,12 @@ const AppointmentDetails = ({
                             queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
                             queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
                             queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+                            
+                            // Close appointment details dialog after short delay
+                            setTimeout(() => {
+                              onOpenChange(false);
+                              if (onEdit) onEdit(appointment.id);
+                            }, 100);
                           }}
                           onError={() => setShowHelcimModal(false)}
                         />
@@ -1928,6 +2052,8 @@ const AppointmentDetails = ({
             )}
           </div>
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
     {client && (
