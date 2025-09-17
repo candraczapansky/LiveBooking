@@ -1900,7 +1900,13 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   });
 
   // Voice webhook handlers for Yealink phone integration
-  app.post('/webhook/voice', async (req: Request, res: Response) => {
+  
+  // Test endpoint to verify webhook is accessible
+  app.get('/api/webhook/voice', (req: Request, res: Response) => {
+    res.send('Voice webhook is active and ready to receive POST requests from Twilio.');
+  });
+
+  app.post('/api/webhook/voice', async (req: Request, res: Response) => {
     try {
       const { From, To, CallSid } = req.body;
       
@@ -1938,14 +1944,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   });
 
   // Voice status webhook
-  app.post('/webhook/voice/status', async (req: Request, res: Response) => {
+  app.post('/api/webhook/voice/status', async (req: Request, res: Response) => {
     const { CallSid, CallStatus } = req.body;
     console.log('📞 Call status update:', CallSid, CallStatus);
     res.status(200).send('OK');
   });
 
   // Voice processing webhook (for speech/DTMF input if needed)
-  app.post('/webhook/voice/process', async (req: Request, res: Response) => {
+  app.post('/api/webhook/voice/process', async (req: Request, res: Response) => {
     console.log('📞 Voice processing:', req.body);
     res.set('Content-Type', 'text/xml');
     res.send('<Response><Say>Thank you.</Say></Response>');

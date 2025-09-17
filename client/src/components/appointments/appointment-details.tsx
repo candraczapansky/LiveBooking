@@ -711,11 +711,6 @@ const AppointmentDetails = ({
         description: "Appointment marked as paid with cash.",
       });
       
-      // Close the appointment details dialog after a short delay
-      setTimeout(() => {
-        onOpenChange(false);
-        if (onEdit) onEdit(appointmentId);
-      }, 100);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -843,11 +838,6 @@ const AppointmentDetails = ({
       setChargeAmount(0);
       setTipAmount(0);
       
-      // Close the appointment details dialog after a short delay
-      setTimeout(() => {
-        onOpenChange(false);
-        if (onEdit) onEdit(appointment?.id);
-      }, 100);
       
     } catch (error: any) {
       console.error('[SavedCardPayment] Payment error:', error);
@@ -924,12 +914,7 @@ const AppointmentDetails = ({
                 title: "Payment Confirmed",
                 description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
               });
-
-              // Close appointment details dialog after short delay
-              setTimeout(() => {
-                onOpenChange(false);
-                if (onEdit) onEdit(appointment.id);
-              }, 100);
+              
             } else {
               throw new Error(completeResult.error || 'Failed to sync payment with calendar');
             }
@@ -973,12 +958,7 @@ const AppointmentDetails = ({
                 title: "Payment Confirmed",
                 description: `Terminal payment completed. Card ending in ${result.cardLast4 || '****'}`,
               });
-
-              // Close appointment details dialog after short delay
-              setTimeout(() => {
-                onOpenChange(false);
-                if (onEdit) onEdit(appointment.id);
-              }, 100);
+              
             } catch (fallbackError) {
               console.error('Fallback payment update failed:', fallbackError);
               toast({
@@ -1132,11 +1112,6 @@ const AppointmentDetails = ({
         setGiftCardBalance(null);
         setShowPaymentOptions(false);
         
-        // Close appointment details dialog after short delay
-        setTimeout(() => {
-          onOpenChange(false);
-          if (onEdit) onEdit(appointmentId);
-        }, 100);
       } else {
         toast({
           title: "Partial Payment Applied",
@@ -1830,11 +1805,7 @@ const AppointmentDetails = ({
                             queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
                             queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
                             
-                            // Close appointment details dialog after short delay
-                            setTimeout(() => {
-                              onOpenChange(false);
-                              if (onEdit) onEdit(appointment.id);
-                            }, 100);
+                            // Keep dialog open so payment complete card stays until user closes
                           }}
                           onError={() => setShowHelcimModal(false)}
                         />

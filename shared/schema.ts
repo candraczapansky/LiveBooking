@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision, date, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -404,6 +404,7 @@ export const memberships = pgTable("memberships", {
   price: doublePrecision("price").notNull(),
   duration: integer("duration").notNull(), // in days
   benefits: text("benefits"),
+  includedServices: json("included_services").$type<number[]>().default([]), // Array of service IDs included with membership
 });
 
 export const insertMembershipSchema = createInsertSchema(memberships).omit({

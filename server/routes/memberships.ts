@@ -179,6 +179,76 @@ export function registerMembershipRoutes(app: Express, storage: IStorage) {
     })
   );
 
+  // Get a specific client membership by ID
+  app.get(
+    "/api/client-memberships/:id",
+    asyncHandler(async (req: Request, res: Response) => {
+      const id = parseInt(req.params.id);
+      const context = getLogContext(req);
+      
+      LoggerService.info("Fetching client membership", { ...context, id });
+      
+      const clientMembership = await storage.getClientMembership(id);
+      if (!clientMembership) {
+        throw new NotFoundError(`Client membership with ID ${id} not found`);
+      }
+      
+      // Get the membership details
+      const membership = await storage.getMembership(clientMembership.membershipId);
+      
+      // Get the client details
+      const client = await storage.getUser(clientMembership.clientId);
+      
+      // Combine the data
+      const result = {
+        ...clientMembership,
+        membership: membership,
+        client: client
+      };
+      
+      res.json(result);
+    })
+  );
+
+  // Update client membership (for toggling auto-renewal, editing dates, etc.)
+  app.put(
+    "/api/client-memberships/:id",
+    asyncHandler(async (req: Request, res: Response) => {
+      const id = parseInt(req.params.id);
+      const context = getLogContext(req);
+      const { autoRenew, active, renewalDay, paymentMethodId, startDate, endDate } = req.body;
+
+      LoggerService.info("Updating client membership", { 
+        ...context, 
+        membershipId: id,
+        updates: req.body 
+      });
+
+      // Check if membership exists
+      const membership = await storage.getClientMembership(id);
+      if (!membership) {
+        throw new NotFoundError(`Client membership with ID ${id} not found`);
+      }
+
+      // Update the membership
+      const updateData: any = {};
+      if (autoRenew !== undefined) updateData.autoRenew = autoRenew;
+      if (active !== undefined) updateData.active = active;
+      if (renewalDay !== undefined) updateData.renewalDay = renewalDay;
+      if (paymentMethodId !== undefined) updateData.paymentMethodId = paymentMethodId;
+      if (startDate !== undefined) updateData.startDate = new Date(startDate);
+      if (endDate !== undefined) updateData.endDate = new Date(endDate);
+
+      const updated = await storage.updateClientMembership(id, updateData);
+
+      invalidateCache("client-memberships");
+      invalidateCache(`client-membership:${id}`);
+      invalidateCache("api:GET:/api/client-memberships");
+
+      res.json(updated);
+    })
+  );
+
   // Delete client membership
   app.delete(
     "/api/client-memberships/:id",

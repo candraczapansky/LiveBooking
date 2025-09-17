@@ -8,6 +8,8 @@ import MembershipForm from "@/components/memberships/membership-form";
 import MembershipSubscriptionDialog from "@/components/memberships/membership-subscription-dialog";
 import SubscriberDialog from "@/components/memberships/subscriber-dialog";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { useLocation } from "wouter";
+import { Package } from "lucide-react";
 
 import {
   Card,
@@ -49,6 +51,15 @@ type Membership = {
   price: number;
   duration: number;
   benefits: string;
+  includedServices?: number[];
+};
+
+type Service = {
+  id: number;
+  name: string;
+  price: number;
+  duration: number;
+  description: string;
 };
 
 type ClientMembership = {
@@ -72,6 +83,7 @@ const MembershipsPage = () => {
   useDocumentTitle("Memberships | Glo Head Spa");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("plans");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedMembershipId, setSelectedMembershipId] = useState<number | null>(null);
@@ -90,6 +102,15 @@ const MembershipsPage = () => {
     queryFn: async () => {
       const response = await fetch('/api/memberships');
       if (!response.ok) throw new Error('Failed to fetch memberships');
+      return response.json();
+    }
+  });
+
+  const { data: services } = useQuery({
+    queryKey: ['/api/services'],
+    queryFn: async () => {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
       return response.json();
     }
   });
@@ -263,11 +284,30 @@ const MembershipsPage = () => {
                           </p>
                           
                           {membership.benefits && (
-                            <div>
+                            <div className="mb-3">
                               <h4 className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">Benefits:</h4>
                               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 overflow-hidden" style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical'}}>
                                 {membership.benefits}
                               </p>
+                            </div>
+                          )}
+
+                          {membership.includedServices && membership.includedServices.length > 0 && (
+                            <div>
+                              <h4 className="text-xs sm:text-sm font-medium mb-1 sm:mb-2 flex items-center">
+                                <Package className="h-3 w-3 mr-1" />
+                                Included Services ({membership.includedServices.length}):
+                              </h4>
+                              <div className="flex flex-wrap gap-1">
+                                {membership.includedServices.map(serviceId => {
+                                  const service = services?.find((s: Service) => s.id === serviceId);
+                                  return service ? (
+                                    <Badge key={serviceId} variant="outline" className="text-xs">
+                                      {service.name}
+                                    </Badge>
+                                  ) : null;
+                                })}
+                              </div>
                             </div>
                           )}
                         </CardContent>
@@ -335,7 +375,11 @@ const MembershipsPage = () => {
                             </TableHeader>
                             <TableBody>
                               {clientMemberships?.map((membership: ClientMembership) => (
-                                <TableRow key={membership.id}>
+                                <TableRow 
+                                  key={membership.id}
+                                  className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                                  onClick={() => navigate(`/clients/${membership.clientId}`)}
+                                >
                                   <TableCell>
                                     <div className="flex items-center space-x-3">
                                       <Avatar>
@@ -347,7 +391,7 @@ const MembershipsPage = () => {
                                         </AvatarFallback>
                                       </Avatar>
                                       <div>
-                                        <div className="font-medium">
+                                        <div className="font-medium text-blue-600 hover:underline">
                                           {getFullName(
                                             membership.client?.firstName,
                                             membership.client?.lastName
@@ -371,9 +415,12 @@ const MembershipsPage = () => {
                                     <Button 
                                       variant="ghost" 
                                       className="text-primary" 
-                                      onClick={() => toast({ title: "Feature Coming Soon", description: "Membership management will be available soon!" })}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/clients/${membership.clientId}`);
+                                      }}
                                     >
-                                      Details
+                                      View Profile
                                     </Button>
                                   </TableCell>
                                 </TableRow>
@@ -385,7 +432,11 @@ const MembershipsPage = () => {
                         {/* Mobile Card View */}
                         <div className="lg:hidden space-y-3">
                           {clientMemberships?.map((membership: ClientMembership) => (
-                            <Card key={membership.id} className="p-4">
+                            <Card 
+                              key={membership.id} 
+                              className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                              onClick={() => navigate(`/clients/${membership.clientId}`)}
+                            >
                               <div className="flex items-start justify-between mb-3">
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-10 w-10">
@@ -433,9 +484,12 @@ const MembershipsPage = () => {
                                   variant="outline" 
                                   size="sm"
                                   className="w-full text-xs"
-                                  onClick={() => toast({ title: "Feature Coming Soon", description: "Membership management will be available soon!" })}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/clients/${membership.clientId}`);
+                                  }}
                                 >
-                                  View Details
+                                  View Profile
                                 </Button>
                               </div>
                             </Card>

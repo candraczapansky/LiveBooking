@@ -122,13 +122,12 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
     console.log('  - Final From Email:', finalFromEmail);
     console.log('  - Is Verified Sender:', isVerifiedSender(finalFromEmail));
     
-    // If the sender is not verified, use fallback and log warning
+    // If the sender isn't in our local verified list, warn but still attempt to send
+    // with the configured sender. This respects your SendGrid setup rather than
+    // forcing a hardcoded fallback.
     if (!isVerifiedSender(finalFromEmail)) {
-      console.warn(`⚠️  WARNING: Sender email "${finalFromEmail}" is not verified in SendGrid.`);
-      console.warn(`Using fallback sender: ${getFallbackSender()}`);
-      console.warn('To fix this permanently, verify one of these senders in your SendGrid account:');
-      console.warn(VERIFIED_SENDERS.join(', '));
-      finalFromEmail = getFallbackSender();
+      console.warn(`⚠️  WARNING: Sender email "${finalFromEmail}" is not in the local verified list.`);
+      console.warn('Proceeding with configured sender. Ensure it is verified in SendGrid.');
     }
     
     const msg: any = {

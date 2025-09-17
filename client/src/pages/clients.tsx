@@ -70,7 +70,7 @@ import { getInitials, getFullName } from "@/lib/utils";
 
 import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
-import ClientAnalytics from "@/components/client/client-analytics";
+import ClientMemberships from "@/components/client/client-memberships";
 import ClientPhotoGallery from "@/components/client/client-photo-gallery";
 import ClientAddNote from "@/components/client/client-add-note";
 import ClientAddPhoto from "@/components/client/client-add-photo";
@@ -1691,9 +1691,9 @@ const ClientsPage = () => {
                   </CardContent>
                 </Card>
 
-                {/* Client Analytics */}
+                {/* Client Memberships */}
                 {clientDetail && (
-                  <ClientAnalytics 
+                  <ClientMemberships 
                     clientId={clientDetail.id} 
                     clientName={getFullName(clientDetail.firstName, clientDetail.lastName, clientDetail.username) || 'Client'}
                   />

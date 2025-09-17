@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDate, getInitials, getFullName } from "@/lib/utils";
+import { useLocation } from "wouter";
 
 import {
   Dialog,
@@ -78,6 +79,7 @@ export default function SubscriberDialog({
   // Removed add subscriber functionality states
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   // Get subscribers for this membership
   const { data: subscribers, isLoading: isLoadingSubscribers } = useQuery({
@@ -198,7 +200,11 @@ export default function SubscriberDialog({
                   </TableHeader>
                   <TableBody>
                     {subscribers?.map((subscription: ClientMembership) => (
-                      <TableRow key={subscription.id} className="border-b hover:bg-slate-50">
+                      <TableRow 
+                        key={subscription.id} 
+                        className="border-b hover:bg-slate-50 cursor-pointer"
+                        onClick={() => navigate(`/clients/${subscription.clientId}`)}
+                      >
                         <TableCell className="py-4">
                           <div className="flex items-center space-x-3">
                             <Avatar>
@@ -210,7 +216,7 @@ export default function SubscriberDialog({
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                                <div className="font-medium">
+                                <div className="font-medium text-blue-600 hover:underline">
                                   {getFullName(
                                     subscription.client?.firstName,
                                     subscription.client?.lastName
@@ -236,7 +242,10 @@ export default function SubscriberDialog({
                         <TableCell className="text-right">
                           <Button
                             variant="outline"
-                            onClick={() => handleRemoveSubscriber(subscription.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveSubscriber(subscription.id);
+                            }}
                             disabled={removeSubscriberMutation.isPending}
                             className="text-red-600 hover:text-white hover:bg-red-600"
                           >
