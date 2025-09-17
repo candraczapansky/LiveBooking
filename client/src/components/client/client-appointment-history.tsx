@@ -11,6 +11,15 @@ type Appointment = {
   endTime: string;
   paymentStatus: string;
   status: string;
+  paymentMethod?: string;
+  rescheduledFrom?: number | null;
+  rescheduledTo?: number | null;
+  paymentDetails?: {
+    method?: string;
+    cardLast4?: string;
+    giftCardNumber?: string;
+    processedAt?: string;
+  };
   service: {
     id: number;
     name: string;
@@ -28,9 +37,10 @@ type Appointment = {
 
 interface ClientAppointmentHistoryProps {
   clientId: number;
+  currentAppointmentStartTime?: string | Date;
 }
 
-export default function ClientAppointmentHistory({ clientId }: ClientAppointmentHistoryProps) {
+export default function ClientAppointmentHistory({ clientId, currentAppointmentStartTime }: ClientAppointmentHistoryProps) {
   const { data: appointments, isLoading } = useQuery({
     queryKey: ['/api/appointments/client', clientId],
     queryFn: async () => {
@@ -75,6 +85,24 @@ export default function ClientAppointmentHistory({ clientId }: ClientAppointment
     }).format(price);
   };
 
+  const formatPaymentMethod = (method?: string) => {
+    if (!method) return '';
+    switch (method) {
+      case 'cash':
+        return 'Cash';
+      case 'card':
+        return 'Card';
+      case 'terminal':
+        return 'Terminal';
+      case 'gift_card':
+        return 'Gift Card';
+      case 'check':
+        return 'Check';
+      default:
+        return method.charAt(0).toUpperCase() + method.slice(1);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -102,6 +130,24 @@ export default function ClientAppointmentHistory({ clientId }: ClientAppointment
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {Array.isArray(appointments) && appointments.length > 0 && currentAppointmentStartTime && (() => {
+          try {
+            const currentStart = new Date(currentAppointmentStartTime);
+            const previous = [...appointments]
+              .filter((a: Appointment) => new Date(a.startTime).getTime() < currentStart.getTime())
+              .sort((a: Appointment, b: Appointment) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())[0];
+            if (!previous) return null;
+            const prevDate = new Date(previous.startTime);
+            const prevStaff = `${previous.staff.user.firstName} ${previous.staff.user.lastName}`;
+            return (
+              <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                <span className="font-medium">Previous appointment:</span> {format(prevDate, 'MMM dd, yyyy')} — {previous.service.name} with {prevStaff}
+              </div>
+            );
+          } catch {
+            return null;
+          }
+        })()}
         {!appointments || appointments.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             No appointments found for this client.
@@ -132,15 +178,24 @@ export default function ClientAppointmentHistory({ clientId }: ClientAppointment
                               <span className="ml-1">
                                 {appointment.paymentDetails.method === 'cash' && '(Cash)'}
                                 {appointment.paymentDetails.method === 'card' && appointment.paymentDetails.cardLast4 && `(****${appointment.paymentDetails.cardLast4})`}
-                                {appointment.paymentDetails.method === 'card' && !appointment.paymentDetails.cardLast4 && '(Unverified)'}
+                                {appointment.paymentDetails.method === 'card' && !appointment.paymentDetails.cardLast4 && '(Card)'}
                                 {appointment.paymentDetails.method === 'terminal' && appointment.paymentDetails.cardLast4 && `(****${appointment.paymentDetails.cardLast4})`}
-                                {appointment.paymentDetails.method === 'terminal' && !appointment.paymentDetails.cardLast4 && '(Unverified)'}
+                                {appointment.paymentDetails.method === 'terminal' && !appointment.paymentDetails.cardLast4 && '(Terminal)'}
+                                {appointment.paymentDetails.method === 'gift_card' && appointment.paymentDetails.giftCardNumber && `(Gift Card)`}
                               </span>
+                            )}
+                            {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && !appointment.paymentDetails && appointment.paymentMethod && (
+                              <span className="ml-1">({formatPaymentMethod(appointment.paymentMethod)})</span>
                             )}
                             {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && !appointment.paymentDetails && (
                               <span className="ml-1 text-orange-600">⚠️</span>
                             )}
                           </span>
+                          {(appointment.rescheduledFrom || appointment.rescheduledTo) && (
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                              Rescheduled
+                            </span>
+                          )}
                         </div>
                       </div>
                       

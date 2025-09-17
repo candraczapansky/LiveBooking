@@ -2718,7 +2718,11 @@ Glo Head Spa`,
 
   // Membership operations
   async createMembership(membership: InsertMembership): Promise<Membership> {
-    const [newMembership] = await db.insert(memberships).values(membership).returning();
+    const membershipData = {
+      ...membership,
+      includedServices: membership.includedServices as number[] | null | undefined
+    };
+    const [newMembership] = await db.insert(memberships).values(membershipData as any).returning();
     return newMembership;
   }
 
@@ -2732,7 +2736,10 @@ Glo Head Spa`,
   }
 
   async updateMembership(id: number, membershipData: Partial<InsertMembership>): Promise<Membership> {
-    const [updatedMembership] = await db.update(memberships).set(membershipData).where(eq(memberships.id, id)).returning();
+    const updateData = membershipData.includedServices !== undefined 
+      ? { ...membershipData, includedServices: membershipData.includedServices as number[] | null | undefined }
+      : membershipData;
+    const [updatedMembership] = await db.update(memberships).set(updateData as any).where(eq(memberships.id, id)).returning();
     if (!updatedMembership) {
       throw new Error('Membership not found');
     }

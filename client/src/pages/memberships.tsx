@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, Edit, Trash2, CreditCard, Users } from "lucide-react";
+import { PlusCircle, Edit, Trash2, CreditCard, Users, Coins } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { getInitials, getFullName, formatDate } from "@/lib/utils";
@@ -52,6 +52,7 @@ type Membership = {
   duration: number;
   benefits: string;
   includedServices?: number[];
+  credits?: number;
 };
 
 type Service = {
@@ -274,6 +275,12 @@ const MembershipsPage = () => {
                               <span className="text-base sm:text-lg font-bold text-primary">
                                 {formatPrice(membership.price)}
                               </span>
+                              {membership.credits && membership.credits > 0 && (
+                                <Badge variant="outline" className="text-xs">
+                                  <Coins className="h-3 w-3 mr-1" />
+                                  {membership.credits} credits
+                                </Badge>
+                              )}
                             </div>
                           </CardDescription>
                         </CardHeader>

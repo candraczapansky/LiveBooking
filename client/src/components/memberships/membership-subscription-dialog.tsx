@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, cn } from "@/lib/utils";
 import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 
 import {
@@ -24,7 +24,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, User, Calendar } from "lucide-react";
+import { Search, User, Calendar as CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 
 type Membership = {
   id: number;
@@ -64,6 +67,8 @@ export default function MembershipSubscriptionDialog({
   const [renewalDay, setRenewalDay] = useState<string>("1");
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -80,6 +85,12 @@ export default function MembershipSubscriptionDialog({
       setRenewalDay("1");
       setSelectedClient(null);
       setIsPaymentOpen(false);
+      // Initialize dates by default based on membership duration
+      const now = new Date();
+      setStartDate(now);
+      const calculatedEnd = new Date(now);
+      calculatedEnd.setDate(calculatedEnd.getDate() + (membership?.duration || 0));
+      setEndDate(calculatedEnd);
     }
   }, [open, membership]);
 
@@ -146,10 +157,13 @@ export default function MembershipSubscriptionDialog({
         throw new Error(error);
       }
 
-      // Calculate dates
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + membership.duration);
+      // Use selected dates (fallback to defaults if not set)
+      const selectedStartDate = startDate || new Date();
+      const selectedEndDate = endDate || (() => {
+        const d = new Date(selectedStartDate);
+        d.setDate(d.getDate() + membership.duration);
+        return d;
+      })();
 
       try {
         // 1. Create membership subscription
@@ -157,8 +171,8 @@ export default function MembershipSubscriptionDialog({
         const subscriptionData = {
           clientId: selectedClient.id,
           membershipId: membership.id,
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
+          startDate: selectedStartDate.toISOString(),
+          endDate: selectedEndDate.toISOString(),
           active: true,
           autoRenew: autoRenew,
           renewalDate: autoRenew ? parseInt(renewalDay) : null,
@@ -474,6 +488,67 @@ export default function MembershipSubscriptionDialog({
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Membership Dates */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Start Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !startDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDate ? format(startDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="z-[9999] w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={startDate}
+                            onSelect={(date) => {
+                              setStartDate(date);
+                              if (date && membership) {
+                                const newEnd = new Date(date);
+                                newEnd.setDate(newEnd.getDate() + membership.duration);
+                                setEndDate(newEnd);
+                              }
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>End Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !endDate && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDate ? format(endDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="z-[9999] w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={endDate}
+                            onSelect={setEndDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <Label htmlFor="auto-renew">Auto-Renewal</Label>
@@ -491,7 +566,7 @@ export default function MembershipSubscriptionDialog({
                   {autoRenew && (
                     <div className="space-y-2 pt-2 border-t">
                       <Label htmlFor="renewal-day">
-                        <Calendar className="inline h-4 w-4 mr-1" />
+                        <CalendarIcon className="inline h-4 w-4 mr-1" />
                         Monthly Billing Day
                       </Label>
                       <Select value={renewalDay} onValueChange={setRenewalDay}>

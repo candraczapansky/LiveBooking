@@ -276,12 +276,28 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
   // Minimal confirmation endpoints that accept any POST and mark last completed
   router.post('/webhook/success', (req: any, res: any) => {
     try {
-      try {
-        (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
-          status: 'completed',
-          updatedAt: Date.now(),
-        };
-      } catch {}
+      // Extract transaction ID from the payload
+      let payload = req.body;
+      if (typeof payload === 'string') {
+        try { payload = JSON.parse(payload); } catch {}
+      }
+      
+      const txId = payload?.id || payload?.transactionId || payload?.invoiceNumber;
+      
+      // Only set the global marker if we have a transaction ID
+      if (txId) {
+        try {
+          (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
+            status: 'completed',
+            transactionId: txId,
+            invoiceNumber: txId, // Use same ID for both fields for compatibility
+            updatedAt: Date.now(),
+          };
+          console.log(`✅ Webhook success marked for transaction: ${txId}`);
+        } catch {}
+      } else {
+        console.log('⚠️ Webhook success endpoint called without transaction ID');
+      }
       return res.json({ received: true });
     } catch {
       return res.json({ received: true });

@@ -1,12 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronsUpDown, X } from "lucide-react";
 
 import {
   Dialog,
@@ -23,24 +22,13 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const membershipFormSchema = z.object({
   name: z.string().min(1, "Membership name is required"),
@@ -49,6 +37,7 @@ const membershipFormSchema = z.object({
   duration: z.coerce.number().min(1, "Duration must be at least 1 day"),
   benefits: z.string().optional(),
   includedServices: z.array(z.number()).optional().default([]),
+  credits: z.coerce.number().min(0, "Credits must be a positive number").default(0),
 });
 
 type MembershipFormValues = z.infer<typeof membershipFormSchema>;
@@ -63,17 +52,21 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
+  const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch available services
-  const { data: services } = useQuery({
+  const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ['/api/services'],
     queryFn: async () => {
       const response = await fetch('/api/services');
       if (!response.ok) throw new Error('Failed to fetch services');
-      return response.json();
+      const data = await response.json();
+      // Filter out hidden services
+      return data.filter((s: any) => !s.isHidden);
     },
+    enabled: open,
   });
 
   const form = useForm<MembershipFormValues>({
@@ -85,8 +78,43 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
       duration: 30, // Default to 30 days
       benefits: "",
       includedServices: [],
+      credits: 0,
     },
   });
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!open) {
+      form.reset({
+        name: "",
+        description: "",
+        price: 0,
+        duration: 30,
+        benefits: "",
+        includedServices: [],
+        credits: 0,
+      });
+      setSelectedServices([]);
+      setServicesDropdownOpen(false);
+    }
+  }, [open, form]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setServicesDropdownOpen(false);
+      }
+    };
+
+    if (servicesDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [servicesDropdownOpen]);
 
   // Fetch membership data if editing
   useEffect(() => {
@@ -102,6 +130,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
             duration: data.duration,
             benefits: data.benefits || "",
             includedServices: data.includedServices || [],
+            credits: data.credits || 0,
           });
           setSelectedServices(data.includedServices || []);
           setIsLoading(false);
@@ -130,6 +159,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
         description: "Membership created successfully",
       });
       form.reset();
+      setSelectedServices([]);
       onOpenChange(false);
     },
     onError: (error) => {
@@ -152,6 +182,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
         description: "Membership updated successfully",
       });
       form.reset();
+      setSelectedServices([]);
       onOpenChange(false);
     },
     onError: (error) => {
@@ -175,15 +206,28 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
     }
   };
 
-  const getSelectedServiceNames = () => {
-    if (!services || selectedServices.length === 0) return "Select services...";
-    const selected = services.filter((s: any) => selectedServices.includes(s.id));
-    return selected.map((s: any) => s.name).join(", ");
+  const toggleService = (serviceId: number) => {
+    setSelectedServices(prev => {
+      if (prev.includes(serviceId)) {
+        return prev.filter(id => id !== serviceId);
+      } else {
+        return [...prev, serviceId];
+      }
+    });
+  };
+
+  const removeService = (serviceId: number) => {
+    setSelectedServices(prev => prev.filter(id => id !== serviceId));
+  };
+
+  const getServiceName = (serviceId: number) => {
+    const service = services.find((s: any) => s.id === serviceId);
+    return service?.name || 'Unknown Service';
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{membershipId ? "Edit Membership" : "Add New Membership"}</DialogTitle>
           <DialogDescription>
@@ -193,49 +237,17 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
           </DialogDescription>
         </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Membership Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Premium Membership" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Describe the membership..."
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
+        <div className="max-h-[calc(90vh-200px)] overflow-y-auto pr-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="price"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Price ($)</FormLabel>
+                    <FormLabel>Membership Name</FormLabel>
                     <FormControl>
-                      <Input type="number" min="0" step="0.01" {...field} />
+                      <Input placeholder="Premium Membership" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -244,136 +256,199 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
 
               <FormField
                 control={form.control}
-                name="duration"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Duration (days)</FormLabel>
+                    <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Input type="number" min="1" {...field} />
+                      <Textarea
+                        placeholder="Describe the membership..."
+                        {...field}
+                        value={field.value || ""}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="benefits"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Benefits</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="List membership benefits..."
-                      {...field}
-                      value={field.value || ""}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="0" step="0.01" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Included Services Selection */}
-            <FormItem>
-              <FormLabel>Included Services</FormLabel>
-              <Popover open={servicesOpen} onOpenChange={setServicesOpen}>
-                <PopoverTrigger asChild>
+                <FormField
+                  control={form.control}
+                  name="duration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration (days)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="1" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="credits"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Service Credits</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        {...field}
+                        placeholder="e.g., 2"
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Number of service credits members get per duration period. 
+                      For example, 2 credits = 2 services can be used from the selected services below.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="benefits"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Benefits</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="List membership benefits..."
+                        {...field}
+                        value={field.value || ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Included Services Selection */}
+              <div className="space-y-2">
+                <FormLabel>Included Services</FormLabel>
+                <FormDescription>
+                  Select which services members can use with their credits
+                </FormDescription>
+                
+                {/* Services Dropdown with fixed positioning */}
+                <div className="relative" ref={dropdownRef}>
                   <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={servicesOpen}
-                    className="w-full justify-between text-left font-normal"
                     type="button"
+                    variant="outline"
+                    className="w-full justify-between"
+                    onClick={() => setServicesDropdownOpen(!servicesDropdownOpen)}
                   >
-                    <span className="truncate">
+                    <span>
                       {selectedServices.length === 0
                         ? "Select services to include..."
                         : `${selectedServices.length} service${selectedServices.length !== 1 ? 's' : ''} selected`}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[400px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search services..." />
-                    <CommandEmpty>No services found.</CommandEmpty>
-                    <CommandGroup>
-                      <ScrollArea className="h-[300px]">
-                        {services?.map((service: any) => (
-                          <CommandItem
-                            key={service.id}
-                            onSelect={() => {
-                              setSelectedServices(prev => {
-                                if (prev.includes(service.id)) {
-                                  return prev.filter(id => id !== service.id);
-                                } else {
-                                  return [...prev, service.id];
-                                }
-                              });
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedServices.includes(service.id) ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">{service.name}</div>
-                              {service.price && (
-                                <div className="text-sm text-gray-500">
-                                  ${service.price} - {service.duration} min
-                                </div>
-                              )}
+
+                  {/* Dropdown positioned to not affect container height */}
+                  {servicesDropdownOpen && (
+                    <div 
+                      className="absolute z-[200] mt-1 w-full rounded-md border bg-white dark:bg-gray-950 shadow-lg"
+                      style={{ 
+                        maxHeight: '240px'
+                      }}
+                    >
+                      <div className="max-h-[230px] overflow-y-auto p-1">
+                        {servicesLoading ? (
+                          <div className="p-2 text-center text-sm text-gray-500">
+                            Loading services...
+                          </div>
+                        ) : services.length === 0 ? (
+                          <div className="p-2 text-center text-sm text-gray-500">
+                            No services available
+                          </div>
+                        ) : (
+                          services.map((service: any) => (
+                            <div
+                              key={service.id}
+                              className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
+                              onClick={() => toggleService(service.id)}
+                            >
+                              <Checkbox
+                                checked={selectedServices.includes(service.id)}
+                                onCheckedChange={() => toggleService(service.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="mr-2"
+                              />
+                              <div className="flex-1">
+                                <div className="text-sm font-medium">{service.name}</div>
+                                {service.price !== undefined && service.price !== null && (
+                                  <div className="text-xs text-gray-500">
+                                    ${service.price} - {service.duration || 60} min
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </CommandItem>
-                        ))}
-                      </ScrollArea>
-                    </CommandGroup>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {selectedServices.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {services
-                    ?.filter((s: any) => selectedServices.includes(s.id))
-                    .map((service: any) => (
-                      <Badge key={service.id} variant="secondary">
-                        {service.name}
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Services Badges */}
+                {selectedServices.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {selectedServices.map(serviceId => (
+                      <Badge key={serviceId} variant="secondary" className="pr-1">
+                        {getServiceName(serviceId)}
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedServices(prev => prev.filter(id => id !== service.id));
-                          }}
+                          onClick={() => removeService(serviceId)}
                           className="ml-1 hover:text-destructive"
                         >
-                          ×
+                          <X className="h-3 w-3" />
                         </button>
                       </Badge>
                     ))}
-                </div>
-              )}
-            </FormItem>
+                  </div>
+                )}
+              </div>
+            </form>
+          </Form>
+        </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending}
-              >
-                {isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending
-                  ? "Saving..."
-                  : membershipId
-                  ? "Update Membership"
-                  : "Create Membership"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+        <DialogFooter className="mt-6">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={form.handleSubmit(onSubmit)}
+            disabled={isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending}
+          >
+            {isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending
+              ? "Saving..."
+              : membershipId
+              ? "Update Membership"
+              : "Create Membership"}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

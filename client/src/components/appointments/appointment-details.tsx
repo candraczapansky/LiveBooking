@@ -38,6 +38,7 @@ import HelcimPayJsModal from "@/components/payment/helcim-payjs-modal";
 import SmartTerminalPayment from "@/components/payment/smart-terminal-payment";
 import ClientFormSubmissions from "@/components/client/client-form-submissions";
 import ClientNoteHistory from "@/components/client/client-note-history";
+import ClientAppointmentHistory from "@/components/client/client-appointment-history";
 import AppointmentPhotos from "@/components/appointments/appointment-photos";
 import PaymentCompleteCard from "@/components/appointments/payment-complete-card";
 // Removed inline photo upload UI; keep only components in use
@@ -1355,6 +1356,13 @@ const AppointmentDetails = ({
               )}
             </CardContent>
           </Card>
+
+          {appointment?.clientId && (
+            <ClientAppointmentHistory
+              clientId={appointment.clientId}
+              currentAppointmentStartTime={appointment.startTime}
+            />
+          )}
 
           {/* Service Information */}
           <Card>

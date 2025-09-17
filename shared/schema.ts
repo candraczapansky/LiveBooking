@@ -405,6 +405,7 @@ export const memberships = pgTable("memberships", {
   duration: integer("duration").notNull(), // in days
   benefits: text("benefits"),
   includedServices: json("included_services").$type<number[]>().default([]), // Array of service IDs included with membership
+  credits: integer("credits").default(0), // Number of service credits per duration period
 });
 
 export const insertMembershipSchema = createInsertSchema(memberships).omit({
@@ -609,7 +610,7 @@ export type CancelledAppointment = typeof cancelledAppointments.$inferSelect;
 export type InsertCancelledAppointment = z.infer<typeof insertCancelledAppointmentSchema>;
 
 export type Membership = typeof memberships.$inferSelect;
-export type InsertMembership = z.infer<typeof insertMembershipSchema>;
+export type InsertMembership = typeof memberships.$inferInsert;
 
 export type ClientMembership = typeof clientMemberships.$inferSelect;
 export type InsertClientMembership = z.infer<typeof insertClientMembershipSchema>;

@@ -16,7 +16,8 @@ import {
   XCircle,
   AlertCircle,
   Edit,
-  Package
+  Package,
+  Coins
 } from "lucide-react";
 import MembershipSubscriptionDialog from "@/components/memberships/membership-subscription-dialog";
 import MembershipEditDialog from "./membership-edit-dialog";
@@ -54,6 +55,7 @@ interface Membership {
   duration: number;
   benefits: string;
   includedServices?: number[];
+  credits?: number;
 }
 
 interface Service {
@@ -271,6 +273,20 @@ export default function ClientMemberships({ clientId, clientName }: ClientMember
                           <p className="font-medium">{membership.membership.duration} days</p>
                         </div>
                       </div>
+
+                      {membership.membership.credits && membership.membership.credits > 0 && (
+                        <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-950 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <Coins className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            <span className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                              {membership.membership.credits} Service Credits Available
+                            </span>
+                            <span className="text-xs text-blue-700 dark:text-blue-300">
+                              (per {membership.membership.duration} day period)
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="flex items-center justify-between pt-3 border-t">
                         <div className="flex items-center gap-2">

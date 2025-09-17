@@ -67,6 +67,22 @@ export class MembershipAutoRenewalService implements MembershipRenewalService {
       
       for (const clientMembership of memberships) {
         try {
+          // If the membership has reached/passed its end date, automatically disable auto-renewal
+          const endDate = new Date(clientMembership.endDate);
+          const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+          if (endDate <= todayStart) {
+            await this.storage.updateClientMembership(clientMembership.id, {
+              autoRenew: false,
+              active: false,
+            });
+            LoggerService.info("Auto-renewal disabled for expired membership", {
+              clientMembershipId: clientMembership.id,
+              endDate: endDate.toISOString(),
+            });
+            // Skip renewal attempts once auto-renew is turned off
+            continue;
+          }
+
           // Check if this membership needs renewal
           if (!this.shouldRenew(clientMembership, today)) {
             continue;

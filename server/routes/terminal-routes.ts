@@ -694,6 +694,7 @@ router.get('/payment/:paymentId', async (req, res) => {
           (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
             status: 'completed',
             transactionId: txId,
+            invoiceNumber: txId, // Include both fields for compatibility
             updatedAt: Date.now(),
           };
         } catch {}
@@ -703,6 +704,7 @@ router.get('/payment/:paymentId', async (req, res) => {
           (globalThis as any).__HEL_WEBHOOK_LAST_COMPLETED__ = {
             status: 'failed',
             transactionId: txId,
+            invoiceNumber: txId, // Include both fields for compatibility
             updatedAt: Date.now(),
           };
         } catch {}
