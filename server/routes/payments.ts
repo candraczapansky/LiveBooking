@@ -310,10 +310,9 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
       paymentDate: checkoutTime, // Record the exact checkout time
     });
 
-    // Update appointment payment status and record checkout time with tip
+    // Update appointment payment status and record checkout time
     await storage.updateAppointment(appointmentId, {
       paymentStatus: 'paid',
-      tipAmount: tipAmount,
       totalAmount: amount
     });
 

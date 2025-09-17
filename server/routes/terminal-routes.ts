@@ -986,19 +986,21 @@ router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
     // Update appointment payment status
     await storage.updateAppointment(parseInt(appointmentId), {
       paymentStatus: 'paid',
-      tipAmount: tipAmount || 0,
       totalAmount: totalAmount || baseAmount
     });
 
     // Import the createSalesHistoryRecord function to properly record the sale
     // This needs to be imported at the top of the file, but for now we'll create the record properly
     const appointment = await storage.getAppointment(parseInt(appointmentId));
+    
+    // Declare variables outside the if block so they're accessible later
+    let staffInfo = null;
+    let clientInfo = null;
+    let serviceInfo = null;
+    
     if (appointment && updatedPayment) {
       try {
         // Get staff and client info for the sales record
-        let staffInfo = null;
-        let clientInfo = null;
-        let serviceInfo = null;
         
         if (appointment.staffId) {
           try {
