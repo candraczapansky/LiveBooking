@@ -129,7 +129,7 @@ export default function ClientAppointmentHistory({ clientId, currentAppointmentS
           Appointment History
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="text-sm">
         {Array.isArray(appointments) && appointments.length > 0 && currentAppointmentStartTime && (() => {
           try {
             const currentStart = new Date(currentAppointmentStartTime);
@@ -167,7 +167,7 @@ export default function ClientAppointmentHistory({ clientId, currentAppointmentS
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-lg">{appointment.service.name}</h4>
+                        <h4 className="font-medium">{appointment.service.name}</h4>
                         <div className="flex gap-2">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(appointment.status)}`}>
                             {appointment.status}
