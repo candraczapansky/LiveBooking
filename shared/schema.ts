@@ -269,6 +269,8 @@ export const appointments = pgTable("appointments", {
   paymentStatus: text("payment_status").notNull().default("unpaid"), // unpaid, paid, refunded
   totalAmount: doublePrecision("total_amount"),
   notes: text("notes"),
+  bookingMethod: text("booking_method").default("staff"), // How it was booked: staff, online, sms, external
+  createdBy: integer("created_by"), // Staff user ID who created it
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -454,6 +456,7 @@ export const payments = pgTable("payments", {
   notes: text("notes"), // Additional payment notes
   squarePaymentId: text("square_payment_id"), // Optional for backward compatibility
   helcimPaymentId: text("helcim_payment_id"),
+  cardLast4: text("card_last4"), // Last 4 digits of card
   paymentDate: timestamp("payment_date"),
   processedAt: timestamp("processed_at"), // When payment was actually processed
   createdAt: timestamp("created_at").defaultNow(),
@@ -954,6 +957,9 @@ export const salesHistory = pgTable("sales_history", {
   
   // External tracking
   helcimPaymentId: text("helcim_payment_id"),
+  
+  // Card information  
+  cardLast4: text("card_last4"),
   
   // Audit trail
   createdBy: integer("created_by"), // User who created the record

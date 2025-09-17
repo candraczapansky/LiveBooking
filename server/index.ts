@@ -151,11 +151,9 @@ async function findAvailablePort(startPort: number): Promise<number> {
     const membershipRenewalService = createMembershipRenewalService(storage);
     membershipRenewalService.start();
     
-    // Load routes module with resilient resolution
-    const routesModule = await import("./routes.js").catch(async () => {
-      return await import("./routes/index.js");
-    });
-    const server = await (routesModule as any).registerRoutes(app, storage);
+    // Load routes module
+    const routesModule = await import("./routes.js");
+    const server = await routesModule.registerRoutes(app, storage, membershipRenewalService);
 
     // Booking-only domain guard: force all HTML navigations to /booking
     // Configure with BOOKING_ONLY_HOSTS env var (comma-separated hostnames)

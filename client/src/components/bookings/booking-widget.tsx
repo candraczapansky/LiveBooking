@@ -91,7 +91,7 @@ const bookingSchema = z.object({
   addOnServiceIds: z.array(z.string()).optional(),
   // Recurring appointment fields
   isRecurring: z.boolean().optional(),
-  recurringFrequency: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+  recurringFrequency: z.enum(["weekly", "biweekly", "triweekly", "monthly"]).optional(),
   recurringCount: z.number().min(2).max(52).optional(),
   recurringEndDate: z.date().optional(),
 });
@@ -1241,6 +1241,8 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
               currentDate.setDate(currentDate.getDate() + 7);
             } else if (values.recurringFrequency === 'biweekly') {
               currentDate.setDate(currentDate.getDate() + 14);
+            } else if (values.recurringFrequency === 'triweekly') {
+              currentDate.setDate(currentDate.getDate() + 21);
             } else if (values.recurringFrequency === 'monthly') {
               currentDate.setMonth(currentDate.getMonth() + 1);
             }
@@ -2258,6 +2260,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                               <SelectContent>
                                 <SelectItem value="weekly">Weekly (every week)</SelectItem>
                                 <SelectItem value="biweekly">Bi-weekly (every 2 weeks)</SelectItem>
+                                <SelectItem value="triweekly">Every 3 weeks</SelectItem>
                                 <SelectItem value="monthly">Monthly (every month)</SelectItem>
                               </SelectContent>
                             </Select>
@@ -2663,6 +2666,7 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
                     <strong>Frequency:</strong> {
                       form.watch('recurringFrequency') === 'weekly' ? 'Weekly' :
                       form.watch('recurringFrequency') === 'biweekly' ? 'Bi-weekly' :
+                      form.watch('recurringFrequency') === 'triweekly' ? 'Every 3 weeks' :
                       'Monthly'
                     }
                   </div>

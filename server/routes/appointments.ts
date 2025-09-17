@@ -178,8 +178,77 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       appointments = await storage.getAllAppointments();
     }
 
-    LoggerService.info("Appointments fetched", { ...context, count: appointments.length });
-    res.json(appointments);
+    // Enrich completed appointments with payment information
+    const enrichedAppointments = await Promise.all(appointments.map(async (apt: any) => {
+      if (apt.status === 'completed' && apt.paymentStatus === 'paid') {
+        try {
+          // Get payment records for this appointment
+          const allPayments = await storage.getAllPayments();
+          const appointmentPayments = allPayments.filter((p: any) => 
+            p.appointmentId === apt.id && p.status === 'completed'
+          );
+          
+          if (appointmentPayments.length > 0) {
+            // Get the most recent payment
+            const latestPayment = appointmentPayments.sort((a: any, b: any) => 
+              new Date(b.processedAt || b.createdAt).getTime() - 
+              new Date(a.processedAt || a.createdAt).getTime()
+            )[0];
+            
+            // Build payment details based on payment method
+            let paymentDetails: any = {
+              method: latestPayment.method || apt.paymentMethod || 'unknown',
+              processedAt: latestPayment.processedAt || latestPayment.createdAt,
+            };
+            
+            if (latestPayment.method === 'card' || latestPayment.method === 'terminal') {
+              // Try to get card details from sales history or payment data
+              if (latestPayment.description) {
+                const last4Match = latestPayment.description.match(/\*{3,}(\d{4})/);
+                if (last4Match) {
+                  paymentDetails.cardLast4 = last4Match[1];
+                }
+              }
+              if (latestPayment.notes) {
+                try {
+                  const notesData = JSON.parse(latestPayment.notes);
+                  if (notesData.cardLast4) {
+                    paymentDetails.cardLast4 = notesData.cardLast4;
+                  }
+                } catch {}
+              }
+            } else if (latestPayment.method === 'gift_card') {
+              // Extract gift card number from payment notes or description
+              if (latestPayment.notes) {
+                try {
+                  const notesData = JSON.parse(latestPayment.notes);
+                  if (notesData.giftCardNumber) {
+                    paymentDetails.giftCardNumber = notesData.giftCardNumber;
+                  }
+                } catch {
+                  paymentDetails.giftCardNumber = latestPayment.notes;
+                }
+              }
+            }
+            
+            return {
+              ...apt,
+              paymentDetails
+            };
+          }
+        } catch (error) {
+          LoggerService.debug("Could not enrich appointment with payment details", { 
+            ...context, 
+            appointmentId: apt.id, 
+            error: error instanceof Error ? error.message : String(error) 
+          });
+        }
+      }
+      return apt;
+    }));
+
+    LoggerService.info("Appointments fetched", { ...context, count: enrichedAppointments.length });
+    res.json(enrichedAppointments);
   }));
 
   // Get active appointments (excluding cancelled)
@@ -202,8 +271,77 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       );
     }
 
-    LoggerService.info("Active appointments fetched", { ...context, count: appointments.length });
-    res.json(appointments);
+    // Enrich completed appointments with payment information
+    const enrichedAppointments = await Promise.all(appointments.map(async (apt: any) => {
+      if (apt.status === 'completed' && apt.paymentStatus === 'paid') {
+        try {
+          // Get payment records for this appointment
+          const allPayments = await storage.getAllPayments();
+          const appointmentPayments = allPayments.filter((p: any) => 
+            p.appointmentId === apt.id && p.status === 'completed'
+          );
+          
+          if (appointmentPayments.length > 0) {
+            // Get the most recent payment
+            const latestPayment = appointmentPayments.sort((a: any, b: any) => 
+              new Date(b.processedAt || b.createdAt).getTime() - 
+              new Date(a.processedAt || a.createdAt).getTime()
+            )[0];
+            
+            // Build payment details based on payment method
+            let paymentDetails: any = {
+              method: latestPayment.method || apt.paymentMethod || 'unknown',
+              processedAt: latestPayment.processedAt || latestPayment.createdAt,
+            };
+            
+            if (latestPayment.method === 'card' || latestPayment.method === 'terminal') {
+              // Try to get card details from sales history or payment data
+              if (latestPayment.description) {
+                const last4Match = latestPayment.description.match(/\*{3,}(\d{4})/);
+                if (last4Match) {
+                  paymentDetails.cardLast4 = last4Match[1];
+                }
+              }
+              if (latestPayment.notes) {
+                try {
+                  const notesData = JSON.parse(latestPayment.notes);
+                  if (notesData.cardLast4) {
+                    paymentDetails.cardLast4 = notesData.cardLast4;
+                  }
+                } catch {}
+              }
+            } else if (latestPayment.method === 'gift_card') {
+              // Extract gift card number from payment notes or description
+              if (latestPayment.notes) {
+                try {
+                  const notesData = JSON.parse(latestPayment.notes);
+                  if (notesData.giftCardNumber) {
+                    paymentDetails.giftCardNumber = notesData.giftCardNumber;
+                  }
+                } catch {
+                  paymentDetails.giftCardNumber = latestPayment.notes;
+                }
+              }
+            }
+            
+            return {
+              ...apt,
+              paymentDetails
+            };
+          }
+        } catch (error) {
+          LoggerService.debug("Could not enrich appointment with payment details", { 
+            ...context, 
+            appointmentId: apt.id, 
+            error: error instanceof Error ? error.message : String(error) 
+          });
+        }
+      }
+      return apt;
+    }));
+
+    LoggerService.info("Active appointments fetched", { ...context, count: enrichedAppointments.length });
+    res.json(enrichedAppointments);
   }));
 
   // Create new appointment
@@ -212,15 +350,25 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
     const context = getLogContext(req);
     const appointmentData = req.body;
     
+    // Get the current user if authenticated
+    const currentUser = (req as any).user;
+    
+    // Add booking method tracking
+    const enrichedAppointmentData = {
+      ...appointmentData,
+      bookingMethod: 'staff',
+      createdBy: currentUser?.id || null
+    };
+    
     // Log the special override action
     LoggerService.info("🛠️ FORCE CREATING appointment without conflict checks", { 
       ...context,
-      appointmentData
+      appointmentData: enrichedAppointmentData
     });
 
     try {
       // Direct insert without conflict validation
-      const appointment = await storage.createAppointment(appointmentData);
+      const appointment = await storage.createAppointment(enrichedAppointmentData);
       
       LoggerService.info("Force-created appointment successfully", { 
         ...context,
@@ -404,8 +552,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         throw new ConflictError("This room is at capacity for the selected time.");
       }
     }
+    
+    // Get the current user if authenticated
+    const currentUser = (req as any).user;
+    
+    // Add booking method tracking
+    const enrichedAppointmentData = {
+      ...appointmentData,
+      bookingMethod: 'staff',
+      createdBy: currentUser?.id || null
+    };
 
-    const newAppointment = await storage.createAppointment(appointmentData);
+    const newAppointment = await storage.createAppointment(enrichedAppointmentData);
 
     // Persist any add-ons passed for this appointment (optional field addOnServiceIds[])
     try {
@@ -923,8 +1081,18 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           }
         }
 
+        // Get the current user if authenticated
+        const currentUser = (req as any).user;
+        
+        // Add booking method tracking
+        const enrichedAppointmentData = {
+          ...appointmentData,
+          bookingMethod: 'staff',
+          createdBy: currentUser?.id || null
+        };
+        
         // Create the appointment
-        const newAppointment = await storage.createAppointment(appointmentData);
+        const newAppointment = await storage.createAppointment(enrichedAppointmentData);
         
         // Add to the list of appointments for future conflict checking
         allAppointments.push(newAppointment);

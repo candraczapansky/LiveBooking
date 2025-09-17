@@ -285,7 +285,7 @@ export class JotformIntegration {
       staffId = staffMembers[0].id;
     }
 
-    // Create the appointment
+    // Create the appointment with online booking method
     const appointment = await this.storage.createAppointment({
       clientId,
       serviceId,
@@ -294,7 +294,9 @@ export class JotformIntegration {
       endTime: new Date(endTime),
       status: 'confirmed',
       notes: notes || 'Appointment from Jotform submission',
-      totalAmount: serviceInfo?.price || 0
+      totalAmount: serviceInfo?.price || 0,
+      bookingMethod: 'online',
+      createdBy: null // Online bookings don't have a staff creator
     });
 
     return appointment;

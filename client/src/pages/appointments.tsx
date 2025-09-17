@@ -1874,9 +1874,30 @@ const AppointmentsPage = () => {
                                   endDate = new Date(startDate.getTime() + 3600000); // Set to 1 hour duration
                                 }
                                 
+                                // Build payment info for completed appointments
+                                let paymentInfo = '';
+                                if (apt.status === 'completed' && apt.paymentStatus === 'paid' && apt.paymentDetails) {
+                                  const details = apt.paymentDetails;
+                                  if (details.method === 'cash') {
+                                    paymentInfo = ' [Cash]';
+                                  } else if (details.method === 'card' || details.method === 'terminal') {
+                                    if (details.cardLast4) {
+                                      paymentInfo = ` [Card ****${details.cardLast4}]`;
+                                    } else {
+                                      paymentInfo = ' [Card]';
+                                    }
+                                  } else if (details.method === 'gift_card') {
+                                    if (details.giftCardNumber) {
+                                      paymentInfo = ` [Gift Card ${details.giftCardNumber}]`;
+                                    } else {
+                                      paymentInfo = ' [Gift Card]';
+                                    }
+                                  }
+                                }
+                                
                                 return {
                                   id: apt.id,
-                                  title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || (typeof (apt as any)?.service?.name === 'string' ? (apt as any).service.name : 'Unknown Service')}`,
+                                  title: `${client ? client.firstName + ' ' + client.lastName : 'Unknown Client'} - ${service?.name || (typeof (apt as any)?.service?.name === 'string' ? (apt as any).service.name : 'Unknown Service')}${paymentInfo}`,
                                   start: startDate,
                                   end: endDate,
                                   resourceId: apt.staffId,

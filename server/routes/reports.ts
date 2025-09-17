@@ -758,4 +758,39 @@ export function registerReportRoutes(app: Express, storage: IStorage) {
       });
     }
   });
+
+  // Update Helcim ID for a sales history record
+  app.put('/api/sales-history/:id/helcim', async (req: any, res: any) => {
+    const { id } = req.params;
+    const { helcimPaymentId } = req.body;
+    
+    try {
+      // Get the existing sales history record
+      const salesHistory = await storage.getSalesHistory(parseInt(id));
+      if (!salesHistory) {
+        return res.status(404).json({ error: 'Sales history record not found' });
+      }
+      
+      // Update the Helcim payment ID
+      const updated = await storage.updateSalesHistory(parseInt(id), {
+        helcimPaymentId: helcimPaymentId || null
+      });
+      
+      // Also update the payment record if it exists
+      if (salesHistory.paymentId) {
+        await storage.updatePayment(salesHistory.paymentId, {
+          helcimPaymentId: helcimPaymentId || null
+        });
+      }
+      
+      res.json({ 
+        success: true, 
+        salesHistory: updated,
+        message: 'Helcim ID updated successfully'
+      });
+    } catch (error) {
+      console.error('Error updating Helcim ID:', error);
+      res.status(500).json({ error: 'Failed to update Helcim ID' });
+    }
+  });
 } 

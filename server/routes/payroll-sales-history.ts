@@ -264,6 +264,7 @@ export function registerPayrollSalesHistoryRoutes(app: any, storage: IStorage) {
       res.json({
         staffId,
         staffName,
+        title: staff.title || 'Staff',
         month: monthDate.toISOString(),
         transactions: detailedTransactions,
         totalRevenue,

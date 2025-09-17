@@ -62,7 +62,7 @@ const appointmentFormSchema = z.object({
   addOnServiceId: z.string().optional(),
   // Recurring appointment fields (optional)
   isRecurring: z.boolean().optional(),
-  recurringFrequency: z.enum(["weekly", "biweekly", "monthly"]).optional(),
+  recurringFrequency: z.enum(["weekly", "biweekly", "triweekly", "monthly"]).optional(),
   recurringCount: z.number().min(2).max(52).optional(),
   recurringIndefinite: z.boolean().optional(),
 });
@@ -708,6 +708,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
           // Create approximately 12 months worth of appointments
           if (values.recurringFrequency === 'weekly') occurrenceCount = 52;
           else if (values.recurringFrequency === 'biweekly') occurrenceCount = 26;
+          else if (values.recurringFrequency === 'triweekly') occurrenceCount = 17;
           else if (values.recurringFrequency === 'monthly') occurrenceCount = 12;
         }
         if (!occurrenceCount || occurrenceCount < 2) occurrenceCount = 2;
@@ -721,6 +722,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
               occurrenceStart.setDate(baseStart.getDate() + 7 * i);
             } else if (values.recurringFrequency === 'biweekly') {
               occurrenceStart.setDate(baseStart.getDate() + 14 * i);
+            } else if (values.recurringFrequency === 'triweekly') {
+              occurrenceStart.setDate(baseStart.getDate() + 21 * i);
             } else if (values.recurringFrequency === 'monthly') {
               const d = new Date(baseStart);
               d.setMonth(baseStart.getMonth() + i);
@@ -1661,6 +1664,7 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                             <SelectContent>
                               <SelectItem value="weekly">Weekly</SelectItem>
                               <SelectItem value="biweekly">Every 2 weeks</SelectItem>
+                              <SelectItem value="triweekly">Every 3 weeks</SelectItem>
                               <SelectItem value="monthly">Monthly</SelectItem>
                             </SelectContent>
                           </Select>

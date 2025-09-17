@@ -152,69 +152,11 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     queryFn: () => fetch('/api/staff-services').then((r) => r.json())
   });
   
-  // Fetch payroll data from sales history for accurate reporting
-  const { data: salesHistoryPayroll, isLoading: salesHistoryLoading } = useQuery({
-    queryKey: ['/api/payroll/sales-history', startDate?.toISOString(), endDate?.toISOString()],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (startDate) params.append('startDate', startDate.toISOString());
-      if (endDate) params.append('endDate', endDate.toISOString());
-      
-      const response = await fetch(`/api/payroll/sales-history?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch payroll data');
-      return response.json();
-    },
-    enabled: !!startDate && !!endDate
-  });
-
-  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading || salesHistoryLoading;
-
-  // Refresh data function
-  const refreshData = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['/api/staff'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/users'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/services'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/payments'] }),
-      queryClient.invalidateQueries({ queryKey: ['/api/payroll/sales-history'] })
-    ]);
-    toast({
-      title: "Data Refreshed",
-      description: "Payroll data has been refreshed successfully.",
-    });
-  };
-
-  // Calculate payroll data - use sales history if available for accuracy
-  const payrollData = useMemo((): PayrollData[] => {
-    // If we have sales history payroll data, use that instead of appointment-based calculation
-    if (salesHistoryPayroll && salesHistoryPayroll.length > 0) {
-      return salesHistoryPayroll.map((staffPayroll: any) => ({
-        staffId: staffPayroll.staffId,
-        staffName: staffPayroll.staffName,
-        totalRevenue: staffPayroll.totalRevenue || 0,
-        totalCommission: staffPayroll.totalCommission || 0,
-        totalTips: staffPayroll.totalTips || 0,
-        totalServices: staffPayroll.transactionCount || 0,
-        uniqueClients: staffPayroll.transactions?.length || 0,
-        totalHours: staffPayroll.totalHourlyPay ? (staffPayroll.totalHourlyPay / (staffPayroll.hourlyRate || 15)) : 0,
-        totalHourlyPay: staffPayroll.totalHourlyPay || 0,
-        totalEarnings: staffPayroll.totalEarnings || 0,
-        avgServiceValue: staffPayroll.transactionCount > 0 ? staffPayroll.totalRevenue / staffPayroll.transactionCount : 0,
-        commissionType: staffPayroll.commissionType,
-        commissionRate: staffPayroll.commissionRate,
-        hourlyRate: staffPayroll.hourlyRate
-      }));
-    }
-    
-    // Fallback to appointment-based calculation if sales history not available
-    if (!staff || !users || !services || !appointments) return [];
-
-    // Determine date range based on timePeriod and custom dates
+  // Calculate date range for queries
+  const { startDate, endDate } = useMemo(() => {
     let rangeStart: Date;
     let rangeEnd: Date;
-
+    
     if (timePeriod === 'custom' && customStartDate && customEndDate) {
       // Use business timezone to parse start/end so they align with what the user picked
       const parseYmdInTz = (ymd: string) => {
@@ -298,6 +240,72 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
         }
       }
     }
+    
+    return { startDate: rangeStart, endDate: rangeEnd };
+  }, [selectedMonth, timePeriod, customStartDate, customEndDate, businessTz]);
+  
+  // Fetch payroll data from sales history for accurate reporting
+  const { data: salesHistoryPayroll, isLoading: salesHistoryLoading } = useQuery({
+    queryKey: ['/api/payroll/sales-history', startDate?.toISOString(), endDate?.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate.toISOString());
+      if (endDate) params.append('endDate', endDate.toISOString());
+      
+      const response = await fetch(`/api/payroll/sales-history?${params}`);
+      if (!response.ok) throw new Error('Failed to fetch payroll data');
+      return response.json();
+    },
+    enabled: !!startDate && !!endDate
+  });
+
+  const isLoading = staffLoading || usersLoading || servicesLoading || appointmentsLoading || paymentsLoading || salesHistoryLoading;
+
+  // Refresh data function
+  const refreshData = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['/api/staff'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/services'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/staff-services'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] }),
+      queryClient.invalidateQueries({ queryKey: ['/api/payroll/sales-history'] })
+    ]);
+    toast({
+      title: "Data Refreshed",
+      description: "Payroll data has been refreshed successfully.",
+    });
+  };
+
+  // Calculate payroll data - use sales history if available for accuracy
+  const payrollData = useMemo((): PayrollData[] => {
+    // If we have sales history payroll data, use that instead of appointment-based calculation
+    if (salesHistoryPayroll && salesHistoryPayroll.length > 0) {
+      return salesHistoryPayroll.map((staffPayroll: any) => ({
+        staffId: staffPayroll.staffId,
+        staffName: staffPayroll.staffName,
+        totalRevenue: staffPayroll.totalRevenue || 0,
+        totalCommission: staffPayroll.totalCommission || 0,
+        totalTips: staffPayroll.totalTips || 0,
+        totalServices: staffPayroll.transactionCount || 0,
+        uniqueClients: staffPayroll.transactions?.length || 0,
+        totalHours: staffPayroll.totalHourlyPay ? (staffPayroll.totalHourlyPay / (staffPayroll.hourlyRate || 15)) : 0,
+        totalHourlyPay: staffPayroll.totalHourlyPay || 0,
+        totalEarnings: staffPayroll.totalEarnings || 0,
+        avgServiceValue: staffPayroll.transactionCount > 0 ? staffPayroll.totalRevenue / staffPayroll.transactionCount : 0,
+        commissionType: staffPayroll.commissionType,
+        commissionRate: staffPayroll.commissionRate,
+        hourlyRate: staffPayroll.hourlyRate
+      }));
+    }
+    
+    // Fallback to appointment-based calculation if sales history not available
+    if (!staff || !users || !services || !appointments) return [];
+
+    // Use the startDate and endDate calculated at component level
+    const rangeStart = startDate;
+    const rangeEnd = endDate;
 
     // Compare by ISO date strings (YYYY-MM-DD) to avoid any timezone off-by-one
     const startStr = formatYmdInTimeZone(rangeStart);
@@ -525,7 +533,7 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
     })
     // Exclude staff with zero qualifying payments/revenue to avoid showing empty staff (e.g., Jamie with none)
     .filter((row) => (row.totalRevenue || 0) > 0 || (row.totalTips || 0) > 0 || (row.totalCommission || 0) > 0);
-  }, [staff, users, services, appointments, staffServices, selectedMonth, timePeriod, customStartDate, customEndDate, payments]);
+  }, [staff, users, services, appointments, staffServices, startDate, endDate, payments, salesHistoryPayroll, businessTz]);
 
   // Filter by selected staff member
   const filteredPayrollData = selectedStaff === "all" 
@@ -767,7 +775,6 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
             staffId={detailStaffId}
             month={selectedMonth}
             onBack={() => {
-              console.log('Going back to summary view');
               setViewMode('summary');
               setDetailStaffId(null);
             }}
@@ -786,10 +793,6 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
               `Track staff earnings and commission for ${format(selectedMonth, 'MMMM yyyy')}`
             )}
           </p>
-          {/* Debug info */}
-          <div className="text-xs text-gray-500 mt-1">
-            Debug: viewMode={viewMode}, detailStaffId={detailStaffId}
-          </div>
         </div>
         
         <div className="flex items-center space-x-2">
@@ -1021,12 +1024,10 @@ export default function PayrollReport({ timePeriod, customStartDate, customEndDa
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => {
-                                console.log('Setting detail view for staff:', data.staffId);
-                                setDetailStaffId(data.staffId);
-                                setViewMode('detail');
-                                console.log('State should now be:', { viewMode: 'detail', detailStaffId: data.staffId });
-                              }}
+                            onClick={() => {
+                              setDetailStaffId(data.staffId);
+                              setViewMode('detail');
+                            }}
                             >
                               <Eye className="h-3 w-3 mr-1" />
                               View Details
@@ -1126,22 +1127,54 @@ interface DetailedPayrollViewProps {
 }
 
 function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProps) {
-  console.log('DetailedPayrollView rendering for staffId:', staffId);
   
   const { data: detailData, isLoading } = useQuery({
     queryKey: ["/api/payroll/sales-history/detailed", String(staffId), month.toISOString()],
     queryFn: async () => {
+      // Format the month as YYYY-MM-DD for the API
+      const monthStr = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(month.getDate()).padStart(2, '0')}`;
+      
       // First try to get data from sales history for accuracy
       try {
-        const salesHistoryRes = await fetch(`/api/payroll/sales-history/${staffId}/detailed?month=${month.toISOString()}`);
-        if (salesHistoryRes.ok) {
-          const salesData = await salesHistoryRes.json();
-          if (salesData.transactions && salesData.transactions.length > 0) {
-            return salesData;
-          }
+        const salesHistoryRes = await fetch(`/api/payroll/sales-history/${staffId}/detailed?month=${monthStr}`);
+        const salesData = await salesHistoryRes.json();
+        
+        // Check if there's an error in the response
+        if (!salesHistoryRes.ok || salesData.error) {
+          // Fall through to appointment-based calculation
+        } else {
+          // Transform sales history data to match expected structure
+          const appointments = (salesData.transactions || []).map((t: any) => ({
+            appointmentId: t.id,
+            date: t.date || t.transactionDate,
+            clientName: t.clientName || 'Unknown',
+            serviceName: t.serviceName || 'Service',
+            duration: 60,
+            servicePrice: t.servicePrice || 0,
+            tipAmount: t.tip || 0,
+            commissionRate: salesData.commissionRate || 0,
+            commissionAmount: t.commission || 0,
+            paymentStatus: 'paid',
+          }));
+          
+          return {
+            staffName: salesData.staffName || 'Unknown',
+            title: salesData.title || 'Staff',
+            commissionType: salesData.commissionType || 'commission',
+            baseCommissionRate: salesData.commissionRate || 0,
+            hourlyRate: salesData.hourlyRate || null,
+            summary: {
+              totalAppointments: salesData.transactionCount || appointments.length,
+              totalRevenue: salesData.totalRevenue || 0,
+              totalCommission: salesData.totalCommission || 0,
+              totalTips: salesData.totalTips || 0,
+              averageCommissionPerService: salesData.transactionCount > 0 ? (salesData.totalCommission / salesData.transactionCount) : 0,
+            },
+            appointments: appointments,
+          };
         }
       } catch (error) {
-        console.log('Sales history not available, falling back to appointment-based calculation');
+        // Sales history fetch error, falling back to appointment-based calculation
       }
       
       // Fallback to computing locally from appointments
@@ -1328,8 +1361,6 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
     }
   });
 
-  console.log('DetailedPayrollView data:', detailData, 'isLoading:', isLoading);
-
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -1357,7 +1388,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
     );
   }
 
-  if (!detailData) {
+  if (!detailData || !detailData.summary) {
     return (
       <Card className="mt-6">
         <CardHeader>
@@ -1377,6 +1408,17 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
     );
   }
 
+  // Ensure data has expected structure with defaults
+  const summary = detailData.summary || {
+    totalAppointments: 0,
+    totalRevenue: 0,
+    totalCommission: 0,
+    totalTips: 0,
+    averageCommissionPerService: 0
+  };
+  
+  const appointments = detailData.appointments || [];
+
   return (
     <Card className="mt-6">
       <CardHeader>
@@ -1388,41 +1430,49 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
           <div>
             <CardTitle>Detailed Payroll Report</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {detailData.staffName} ({detailData.title}) - {format(month, 'MMMM yyyy')}
+              {detailData.staffName || 'Unknown'} ({detailData.title || 'Staff'}) - {format(month, 'MMMM yyyy')}
             </p>
           </div>
         </div>
       </CardHeader>
       <CardContent>
         {/* Summary Stats */}
+        <div className="mb-2">
+          <p className="text-sm text-muted-foreground">
+            Total Earnings = Commission ({formatCurrency(summary.totalCommission)}) + Tips ({formatCurrency(summary.totalTips)}) = {formatCurrency(summary.totalCommission + summary.totalTips)}
+          </p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
-              {detailData.summary.totalAppointments}
+              {summary.totalAppointments}
             </div>
             <div className="text-sm text-blue-600">Total Appointments</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(detailData.summary.totalRevenue)}
+              {formatCurrency(summary.totalRevenue)}
             </div>
             <div className="text-sm text-green-600">Total Revenue</div>
           </div>
           <div className="bg-purple-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-purple-600">
-              {formatCurrency(detailData.summary.totalCommission)}
+              {formatCurrency(summary.totalCommission)}
             </div>
             <div className="text-sm text-purple-600">Total Commission</div>
           </div>
           <div className="bg-orange-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-orange-600">
-              {formatCurrency(detailData.summary.averageCommissionPerService)}
+              {formatCurrency(summary.averageCommissionPerService)}
             </div>
             <div className="text-sm text-orange-600">Avg Commission/Service</div>
           </div>
           <div className="bg-amber-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-amber-600">
-              {formatCurrency(detailData.summary.totalTips || 0)}
+              {formatCurrency(summary.totalTips || 0)}
+              {summary.totalTips > 0 && (
+                <span className="text-sm ml-2">💰</span>
+              )}
             </div>
             <div className="text-sm text-amber-600">Total Tips</div>
           </div>
@@ -1430,7 +1480,19 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
 
         {/* Appointments Table */}
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Individual Appointments</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Individual Appointments</h3>
+            {summary.totalTips > 0 && (
+              <Badge className="bg-amber-100 text-amber-800">
+                💵 {appointments.filter((a: any) => a.tipAmount > 0).length} transactions with tips
+              </Badge>
+            )}
+          </div>
+          {appointments.length === 0 ? (
+            <div className="text-center py-8 border rounded-lg">
+              <p className="text-muted-foreground">No appointments found for this period.</p>
+            </div>
+          ) : (
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -1440,26 +1502,36 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
                   <TableHead>Service</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Service Price</TableHead>
-                  <TableHead>Tip</TableHead>
+                  <TableHead>Tip 💵</TableHead>
                   <TableHead>Commission Rate</TableHead>
                   <TableHead>Commission Earned</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {detailData.appointments.map((appointment: any) => (
-                  <TableRow key={appointment.appointmentId}>
+                {appointments.map((appointment: any, index: number) => (
+                  <TableRow key={appointment.appointmentId || index}>
                     <TableCell>
-                      {format(new Date(appointment.date), 'MMM dd, yyyy')}
+                      {appointment.date ? format(new Date(appointment.date), 'MMM dd, yyyy') : 'N/A'}
                     </TableCell>
                     <TableCell>{appointment.clientName}</TableCell>
                     <TableCell>{appointment.serviceName}</TableCell>
                     <TableCell>{appointment.duration} min</TableCell>
-                    <TableCell>{formatCurrency(appointment.servicePrice)}</TableCell>
-                    <TableCell>{formatCurrency(Number(appointment.tipAmount || 0))}</TableCell>
-                    <TableCell>{(appointment.commissionRate * 100).toFixed(1)}%</TableCell>
+                    <TableCell>{formatCurrency(appointment.servicePrice || 0)}</TableCell>
+                    <TableCell>
+                      {appointment.tipAmount > 0 ? (
+                        <span className="font-semibold text-green-600">
+                          {formatCurrency(Number(appointment.tipAmount))}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">
+                          {formatCurrency(0)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>{((appointment.commissionRate || 0) * 100).toFixed(1)}%</TableCell>
                     <TableCell className="font-semibold text-green-600">
-                      {formatCurrency(appointment.commissionAmount)}
+                      {formatCurrency(appointment.commissionAmount || 0)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={appointment.paymentStatus === 'paid' ? 'default' : 'secondary'}>
@@ -1471,6 +1543,7 @@ function DetailedPayrollView({ staffId, month, onBack }: DetailedPayrollViewProp
               </TableBody>
             </Table>
           </div>
+          )}
           <div className="text-xs text-muted-foreground mt-3 p-2 bg-blue-50 border border-blue-200 rounded">
             <strong>Important:</strong> This report only includes appointments with verified completed payments that have positive amounts. 
             The prices shown reflect the actual paid amounts from payment records, not the original service prices. 

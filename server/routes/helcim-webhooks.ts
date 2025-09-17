@@ -98,6 +98,21 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
       // Helcim sends minimal webhook: {"id":"TRANSACTION_ID", "type":"cardTransaction"}
       const txId = payload?.id;
       const type = payload?.type;
+      
+      // Log full payload to see if amount/tip is included
+      console.log('🔍 WEBHOOK PAYLOAD DETAILS:', {
+        id: txId,
+        type,
+        amount: payload?.amount,
+        tipAmount: payload?.tipAmount,
+        totalAmount: payload?.totalAmount,
+        total: payload?.total,
+        tip: payload?.tip,
+        // Log all numeric fields to find where the amounts are
+        allNumericFields: Object.entries(payload || {})
+          .filter(([_, v]) => typeof v === 'number')
+          .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {})
+      });
 
       // Do not set any global completion markers here; wait until status is verified below
 
@@ -105,29 +120,46 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
       if (type === 'cardTransaction' && txId) {
         console.log('🎯 Processing cardTransaction webhook for transaction:', txId);
         
-        // Extract status from the payload - check for declined/cancelled indicators
-        let paymentStatus = 'completed'; // DEFAULT TO COMPLETED for cardTransaction webhooks
+        // CRITICAL FIX: Default to 'pending' NOT 'completed' to prevent auto-completion of failed transactions
+        let paymentStatus = 'pending'; // SAFE DEFAULT - don't assume success
         
-        // Helcim typically only sends webhooks for successful transactions
-        // Only mark as failed if we have explicit indicators
+        // Extract all status-related fields
         const statusFields = [
           payload?.status,
           payload?.approved,
           payload?.transactionStatus,
           payload?.response,
           payload?.responseMessage,
-          payload?.error
+          payload?.responseText,
+          payload?.error,
+          payload?.result
         ];
         
-        // Check for declined/cancelled/failed status
+        // Create combined status string for checking
         const statusStr = statusFields.filter(s => s != null).map(s => String(s).toLowerCase()).join(' ');
-        if (statusStr.includes('declined') || 
+        
+        // Check for EXPLICIT success indicators FIRST
+        if (payload?.approved === true || 
+            payload?.approved === 'true' ||
+            payload?.approved === 1 ||
+            payload?.approved === '1' ||
+            statusStr.includes('approved') ||
+            statusStr.includes('captured') ||
+            statusStr.includes('sale') ||
+            (statusStr.includes('success') && !statusStr.includes('unsuccess'))) {
+          paymentStatus = 'completed';
+          console.log('✅ Payment EXPLICITLY approved/completed in webhook');
+        }
+        // Check for failure indicators
+        else if (statusStr.includes('declined') || 
             statusStr.includes('failed') || 
             statusStr.includes('cancelled') || 
             statusStr.includes('cancel') ||
             statusStr.includes('voided') ||
             statusStr.includes('refunded') ||
             statusStr.includes('error') ||
+            statusStr.includes('rejected') ||
+            statusStr.includes('insufficient') ||
             payload?.approved === false ||
             payload?.approved === 'false' ||
             payload?.approved === 0 ||
@@ -135,16 +167,24 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
           paymentStatus = 'failed';
           console.log('❌ Payment declined/failed detected in webhook');
         } else {
-          // For cardTransaction type with minimal payload, assume success
-          // Helcim generally only sends webhooks for successful transactions
-          paymentStatus = 'completed';
-          console.log('✅ Processing cardTransaction webhook as successful (default for minimal payload)');
+          // NO CLEAR STATUS - keep as pending (DO NOT auto-complete!)
+          console.log('⚠️ Webhook status unclear - keeping as PENDING to prevent auto-completion');
+          console.log('   Raw webhook data:', {
+            approved: payload?.approved,
+            status: payload?.status,
+            response: payload?.response,
+            transactionStatus: payload?.transactionStatus
+          });
         }
         
         // Handle the webhook asynchronously to return quickly
         setImmediate(async () => {
           try {
             // Pass the webhook data to the handler with the actual status
+            // Include amount if present in payload under any common field name
+            const amount = payload?.amount || payload?.totalAmount || payload?.total || 
+                         payload?.transactionAmount || payload?.paymentAmount;
+            
             await (terminalService as any).handleWebhook({
               id: txId,
               transactionId: txId,
@@ -152,6 +192,7 @@ export default function createHelcimWebhookRoutes(storage: IStorage) {
               status: paymentStatus,
               approved: payload?.approved,
               response: payload?.response,
+              amount: amount,
               rawPayload: payload
             });
             console.log(`✅ Webhook processing completed for transaction ${txId} with status: ${paymentStatus}`);

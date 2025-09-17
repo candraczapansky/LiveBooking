@@ -7,9 +7,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { CreditCard, CheckCircle, XCircle } from 'lucide-react';
+import { CreditCard, CheckCircle, XCircle, Mail, MessageCircle, Send } from 'lucide-react';
 
 interface PaymentResponse {
   success: boolean;
@@ -48,6 +50,9 @@ export default function SmartTerminalPayment({
   const [status, setStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
   const [paymentDetails, setPaymentDetails] = useState<PaymentResponse | null>(null);
+  const [emailInput, setEmailInput] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [sendingReceipt, setSendingReceipt] = useState(false);
   const { toast } = useToast();
 
   const startPayment = async () => {
@@ -181,12 +186,8 @@ export default function SmartTerminalPayment({
       description: `Payment of $${(response.amount || amount).toFixed(2)} processed successfully${tipDisplay}`,
     });
     onSuccess?.(response);
-    setTimeout(() => {
-      onOpenChange(false);
-      setStatus('idle');
-      setMessage('');
-      setPaymentDetails(null);
-    }, 3000);
+    // Don't auto-close - let user dismiss the success screen manually
+    // This gives them time to send receipts via SMS/email
   };
 
   const stringifyError = (err: any): string => {
@@ -204,11 +205,70 @@ export default function SmartTerminalPayment({
       variant: "destructive",
     });
     onError?.(stringifyError(error));
-    setTimeout(() => {
-      onOpenChange(false);
-      setStatus('idle');
-      setMessage('');
-    }, 2000);
+    // Keep the error visible for user to read
+    // User can close manually
+  };
+
+  const sendEmailReceipt = async () => {
+    if (!emailInput.trim() || !paymentDetails) return;
+    
+    setSendingReceipt(true);
+    try {
+      await apiRequest('POST', '/api/send-receipt', {
+        type: 'email',
+        recipient: emailInput.trim(),
+        paymentDetails: {
+          ...paymentDetails,
+          description,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      
+      toast({
+        title: "Receipt Sent",
+        description: `Email receipt sent to ${emailInput}`,
+      });
+      setEmailInput('');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send email receipt. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReceipt(false);
+    }
+  };
+
+  const sendSMSReceipt = async () => {
+    if (!phoneInput.trim() || !paymentDetails) return;
+    
+    setSendingReceipt(true);
+    try {
+      await apiRequest('POST', '/api/send-receipt', {
+        type: 'sms',
+        recipient: phoneInput.trim(),
+        paymentDetails: {
+          ...paymentDetails,
+          description,
+          timestamp: new Date().toISOString(),
+        },
+      });
+      
+      toast({
+        title: "Receipt Sent",
+        description: `SMS receipt sent to ${phoneInput}`,
+      });
+      setPhoneInput('');
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send SMS receipt. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingReceipt(false);
+    }
   };
 
   return (
@@ -300,6 +360,61 @@ export default function SmartTerminalPayment({
                     )}
                   </div>
                 )}
+                
+                {/* Receipt Options */}
+                <div className="w-full mt-4 p-4 border rounded-lg space-y-4">
+                  <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Send Receipt</h4>
+                  
+                  {/* Email Receipt */}
+                  <div className="space-y-2">
+                    <Label htmlFor="email-receipt" className="text-xs">Email Receipt</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="email-receipt"
+                        type="email"
+                        placeholder="customer@email.com"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        className="flex-1"
+                        disabled={sendingReceipt}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={sendEmailReceipt}
+                        disabled={!emailInput.trim() || sendingReceipt}
+                        variant="outline"
+                      >
+                        <Mail className="h-4 w-4 mr-1" />
+                        Send
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* SMS Receipt */}
+                  <div className="space-y-2">
+                    <Label htmlFor="sms-receipt" className="text-xs">SMS Receipt</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="sms-receipt"
+                        type="tel"
+                        placeholder="(555) 123-4567"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        className="flex-1"
+                        disabled={sendingReceipt}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={sendSMSReceipt}
+                        disabled={!phoneInput.trim() || sendingReceipt}
+                        variant="outline"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-1" />
+                        Send
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
 
@@ -320,17 +435,37 @@ export default function SmartTerminalPayment({
         </div>
 
         <div className="flex justify-end gap-3">
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-              setStatus('idle');
-              setMessage('');
-            }}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
+          {status === 'success' ? (
+            <Button
+              onClick={() => {
+                onOpenChange(false);
+                setStatus('idle');
+                setMessage('');
+                setPaymentDetails(null);
+                setEmailInput('');
+                setPhoneInput('');
+              }}
+              className="w-full sm:w-auto"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Done
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false);
+                setStatus('idle');
+                setMessage('');
+                setPaymentDetails(null);
+                setEmailInput('');
+                setPhoneInput('');
+              }}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

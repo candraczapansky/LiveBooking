@@ -483,9 +483,25 @@ export default function AppointmentsMobilePage() {
                           >
                             <div className="text-sm font-bold truncate">
                               {client ? `${client.firstName} ${client.lastName}` : 'Client'}
+                              {apt.bookingMethod && apt.bookingMethod !== 'staff' && (
+                                <span className="text-xs opacity-85 ml-2">
+                                  {apt.bookingMethod === 'online' && '🌐'}
+                                  {apt.bookingMethod === 'sms' && '💬'}
+                                  {apt.bookingMethod === 'external' && '🔗'}
+                                </span>
+                              )}
                             </div>
                             <div className="text-xs opacity-95 font-medium mt-0.5">{formatTime(apt.startTime)}</div>
                             <div className="text-xs opacity-90 truncate mt-1">{service?.name}</div>
+                            {apt.status === 'completed' && apt.paymentStatus === 'paid' && apt.paymentDetails && (
+                              <div className="text-xs opacity-85 truncate mt-1 font-medium">
+                                {apt.paymentDetails.method === 'cash' && '💵 Cash'}
+                                {apt.paymentDetails.method === 'card' && apt.paymentDetails.cardLast4 && `💳 ****${apt.paymentDetails.cardLast4}`}
+                                {apt.paymentDetails.method === 'card' && !apt.paymentDetails.cardLast4 && '💳 Card'}
+                                {apt.paymentDetails.method === 'terminal' && '💳 Terminal'}
+                                {apt.paymentDetails.method === 'gift_card' && '🎁 Gift Card'}
+                              </div>
+                            )}
                             {selectedStaffId === "all" && staff && (
                               <div className="text-xs opacity-85 truncate mt-1 font-medium">
                                 with {staff.firstName || 'Staff'} {staff.lastName ? staff.lastName[0].toUpperCase() + '.' : ''}

@@ -128,6 +128,18 @@ export default function ClientAppointmentHistory({ clientId }: ClientAppointment
                           </span>
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(appointment.paymentStatus)}`}>
                             {appointment.paymentStatus}
+                            {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && appointment.paymentDetails && (
+                              <span className="ml-1">
+                                {appointment.paymentDetails.method === 'cash' && '(Cash)'}
+                                {appointment.paymentDetails.method === 'card' && appointment.paymentDetails.cardLast4 && `(****${appointment.paymentDetails.cardLast4})`}
+                                {appointment.paymentDetails.method === 'card' && !appointment.paymentDetails.cardLast4 && '(Unverified)'}
+                                {appointment.paymentDetails.method === 'terminal' && appointment.paymentDetails.cardLast4 && `(****${appointment.paymentDetails.cardLast4})`}
+                                {appointment.paymentDetails.method === 'terminal' && !appointment.paymentDetails.cardLast4 && '(Unverified)'}
+                              </span>
+                            )}
+                            {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && !appointment.paymentDetails && (
+                              <span className="ml-1 text-orange-600">⚠️</span>
+                            )}
                           </span>
                         </div>
                       </div>

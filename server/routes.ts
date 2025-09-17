@@ -28,6 +28,7 @@ import {
 // dependencies on files that may not be emitted in production builds.
 import createTerminalRoutes from "./routes/terminal-routes.js";
 import createHelcimWebhookRoutes from "./routes/helcim-webhooks.js";
+import createReceiptRoutes from "./routes/receipt-routes.js";
 // Import helcim payments router dynamically to avoid missing compiled file failures
 import { CheckSoftwareService } from "./check-software-service.js";
 import { registerExternalRoutes } from "./external-api.js";
@@ -43,6 +44,8 @@ import { registerPermissionRoutes } from "./routes/permissions.js";
 import { registerBusinessSettingsRoutes } from "./routes/business-settings.js";
 import { registerNotificationRoutes } from "./routes/notifications.js";
 import { registerPaymentRoutes } from "./routes/payments.js";
+import { registerPaymentVerificationRoutes } from "./routes/verify-payments.js";
+import { registerPaymentMatchingRoutes } from "./routes/match-payments.js";
 import { registerMarketingRoutes } from "./routes/marketing.js";
 import { registerFormsRoutes } from "./routes/forms.js";
 import { registerDocumentsRoutes } from "./routes/documents.js";
@@ -100,6 +103,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   registerBusinessSettingsRoutes(app, storage);
   registerNotificationRoutes(app, storage);
   registerPaymentRoutes(app, storage);
+  registerPaymentVerificationRoutes(app, storage);
+  registerPaymentMatchingRoutes(app, storage);
   registerMarketingRoutes(app, storage);
   registerFormsRoutes(app, storage);
   registerDocumentsRoutes(app, storage);
@@ -131,6 +136,8 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.use('/api/helcim', createHelcimWebhookRoutes(storage));
   // Legacy alias used by some Helcim configurations
   app.use('/api/helcim-smart-terminal', createHelcimWebhookRoutes(storage));
+  // Register receipt routes
+  app.use('/api', createReceiptRoutes(storage));
   // Enable helcim payment routes; attempt multiple resolutions to support dev (.ts) and prod (.js)
   try {
     let helcimModule: any;
@@ -570,6 +577,20 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         const transactionId = paymentResult?.transactionId || paymentResult?.id || `${Date.now()}`;
         const status = paymentResult?.status || paymentResult?.state || 'completed';
         
+        // Try to get card last 4 from saved payment method if available
+        let cardLast4 = null;
+        if (storage && clientId) {
+          try {
+            const savedMethods = await storage.getSavedPaymentMethodsByClient(parseInt(clientId));
+            const savedCard = savedMethods.find((m: any) => m.helcimCardId === cardId || m.helcimCustomerId === customerId);
+            if (savedCard && savedCard.cardLast4) {
+              cardLast4 = savedCard.cardLast4;
+            }
+          } catch (err) {
+            console.log('[Process Saved Card] Could not fetch saved card details:', err);
+          }
+        }
+        
         return res.json({
           success: true,
           paymentId: String(paymentId),
@@ -577,6 +598,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           amount: amount,
           customerId: customerId,
           cardId: cardId,
+          cardLast4: cardLast4,
           status: status,
           message: 'Payment processed successfully',
           helcimResponse: paymentResult

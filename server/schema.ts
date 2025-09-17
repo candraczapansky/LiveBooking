@@ -175,6 +175,8 @@ export const appointments = pgTable("appointments", {
   rescheduledFrom: integer("rescheduled_from"),
   rescheduledTo: integer("rescheduled_to"),
   notes: text("notes"),
+  bookingMethod: text("booking_method").default("staff"), // How it was booked: staff, online, sms, external
+  createdBy: integer("created_by").references(() => users.id), // Staff user ID who created it
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

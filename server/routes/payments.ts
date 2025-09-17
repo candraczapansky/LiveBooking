@@ -15,8 +15,8 @@ import { triggerAfterPayment } from "../automation-triggers.js";
 
 import cache, { invalidateCache } from "../utils/cache.js";
 
-// Move this function to the top level
-async function createSalesHistoryRecord(storage: IStorage, paymentData: any, transactionType: string, additionalData?: any) {
+// Export this function so it can be used in other routes
+export async function createSalesHistoryRecord(storage: IStorage, paymentData: any, transactionType: string, additionalData?: any) {
   console.log('createSalesHistoryRecord called with:', { paymentData: paymentData.id, transactionType });
   try {
     // Use checkout time if provided, otherwise use current time
@@ -116,8 +116,12 @@ async function createSalesHistoryRecord(storage: IStorage, paymentData: any, tra
       // External tracking
       helcimPaymentId: paymentData.helcimPaymentId || null,
       
-      // Discount and audit
+      // Tax and fees
+      taxAmount: 0, // Could be enhanced to track tax separately
+      tipAmount: paymentData.tipAmount || 0, // Capture tip amount from payment
       discountAmount: (additionalData && typeof additionalData.discountAmount === 'number') ? additionalData.discountAmount : 0,
+      
+      // Audit trail
       createdBy: null, // Could be set to current user ID if available
       notes: paymentData.notes || null
     };
@@ -141,7 +145,43 @@ export function registerPaymentRoutes(app: Express, storage: IStorage) {
 
     LoggerService.logPayment("create", paymentData.amount, context);
 
+    // If card payment, store card details in notes for display purposes
+    if ((paymentData.method === 'card' || paymentData.method === 'terminal') && req.body.cardLast4) {
+      if (!paymentData.notes || paymentData.notes === '') {
+        paymentData.notes = JSON.stringify({ cardLast4: req.body.cardLast4 });
+      } else {
+        try {
+          const existingNotes = JSON.parse(paymentData.notes);
+          existingNotes.cardLast4 = req.body.cardLast4;
+          paymentData.notes = JSON.stringify(existingNotes);
+        } catch {
+          paymentData.notes = JSON.stringify({ 
+            originalNote: paymentData.notes, 
+            cardLast4: req.body.cardLast4 
+          });
+        }
+      }
+    }
+
     const newPayment = await storage.createPayment(paymentData);
+    
+    // Store invoice number in notes if this is a Helcim payment
+    if (paymentData.helcimPaymentId && newPayment.id) {
+      try {
+        const invoiceNumber = `INV${String(newPayment.id).padStart(6, '0')}`;
+        const existingNotes = paymentData.notes ? JSON.parse(paymentData.notes) : {};
+        await storage.updatePayment(newPayment.id, {
+          notes: JSON.stringify({
+            ...existingNotes,
+            invoiceNumber,
+            helcimPaymentId: paymentData.helcimPaymentId
+          })
+        });
+        console.log(`📝 Added invoice number ${invoiceNumber} to payment ${newPayment.id}`);
+      } catch (err) {
+        console.warn('Could not update payment with invoice number:', err);
+      }
+    }
 
     // Invalidate relevant caches
     invalidateCache('payments');

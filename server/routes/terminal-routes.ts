@@ -69,22 +69,69 @@ router.post('/payment/start', async (req, res) => {
     try { log('🟢 POST /api/terminal/payment/start'); } catch {}
     const data = PaymentRequestSchema.parse(req.body);
     
+    // Create payment record first to get payment ID for invoice number
+    let paymentId: number | undefined;
+    let invoiceNumber: string;
+    
+    if ((data as any).appointmentId && storage) {
+      try {
+        // Create a pending payment record
+        const payment = await storage.createPayment({
+          appointmentId: (data as any).appointmentId,
+          clientId: (data as any).clientId,
+          amount: data.amount,
+          totalAmount: data.amount, // Add required totalAmount
+          method: 'terminal',
+          status: 'pending',
+          type: 'appointment',
+          description: data.description || 'Terminal payment'
+        });
+        paymentId = payment.id;
+        invoiceNumber = `INV${String(paymentId).padStart(6, '0')}`;
+        console.log(`📝 Created payment ${paymentId} with invoice number ${invoiceNumber}`);
+      } catch (error) {
+        console.warn('Could not pre-create payment record:', error);
+        // Fallback to timestamp-based invoice
+        invoiceNumber = `POS-${Date.now()}`;
+      }
+    } else {
+      // Fallback for non-appointment payments
+      invoiceNumber = `POS-${Date.now()}`;
+    }
+    
     const result = await terminalService.startPayment(
       data.locationId,
       data.amount,
       {
         description: data.description,
+        invoiceNumber,
+        appointmentId: (data as any).appointmentId,
+        paymentId
       }
     );
 
     // Normalize response for client expectations
     // Prefer real transactionId when available so polling matches webhook cache
-    const pid = (result as any).transactionId || (result as any).paymentId || (result as any).invoiceNumber || (result as any).id || null;
+    const helcimTxId = (result as any).transactionId || (result as any).paymentId || (result as any).id || null;
+    
+    // Update payment record with Helcim transaction ID if we have one
+    if (paymentId && helcimTxId && storage) {
+      try {
+        await storage.updatePayment(paymentId, {
+          helcimPaymentId: helcimTxId,
+          status: (result as any).status === 'completed' ? 'completed' : 'pending'
+        });
+        console.log(`✅ Updated payment ${paymentId} with Helcim TX ${helcimTxId}`);
+      } catch (error) {
+        console.warn('Could not update payment with Helcim ID:', error);
+      }
+    }
+    
     res.json({
       success: true,
-      paymentId: pid,
-      transactionId: (result as any).transactionId || pid,
-      invoiceNumber: (result as any).invoiceNumber || undefined,
+      paymentId: paymentId || helcimTxId,
+      transactionId: helcimTxId,
+      invoiceNumber: invoiceNumber,
       status: (result as any).status || 'pending'
     });
   } catch (error: any) {
@@ -919,14 +966,21 @@ router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
       throw new Error('Storage not available');
     }
 
-    // Update payment with terminal details
+    // Update payment with terminal details - ALWAYS store the Helcim transaction ID
     const updatedPayment = await storage.updatePayment(parseInt(paymentId), {
       status: 'completed',
-      helcimPaymentId: transactionId,
+      helcimPaymentId: transactionId || paymentId, // Always store the Helcim ID
       tipAmount: tipAmount || 0,
       totalAmount: totalAmount || baseAmount,
       processedAt: new Date(),
-      notes: cardLast4 ? `Terminal payment - Card ending in ${cardLast4}` : 'Terminal payment completed'
+      notes: JSON.stringify({
+        helcimTransactionId: transactionId,
+        invoiceNumber: `INV${String(paymentId).padStart(6, '0')}`,
+        cardLast4: cardLast4 || null,
+        terminalPayment: true,
+        verified: true,
+        processedAt: new Date().toISOString()
+      })
     });
 
     // Update appointment payment status
@@ -936,28 +990,94 @@ router.post('/complete/:appointmentId/:paymentId', async (req, res) => {
       totalAmount: totalAmount || baseAmount
     });
 
-    // Create sales history record for reports
+    // Import the createSalesHistoryRecord function to properly record the sale
+    // This needs to be imported at the top of the file, but for now we'll create the record properly
     const appointment = await storage.getAppointment(parseInt(appointmentId));
-    if (appointment) {
-      const salesData = {
-        appointmentId: parseInt(appointmentId),
-        clientId: appointment.clientId,
-        staffId: appointment.staffId,
-        serviceId: appointment.serviceId,
-        amount: baseAmount || (totalAmount && tipAmount ? totalAmount - tipAmount : totalAmount),
-        tipAmount: tipAmount || 0,
-        totalAmount: totalAmount || baseAmount,
-        paymentMethod: 'terminal',
-        transactionId: transactionId,
-        date: new Date(),
-      };
-
-      // Try to create sales history record
+    if (appointment && updatedPayment) {
       try {
-        await storage.createSalesHistory(salesData);
-        console.log('📊 Sales history record created for terminal payment');
+        // Get staff and client info for the sales record
+        let staffInfo = null;
+        let clientInfo = null;
+        let serviceInfo = null;
+        
+        if (appointment.staffId) {
+          try {
+            const staffData = await storage.getStaff(appointment.staffId);
+            if (staffData && staffData.userId) {
+              const staffUser = await storage.getUser(staffData.userId);
+              if (staffUser) {
+                staffInfo = { id: staffData.id, user: staffUser };
+              }
+            }
+          } catch (e) {
+            console.log('Error getting staff info:', e);
+          }
+        }
+        
+        if (appointment.clientId) {
+          try {
+            clientInfo = await storage.getUser(appointment.clientId);
+          } catch (e) {
+            console.log('Error getting client info:', e);
+          }
+        }
+        
+        if (appointment.serviceId) {
+          try {
+            serviceInfo = await storage.getService(appointment.serviceId);
+          } catch (e) {
+            console.log('Error getting service info:', e);
+          }
+        }
+        
+        const now = new Date();
+        const salesHistoryData = {
+          transactionType: 'appointment',
+          transactionDate: now,
+          paymentId: updatedPayment.id,
+          totalAmount: totalAmount || baseAmount || 0,
+          paymentMethod: 'terminal',
+          paymentStatus: 'completed',
+          
+          // Client information
+          clientId: clientInfo?.id || null,
+          clientName: clientInfo ? `${clientInfo.firstName || ''} ${clientInfo.lastName || ''}`.trim() : null,
+          clientEmail: clientInfo?.email || null,
+          clientPhone: clientInfo?.phone || null,
+          
+          // Staff information
+          staffId: staffInfo?.id || appointment.staffId || null,
+          staffName: staffInfo?.user ? `${staffInfo.user.firstName || ''} ${staffInfo.user.lastName || ''}`.trim() : null,
+          
+          // Appointment and service information
+          appointmentId: parseInt(appointmentId),
+          serviceIds: serviceInfo ? JSON.stringify([serviceInfo.id]) : null,
+          serviceNames: serviceInfo ? JSON.stringify([serviceInfo.name]) : null,
+          serviceTotalAmount: baseAmount || (totalAmount && tipAmount ? totalAmount - tipAmount : totalAmount),
+          
+          // Business date info
+          businessDate: now.toISOString().split('T')[0],
+          dayOfWeek: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][now.getDay()],
+          monthYear: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
+          quarter: `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`,
+          
+          // External tracking
+          helcimPaymentId: transactionId || null,
+          
+          // Tax and fees - CRITICALLY IMPORTANT FOR TIPS
+          taxAmount: 0,
+          tipAmount: tipAmount || 0,
+          discountAmount: 0,
+          
+          // Audit trail
+          createdBy: null,
+          notes: cardLast4 ? `Terminal payment - Card ending in ${cardLast4}` : 'Terminal payment completed'
+        };
+        
+        await storage.createSalesHistory(salesHistoryData);
+        console.log('📊 Sales history record created with tip:', { appointmentId, tipAmount });
       } catch (e) {
-        console.log('Sales history creation skipped:', e);
+        console.error('❌ Error creating sales history:', e);
       }
     }
 

@@ -626,6 +626,9 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
         );
         
         // Check if the appointment time falls within any blocked schedule
+        const appointmentStart = new Date(startTime);
+        const appointmentEnd = new Date(endTime);
+        
         for (const blockedSchedule of blockedSchedules) {
           const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
           const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
@@ -637,7 +640,7 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
           blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
           
           // Check if the new appointment overlaps with the blocked time
-          if (newStart < blockEnd && newEnd > blockStart) {
+          if (appointmentStart < blockEnd && appointmentEnd > blockStart) {
             return res.status(409).json({ 
               error: "Blocked Time Slot",
               message: "The requested time slot is blocked and unavailable for appointments",
@@ -674,8 +677,15 @@ export function registerExternalRoutes(app: Express, storage: IStorage) {
         totalAmount,
         externalId: externalAppointmentId || null
       };
+      
+      // Add booking method for external API bookings
+      const enrichedAppointmentData = {
+        ...appointmentData,
+        bookingMethod: 'external',
+        createdBy: null // External API bookings don't have a staff creator
+      };
 
-      const newAppointment = await storage.createAppointment(appointmentData);
+      const newAppointment = await storage.createAppointment(enrichedAppointmentData);
       
       // Create notification for new appointment
       try {

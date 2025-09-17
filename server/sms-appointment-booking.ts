@@ -496,8 +496,15 @@ export class SMSAppointmentBookingService {
         totalAmount: selectedSlot.servicePrice
       };
 
+      // Add booking method for SMS bookings
+      const enrichedAppointmentData = {
+        ...appointmentData,
+        bookingMethod: 'sms',
+        createdBy: null // SMS bookings don't have a staff creator
+      };
+      
       // Create the appointment
-      const appointment = await this.storage.createAppointment(appointmentData);
+      const appointment = await this.storage.createAppointment(enrichedAppointmentData);
 
       return {
         success: true,

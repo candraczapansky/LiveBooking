@@ -128,6 +128,13 @@ const AppointmentsTable = () => {
                           <Badge className={getStatusBadgeStyle(appointment.status)}>
                             {appointment.status}
                           </Badge>
+                          {appointment.bookingMethod && appointment.bookingMethod !== 'staff' && (
+                            <Badge variant="outline" className="text-xs">
+                              {appointment.bookingMethod === 'online' && '🌐 Online'}
+                              {appointment.bookingMethod === 'sms' && '💬 SMS'}
+                              {appointment.bookingMethod === 'external' && '🔗 External'}
+                            </Badge>
+                          )}
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {staff?.firstName} {staff?.lastName}
@@ -151,6 +158,7 @@ const AppointmentsTable = () => {
               <TableHead>Client</TableHead>
               <TableHead>Service</TableHead>
               <TableHead>Staff</TableHead>
+              <TableHead>Booking</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -196,9 +204,40 @@ const AppointmentsTable = () => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className={getStatusBadgeStyle(appointment.paymentStatus || 'pending')}>
-                      {appointment.paymentStatus || 'pending'}
-                    </Badge>
+                    <div className="text-xs">
+                      {appointment.bookingMethod === 'online' && (
+                        <Badge variant="outline" className="text-xs">🌐 Online</Badge>
+                      )}
+                      {appointment.bookingMethod === 'sms' && (
+                        <Badge variant="outline" className="text-xs">💬 SMS</Badge>
+                      )}
+                      {appointment.bookingMethod === 'external' && (
+                        <Badge variant="outline" className="text-xs">🔗 External</Badge>
+                      )}
+                      {(!appointment.bookingMethod || appointment.bookingMethod === 'staff') && (
+                        <span className="text-gray-500 dark:text-gray-400">Staff</span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-1">
+                      <Badge className={getStatusBadgeStyle(appointment.paymentStatus || 'pending')}>
+                        {appointment.paymentStatus || 'pending'}
+                      </Badge>
+                      {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && appointment.paymentDetails && (
+                        <span className="text-xs text-gray-600 dark:text-gray-400">
+                          {appointment.paymentDetails.method === 'cash' && 'Cash'}
+                          {appointment.paymentDetails.method === 'card' && appointment.paymentDetails.cardLast4 && `Card ****${appointment.paymentDetails.cardLast4}`}
+                          {appointment.paymentDetails.method === 'card' && !appointment.paymentDetails.cardLast4 && 'Card (Unverified)'}
+                          {appointment.paymentDetails.method === 'terminal' && appointment.paymentDetails.cardLast4 && `Terminal ****${appointment.paymentDetails.cardLast4}`}
+                          {appointment.paymentDetails.method === 'terminal' && !appointment.paymentDetails.cardLast4 && 'Terminal (Unverified)'}
+                          {appointment.paymentDetails.method === 'gift_card' && 'Gift Card'}
+                          {!appointment.paymentDetails && appointment.paymentStatus === 'paid' && (
+                            <span className="text-orange-600 dark:text-orange-400 font-medium">⚠️ Unverified</span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm">

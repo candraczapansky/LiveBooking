@@ -267,10 +267,11 @@ export default function AppointmentCheckout({
         paymentStatus: 'paid',
         totalAmount: finalAmount,
         paymentMethod: 'card',
-        paymentReference: paymentData.paymentId
+        paymentReference: paymentData.paymentId,
+        paymentDate: new Date()
       });
 
-      // Create payment record
+      // Create payment record with card details if available
       await apiRequest("POST", "/api/payments", {
         clientId: appointment.clientId,
         appointmentId: appointment.id,
@@ -282,6 +283,7 @@ export default function AppointmentCheckout({
         type: 'appointment',
         description: `Card payment for ${appointment.serviceName} appointment`,
         helcimPaymentId: paymentData.paymentId,
+        cardLast4: paymentData.cardLast4 || null,
         paymentDate: new Date(),
         products: selectedProducts.length > 0 ? selectedProducts : undefined,
         productTaxAmount: productTaxAmount,

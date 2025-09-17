@@ -251,6 +251,18 @@ const AppointmentDetails = ({
     enabled: !!staff?.userId
   });
 
+  // Fetch the user who created the appointment (if booked by staff)
+  const { data: createdByUser } = useQuery({
+    queryKey: ['/api/users', appointment?.createdBy],
+    queryFn: async () => {
+      if (!appointment?.createdBy) return null;
+      const response = await fetch(`/api/users/${appointment.createdBy}`);
+      if (!response.ok) throw new Error('Failed to fetch creator user');
+      return response.json();
+    },
+    enabled: !!appointment?.createdBy
+  });
+
   // Fetch saved payment methods for the client
   const { data: savedPaymentMethods } = useQuery({
     queryKey: ['/api/saved-payment-methods', appointment?.clientId],
@@ -765,7 +777,7 @@ const AppointmentDetails = ({
         paymentReference: paymentData.paymentId
       });
       
-      // Create payment record
+      // Create payment record with card details
       await apiRequest('POST', '/api/payments', {
         appointmentId: appointment?.id,
         clientId: appointment?.clientId,
@@ -777,7 +789,8 @@ const AppointmentDetails = ({
         type: 'appointment',
         description: `Card payment for ${service?.name || 'Appointment'}`,
         helcimPaymentId: paymentData.paymentId,
-        transactionId: paymentData.transactionId
+        transactionId: paymentData.transactionId,
+        cardLast4: paymentData.cardLast4 || paymentMethod.cardLast4 || null
       });
       
       // Dismiss loading toast and show success
@@ -1131,6 +1144,22 @@ const AppointmentDetails = ({
             <Badge className={getPaymentStatusColor(appointment.paymentStatus || 'unpaid')}>
               {(appointment.paymentStatus || 'unpaid').charAt(0).toUpperCase() + (appointment.paymentStatus || 'unpaid').slice(1)}
             </Badge>
+            {appointment.status === 'completed' && appointment.paymentStatus === 'paid' && appointment.paymentDetails && (
+              <Badge variant="outline" className="text-green-600 border-green-600">
+                {appointment.paymentDetails.method === 'cash' && 'Paid with Cash'}
+                {appointment.paymentDetails.method === 'card' && appointment.paymentDetails.cardLast4 && `Card ****${appointment.paymentDetails.cardLast4}`}
+                {appointment.paymentDetails.method === 'card' && !appointment.paymentDetails.cardLast4 && 'Paid with Card'}
+                {appointment.paymentDetails.method === 'terminal' && appointment.paymentDetails.cardLast4 && `Terminal ****${appointment.paymentDetails.cardLast4}`}
+                {appointment.paymentDetails.method === 'terminal' && !appointment.paymentDetails.cardLast4 && 'Terminal Payment'}
+                {appointment.paymentDetails.method === 'gift_card' && appointment.paymentDetails.giftCardNumber && `Gift Card ${appointment.paymentDetails.giftCardNumber}`}
+                {appointment.paymentDetails.method === 'gift_card' && !appointment.paymentDetails.giftCardNumber && 'Gift Card'}
+                {appointment.paymentDetails.processedAt && ` at ${new Date(appointment.paymentDetails.processedAt).toLocaleTimeString('en-US', { 
+                  hour: 'numeric', 
+                  minute: '2-digit',
+                  hour12: true 
+                })}`}
+              </Badge>
+            )}
           </div>
 
           {/* Time and Date */}
@@ -1173,6 +1202,27 @@ const AppointmentDetails = ({
                     </p>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       {staffUser ? `${staffUser.firstName} ${staffUser.lastName}` : (staff?.user ? `${staff.user.firstName} ${staff.user.lastName}` : 'Unknown Staff')}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <FileText className="h-5 w-5 text-gray-500" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      Booking Method
+                    </p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {appointment.bookingMethod === 'online' && 'Online Booking'}
+                      {appointment.bookingMethod === 'sms' && 'SMS Booking'}
+                      {appointment.bookingMethod === 'external' && 'External System'}
+                      {appointment.bookingMethod === 'staff' && createdByUser && (
+                        <>Booked by {createdByUser.firstName} {createdByUser.lastName}</>
+                      )}
+                      {appointment.bookingMethod === 'staff' && !createdByUser && appointment.createdBy && (
+                        <>Booked by Staff</>
+                      )}
+                      {appointment.bookingMethod === 'staff' && !appointment.createdBy && 'Booked by Staff'}
+                      {!appointment.bookingMethod && 'Staff Booking'}
                     </p>
                   </div>
                 </div>

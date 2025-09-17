@@ -37,6 +37,8 @@ import { z } from "zod";
 // import { apiRequest } from "@/lib/queryClient";
 import TwoFactorSetupModal from "@/components/TwoFactorSetupModal";
 import TwoFactorDisableModal from "@/components/TwoFactorDisableModal";
+import VerifyHelcimPayments from "@/components/payments/verify-helcim-payments";
+import MatchHelcimPayments from "@/components/payments/match-helcim-payments";
 
 import timeZones from "@/lib/timezones"; // We'll add a list of IANA timezones
 import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
@@ -597,6 +599,24 @@ export default function Settings() {
                 >
                   Business
                 </TabsTrigger>
+            <TabsTrigger 
+              value="payment-verification"
+              className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+              style={{ 
+                color: customColor
+              } as React.CSSProperties}
+            >
+              Payment Verification
+            </TabsTrigger>
+            <TabsTrigger 
+              value="payment-matching"
+              className="bg-white dark:bg-gray-800 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:border-2 data-[state=active]:border-current data-[state=active]:text-current hover:bg-white dark:hover:bg-gray-800 hover:!bg-white dark:hover:!bg-gray-800"
+              style={{ 
+                color: customColor
+              } as React.CSSProperties}
+            >
+              Payment Matching
+            </TabsTrigger>
 
               </TabsList>
 
@@ -1267,6 +1287,14 @@ export default function Settings() {
                 </Card>
               </TabsContent>
 
+              {/* Payment Verification Tab */}
+          <TabsContent value="payment-verification" className="space-y-6">
+            <VerifyHelcimPayments />
+          </TabsContent>
+          
+          <TabsContent value="payment-matching" className="space-y-6">
+            <MatchHelcimPayments />
+          </TabsContent>
 
             </Tabs>
           </div>

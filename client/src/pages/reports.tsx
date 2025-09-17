@@ -602,19 +602,34 @@ const AppointmentsReport = ({ timePeriod, customStartDate, customEndDate }: {
                       {getStaffName(apt.staffId)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        apt.status === 'completed' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                          : apt.status === 'no_show'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-                          : apt.status === 'cancelled'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                      }`}>
-                        {apt.status === 'completed' ? 'Completed' : 
-                         apt.status === 'no_show' ? 'No-Show' : 
-                         apt.status === 'cancelled' ? 'Cancelled' : apt.status}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                          apt.status === 'completed' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
+                            : apt.status === 'no_show'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                            : apt.status === 'cancelled'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
+                        }`}>
+                          {apt.status === 'completed' ? 'Completed' : 
+                           apt.status === 'no_show' ? 'No-Show' : 
+                           apt.status === 'cancelled' ? 'Cancelled' : apt.status}
+                        </span>
+                        {apt.status === 'completed' && apt.paymentStatus === 'paid' && apt.paymentDetails && (
+                          <span className="text-xs text-gray-600 dark:text-gray-400">
+                            {apt.paymentDetails.method === 'cash' && 'Cash'}
+                            {apt.paymentDetails.method === 'card' && apt.paymentDetails.cardLast4 && `****${apt.paymentDetails.cardLast4}`}
+                            {apt.paymentDetails.method === 'card' && !apt.paymentDetails.cardLast4 && '⚠️ Unverified'}
+                            {apt.paymentDetails.method === 'terminal' && apt.paymentDetails.cardLast4 && `****${apt.paymentDetails.cardLast4}`}
+                            {apt.paymentDetails.method === 'terminal' && !apt.paymentDetails.cardLast4 && '⚠️ Unverified'}
+                            {apt.paymentDetails.method === 'gift_card' && 'Gift Card'}
+                          </span>
+                        )}
+                        {apt.status === 'completed' && apt.paymentStatus === 'paid' && !apt.paymentDetails && (
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-semibold">⚠️ Unverified</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100">
                       {apt.status === 'completed' ? formatPrice(apt.totalAmount || 0) : '-'}
@@ -682,6 +697,8 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
 }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [editingHelcimId, setEditingHelcimId] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState<string>("");
   const itemsPerPage = 50; // Show 50 transactions per page
   
   const { data: salesHistory = [], isLoading, refetch } = useQuery({ 
@@ -713,12 +730,10 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
     refetchOnMount: true,
     staleTime: 0,
   });
-  // Fetch appointments (optionally filtered by location) to support location-based sales filtering
-  const appointmentsUrl = selectedLocation && selectedLocation !== 'all'
-    ? `/api/appointments?locationId=${selectedLocation}`
-    : '/api/appointments';
+  // Fetch ALL appointments (without location filter) to support proper location-based sales filtering
+  // We need all appointments to determine which location each sale belongs to
   const { data: appointments = [], isLoading: appointmentsLoading } = useQuery({
-    queryKey: [appointmentsUrl],
+    queryKey: ['/api/appointments'],
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
@@ -731,14 +746,15 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
   const isSingleDay = timePeriod === 'day' || timePeriod === 'yesterday';
   const targetUtcDay = new Date(Date.UTC(normalizedStart.getFullYear(), normalizedStart.getMonth(), normalizedStart.getDate())).toISOString().slice(0, 10);
   
-  // Build a quick lookup of appointments that are both completed and paid
+  // Build a quick lookup of appointments that are paid (regardless of status)
+  // We only care if they're paid, not their completion status
   const paidAppointmentIdSet = new Set(
     (appointments as any[])
-      .filter((a: any) => String((a.status || '').toLowerCase()) === 'completed' && String((a.paymentStatus || a.payment_status || '').toLowerCase()) === 'paid')
+      .filter((a: any) => String((a.paymentStatus || a.payment_status || '').toLowerCase()) === 'paid')
       .map((a: any) => a.id)
   );
 
-  // Filter sales by date range, completed payment status, appointment paid/completed (for services), and location
+  // Filter sales by date range, completed payment status, and location
   const filteredSales = (salesHistory as any[]).filter((sale: any) => {
     const saleDate = new Date(sale.transactionDate || sale.transaction_date);
     const dateFilterPrimary = saleDate >= normalizedStart && saleDate <= normalizedEnd;
@@ -757,7 +773,9 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
     const statusFilter = (sale.paymentStatus === "completed" || sale.payment_status === "completed");
     const txType = sale.transactionType || sale.transaction_type;
     const apptId = sale.appointmentId || sale.appointment_id;
-    const appointmentPaidOk = txType === 'appointment' ? (apptId ? paidAppointmentIdSet.has(apptId) : false) : true;
+    // For appointment sales, we trust sales_history records - they're only created when payment is completed
+    // We don't need to double-check the appointment status since sales_history is the source of truth
+    const appointmentPaidOk = true; // Trust sales_history records
     
     // Location filtering - for appointment sales, check the appointment's location
     let locationFilter = true;
@@ -833,10 +851,17 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
 
   const combinedSales = [...(filteredSales || []), ...(paymentFallbackRecords || [])];
 
+  // Sort combined sales in chronological order (oldest to newest)
+  const sortedSales = [...combinedSales].sort((a, b) => {
+    const dateA = new Date(a.transactionDate || a.transaction_date);
+    const dateB = new Date(b.transactionDate || b.transaction_date);
+    return dateA.getTime() - dateB.getTime();
+  });
+
   // Apply search filter
   const searchFilteredSales = searchTerm.trim() === "" 
-    ? combinedSales 
-    : combinedSales.filter((sale: any) => {
+    ? sortedSales 
+    : sortedSales.filter((sale: any) => {
         const searchLower = searchTerm.toLowerCase();
         
         // Search in multiple fields
@@ -1307,13 +1332,16 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                     Method
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Card
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Helcim ID
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                 {(paginatedSales || []).map((sale: any, index: number) => (
-                  <tr key={sale.id} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
+                  <tr key={sale.id || `sale-${index}`} className={index % 2 === 0 ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-800'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                       <div>
                         <div className="font-medium">
@@ -1324,32 +1352,11 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                           })}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {(() => {
-                            const date = new Date(sale.transactionDate || sale.transaction_date);
-                            const hours = date.getUTCHours();
-                            const minutes = date.getUTCMinutes();
-                            const seconds = date.getUTCSeconds();
-                            
-                            // Check if time is midnight UTC (imported data without time)
-                            // or if it's a Helcim imported transaction
-                            if ((hours === 0 && minutes === 0 && seconds === 0) || 
-                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('POS-')) ||
-                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('INV')) ||
-                                (sale.helcimPaymentId && sale.helcimPaymentId.startsWith('APT-'))) {
-                              return <span className="italic">Time not recorded</span>;
-                            }
-                            
-                            return (
-                              <span className="font-mono">
-                                {date.toLocaleTimeString('en-US', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  second: '2-digit',
-                                  hour12: true
-                                })}
-                              </span>
-                            );
-                          })()}
+                          {new Date(sale.transactionDate || sale.transaction_date).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
                         </div>
                       </div>
                     </td>
@@ -1388,16 +1395,140 @@ const SalesReport = ({ timePeriod, customStartDate, customEndDate, selectedLocat
                       {formatPrice(sale.tipAmount || sale.tip_amount || 0)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {sale.paymentMethod || 'N/A'}
+                      {(() => {
+                        const method = sale.paymentMethod || sale.payment_method || 'card';
+                        const notes = sale.notes || '';
+                        
+                        // Check if this was auto-completed without payment
+                        if (method.toUpperCase() === 'AUTO-COMPLETED' || notes.includes('AUTO-COMPLETED')) {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-bold bg-red-600 text-white animate-pulse">
+                              ⚠️ NO PAYMENT
+                            </span>
+                          );
+                        }
+                        
+                        // Check if this is a legitimate payment
+                        if (notes.includes('LEGITIMATE PAYMENT')) {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-600 text-white">
+                              ✅ Card Paid
+                            </span>
+                          );
+                        }
+                        
+                        // Extract card last 4 from notes if available
+                        const cardMatch = notes.match(/Card ending in (\d{4})/);
+                        
+                        if (method.toLowerCase() === 'cash') {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                              💵 Cash
+                            </span>
+                          );
+                        } else if (method.toLowerCase() === 'check') {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                              📝 Check
+                            </span>
+                          );
+                        } else if (cardMatch && cardMatch[1]) {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                              💳 Card ****{cardMatch[1]}
+                            </span>
+                          );
+                        } else if (method.toLowerCase() === 'card' || method.toLowerCase() === 'terminal') {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+                              💳 Card
+                            </span>
+                          );
+                        } else {
+                          return (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300">
+                              {method}
+                            </span>
+                          );
+                        }
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                      {sale.helcimPaymentId || sale.helcim_payment_id ? (
-                        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
-                          {sale.helcimPaymentId || sale.helcim_payment_id}
+                      {sale.card_last4 || sale.cardLast4 ? (
+                        <span className="font-mono text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                          ****{sale.card_last4 || sale.cardLast4}
                         </span>
+                      ) : sale.paymentMethod === 'cash' ? (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">Cash</span>
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
                       )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                      <div className="flex items-center gap-2">
+                        {editingHelcimId === sale.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editingValue}
+                              onChange={(e) => setEditingValue(e.target.value)}
+                              className="font-mono text-xs px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 w-32"
+                              placeholder="Helcim ID"
+                              autoFocus
+                            />
+                            <button
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(`/api/sales-history/${sale.id}/helcim`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ helcimPaymentId: editingValue || null })
+                                  });
+                                  if (response.ok) {
+                                    await refetch();
+                                    setEditingHelcimId(null);
+                                  }
+                                } catch (error) {
+                                  console.error('Failed to update:', error);
+                                }
+                              }}
+                              className="text-green-600 hover:text-green-700"
+                              title="Save"
+                            >
+                              ✓
+                            </button>
+                            <button
+                              onClick={() => setEditingHelcimId(null)}
+                              className="text-red-600 hover:text-red-700"
+                              title="Cancel"
+                            >
+                              ✗
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            {sale.helcimPaymentId || sale.helcim_payment_id ? (
+                              <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">
+                                {sale.helcimPaymentId || sale.helcim_payment_id}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                            {sale.id && (
+                              <button
+                                onClick={() => {
+                                  setEditingHelcimId(sale.id);
+                                  setEditingValue(sale.helcimPaymentId || sale.helcim_payment_id || '');
+                                }}
+                                className="text-gray-400 hover:text-gray-600 text-xs"
+                                title="Edit"
+                              >
+                                ✏️
+                              </button>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

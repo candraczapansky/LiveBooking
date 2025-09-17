@@ -646,35 +646,12 @@ export class HelcimTerminalService {
         type: payload?.type
       });
       
-      // Be more permissive with status detection
-      // DEFAULT TO COMPLETED for cardTransaction type webhooks
+      // CRITICAL FIX: Be conservative with status detection
+      // DEFAULT TO PENDING to prevent auto-completion of failed transactions
       let normalized: 'completed' | 'failed' | 'pending' = 'pending';
       
-      // IMPORTANT: Helcim typically only sends webhooks for successful transactions
-      // We should default to 'completed' for cardTransaction webhooks unless explicitly failed
-      
-      // First check for explicitly failed/declined status
+      // Check for EXPLICIT success indicators FIRST
       if (
-        rawStatus.includes('declined') || 
-        rawStatus.includes('failed') || 
-        rawStatus.includes('canceled') || 
-        rawStatus.includes('cancelled') ||
-        rawStatus.includes('voided') ||
-        rawStatus.includes('refunded') ||
-        rawStatus.includes('error') ||
-        payload?.approved === false ||
-        payload?.approved === 'false' ||
-        payload?.approved === 0 ||
-        payload?.approved === '0' ||
-        payload?.status === 'failed' ||
-        payload?.status === 'cancelled' ||
-        payload?.status === 'declined'
-      ) {
-        console.log('❌ Payment declined/failed status detected in webhook');
-        normalized = 'failed';
-      } 
-      // Check for explicit success indicators
-      else if (
         rawStatus.includes('approved') || 
         rawStatus.includes('success') || 
         rawStatus.includes('completed') || 
@@ -688,19 +665,41 @@ export class HelcimTerminalService {
         payload?.status === 'completed' ||
         payload?.status === 'approved'
       ) {
-        console.log('✅ Payment approved/completed status detected in webhook');
+        console.log('✅ Payment EXPLICITLY approved/completed in webhook');
         normalized = 'completed';
+      } 
+      // Check for failure indicators
+      else if (
+        rawStatus.includes('declined') || 
+        rawStatus.includes('failed') || 
+        rawStatus.includes('canceled') || 
+        rawStatus.includes('cancelled') ||
+        rawStatus.includes('voided') ||
+        rawStatus.includes('refunded') ||
+        rawStatus.includes('error') ||
+        rawStatus.includes('rejected') ||
+        rawStatus.includes('insufficient') ||
+        payload?.approved === false ||
+        payload?.approved === 'false' ||
+        payload?.approved === 0 ||
+        payload?.approved === '0' ||
+        payload?.status === 'failed' ||
+        payload?.status === 'cancelled' ||
+        payload?.status === 'declined'
+      ) {
+        console.log('❌ Payment declined/failed status detected in webhook');
+        normalized = 'failed';
       }
-      // For cardTransaction type with no clear status, DEFAULT TO COMPLETED
-      else if (payload?.type === 'cardTransaction' && transactionId) {
-        // Helcim generally only sends webhooks for successful transactions
-        // If there's no explicit failure indicator, treat it as successful
-        console.log('✅ CardTransaction webhook without explicit status - treating as successful (Helcim default behavior)');
-        normalized = 'completed';
-      }
-      // Only remain pending if we truly can't determine the type
-      else if (!payload?.type) {
-        console.log('⚠️ Webhook without type field, keeping as pending');
+      // NO CLEAR STATUS - keep as pending (DO NOT auto-complete!)
+      else {
+        console.log('⚠️ Webhook status unclear - keeping as PENDING to prevent auto-completion');
+        console.log('   Cannot determine status from:', {
+          approved: payload?.approved,
+          status: payload?.status,
+          type: payload?.type,
+          rawStatus
+        });
+        // DO NOT default to completed for any webhook type!
       }
       
       console.log('✅ Webhook normalized status:', normalized);
@@ -819,7 +818,20 @@ export class HelcimTerminalService {
             if (session && session.baseAmount && totalAmount) {
               baseAmount = session.baseAmount;
               tipAmount = Number((totalAmount - baseAmount).toFixed(2));
-              console.log('💰 Calculated tip from session:', { baseAmount, tipAmount, totalAmount });
+              console.log('💰 TIP CALCULATION FROM SESSION - ENRICHED:', { 
+                baseAmount, 
+                tipAmount, 
+                totalAmount,
+                sessionKey,
+                transactionId 
+              });
+            } else {
+              console.log('⚠️ Unable to calculate tip - missing data:', {
+                hasSession: !!session,
+                sessionBaseAmount: session?.baseAmount,
+                totalAmount,
+                sessionKey
+              });
             }
             
             if (inv) invoiceNumber = String(inv);
@@ -900,10 +912,22 @@ export class HelcimTerminalService {
         payload.baseAmount = baseAmount;
         payload.tipAmount = tipAmount;
         
-        console.log('💰 Calculated tip from session (no enrichment):', { 
+        console.log('💰 TIP CALCULATION FROM SESSION - NO ENRICHMENT:', { 
           baseAmount, 
           tipAmount, 
-          totalAmount 
+          totalAmount,
+          sessionKey: sessionKey || 'unknown',
+          invoiceNumber,
+          transactionId
+        });
+      } else if (!payload?.tipAmount) {
+        console.log('⚠️ NO TIP CALCULATED - Missing required data:', {
+          hasTipInPayload: !!payload?.tipAmount,
+          hasSession: !!session,
+          sessionBaseAmount: session?.baseAmount,
+          payloadAmount: payload?.amount,
+          invoiceNumber,
+          transactionId
         });
       }
       
@@ -1030,15 +1054,16 @@ export class HelcimTerminalService {
       try {
         const fallbackTransactionId = payload?.transactionId || payload?.id;
         if (fallbackTransactionId) {
+          // DO NOT default to completed - use pending to prevent auto-completion
           const fallbackCache = {
-            status: 'completed' as const, // Default to completed for cardTransaction
+            status: 'pending' as const, // SAFE DEFAULT - don't assume success on error
             transactionId: fallbackTransactionId,
             updatedAt: Date.now(),
           };
           
           // Cache by transaction ID
           webhookStore.set(String(fallbackTransactionId), fallbackCache);
-          console.log('🆘 Emergency cache: Stored webhook despite error');
+          console.log('🆘 Emergency cache: Stored webhook as PENDING due to error');
           
           // Also try to cache under recent POS sessions
           const now = Date.now();
@@ -1047,7 +1072,7 @@ export class HelcimTerminalService {
               const age = now - value.startedAt;
               if (age <= 10 * 60 * 1000) {
                 webhookStore.set(key, fallbackCache);
-                console.log(`🆘 Emergency cache: Also cached under ${key}`);
+                console.log(`🆘 Emergency cache: Also cached as PENDING under ${key}`);
               }
             }
           });
