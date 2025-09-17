@@ -1973,24 +1973,52 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         // Clean up the To number - remove spaces and ensure proper format
         let dialNumber = To?.toString().trim();
         
-        // If number doesn't start with +, add US country code
+        // Remove any spaces, dashes, parentheses from the number
+        dialNumber = dialNumber.replace(/[\s\-\(\)]/g, '');
+        
+        // IMPORTANT: Force US format to prevent international routing
         if (dialNumber && !dialNumber.startsWith('+')) {
-          if (dialNumber.startsWith('1')) {
+          // Remove any leading zeros (international format)
+          dialNumber = dialNumber.replace(/^0+/, '');
+          
+          if (dialNumber.startsWith('1') && dialNumber.length === 11) {
+            // US number with country code (1XXXXXXXXXX)
             dialNumber = `+${dialNumber}`;
           } else if (dialNumber.length === 10) {
-            // US number without country code
+            // US number without country code (XXXXXXXXXX)
             dialNumber = `+1${dialNumber}`;
+          } else if (dialNumber.length === 7) {
+            // Local number - add US area code (you may need to change this)
+            dialNumber = `+1918${dialNumber}`; // Using 918 area code as default
           } else {
-            dialNumber = `+${dialNumber}`;
+            // For any other format, assume US and prepend +1
+            console.log('⚠️ Unusual number format:', dialNumber, 'Length:', dialNumber.length);
+            if (!dialNumber.startsWith('1')) {
+              dialNumber = `+1${dialNumber}`;
+            } else {
+              dialNumber = `+${dialNumber}`;
+            }
           }
         }
         
-        console.log('📞 Dialing number:', dialNumber);
+        console.log('📞 Original To number:', To);
+        console.log('📞 Formatted dial number:', dialNumber);
+        console.log('📞 Number length:', dialNumber?.length);
         
         // Outbound call from Yealink - connect the call
         // IMPORTANT: This MUST be your actual Twilio phone number or a verified caller ID
         // Check your Twilio console for your actual number
-        const twilioPhone = process.env.TWILIO_PHONE_NUMBER || '+19187277348';
+        let twilioPhone = process.env.TWILIO_PHONE_NUMBER || '+19187277348';
+        
+        // Clean up the phone number format - remove spaces, parentheses, dashes
+        // Convert (918) 727-7348 to +19187277348
+        if (twilioPhone && !twilioPhone.startsWith('+')) {
+          twilioPhone = twilioPhone.replace(/\D/g, ''); // Remove all non-digits
+          if (!twilioPhone.startsWith('1')) {
+            twilioPhone = '1' + twilioPhone; // Add country code if missing
+          }
+          twilioPhone = '+' + twilioPhone; // Add plus sign
+        }
         
         console.log('📞 Using caller ID:', twilioPhone);
         
