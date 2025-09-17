@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Edit, X, Save, MessageSquare, Calendar, Clock, User, Scissors, CheckCircle, AlertCircle, XCircle, DollarSign, CreditCard, Gift, FileText, Mail, UserCog, Settings, Camera, ShoppingCart, Search, Loader2 } from "lucide-react";
 import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
@@ -1313,12 +1313,14 @@ const AppointmentDetails = ({
 
           {/* Client Information */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                  <User className="h-5 w-5 text-gray-500" />
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Client</h3>
-                </div>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5" />
+                Client
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-end mb-4">
                 {client && (
                   <Button
                     variant="outline"
@@ -1366,12 +1368,14 @@ const AppointmentDetails = ({
 
           {/* Service Information */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <div className="flex items-center gap-3">
-                  <Scissors className="h-5 w-5 text-gray-500" />
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Service</h3>
-                </div>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scissors className="h-5 w-5" />
+                Service
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-end mb-4">
                 {service && (
                   <Button
                     variant="outline"
@@ -1410,11 +1414,13 @@ const AppointmentDetails = ({
           {/* Add-Ons (if any) */}
           {Array.isArray((appointment as any)?.addOns) && (appointment as any).addOns.length > 0 && (
             <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3 mb-2">
-                  <Scissors className="h-5 w-5 text-gray-500" />
-                  <h3 className="font-medium text-gray-900 dark:text-gray-100">Add-Ons</h3>
-                </div>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Scissors className="h-5 w-5" />
+                  Add-Ons
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
                 <div className="space-y-1">
                   {(appointment as any).addOns.map((ao: any) => (
                     <div key={ao.id} className="text-sm text-gray-700 dark:text-gray-300">
@@ -1432,11 +1438,13 @@ const AppointmentDetails = ({
 
           {/* Payment Information */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-4">
-                <DollarSign className="h-5 w-5 text-gray-500" />
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Payment</h3>
-              </div>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Payment
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-2">
                 <p className="text-sm">
                   <span className="font-medium">Total Amount:</span> {formatPrice(getAppointmentTotalAmount())}
@@ -1906,29 +1914,32 @@ const AppointmentDetails = ({
 
           {/* Notes (read-only) */}
           <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                <h3 className="font-medium text-gray-900 dark:text-gray-100">Notes</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsNotesOpen(true)}
-                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                    <span className="whitespace-nowrap">Note History</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsFormsOpen(true)}
-                    className="flex items-center justify-center gap-2 w-full sm:w-auto"
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span className="whitespace-nowrap">Client Forms</span>
-                  </Button>
-                </div>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                Notes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-end gap-2 mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsNotesOpen(true)}
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Note History</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsFormsOpen(true)}
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Client Forms</span>
+                </Button>
               </div>
               <div>
                 {appointment.notes ? (
@@ -1942,11 +1953,13 @@ const AppointmentDetails = ({
 
           {/* Treatment Photos (standalone section) */}
           <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Treatment Photos
+              </CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-2 mb-2">
-                <Camera className="h-4 w-4" />
-                <span className="text-sm font-medium">Treatment Photos</span>
-              </div>
               {appointmentId && (
                 <AppointmentPhotos appointmentId={appointmentId!} onPhotosUpdated={() => {}} />
               )}

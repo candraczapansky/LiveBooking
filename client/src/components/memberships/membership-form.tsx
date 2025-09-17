@@ -5,7 +5,7 @@ import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { ChevronsUpDown, X } from "lucide-react";
+import { ChevronsUpDown, X, Search } from "lucide-react";
 
 import {
   Dialog,
@@ -54,6 +54,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
   const [isLoading, setIsLoading] = useState(false);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
   const [selectedServices, setSelectedServices] = useState<number[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Fetch available services
@@ -68,6 +69,11 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
     },
     enabled: open,
   });
+
+  // Filter services based on search query
+  const filteredServices = services.filter((service: any) =>
+    service.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const form = useForm<MembershipFormValues>({
     resolver: zodResolver(membershipFormSchema),
@@ -96,6 +102,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
       });
       setSelectedServices([]);
       setServicesDropdownOpen(false);
+      setSearchQuery("");
     }
   }, [open, form]);
 
@@ -104,6 +111,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setServicesDropdownOpen(false);
+        setSearchQuery("");
       }
     };
 
@@ -237,9 +245,9 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
           </DialogDescription>
         </DialogHeader>
 
-        <div className="max-h-[calc(90vh-200px)] overflow-y-auto pr-2">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="max-h-[calc(80vh-200px)] overflow-y-auto pr-2 space-y-4">
               <FormField
                 control={form.control}
                 name="name"
@@ -350,7 +358,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
                   Select which services members can use with their credits
                 </FormDescription>
                 
-                {/* Services Dropdown with fixed positioning */}
+                {/* Services Dropdown with inline dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <Button
                     type="button"
@@ -366,25 +374,42 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
 
-                  {/* Dropdown positioned to not affect container height */}
+                  {/* Dropdown appears directly below button */}
                   {servicesDropdownOpen && (
                     <div 
                       className="absolute z-[200] mt-1 w-full rounded-md border bg-white dark:bg-gray-950 shadow-lg"
                       style={{ 
-                        maxHeight: '240px'
+                        top: '100%',
+                        left: 0,
+                        right: 0,
                       }}
                     >
-                      <div className="max-h-[230px] overflow-y-auto p-1">
+                      {/* Search Bar */}
+                      <div className="p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Search services..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-8"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Services List */}
+                      <div className="max-h-[200px] overflow-y-auto p-1">
                         {servicesLoading ? (
                           <div className="p-2 text-center text-sm text-gray-500">
                             Loading services...
                           </div>
-                        ) : services.length === 0 ? (
+                        ) : filteredServices.length === 0 ? (
                           <div className="p-2 text-center text-sm text-gray-500">
-                            No services available
+                            {searchQuery ? 'No services found' : 'No services available'}
                           </div>
                         ) : (
-                          services.map((service: any) => (
+                          filteredServices.map((service: any) => (
                             <div
                               key={service.id}
                               className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded cursor-pointer"
@@ -414,7 +439,7 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
 
                 {/* Selected Services Badges */}
                 {selectedServices.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1">
                     {selectedServices.map(serviceId => (
                       <Badge key={serviceId} variant="secondary" className="pr-1">
                         {getServiceName(serviceId)}
@@ -430,25 +455,25 @@ const MembershipForm = ({ open, onOpenChange, membershipId }: MembershipFormProp
                   </div>
                 )}
               </div>
-            </form>
-          </Form>
-        </div>
+            </div>
 
-        <DialogFooter className="mt-6">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={form.handleSubmit(onSubmit)}
-            disabled={isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending}
-          >
-            {isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending
-              ? "Saving..."
-              : membershipId
-              ? "Update Membership"
-              : "Create Membership"}
-          </Button>
-        </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit"
+                disabled={isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending}
+              >
+                {isLoading || createMembershipMutation.isPending || updateMembershipMutation.isPending
+                  ? "Saving..."
+                  : membershipId
+                  ? "Update Membership"
+                  : "Create Membership"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
