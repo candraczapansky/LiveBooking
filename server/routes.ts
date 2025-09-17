@@ -1905,7 +1905,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   app.get('/api/webhook/voice', (req: Request, res: Response) => {
     const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
     const message = twilioPhone 
-      ? `Voice webhook is active. Caller ID is set to: ${twilioPhone}`
+      ? `Voice webhook is active. Caller ID is set to: ${twilioPhone}. Updated: ${new Date().toISOString()}`
       : 'Voice webhook is active. WARNING: No TWILIO_PHONE_NUMBER env variable set!';
     res.send(message);
   });
