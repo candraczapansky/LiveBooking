@@ -1931,12 +1931,28 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // Simple test endpoint - just tries to dial a number
   app.post('/api/webhook/voice/simple', (req: Request, res: Response) => {
     console.log('📞 Simple webhook called with:', req.body);
-    const { To } = req.body;
+    let { To } = req.body;
+    
+    // Clean up the number and ensure it has + prefix
+    if (To) {
+      To = To.toString().replace(/[\s\-\(\)]/g, ''); // Remove spaces, dashes, parens
+      if (!To.startsWith('+')) {
+        if (To.length === 10) {
+          To = '+1' + To; // US number without country code
+        } else if (To.length === 11 && To.startsWith('1')) {
+          To = '+' + To; // US number with country code
+        } else {
+          To = '+' + To; // Add + to whatever was dialed
+        }
+      }
+    }
+    
+    console.log('📞 Simple endpoint dialing:', To);
     
     // Very simple TwiML - NO caller ID specified
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
-        <Say>Testing without caller ID.</Say>
+        <Say>Connecting your call.</Say>
         <Dial>${To || '+19185551234'}</Dial>
       </Response>`;
     
