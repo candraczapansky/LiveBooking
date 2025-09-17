@@ -54,6 +54,7 @@ const AppointmentsPage = () => {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [checkoutAppointment, setCheckoutAppointment] = useState<any>(null);
+  const [checkoutAppointmentId, setCheckoutAppointmentId] = useState<number | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -1075,9 +1076,11 @@ const AppointmentsPage = () => {
   };
 
   const handlePaymentSuccess = () => {
-    // Leave the checkout overlay open so the success confirmation stays visible
-    // Only refresh appointments data
-    refetch();
+    // DO NOT REFRESH DATA HERE - this causes the component to unmount
+    // The user must manually close the success dialog first
+    console.log("[AppointmentsPage] Payment success - keeping dialog open");
+    // DO NOT call refetch() here - it causes the component to unmount
+    // Refresh will happen when user closes the dialog
   };
 
 
@@ -2332,6 +2335,7 @@ const AppointmentsPage = () => {
                               try {
                                 if (!ctxAppointment?.id) return;
                                 setCheckoutAppointment(ctxAppointment);
+                                setCheckoutAppointmentId(ctxAppointment.id);
                                 setIsCheckoutOpen(true);
                                 setCtxMenuOpen(false);
                               } catch {}
@@ -2799,11 +2803,18 @@ const AppointmentsPage = () => {
 
       {/* Checkout Component */}
       <Suspense fallback={null}>
-        {checkoutAppointment && (
+        {isCheckoutOpen && checkoutAppointment && (
           <AppointmentCheckout
             appointment={checkoutAppointment}
-            isOpen={isCheckoutOpen}
-            onClose={() => setIsCheckoutOpen(false)}
+            isOpen={true}
+            onClose={() => {
+              console.log("[AppointmentsPage] Closing checkout dialog and refreshing data");
+              setIsCheckoutOpen(false);
+              setCheckoutAppointment(null);
+              setCheckoutAppointmentId(null);
+              // Refresh data after closing
+              refetch();
+            }}
             onSuccess={handlePaymentSuccess}
           />
         )}

@@ -13,6 +13,7 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PageWrapper } from "@/components/layout/PageWrapper";
 import { GlobalErrorBoundary } from "@/components/error-boundary";
 import ProtectedRoute from "@/components/permissions/ProtectedRoute";
+import { GlobalPaymentSuccess } from "@/components/global-payment-success";
 
 // Lazy load components
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -371,6 +372,7 @@ export default function App() {
                   <MainLayout>
                     <Router />
                     <Toaster />
+                    <GlobalPaymentSuccess />
                   </MainLayout>
                 </SidebarProvider>
               </LocationProvider>

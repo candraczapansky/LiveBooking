@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { format } from "date-fns";
 import { HelcimPayModal } from "../payment/helcim-pay-modal";
 import { SaveCardModal } from "../payment/save-card-modal";
 import { useBusinessSettings } from "@/contexts/BusinessSettingsContext";
+import { paymentSuccessStore } from "@/lib/payment-success-store";
 
 interface AppointmentDetails {
   id: number;
@@ -61,7 +62,6 @@ export default function AppointmentCheckout({
   onSuccess 
 }: AppointmentCheckoutProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("cash");
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [showHelcimPayModal, setShowHelcimPayModal] = useState(false);
@@ -71,6 +71,7 @@ export default function AppointmentCheckout({
   const [productSearchQuery, setProductSearchQuery] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
   const { businessSettings } = useBusinessSettings();
   
   // Debug log to verify component is loading with latest code
@@ -229,17 +230,24 @@ export default function AppointmentCheckout({
           description: `Appointment for ${appointment.serviceName} has been marked as completed.`,
         });
 
-        // Invalidate related data so payroll/report pages reflect immediately
-        queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
-        queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
-        queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
+        // Don't invalidate queries immediately - wait until dialog closes
+        // This prevents the component from unmounting when data refreshes
+        // queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+        // queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+        // queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+        // queryClient.invalidateQueries({ queryKey: ['payroll-history'] });
+        // queryClient.invalidateQueries({ queryKey: ['/api/sales-history'] });
+        // queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
 
-        setIsSuccess(true);
-        // Notify parent that payment succeeded for any external updates
-        try { onSuccess(); } catch {}
+        // Show global success modal
+        paymentSuccessStore.show(finalAmount);
+        console.log("[AppointmentCheckout] PAYMENT SUCCESS - Showing GLOBAL success modal");
+        setIsProcessing(false);
+        
+        // Close the checkout dialog after a brief delay
+        setTimeout(() => {
+          onClose();
+        }, 500);
       } else {
         // Card payment - show HelcimPay modal
         setShowHelcimPayModal(true);
@@ -295,15 +303,24 @@ export default function AppointmentCheckout({
         description: `Payment of ${formatPrice(finalAmount)} has been processed.`,
       });
 
-      // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
-      queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
+      // Don't invalidate queries immediately - wait until dialog closes
+      // This prevents the component from unmounting when data refreshes
+      // queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+      // queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      // queryClient.invalidateQueries({ queryKey: ['staff-earnings'] });
+      // queryClient.invalidateQueries({ queryKey: ['/api/saved-payment-methods'] });
 
       setShowHelcimPayModal(false);
-      setIsSuccess(true);
-      try { onSuccess(); } catch {}
+      
+      // Show global success modal
+      paymentSuccessStore.show(finalAmount);
+      console.log("[AppointmentCheckout] CARD PAYMENT SUCCESS - Showing GLOBAL success modal");
+      setIsProcessing(false);
+      
+      // Close the checkout dialog after a brief delay
+      setTimeout(() => {
+        onClose();
+      }, 500);
     } catch (error) {
       console.error("[AppointmentCheckout] Error after payment:", error);
       toast({
@@ -326,8 +343,6 @@ export default function AppointmentCheckout({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 overflow-x-hidden">
-          {!isSuccess ? (
-            <>
               <div className="space-y-3">
                 <div className="flex items-center space-x-2">
                   <User className="h-4 w-4 text-gray-500" />
@@ -567,14 +582,14 @@ export default function AppointmentCheckout({
               </div>
 
               <div className="flex space-x-2 pt-2">
-                <Button
-                  variant="outline"
-                  onClick={onClose}
-                  className="flex-1"
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </Button>
+              <Button
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+                disabled={isProcessing}
+              >
+                Cancel
+              </Button>
                 <Button
                   onClick={handleCompleteAppointment}
                   className="flex-1"
@@ -583,17 +598,6 @@ export default function AppointmentCheckout({
                   {isProcessing ? "Processing..." : paymentMethod === "cash" ? "Complete (Cash)" : "Process Payment"}
                 </Button>
               </div>
-            </>
-          ) : (
-            <div className="text-center py-4">
-              <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Payment Successful</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                The appointment has been successfully marked as completed and paid.
-              </p>
-              <Button onClick={onClose} className="mt-2">Close</Button>
-            </div>
-          )}
         </CardContent>
       </Card>
 

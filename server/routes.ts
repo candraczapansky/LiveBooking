@@ -1899,5 +1899,57 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     }
   });
 
+  // Voice webhook handlers for Yealink phone integration
+  app.post('/webhook/voice', async (req: Request, res: Response) => {
+    try {
+      const { From, To, CallSid } = req.body;
+      
+      console.log('📞 Voice webhook called:', { From, To, CallSid });
+      
+      // Check if call is from SIP device (your Yealink phone)
+      if (From?.includes('sip:')) {
+        // Outbound call from Yealink - connect the call
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Say>Connecting your call.</Say>
+            <Dial callerId="${process.env.TWILIO_PHONE_NUMBER || '+19187277348'}">${To}</Dial>
+          </Response>`;
+        
+        res.set('Content-Type', 'text/xml');
+        return res.send(twiml);
+      } else {
+        // Inbound call - route to Yealink phone
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Say>Thank you for calling. Please hold while we connect you.</Say>
+            <Dial>
+              <Sip>sip:yealink1@glo-head-spa-phones.sip.twilio.com</Sip>
+            </Dial>
+          </Response>`;
+        
+        res.set('Content-Type', 'text/xml');
+        return res.send(twiml);
+      }
+    } catch (error) {
+      console.error('Error in voice webhook:', error);
+      res.set('Content-Type', 'text/xml');
+      res.send('<Response><Say>Sorry, an error occurred processing your call.</Say></Response>');
+    }
+  });
+
+  // Voice status webhook
+  app.post('/webhook/voice/status', async (req: Request, res: Response) => {
+    const { CallSid, CallStatus } = req.body;
+    console.log('📞 Call status update:', CallSid, CallStatus);
+    res.status(200).send('OK');
+  });
+
+  // Voice processing webhook (for speech/DTMF input if needed)
+  app.post('/webhook/voice/process', async (req: Request, res: Response) => {
+    console.log('📞 Voice processing:', req.body);
+    res.set('Content-Type', 'text/xml');
+    res.send('<Response><Say>Thank you.</Say></Response>');
+  });
+
   return server;
 }
