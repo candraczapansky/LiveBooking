@@ -1903,7 +1903,63 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   
   // Test endpoint to verify webhook is accessible
   app.get('/api/webhook/voice', (req: Request, res: Response) => {
-    res.send('Voice webhook is active and ready to receive POST requests from Twilio.');
+    const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+    const message = twilioPhone 
+      ? `Voice webhook is active. Caller ID is set to: ${twilioPhone}`
+      : 'Voice webhook is active. WARNING: No TWILIO_PHONE_NUMBER env variable set!';
+    res.send(message);
+  });
+
+  // Diagnostic endpoint to see what Twilio sends
+  app.post('/api/webhook/voice/debug', (req: Request, res: Response) => {
+    console.log('🔍 Debug webhook - Request body:', JSON.stringify(req.body, null, 2));
+    const { From, To, CallSid } = req.body;
+    
+    // Return TwiML that announces what was received
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say>Debug mode. From: ${From || 'unknown'}. To: ${To || 'unknown'}. Call ID: ${CallSid || 'unknown'}.</Say>
+        <Pause length="2"/>
+        <Say>Attempting to dial ${To || 'no number'}.</Say>
+        <Dial callerId="+19187277348">+19185551234</Dial>
+      </Response>`;
+    
+    res.set('Content-Type', 'text/xml');
+    res.send(twiml);
+  });
+
+  // Simple test endpoint - just tries to dial a number
+  app.post('/api/webhook/voice/simple', (req: Request, res: Response) => {
+    console.log('📞 Simple webhook called with:', req.body);
+    const { To } = req.body;
+    
+    // Very simple TwiML - NO caller ID specified
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say>Testing without caller ID.</Say>
+        <Dial>${To || '+19185551234'}</Dial>
+      </Response>`;
+    
+    res.set('Content-Type', 'text/xml');
+    res.send(twiml);
+  });
+
+  // Test endpoint that just plays a message (no dialing)
+  app.post('/api/webhook/voice/test-message', (req: Request, res: Response) => {
+    console.log('📞 Test message webhook called');
+    
+    // Just play a message, no dialing - this should always work
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say>This is a test message from your webhook. The webhook is working correctly.</Say>
+        <Pause length="2"/>
+        <Say>If you hear this message, the issue is with Twilio dialing, not the webhook.</Say>
+        <Pause length="2"/>
+        <Say>Check if you have a Twilio trial account that can only call verified numbers.</Say>
+      </Response>`;
+    
+    res.set('Content-Type', 'text/xml');
+    res.send(twiml);
   });
 
   app.post('/api/webhook/voice', async (req: Request, res: Response) => {
@@ -1914,11 +1970,53 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       
       // Check if call is from SIP device (your Yealink phone)
       if (From?.includes('sip:')) {
+        // Clean up the To number - remove spaces and ensure proper format
+        let dialNumber = To?.toString().trim();
+        
+        // If number doesn't start with +, add US country code
+        if (dialNumber && !dialNumber.startsWith('+')) {
+          if (dialNumber.startsWith('1')) {
+            dialNumber = `+${dialNumber}`;
+          } else if (dialNumber.length === 10) {
+            // US number without country code
+            dialNumber = `+1${dialNumber}`;
+          } else {
+            dialNumber = `+${dialNumber}`;
+          }
+        }
+        
+        console.log('📞 Dialing number:', dialNumber);
+        
         // Outbound call from Yealink - connect the call
+        // IMPORTANT: This MUST be your actual Twilio phone number or a verified caller ID
+        // Check your Twilio console for your actual number
+        const twilioPhone = process.env.TWILIO_PHONE_NUMBER || '+19187277348';
+        
+        console.log('📞 Using caller ID:', twilioPhone);
+        
+        // For SIP calls, we MUST use a valid Twilio number or verified caller ID
+        // If the env variable is not set, try without callerId (might work for some accounts)
+        let dialElement;
+        if (process.env.TWILIO_PHONE_NUMBER) {
+          // Use the configured caller ID
+          dialElement = `
+            <Dial callerId="${twilioPhone}">
+              <Number>${dialNumber}</Number>
+            </Dial>`;
+        } else {
+          // Try without caller ID - Twilio will use the default
+          console.log('⚠️ No TWILIO_PHONE_NUMBER env set, dialing without caller ID');
+          dialElement = `
+            <Dial>
+              <Number>${dialNumber}</Number>
+            </Dial>`;
+        }
+        
         const twiml = `<?xml version="1.0" encoding="UTF-8"?>
           <Response>
             <Say>Connecting your call.</Say>
-            <Dial callerId="${process.env.TWILIO_PHONE_NUMBER || '+19187277348'}">${To}</Dial>
+            ${dialElement}
+            <Say>The call could not be completed. Please check the number and try again.</Say>
           </Response>`;
         
         res.set('Content-Type', 'text/xml');
