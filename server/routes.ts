@@ -2305,16 +2305,14 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           <Say voice="alice">
             Hello! Thank you for calling Glo Head Spa. I'm your AI assistant and I'm here to help you today.
           </Say>
-          <Gather input="speech" timeout="3" speechTimeout="1" 
+          <Gather input="speech" timeout="10" speechTimeout="3" 
                   action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
                   method="POST">
             <Say voice="alice">
               Are you calling to book an appointment for one of our amazing head spa treatments, or do you have questions about our services?
             </Say>
           </Gather>
-          <Say voice="alice">
-            I didn't catch that. Let me help you book an appointment. Our signature head spa treatment is ninety nine dollars and includes a relaxing scalp massage and hair treatment. Would you like to schedule one?
-          </Say>
+          <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
         </Response>`;
       
       res.set('Content-Type', 'text/xml');
@@ -2360,14 +2358,12 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
       <Response>
-        <Gather input="speech" timeout="3" speechTimeout="1" 
+        <Say voice="alice">${responseText}</Say>
+        <Gather input="speech" timeout="10" speechTimeout="3" 
                 action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" method="POST">
-          <Say voice="alice">${responseText}</Say>
+          <Say voice="alice">Is there anything else I can help you with?</Say>
         </Gather>
-        <Say voice="alice">Is there anything else I can help you with today?</Say>
-        <Pause length="2"/>
-        <Say voice="alice">Thank you for calling Glo Head Spa. Have a wonderful day!</Say>
-        <Hangup/>
+        <Redirect>https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process</Redirect>
       </Response>`;
     
     res.set('Content-Type', 'text/xml');
