@@ -2335,24 +2335,43 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       const speech = SpeechResult.toLowerCase();
       console.log('🗣️ User said:', SpeechResult);
       
+      // Check for goodbye/end conversation
+      if (speech.includes('goodbye') || speech.includes('bye') || speech.includes('thank') || 
+          speech.includes('that\'s all') || speech.includes('no') && speech.includes('thanks')) {
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Say voice="alice">Thank you for calling Glo Head Spa! Have a wonderful day!</Say>
+            <Hangup/>
+          </Response>`;
+        res.set('Content-Type', 'text/xml');
+        return res.send(twiml);
+      }
+      
       // Generate appropriate response based on what they said
       if (speech.includes('book') || speech.includes('appointment') || speech.includes('schedule')) {
-        responseText = "I'd love to help you book a head spa treatment! We offer the Signature Head Spa for $99, " +
-                      "Deluxe for $160, or our Platinum experience for $220. Which one interests you?";
+        responseText = "I'd love to help you book a head spa treatment! We offer the Signature Head Spa for ninety nine dollars, " +
+                      "Deluxe for one sixty, or our Platinum experience for two twenty. Which one interests you?";
+      } else if (speech.includes('signature')) {
+        responseText = "Great choice! The Signature Head Spa is ninety nine dollars and includes sixty minutes of relaxation. " +
+                      "To complete your booking, please stay on the line and I'll transfer you to our booking system, " +
+                      "or you can call back during business hours. What day works best for you?";
+      } else if (speech.includes('yes') || speech.includes('yeah') || speech.includes('sure')) {
+        responseText = "Wonderful! Which service interests you? The Signature for ninety nine, Deluxe for one sixty, " +
+                      "or our Platinum experience for two twenty?";
       } else if (speech.includes('price') || speech.includes('cost') || speech.includes('how much')) {
-        responseText = "Our head spa treatments start at $99 for the Signature, $160 for Deluxe, " +
-                      "and $220 for our Platinum experience. We also offer facial treatments. " +
+        responseText = "Our head spa treatments start at ninety nine dollars for the Signature, one sixty for Deluxe, " +
+                      "and two twenty for our Platinum experience. We also offer facial treatments. " +
                       "Which service would you like to know more about?";
       } else if (speech.includes('hours') || speech.includes('open') || speech.includes('time')) {
-        responseText = "Glo Head Spa is open Monday through Saturday from 9AM to 7PM, " +
-                      "and Sundays from 10AM to 5PM. Would you like to schedule an appointment?";
+        responseText = "Glo Head Spa is open Monday through Saturday from nine AM to seven PM, " +
+                      "and Sundays from ten AM to five PM. Would you like to schedule an appointment?";
       } else if (speech.includes('what') && speech.includes('head spa')) {
         responseText = "A head spa is a relaxing Japanese scalp treatment that includes deep cleansing, " +
                       "massage, and hair treatment. It's amazing for relaxation and hair health! " +
-                      "Our treatments range from 60 to 120 minutes. Would you like to book one?";
+                      "Our treatments range from sixty to one twenty minutes. Would you like to book one?";
       } else {
-        responseText = "I'd be happy to help! You can book an appointment, ask about our services, " +
-                      "or learn about our head spa treatments. What would you like to know?";
+        responseText = "I'd be happy to help! You can ask about booking appointments, our services, " +
+                      "pricing, or business hours. What would you like to know?";
       }
     }
     
