@@ -2296,47 +2296,27 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     if (!DialCallStatus || (DialCallStatus !== 'completed' && DialCallStatus !== 'answered')) {
       console.log(`📞 Call not completed (status: ${DialCallStatus || 'immediate-failure'}), forwarding to AI...`);
       
-      try {
-        // Forward to Python AI responder
-        const pythonUrl = process.env.PYTHON_AI_URL || 'http://localhost:8000';
-        console.log(`📞 Forwarding to Python AI at: ${pythonUrl}/webhook/voice`);
-        
-        const response = await fetch(`${pythonUrl}/webhook/voice`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-                body: new URLSearchParams({
-                  CallSid: CallSid || '',
-                  From: From || '',
-                  To: To || '',
-                  CallStatus: 'ringing',
-                  AccountSid: req.body.AccountSid || 'AC2f2ec0300713e653facec924bfa07ba6'
-                })
-        });
-        
-        console.log(`📞 Python AI response status: ${response.status}`);
-        
-        if (response.ok) {
-          const twimlResponse = await response.text();
-          console.log('✅ Got TwiML from Python AI responder');
-          console.log('📞 AI TwiML (first 200 chars):', twimlResponse.substring(0, 200));
-          res.set('Content-Type', 'text/xml');
-          return res.send(twimlResponse);
-        } else {
-          console.error(`❌ Python AI returned status ${response.status}`);
-        }
-      } catch (error) {
-        console.error('❌ Error forwarding to Python AI:', error);
-      }
+      // Use built-in AI responder (Python service not accessible in deployed environment)
+      console.log('📞 Using built-in AI responder for unanswered call');
       
-      // Fallback if Python service is down
+      // Generate AI response directly
       const twiml = `<?xml version="1.0" encoding="UTF-8"?>
         <Response>
           <Say voice="alice">
-            Sorry, all our representatives are busy. Please try calling back later or leave a message.
+            Hello! Thank you for calling Glo Head Spa. I'm your AI assistant and I'm here to help you today.
+          </Say>
+          <Gather input="speech" timeout="3" speechTimeout="auto" 
+                  action="https://dev-booking-91625-candraczapansky.replit.app/api/webhook/voice/process" 
+                  method="POST">
+            <Say voice="alice">
+              Are you calling to book an appointment for one of our amazing head spa treatments, or do you have questions about our services?
+            </Say>
+          </Gather>
+          <Say voice="alice">
+            I didn't catch that. Let me help you book an appointment. Our signature head spa treatment is ninety nine dollars and includes a relaxing scalp massage and hair treatment. Would you like to schedule one?
           </Say>
         </Response>`;
+      
       res.set('Content-Type', 'text/xml');
       return res.send(twiml);
     } else {
