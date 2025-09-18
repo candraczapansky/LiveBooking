@@ -133,6 +133,9 @@ const AppointmentDetails = ({
   // Inline photo upload removed; handled by standalone AppointmentPhotos
   const [photoSectionNote, setPhotoSectionNote] = useState("");
   const [isSavingPhotoNote, setIsSavingPhotoNote] = useState(false);
+  
+  // Recurring appointment state
+  const [showRecurringOptions, setShowRecurringOptions] = useState(false);
 
   // Client edit form
   const editClientForm = useForm<ClientFormValues>({
@@ -192,6 +195,20 @@ const AppointmentDetails = ({
       return null;
     },
     enabled: open && !!appointmentId
+  });
+
+  // Fetch recurring appointments if this appointment is part of a series
+  const { data: recurringAppointments } = useQuery({
+    queryKey: ['/api/appointments/recurring', appointment?.recurringGroupId],
+    queryFn: async () => {
+      if (!appointment?.recurringGroupId) return null;
+      const res = await apiRequest("GET", `/api/appointments/recurring/${appointment.recurringGroupId}`);
+      if (res.ok) {
+        return res.json();
+      }
+      return null;
+    },
+    enabled: open && !!appointment?.recurringGroupId
   });
 
   // Fetch payments for this appointment to calculate amount paid
@@ -1310,6 +1327,129 @@ const AppointmentDetails = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Recurring Appointment Information */}
+          {appointment?.recurringGroupId && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5" />
+                    Recurring Appointment
+                  </span>
+                  <Badge variant="outline">
+                    {recurringAppointments?.length || 0} appointments in series
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    This appointment is part of a recurring series.
+                  </p>
+                  
+                  {recurringAppointments && recurringAppointments.length > 0 && (
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <p>
+                        Future appointments in series: {
+                          recurringAppointments.filter((apt: any) => 
+                            new Date(apt.startTime) > new Date() && 
+                            apt.status !== 'cancelled'
+                          ).length
+                        }
+                      </p>
+                      <p>
+                        Completed appointments: {
+                          recurringAppointments.filter((apt: any) => 
+                            apt.status === 'completed'
+                          ).length
+                        }
+                      </p>
+                    </div>
+                  )}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRecurringOptions(!showRecurringOptions)}
+                    className="w-full sm:w-auto"
+                  >
+                    <Settings className="mr-2 h-4 w-4" />
+                    Manage Recurring Series
+                  </Button>
+                  
+                  {showRecurringOptions && (
+                    <div className="mt-4 p-4 border rounded-lg space-y-3 bg-gray-50 dark:bg-gray-800">
+                      <h4 className="font-medium text-sm mb-2">Recurring Series Options</h4>
+                      
+                      <PermissionGuard permission="update_appointments">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            if (confirm("Edit all future appointments in this series? This will update service, staff, and notes for all future appointments.")) {
+                              if (onEdit && appointmentId) {
+                                onEdit(appointmentId);
+                                // Pass a flag to indicate editing all recurring appointments
+                                queryClient.setQueryData(['editRecurringMode'], true);
+                                queryClient.setQueryData(['recurringGroupId'], appointment.recurringGroupId);
+                              }
+                              onOpenChange(false);
+                            }
+                          }}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit All Future Appointments
+                        </Button>
+                      </PermissionGuard>
+                      
+                      <PermissionGuard permission="delete_appointments">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={async () => {
+                            if (confirm("Cancel all future appointments in this recurring series? This action cannot be undone.")) {
+                              try {
+                                const res = await apiRequest(
+                                  "PUT", 
+                                  `/api/appointments/recurring/${appointment.recurringGroupId}/cancel`
+                                );
+                                if (res.ok) {
+                                  const result = await res.json();
+                                  toast({
+                                    title: "Recurring appointments cancelled",
+                                    description: `${result.cancelledCount} future appointments have been cancelled.`
+                                  });
+                                  queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
+                                  onOpenChange(false);
+                                } else {
+                                  throw new Error('Failed to cancel recurring appointments');
+                                }
+                              } catch (error) {
+                                toast({
+                                  title: "Error",
+                                  description: "Failed to cancel recurring appointments. Please try again.",
+                                  variant: "destructive"
+                                });
+                              }
+                            }
+                          }}
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Cancel All Future Appointments
+                        </Button>
+                      </PermissionGuard>
+                      
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded">
+                        <AlertCircle className="h-3 w-3 inline mr-1" />
+                        Note: Changes will only affect future appointments that haven't been completed or individually modified.
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Client Information */}
           <Card>

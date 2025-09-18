@@ -477,6 +477,53 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       return isConflict;
     });
 
+    // Check for blocked schedules
+    const appointmentDate = new Date(appointmentData.startTime);
+    const dayName = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const dateString = appointmentDate.toISOString().slice(0, 10);
+    
+    const staffSchedules = await storage.getStaffSchedulesByStaffId(appointmentData.staffId);
+    const blockedSchedules = staffSchedules.filter((schedule: any) => 
+      schedule.dayOfWeek === dayName &&
+      schedule.startDate <= dateString &&
+      (!schedule.endDate || schedule.endDate >= dateString) &&
+      schedule.isBlocked
+    );
+    
+    // Check if the appointment time falls within any blocked schedule
+    const appointmentStart = new Date(appointmentData.startTime);
+    const appointmentEnd = new Date(appointmentData.endTime);
+    
+    for (const blockedSchedule of blockedSchedules) {
+      const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+      const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+      
+      const blockStart = new Date(appointmentDate);
+      blockStart.setHours(blockStartHour, blockStartMinute, 0, 0);
+      
+      const blockEnd = new Date(appointmentDate);
+      blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
+      
+      // Check if the new appointment overlaps with the blocked time
+      if (appointmentStart < blockEnd && appointmentEnd > blockStart) {
+        LoggerService.warn("Appointment time conflicts with blocked schedule", {
+          ...context,
+          blockedSchedule: {
+            startTime: blockedSchedule.startTime,
+            endTime: blockedSchedule.endTime,
+            dayOfWeek: blockedSchedule.dayOfWeek
+          },
+          newAppointment: {
+            startTime: appointmentData.startTime,
+            endTime: appointmentData.endTime,
+            staffId: appointmentData.staffId
+          }
+        });
+        
+        throw new ConflictError("The requested time slot is blocked and unavailable for appointments");
+      }
+    }
+
     // EMERGENCY OVERRIDE: Complete bypass of conflict checks for October 26th
     const appointmentDateStr = String(appointmentData.startTime).toLowerCase();
     
@@ -966,6 +1013,9 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
       recurringCount
     } = req.body;
 
+    // Generate a unique ID for this recurring group
+    const recurringGroupId = `recurring_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     console.log("🔄 RECURRING APPOINTMENTS CREATION STARTED:", {
       clientId,
       serviceId,
@@ -1013,7 +1063,8 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           status: status || "confirmed",
           paymentStatus: paymentStatus || "unpaid",
           notes: notes ? `${notes} (Recurring ${i + 1}/${recurringCount})` : `Recurring appointment ${i + 1}/${recurringCount}`,
-          totalAmount
+          totalAmount,
+          recurringGroupId // Link all appointments in this recurring series
         };
 
         // Validate appointment time conflicts (staff and rooms)
@@ -1375,6 +1426,46 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
           type: 'staff/location or room'
         });
         throw new ConflictError("Updated appointment time conflicts with existing appointments");
+      }
+
+      // Check for blocked schedules
+      const appointmentDate = new Date(effectiveStart);
+      const dayName = appointmentDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const dateString = appointmentDate.toISOString().slice(0, 10);
+      
+      const staffSchedules = await storage.getStaffSchedulesByStaffId(effectiveStaffId);
+      const blockedSchedules = staffSchedules.filter((schedule: any) => 
+        schedule.dayOfWeek === dayName &&
+        schedule.startDate <= dateString &&
+        (!schedule.endDate || schedule.endDate >= dateString) &&
+        schedule.isBlocked
+      );
+      
+      // Check if the appointment time falls within any blocked schedule
+      for (const blockedSchedule of blockedSchedules) {
+        const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+        const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+        
+        const blockStart = new Date(appointmentDate);
+        blockStart.setHours(blockStartHour, blockStartMinute, 0, 0);
+        
+        const blockEnd = new Date(appointmentDate);
+        blockEnd.setHours(blockEndHour, blockEndMinute, 0, 0);
+        
+        // Check if the updated appointment overlaps with the blocked time
+        if (effectiveStart < blockEnd && effectiveEnd > blockStart) {
+          LoggerService.warn("Appointment update conflicts with blocked schedule", {
+            ...context,
+            appointmentId,
+            blockedSchedule: {
+              startTime: blockedSchedule.startTime,
+              endTime: blockedSchedule.endTime,
+              dayOfWeek: blockedSchedule.dayOfWeek
+            }
+          });
+          
+          throw new ConflictError("The requested time slot is blocked and unavailable for appointments");
+        }
       }
     }
 
@@ -2204,5 +2295,183 @@ export function registerAppointmentRoutes(app: Express, storage: IStorage) {
         details: error instanceof Error ? error.message : String(error)
       });
     }
+  }));
+
+  // Get all appointments in a recurring group
+  app.get("/api/appointments/recurring/:groupId", asyncHandler(async (req: Request, res: Response) => {
+    const { groupId } = req.params;
+    const context = getLogContext(req);
+    
+    LoggerService.info("Fetching recurring appointments", { ...context, groupId });
+    
+    // Get all appointments with this recurringGroupId
+    const allAppointments = await storage.getAllAppointments();
+    const recurringAppointments = allAppointments.filter((apt: any) => 
+      apt.recurringGroupId === groupId
+    ).sort((a: any, b: any) => 
+      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+    );
+    
+    res.json(recurringAppointments);
+  }));
+
+  // Update all future appointments in a recurring group
+  app.put("/api/appointments/recurring/:groupId/all", asyncHandler(async (req: Request, res: Response) => {
+    const { groupId } = req.params;
+    const updateData = req.body;
+    const context = getLogContext(req);
+    
+    LoggerService.info("Updating all future recurring appointments", { ...context, groupId, updateData });
+    
+    // Get all appointments with this recurringGroupId
+    const allAppointments = await storage.getAllAppointments();
+    const now = new Date();
+    const futureAppointments = allAppointments.filter((apt: any) => 
+      apt.recurringGroupId === groupId &&
+      new Date(apt.startTime) > now &&
+      apt.status !== 'cancelled' &&
+      apt.status !== 'completed'
+    );
+    
+    const updatedAppointments = [];
+    const failedUpdates = [];
+    
+    // Update each future appointment
+    for (const appointment of futureAppointments) {
+      try {
+        await storage.updateAppointment(appointment.id, updateData);
+        updatedAppointments.push(appointment.id);
+        LoggerService.info("Updated recurring appointment", { 
+          ...context, 
+          appointmentId: appointment.id 
+        });
+      } catch (error) {
+        LoggerService.error("Failed to update recurring appointment", { 
+          ...context, 
+          appointmentId: appointment.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        failedUpdates.push({
+          appointmentId: appointment.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      updatedCount: updatedAppointments.length,
+      failedCount: failedUpdates.length,
+      updatedAppointmentIds: updatedAppointments,
+      failures: failedUpdates
+    });
+  }));
+
+  // Cancel all future appointments in a recurring group
+  app.put("/api/appointments/recurring/:groupId/cancel", asyncHandler(async (req: Request, res: Response) => {
+    const { groupId } = req.params;
+    const context = getLogContext(req);
+    
+    LoggerService.info("Cancelling all future recurring appointments", { ...context, groupId });
+    
+    // Get all appointments with this recurringGroupId
+    const allAppointments = await storage.getAllAppointments();
+    const now = new Date();
+    const futureAppointments = allAppointments.filter((apt: any) => 
+      apt.recurringGroupId === groupId &&
+      new Date(apt.startTime) > now &&
+      apt.status !== 'cancelled'
+    );
+    
+    const cancelledAppointments = [];
+    const failedCancellations = [];
+    
+    // Cancel each future appointment
+    for (const appointment of futureAppointments) {
+      try {
+        await storage.moveAppointmentToCancelled(
+          appointment.id,
+          'Recurring series cancelled'
+        );
+        
+        // Trigger cancellation automation
+        try {
+          await triggerCancellation(appointment as any, storage);
+          LoggerService.info("Cancellation automation triggered for recurring appointment", { 
+            ...context, 
+            appointmentId: appointment.id 
+          });
+        } catch (autoErr) {
+          LoggerService.error("Failed to trigger cancellation automation", { 
+            ...context, 
+            appointmentId: appointment.id 
+          }, autoErr as Error);
+        }
+        
+        cancelledAppointments.push(appointment.id);
+        LoggerService.info("Cancelled recurring appointment", { 
+          ...context, 
+          appointmentId: appointment.id 
+        });
+      } catch (error) {
+        LoggerService.error("Failed to cancel recurring appointment", { 
+          ...context, 
+          appointmentId: appointment.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        failedCancellations.push({
+          appointmentId: appointment.id,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      cancelledCount: cancelledAppointments.length,
+      failedCount: failedCancellations.length,
+      cancelledAppointmentIds: cancelledAppointments,
+      failures: failedCancellations
+    });
+  }));
+
+  // Edit a single appointment in a recurring series (break from series)
+  app.put("/api/appointments/recurring/:groupId/single/:appointmentId", asyncHandler(async (req: Request, res: Response) => {
+    const { groupId, appointmentId } = req.params;
+    const updateData = req.body;
+    const context = getLogContext(req);
+    
+    LoggerService.info("Updating single appointment in recurring series", { 
+      ...context, 
+      groupId, 
+      appointmentId, 
+      updateData 
+    });
+    
+    // Verify the appointment belongs to the recurring group
+    const appointment = await storage.getAppointment(parseInt(appointmentId));
+    if (!appointment) {
+      throw new NotFoundError("Appointment");
+    }
+    
+    if ((appointment as any).recurringGroupId !== groupId) {
+      throw new ValidationError("Appointment does not belong to this recurring group");
+    }
+    
+    // Remove the appointment from the recurring group if editing individually
+    const updatedData = {
+      ...updateData,
+      recurringGroupId: null, // Break from recurring series
+      notes: updateData.notes || (appointment as any).notes + " (Modified from recurring series)"
+    };
+    
+    const updatedAppointment = await storage.updateAppointment(parseInt(appointmentId), updatedData);
+    
+    LoggerService.info("Appointment removed from recurring series and updated", { 
+      ...context, 
+      appointmentId 
+    });
+    
+    res.json(updatedAppointment);
   }));
 } 

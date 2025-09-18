@@ -725,6 +725,28 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
           !schedule.isBlocked;
       });
 
+      // Also get blocked schedules for this staff member on this day
+      const blockedSchedules = (Array.isArray(schedules) ? (schedules as any[]) : []).filter((schedule: any) => {
+        const currentDateString = formatDateForComparison(selectedFormDate);
+        const startDateString = typeof schedule.startDate === 'string'
+          ? String(schedule.startDate).slice(0, 10)
+          : format(new Date(schedule.startDate), 'yyyy-MM-dd');
+        const endDateString = schedule.endDate
+          ? (typeof schedule.endDate === 'string'
+              ? String(schedule.endDate).slice(0, 10)
+              : format(new Date(schedule.endDate), 'yyyy-MM-dd'))
+          : null;
+
+        const scheduleDay = String(schedule.dayOfWeek || '').trim().toLowerCase();
+        const targetDay = String(dayName).trim().toLowerCase();
+
+        return Number(schedule.staffId) === Number(staffIdNum) &&
+          scheduleDay === targetDay &&
+          startDateString <= currentDateString &&
+          (!endDateString || endDateString >= currentDateString) &&
+          schedule.isBlocked === true;
+      });
+
       if (isDebugCase) {
         console.log('  - Staff schedules found:', staffSchedules.length);
       }
@@ -741,6 +763,22 @@ const BookingWidget = ({ open, onOpenChange, userId, overlayColor, variant = 'de
       // Require full containment within at least one schedule window
       const withinSchedule = staffSchedules.some((schedule: any) => isRangeWithinSchedule(slotStartMin, slotEndMin, schedule));
       if (!withinSchedule) return false;
+
+      // Check if the time slot conflicts with any blocked schedules
+      for (const blockedSchedule of blockedSchedules) {
+        const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+        const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+        const blockStartMin = blockStartHour * 60 + blockStartMinute;
+        const blockEndMin = blockEndHour * 60 + blockEndMinute;
+        
+        // Check if the slot overlaps with the blocked time
+        if (slotStartMin < blockEndMin && slotEndMin > blockStartMin) {
+          if (isDebugCase) {
+            console.log('  ❌ BLOCKED: Time slot conflicts with blocked schedule', blockedSchedule.id);
+          }
+          return false;
+        }
+      }
 
       // Get all appointments for this staff member
       const allStaffAppts = (Array.isArray(appointmentsForAvailability) ? (appointmentsForAvailability as any[]) : [])

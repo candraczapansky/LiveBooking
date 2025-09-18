@@ -174,6 +174,18 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
   const [debouncedClientSearch, setDebouncedClientSearch] = useState("");
   const [serviceComboboxOpen, setServiceComboboxOpen] = useState(false);
   const [showScheduleEdit, setShowScheduleEdit] = useState(false);
+  
+  // Check if we're editing recurring appointments
+  const editRecurringMode = queryClient.getQueryData(['editRecurringMode']) as boolean;
+  const recurringGroupId = queryClient.getQueryData(['recurringGroupId']) as string;
+  
+  // Clear recurring edit mode when dialog closes
+  useEffect(() => {
+    if (!open) {
+      queryClient.setQueryData(['editRecurringMode'], false);
+      queryClient.setQueryData(['recurringGroupId'], null);
+    }
+  }, [open, queryClient]);
 
   useEffect(() => {
     const handle = setTimeout(() => {
@@ -385,6 +397,25 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         !schedule.isBlocked;
     });
 
+    // Also get blocked schedules for this staff member on this day
+    const blockedSchedules = (schedules as any[]).filter((schedule: any) => {
+      const currentDateString = formatDateForComparison(selectedFormDate);
+      const startDateString = typeof schedule.startDate === 'string' 
+        ? schedule.startDate 
+        : new Date(schedule.startDate).toISOString().slice(0, 10);
+      const endDateString = schedule.endDate 
+        ? (typeof schedule.endDate === 'string' 
+          ? schedule.endDate 
+          : new Date(schedule.endDate).toISOString().slice(0, 10))
+        : null;
+      
+      return schedule.staffId === parseInt(selectedStaffId) && 
+        schedule.dayOfWeek === dayName &&
+        startDateString <= currentDateString &&
+        (!endDateString || endDateString >= currentDateString) &&
+        schedule.isBlocked === true;
+    });
+
     if (staffSchedules.length === 0) {
       return [];
     }
@@ -405,6 +436,35 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
         isTimeInRange(slot.value, schedule.startTime, schedule.endTime)
       );
       if (!isWithinSchedule) return false;
+
+      // Check if the time slot conflicts with any blocked schedules
+      const [slotHours, slotMinutes] = slot.value.split(':').map(Number);
+      for (const blockedSchedule of blockedSchedules) {
+        const [blockStartHour, blockStartMinute] = blockedSchedule.startTime.split(':').map(Number);
+        const [blockEndHour, blockEndMinute] = blockedSchedule.endTime.split(':').map(Number);
+        
+        const slotStartMin = slotHours * 60 + slotMinutes;
+        const blockStartMin = blockStartHour * 60 + blockStartMinute;
+        const blockEndMin = blockEndHour * 60 + blockEndMinute;
+        
+        // For the slot itself (without service duration), check if it starts within blocked time
+        if (slotStartMin >= blockStartMin && slotStartMin < blockEndMin) {
+          return false; // Slot starts within blocked time
+        }
+        
+        // If service is selected, check if the appointment would overlap with blocked time
+        if (selectedService) {
+          const totalDuration = selectedService.duration + 
+                               (selectedService.bufferTimeBefore || 0) + 
+                               (selectedService.bufferTimeAfter || 0);
+          const slotEndMin = slotStartMin + totalDuration;
+          
+          // Check if the appointment overlaps with the blocked time
+          if (slotStartMin < blockEndMin && slotEndMin > blockStartMin) {
+            return false; // Appointment would overlap with blocked time
+          }
+        }
+      }
 
       if (!selectedService) return true; // If no service selected, allow the slot
 
@@ -955,11 +1015,27 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
     mutationFn: async (values: AppointmentFormValues) => {
       console.log('Update mutation function called with:', values);
       console.log('Current appointmentId:', appointmentId);
+      console.log('Edit recurring mode:', editRecurringMode);
+      console.log('Recurring group ID:', recurringGroupId);
       
       if (!appointmentId || appointmentId <= 0) {
         throw new Error("No appointment ID provided");
       }
 
+      // If we're editing all recurring appointments
+      if (editRecurringMode && recurringGroupId) {
+        const updateData = {
+          staffId: parseInt(values.staffId),
+          serviceId: parseInt(values.serviceId),
+          clientId: parseInt(values.clientId),
+          notes: values.notes || null,
+          addOnServiceIds: values.addOnServiceId ? [parseInt(values.addOnServiceId)] : [],
+        };
+        
+        return apiRequest("PUT", `/api/appointments/recurring/${recurringGroupId}/all`, updateData);
+      }
+
+      // Regular single appointment update
       // Validate that time is selected
       if (!values.time || values.time.trim() === '') {
         throw new Error('Please select a time for the appointment');
@@ -1015,9 +1091,14 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
 
       return apiRequest("PUT", `/api/appointments/${appointmentId}`, appointmentData);
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/appointments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/appointments', appointmentId] });
+      
+      // Invalidate recurring appointments if we edited them
+      if (editRecurringMode && recurringGroupId) {
+        queryClient.invalidateQueries({ queryKey: ['/api/appointments/recurring', recurringGroupId] });
+      }
       
       // Invalidate location-specific queries
       if (selectedLocation?.id) {
@@ -1025,10 +1106,21 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
       }
       
       onOpenChange(false);
-      toast({
-        title: "Success",
-        description: "Appointment updated successfully.",
-      });
+      
+      // Show appropriate success message
+      if (editRecurringMode && response?.json) {
+        response.json().then((data: any) => {
+          toast({
+            title: "Success",
+            description: `Updated ${data.updatedCount || 0} future appointments in the series.`,
+          });
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Appointment updated successfully.",
+        });
+      }
     },
     onError: (error: any) => {
       const isConflict = error.response?.status === 409;
@@ -1159,6 +1251,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                 <DialogTitle>
                   {preSelectedStaffId && selectedSchedule 
                     ? "Appointment & Schedule Management" 
+                    : editRecurringMode
+                      ? "Edit Recurring Appointments"
                     : appointmentId && appointmentId > 0 
                       ? "Edit Appointment" 
                       : "Create Appointment"}
@@ -1166,6 +1260,8 @@ const AppointmentForm = ({ open, onOpenChange, appointmentId, selectedDate, sele
                 <DialogDescription className="mt-1">
                   {preSelectedStaffId && selectedSchedule
                     ? "Create an appointment or adjust the schedule for this time slot."
+                    : editRecurringMode
+                      ? "Changes will apply to all future appointments in this recurring series."
                     : appointmentId && appointmentId > 0 
                       ? "Update the appointment details below." 
                       : "Fill in the details to create a new appointment."}

@@ -271,6 +271,7 @@ export const appointments = pgTable("appointments", {
   notes: text("notes"),
   bookingMethod: text("booking_method").default("staff"), // How it was booked: staff, online, sms, external
   createdBy: integer("created_by"), // Staff user ID who created it
+  recurringGroupId: text("recurring_group_id"), // Links recurring appointments together
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -281,6 +282,7 @@ export const insertAppointmentSchema = createInsertSchema(appointments).omit({
   startTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   endTime: z.union([z.date(), z.string().transform((str) => new Date(str))]),
   addOnServiceIds: z.array(z.number()).optional(),
+  recurringGroupId: z.string().optional(),
 });
 
 // Classes schema
