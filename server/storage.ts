@@ -574,9 +574,11 @@ export class DatabaseStorage implements IStorage {
         await db.execute(sql`ALTER TABLE rooms ADD COLUMN IF NOT EXISTS location_id INTEGER`);
         // Ensure services table has room_id for room-capacity enforcement on services
         await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS room_id INTEGER`);
-        // Ensure services table has location_id to link services to a location
-        await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS location_id INTEGER`);
-        console.log('Ensured is_hidden column exists in services table');
+      // Ensure services table has location_id to link services to a location
+      await db.execute(sql`ALTER TABLE services ADD COLUMN IF NOT EXISTS location_id INTEGER`);
+      // Add recurringGroupId column for linking recurring appointments
+      await db.execute(sql`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS recurring_group_id TEXT`);
+      console.log('Ensured is_hidden column exists in services table');
         // Ensure add-on mapping container exists in system_config
         try {
           const existing: any = await db.execute(sql`SELECT 1 FROM system_config WHERE key = 'service_add_on_mapping' LIMIT 1`);

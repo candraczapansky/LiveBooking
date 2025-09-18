@@ -2032,6 +2032,9 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
     try {
       const { From, To, CallSid, Direction, CallDirection } = req.body;
       
+      // Add option to test AI directly with ?test_ai=true
+      const testAI = req.query.test_ai === 'true';
+      
       console.log('📞 Voice webhook called:', { From, To, CallSid, Direction, CallDirection });
       console.log('📞 Full request body:', JSON.stringify(req.body, null, 2));
       
@@ -2193,7 +2196,7 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
         return res.send(twiml);
       } else {
         // Inbound call - route to Yealink phone with AI fallback
-        const useAI = req.query.ai === 'true' || process.env.USE_AI_RESPONDER === 'true';
+        const useAI = testAI || req.query.ai === 'true' || process.env.USE_AI_RESPONDER === 'true';
         
         if (useAI) {
           // AI voice responder mode
@@ -2214,12 +2217,18 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
           return res.send(twiml);
         } else {
           // Normal mode - route to Yealink phone
+          // Use absolute URL for the no-answer webhook
+          const baseUrl = process.env.BASE_URL || 'https://dev-booking-91625-candraczapansky.replit.app';
+          const noAnswerUrl = `${baseUrl}/api/webhook/voice/no-answer`;
+          
           const twiml = `<?xml version="1.0" encoding="UTF-8"?>
             <Response>
-              <Say>Thank you for calling. Please hold while we connect you.</Say>
-              <Dial timeout="15" action="/api/webhook/voice/no-answer">
+              <Say>Thank you for calling Glo Head Spa. Connecting you now.</Say>
+              <Dial timeout="10" action="${noAnswerUrl}">
                 <Sip>sip:yealink1@glo-head-spa-phones.sip.twilio.com</Sip>
               </Dial>
+              <!-- Fallback if Dial fails immediately -->
+              <Redirect>${noAnswerUrl}</Redirect>
             </Response>`;
           res.set('Content-Type', 'text/xml');
           return res.send(twiml);
@@ -2229,6 +2238,40 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
       console.error('Error in voice webhook:', error);
       res.set('Content-Type', 'text/xml');
       res.send('<Response><Say>Sorry, an error occurred processing your call.</Say></Response>');
+    }
+  });
+
+  // Test AI responder directly
+  app.get('/api/webhook/voice/test-ai', async (req: Request, res: Response) => {
+    try {
+      console.log('🧪 Testing AI responder directly');
+      
+      // Call Python AI responder
+      const pythonUrl = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+      const response = await fetch(`${pythonUrl}/webhook/voice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          CallSid: 'TEST-' + Date.now(),
+          From: '+19185551234',
+          To: '+19187277348',
+          CallStatus: 'ringing',
+          AccountSid: 'TEST'
+        })
+      });
+      
+      if (response.ok) {
+        const twiml = await response.text();
+        res.set('Content-Type', 'text/xml');
+        res.send(twiml);
+      } else {
+        res.status(500).send('AI responder not available');
+      }
+    } catch (error) {
+      console.error('Test AI error:', error);
+      res.status(500).send('Error testing AI: ' + error);
     }
   });
 
@@ -2242,34 +2285,49 @@ export async function registerRoutes(app: Express, storage: IStorage, autoRenewa
   // No answer handler - when Yealink doesn't pick up
   app.post('/api/webhook/voice/no-answer', async (req: Request, res: Response) => {
     console.log('📞 Yealink did not answer, falling back to AI');
+    console.log('📞 No-answer webhook body:', JSON.stringify(req.body, null, 2));
     const { DialCallStatus, CallSid, From, To } = req.body;
     
-    if (DialCallStatus === 'no-answer' || DialCallStatus === 'busy' || DialCallStatus === 'failed') {
+    console.log(`📞 DialCallStatus: ${DialCallStatus}`);
+    
+    // Forward to AI if Yealink didn't complete the call successfully
+    // Note: 'completed' means someone answered and hung up normally
+    // If DialCallStatus is undefined, it means Redirect was triggered (immediate failure)
+    if (!DialCallStatus || (DialCallStatus !== 'completed' && DialCallStatus !== 'answered')) {
+      console.log(`📞 Call not completed (status: ${DialCallStatus || 'immediate-failure'}), forwarding to AI...`);
+      
       try {
         // Forward to Python AI responder
         const pythonUrl = process.env.PYTHON_AI_URL || 'http://localhost:8000';
+        console.log(`📞 Forwarding to Python AI at: ${pythonUrl}/webhook/voice`);
+        
         const response = await fetch(`${pythonUrl}/webhook/voice`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: new URLSearchParams({
-            CallSid: CallSid || '',
-            From: From || '',
-            To: To || '',
-            CallStatus: 'ringing',
-            AccountSid: req.body.AccountSid || ''
-          })
+                body: new URLSearchParams({
+                  CallSid: CallSid || '',
+                  From: From || '',
+                  To: To || '',
+                  CallStatus: 'ringing',
+                  AccountSid: req.body.AccountSid || 'AC2f2ec0300713e653facec924bfa07ba6'
+                })
         });
+        
+        console.log(`📞 Python AI response status: ${response.status}`);
         
         if (response.ok) {
           const twimlResponse = await response.text();
           console.log('✅ Got TwiML from Python AI responder');
+          console.log('📞 AI TwiML (first 200 chars):', twimlResponse.substring(0, 200));
           res.set('Content-Type', 'text/xml');
           return res.send(twimlResponse);
+        } else {
+          console.error(`❌ Python AI returned status ${response.status}`);
         }
       } catch (error) {
-        console.error('Error forwarding to Python AI:', error);
+        console.error('❌ Error forwarding to Python AI:', error);
       }
       
       // Fallback if Python service is down

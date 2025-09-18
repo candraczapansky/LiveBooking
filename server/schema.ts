@@ -177,6 +177,7 @@ export const appointments = pgTable("appointments", {
   notes: text("notes"),
   bookingMethod: text("booking_method").default("staff"), // How it was booked: staff, online, sms, external
   createdBy: integer("created_by").references(() => users.id), // Staff user ID who created it
+  recurringGroupId: text("recurring_group_id"), // Links recurring appointments together
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

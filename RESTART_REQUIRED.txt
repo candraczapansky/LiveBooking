@@ -1,0 +1,27 @@
+🚨 ACTION REQUIRED: RESTART YOUR APP
+=====================================
+
+The AI responder is READY but your Node.js app needs restart to activate it.
+
+STEP 1: Go to your Replit dashboard
+STEP 2: Click the "Stop" button (⏹️)
+STEP 3: Wait 2 seconds
+STEP 4: Click "Run" button (▶️)
+
+After restart, your phone system will work like this:
+- Someone calls → Yealink phone rings
+- Front desk has 10 seconds to answer
+- If no answer → AI automatically picks up
+- Front desk CAN STILL answer during those 10 seconds!
+
+TEST IT:
+1. Call your phone number
+2. DON'T answer the Yealink
+3. After 10 seconds, you'll hear: "Hello! Welcome to our salon..."
+
+The AI is currently running and healthy. Just needs the Node.js restart!
+
+
+
+
+
